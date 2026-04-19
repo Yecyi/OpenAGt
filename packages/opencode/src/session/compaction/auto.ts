@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { MessageV2 } from "../message-v2"
 import { Token } from "@/util"
 import { Log } from "@/util"
+import { calculateToolImportance, getContentPreservationWeight } from "./importance"
 
 const log = Log.create({ service: "compaction.auto" })
 
@@ -190,7 +191,11 @@ export function findToolPartsToCompact(
   messages: MessageV2.WithParts[],
   targetTokens: number,
 ): Array<MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }> {
-  const candidates: Array<{ part: MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }; age: number }> = []
+  const candidates: Array<{
+    part: MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }
+    age: number
+    priority: number
+  }> = []
 
   for (const msg of messages) {
     for (const part of msg.parts) {
@@ -201,23 +206,46 @@ export function findToolPartsToCompact(
       if (part.state.time.compacted) continue
 
       const age = Date.now() - (part.state.time.end ?? part.state.time.start)
-      candidates.push({ part: part as MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }, age })
+      const importance = calculateToolImportance(part.tool)
+      const contentWeight = getContentPreservationWeight(part.state.output ?? "")
+
+      // Calculate priority score:
+      // - Age is weighted logarithmically (older = higher priority to compress)
+      // - Tool importance reduces priority (high importance = lower compress priority)
+      // - Content weight increases priority (critical content = lower compress priority)
+      const ageWeight = Math.log2(age / (60 * 1000) + 1) // log of age in minutes + 1
+      const importanceFactor = Math.max(1, 11 - importance) // 10 = highest importance -> factor 1
+      const contentBonus = contentWeight > 0 ? contentWeight * 0.5 : 0
+
+      // Higher priority = better candidate for compression
+      const priority = ageWeight * importanceFactor + contentBonus
+
+      candidates.push({
+        part: part as MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted },
+        age,
+        priority,
+      })
     }
   }
 
-  // Sort by age (oldest first)
-  candidates.sort((a, b) => a.age - b.age)
+  // Sort by priority (highest priority first = best compression candidates)
+  candidates.sort((a, b) => b.priority - a.priority)
 
   const toCompact: Array<MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }> = []
   let saved = 0
 
-  for (const { part } of candidates) {
+  for (const { part, priority } of candidates) {
     if (saved >= targetTokens) break
     toCompact.push(part)
     saved += Token.estimate(part.state.output)
   }
 
-  log.info("auto-compact targets", { count: toCompact.length, estimatedTokens: saved, target: targetTokens })
+  log.info("auto-compact targets", {
+    count: toCompact.length,
+    estimatedTokens: saved,
+    target: targetTokens,
+    candidatesAnalyzed: candidates.length,
+  })
   return toCompact
 }
 

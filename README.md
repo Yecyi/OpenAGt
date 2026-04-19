@@ -1,14 +1,14 @@
 # OpenAG
 
-> An enhanced open-source AI coding agent built on [OpenCode](https://github.com/anomalyco/opencode), featuring advanced context compression, tool concurrency control, and Flutter-based mobile/desktop support.
+> An enhanced open-source AI coding agent built on [OpenAG](https://github.com/anomalyco/opencode), featuring advanced context compression, tool concurrency control, and Flutter-based mobile/desktop support.
 
 ---
 
 ## About OpenAG
 
-OpenAG is a research and development project that extends [OpenCode](https://opencode.ai) — the open-source AI coding agent — with enhanced algorithms, improved reliability, and native mobile application support.
+OpenAG is a research and development project that extends [OpenAG](https://opencode.ai) — the open-source AI coding agent — with enhanced algorithms, improved reliability, and native mobile application support.
 
-**Key Enhancements over OpenCode:**
+**Key Enhancements over OpenAG:**
 
 - **Three-Layer Progressive Compression** — Hierarchical context management inspired by Claude Code and Hermes Agent, reducing token usage by 40-55% while preserving critical information
 - **Tool Concurrency Partitioning** — Safe/unsafe tool batching for parallel execution, improving throughput by 2-3x
@@ -36,7 +36,7 @@ OpenAG builds upon OpenCode's client/server architecture:
                            │ HTTP + SSE/WebSocket
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  OpenCode Server (Hono + Effect Framework)              │
+│  OpenAG Server (Hono + Effect Framework)              │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
 │  │ Session  │ │   Tool   │ │Provider │ │Compaction│   │
 │  │ Manager  │ │ Registry │ │ Manager │ │ Engine   │   │
@@ -76,7 +76,7 @@ bun install
 bun run dev
 
 # In another terminal, start the TUI
-bun run opencode
+bun run openag
 ```
 
 ### Development
@@ -99,7 +99,7 @@ bun test packages/opencode
 ```
 openag/
 ├── packages/
-│   ├── opencode/          # Core agent engine (OpenCode base)
+│   ├── opencode/          # Core agent engine (OpenAG base)
 │   │   └── src/
 │   │       ├── session/   # Agent loop, compaction, messaging
 │   │       ├── tool/      # Tool registry, execution, partitioning
@@ -209,7 +209,7 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ## References
 
-- [OpenCode](https://opencode.ai) — Base project
+- [OpenAG](https://opencode.ai) — Base project
 - [Claude Code](https://claude.ai/code) — Reference implementation
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Reference implementation
 - [Vercel AI SDK](https://sdk.vercel.ai) — AI provider abstraction
@@ -217,4 +217,4 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ---
 
-**Note:** OpenAG is an independent research project. It is not affiliated with, endorsed by, or supported by Anthropic, OpenAI, or the OpenCode team.
+**Note:** OpenAG is an independent research project. It is not affiliated with, endorsed by, or supported by Anthropic, OpenAI, or the OpenAG team.

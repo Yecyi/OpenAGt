@@ -1,4 +1,4 @@
-# OpenAG 深度分析与发展建议报告
+<div align="center" style="width: 95%; max-width: 1400px; margin: 0 auto;"><font size="7">**OpenAG 深度分析与发展建议报告**</font></div>
 
 **基于 OpenAG vs Codex vs Hermes Agent 对比**
 

@@ -21,6 +21,8 @@ import { Effect, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
+import { commandClassifier } from "../security/command-classifier"
+
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
 const PS = new Set(["powershell", "pwsh"])
@@ -595,6 +597,31 @@ export const BashTool = Tool.define(
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
+
+              // Security check: classify command for dangerous patterns
+              const classification = commandClassifier.classify(params.command)
+              if (classification.riskLevel === "high") {
+                // High risk commands are blocked immediately
+                log.warn("high-risk command blocked", {
+                  riskLevel: classification.riskLevel,
+                  warnings: classification.warnings,
+                  matchedPatterns: classification.matchedPatterns,
+                })
+                const errorMsg = `Dangerous command blocked: ${classification.warnings.join("; ")}`
+                return {
+                  title: "Bash Command Blocked",
+                  metadata: { output: errorMsg, exit: null, description: params.description ?? "", truncated: false },
+                  output: errorMsg,
+                }
+              } else if (classification.riskLevel === "medium") {
+                // Medium risk commands get logged as warnings but proceed
+                // The permission system will handle the actual confirmation
+                log.warn("medium-risk command detected", {
+                  riskLevel: classification.riskLevel,
+                  warnings: classification.warnings,
+                })
+              }
+
               const timeout = params.timeout ?? DEFAULT_TIMEOUT
               const ps = PS.has(name)
               const root = yield* parse(params.command, ps)

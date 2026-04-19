@@ -19,6 +19,8 @@ import { isOverflow as overflow } from "./overflow"
 import { MICRO_COMPACT_TIME_THRESHOLD_MS, applyMicroCompact, summarizeToolResult } from "./compaction/micro"
 import { DEFAULT_AUTO_COMPACT_CONFIG, needsAutoCompact, findToolPartsToCompact } from "./compaction/auto"
 import { buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
+import { compactionCoordinator, needsCompaction, getRecommendedLayer } from "./compaction/coordinator"
+import { compressionTracker } from "./compaction/metrics"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -101,66 +103,62 @@ export const layer: Layer.Layer<
         .pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.succeed(undefined)))
       if (!msgs) return
 
-      // LAYER 1: MicroCompact - time-based compaction
-      // This runs first and is free (no LLM call)
-      let microCompacted = 0
-      for (const msg of msgs) {
-        const updatedParts = applyMicroCompact(msg.parts, {
-          timeThresholdMs: MICRO_COMPACT_TIME_THRESHOLD_MS,
-          preserveRecentN: 3,
-          compactableTools: new Set(["read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
-        })
-        for (let i = 0; i < msg.parts.length; i++) {
-          if (msg.parts[i] !== updatedParts[i]) {
-            microCompacted++
-            yield* session.updatePart(updatedParts[i])
-          }
-        }
-      }
-      if (microCompacted > 0) {
-        log.info("layer-1 micro-compacted", { count: microCompacted })
-      }
-
-      // Re-fetch messages after micro-compaction
-      const updatedMsgs = yield* session
-        .messages({ sessionID: input.sessionID })
-        .pipe(Effect.catchIf(NotFoundError.isInstance, () => Effect.succeed(undefined)))
-      if (!updatedMsgs) return
-
-      // LAYER 2: AutoCompact - token-based pruning
-      // Only runs if we're still approaching context limit after MicroCompact
-      const currentUser = updatedMsgs.findLast((item) => item.info.role === "user")
+      // Get model info for coordinator decision
+      const currentUser = msgs.findLast((item) => item.info.role === "user")
       if (!currentUser) return
       const currentUserInfo = currentUser.info as MessageV2.User
-      const model = yield* provider
+      const modelResult = yield* provider
         .getModel(currentUserInfo.model.providerID, currentUserInfo.model.modelID)
         .pipe(Effect.option)
-      if (Option.isNone(model)) return
-      const contextLimit = model.value.limit.context
+      if (Option.isNone(modelResult)) return
 
-      if (needsAutoCompact(updatedMsgs, contextLimit, DEFAULT_AUTO_COMPACT_CONFIG)) {
-        const targetTokens = Math.floor(contextLimit * 0.2)
-        const toCompact = findToolPartsToCompact(updatedMsgs, targetTokens)
+      // Use coordinator to decide which layer to run
+      const decision = compactionCoordinator.decide(msgs, modelResult.value)
+      log.info("compaction decision", { layer: decision.layer, reason: decision.reason })
 
-        let autoCompacted = 0
-        for (const part of toCompact) {
-          const summary = summarizeToolResult(part.state.output, part.tool)
-          part.state.output = summary.summary
-          part.state.metadata = {
-            ...part.state.metadata,
-            auto_compacted: true,
-            original_length: summary.originalLength,
+      if (!decision.shouldCompact) {
+        log.info("no compaction needed", { reason: decision.reason })
+        return
+      }
+
+      // LAYER 1: MicroCompact - time-based compaction
+      if (decision.layer === "micro") {
+        const { updatedMessages, compactedCount, tokensSaved } = compactionCoordinator.applyMicroCompact(msgs)
+
+        for (const msg of updatedMessages) {
+          for (const part of msg.parts) {
+            yield* session.updatePart(part)
           }
-          part.state.time.compacted = Date.now()
-          yield* session.updatePart(part)
-          autoCompacted++
         }
-        if (autoCompacted > 0) {
-          log.info("layer-2 auto-compacted", { count: autoCompacted })
+
+        log.info("layer-1 micro-compacted", { count: compactedCount, tokensSaved })
+        compressionTracker.recordCompression("micro", tokensSaved, Math.floor(tokensSaved * 0.5))
+        return
+      }
+
+      // LAYER 2: AutoCompact - token-based pruning
+      if (decision.layer === "auto" && decision.targetTokens) {
+        const { updatedMessages, compactedCount, tokensSaved } = compactionCoordinator.applyAutoCompact(
+          msgs,
+          decision.targetTokens,
+        )
+
+        for (const msg of updatedMessages) {
+          for (const part of msg.parts) {
+            yield* session.updatePart(part)
+          }
         }
+
+        log.info("layer-2 auto-compacted", { count: compactedCount, tokensSaved })
+        compressionTracker.recordCompression("auto", tokensSaved, Math.floor(tokensSaved * 0.3))
+        return
       }
 
       // LAYER 3: Full Compact is handled by process() method, not here
+      // Log that full compaction is needed
+      if (decision.layer === "full") {
+        log.info("layer-3 full-compact needed", { reason: decision.reason })
+      }
     })
 
     const processCompaction = Effect.fn("SessionCompaction.process")(function* (input: {
