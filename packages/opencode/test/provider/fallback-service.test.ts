@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Config } from "../../src/config"
 import { Provider } from "../../src/provider"
+import { ModelID, ProviderID } from "../../src/provider/schema"
 import { ProviderFallback } from "../../src/provider/fallback-service"
 
 function createConfigLayer(config: unknown) {
@@ -25,25 +26,25 @@ function createProviderLayer(models: Provider.Model[]) {
   return Layer.succeed(
     Provider.Service,
     Provider.Service.of({
-      list: () => Effect.succeed({} as any),
-      getProvider: () => Effect.fail(new Error("unused")),
+      list: () => Effect.succeed({} as Record<ProviderID, Provider.Info>),
+      getProvider: (_providerID) => Effect.fail(new Error("unused")) as any,
       getModel: (providerID, modelID) => {
         const found = table.get(`${providerID}/${modelID}`)
-        if (!found) return Effect.fail(new Error("model not found"))
-        return Effect.succeed(found)
+        if (!found) return Effect.fail(new Error("model not found")) as any
+        return Effect.succeed(found) as any
       },
-      getLanguage: () => Effect.fail(new Error("unused")),
-      closest: () => Effect.succeed(undefined),
-      getSmallModel: () => Effect.succeed(undefined),
-      defaultModel: () => Effect.fail(new Error("unused")),
+      getLanguage: (_model) => Effect.fail(new Error("unused")) as any,
+      closest: () => Effect.succeed(undefined) as any,
+      getSmallModel: () => Effect.succeed(undefined) as any,
+      defaultModel: () => Effect.fail(new Error("unused")) as any,
     }),
   )
 }
 
-function model(providerID: string, id: string) {
+function model(providerID: string, id: string): Provider.Model {
   return {
-    id,
-    providerID,
+    id: ModelID.make(id),
+    providerID: ProviderID.make(providerID),
     name: `${providerID}/${id}`,
     api: { id: providerID, npm: "@ai-sdk/openai-compatible", url: "" },
     capabilities: {
@@ -61,7 +62,7 @@ function model(providerID: string, id: string) {
     headers: {},
     options: {},
     release_date: "2026-01-01",
-  } as Provider.Model
+  }
 }
 
 async function run<A, E>(config: unknown, models: Provider.Model[], effect: Effect.Effect<A, E, ProviderFallback.Service>) {
@@ -157,8 +158,8 @@ describe("provider.fallback-service", () => {
     )
 
     expect(selected).toBeDefined()
-    expect(selected?.model.providerID).toBe("backup")
-    expect(selected?.model.id).toBe("model-b")
+    expect(selected?.model.providerID).toBe(ProviderID.make("backup"))
+    expect(selected?.model.id).toBe(ModelID.make("model-b"))
     expect(selected?.state.index).toBe(1)
     expect(selected?.state.attempts).toBe(2)
   })

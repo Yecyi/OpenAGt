@@ -108,7 +108,7 @@ export function stripImagesFromMessages(messages: MessageV2.WithParts[]): Messag
       }
 
       // Handle tool parts - check for media in tool results
-      if (part.type === "tool" && part.state.output) {
+      if (part.type === "tool" && part.state.status === "completed" && "output" in part.state) {
         // Check if output contains media indicators
         // This is a simplified version - full implementation would parse structured output
         return part
@@ -136,7 +136,8 @@ export function findExistingSummary(messages: MessageV2.WithParts[]): ExistingSu
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.info.role !== "assistant") continue
-    if (!msg.info.summary) continue
+    const assistantInfo = msg.info as MessageV2.Assistant
+    if (!assistantInfo.summary) continue
 
     for (const part of msg.parts) {
       if (part.type === "text" && part.text.length > 100) {
@@ -144,7 +145,7 @@ export function findExistingSummary(messages: MessageV2.WithParts[]): ExistingSu
           content: part.text,
           messageID: msg.info.id,
           timestamp: msg.info.time.created,
-          version: (msg.info.version ?? 0) + 1,
+          version: 1,
         }
       }
     }

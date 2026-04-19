@@ -362,8 +362,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       done: Promise<unknown>
     }
 
-    const normalizeToolInput = (value: unknown) =>
-      typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}
+    const normalizeToolInput = (value: unknown): Record<string, unknown> =>
+      typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
     const hasPathConflict = (left: Record<string, unknown>, right: Record<string, unknown>) =>
       PathOverlap.detectPathConflicts([
@@ -730,11 +730,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           ),
         )
 
-      const attachments = result?.attachments?.map((attachment) => ({
-        ...attachment,
+      const attachments: MessageV2.FilePart[] | undefined = result?.attachments?.map((attachment) => ({
         id: PartID.ascending(),
         sessionID,
         messageID: assistantMessage.id,
+        type: "file" as const,
+        mime: attachment.mime ?? "application/octet-stream",
+        filename: attachment.filename,
+        url: attachment.url ?? "",
       }))
 
       yield* plugin.trigger(

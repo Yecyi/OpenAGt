@@ -1,6 +1,8 @@
 import { Effect, Layer, Context } from "effect"
-import type { Model } from "@/provider"
+import { type Provider } from "@/provider"
 import { Log } from "@/util"
+
+type Model = Provider.Model
 
 export interface FallbackEntry {
   providerID: string

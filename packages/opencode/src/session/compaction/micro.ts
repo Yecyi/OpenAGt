@@ -137,6 +137,9 @@ export function applyTimeBasedMicroCompact(
         return part
       }
 
+      // Only process completed tool states
+      if (part.state.status !== "completed") return part
+
       // Check if already cleared
       if (part.state.output === TIME_BASED_MC_CLEARED_MESSAGE) {
         return part
@@ -251,7 +254,6 @@ export function applyMicroCompact(
       state: {
         ...part.state,
         output: summary.summary,
-        compacted: true,
         time: {
           ...part.state.time,
           compacted: now,

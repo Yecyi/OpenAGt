@@ -131,8 +131,9 @@ export const layer: Layer.Layer<
       // Only runs if we're still approaching context limit after MicroCompact
       const currentUser = updatedMsgs.findLast((item) => item.info.role === "user")
       if (!currentUser) return
+      const currentUserInfo = currentUser.info as MessageV2.User
       const model = yield* provider
-        .getModel(currentUser.info.model.providerID, currentUser.info.model.modelID)
+        .getModel(currentUserInfo.model.providerID, currentUserInfo.model.modelID)
         .pipe(Effect.option)
       if (Option.isNone(model)) return
       const contextLimit = model.value.limit.context

@@ -189,8 +189,8 @@ export function needsAutoCompact(
 export function findToolPartsToCompact(
   messages: MessageV2.WithParts[],
   targetTokens: number,
-): MessageV2.ToolPart[] {
-  const candidates: Array<{ part: MessageV2.ToolPart; age: number }> = []
+): Array<MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }> {
+  const candidates: Array<{ part: MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }; age: number }> = []
 
   for (const msg of messages) {
     for (const part of msg.parts) {
@@ -201,14 +201,14 @@ export function findToolPartsToCompact(
       if (part.state.time.compacted) continue
 
       const age = Date.now() - (part.state.time.end ?? part.state.time.start)
-      candidates.push({ part, age })
+      candidates.push({ part: part as MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }, age })
     }
   }
 
   // Sort by age (oldest first)
   candidates.sort((a, b) => a.age - b.age)
 
-  const toCompact: MessageV2.ToolPart[] = []
+  const toCompact: Array<MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }> = []
   let saved = 0
 
   for (const { part } of candidates) {
