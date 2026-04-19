@@ -16,6 +16,7 @@ import { Snapshot } from "@/snapshot"
 import { Plugin } from "@/plugin"
 import { Provider } from "@/provider"
 import { ProviderAuth } from "@/provider"
+import { ProviderFallback } from "@/provider"
 import { Agent } from "@/agent/agent"
 import { Skill } from "@/skill"
 import { Discovery } from "@/skill/discovery"
@@ -64,6 +65,7 @@ export const AppLayer = Layer.mergeAll(
   Snapshot.defaultLayer,
   Plugin.defaultLayer,
   Provider.defaultLayer,
+  ProviderFallback.defaultLayer,
   ProviderAuth.defaultLayer,
   Agent.defaultLayer,
   Skill.defaultLayer,

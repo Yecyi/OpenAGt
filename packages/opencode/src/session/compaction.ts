@@ -13,12 +13,12 @@ import { Plugin } from "@/plugin"
 import { Config } from "@/config"
 import { NotFoundError } from "@/storage"
 import { ModelID, ProviderID } from "@/provider/schema"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { InstanceState } from "@/effect"
 import { isOverflow as overflow } from "./overflow"
-import { MicroCompact, shouldMicroCompact, applyMicroCompact } from "./compaction/micro"
-import { AutoCompact, needsAutoCompact, findToolPartsToCompact, CircuitBreaker } from "./compaction/auto"
-import { FullCompact, buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
+import { MICRO_COMPACT_TIME_THRESHOLD_MS, applyMicroCompact, summarizeToolResult } from "./compaction/micro"
+import { DEFAULT_AUTO_COMPACT_CONFIG, needsAutoCompact, findToolPartsToCompact } from "./compaction/auto"
+import { buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
 
 const log = Log.create({ service: "session.compaction" })
 
@@ -106,7 +106,7 @@ export const layer: Layer.Layer<
       let microCompacted = 0
       for (const msg of msgs) {
         const updatedParts = applyMicroCompact(msg.parts, {
-          timeThresholdMs: MicroCompact.MICRO_COMPACT_TIME_THRESHOLD_MS,
+          timeThresholdMs: MICRO_COMPACT_TIME_THRESHOLD_MS,
           preserveRecentN: 3,
           compactableTools: new Set(["read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
         })
@@ -129,16 +129,21 @@ export const layer: Layer.Layer<
 
       // LAYER 2: AutoCompact - token-based pruning
       // Only runs if we're still approaching context limit after MicroCompact
-      const model = yield* provider.getModel(ProviderID.anthropic, "claude-sonnet-4")
-      const contextLimit = model.capabilities.context?.window ?? 200_000
+      const currentUser = updatedMsgs.findLast((item) => item.info.role === "user")
+      if (!currentUser) return
+      const model = yield* provider
+        .getModel(currentUser.info.model.providerID, currentUser.info.model.modelID)
+        .pipe(Effect.option)
+      if (Option.isNone(model)) return
+      const contextLimit = model.value.limit.context
 
-      if (needsAutoCompact(updatedMsgs, contextLimit, AutoCompact.DEFAULT_AUTO_COMPACT_CONFIG)) {
+      if (needsAutoCompact(updatedMsgs, contextLimit, DEFAULT_AUTO_COMPACT_CONFIG)) {
         const targetTokens = Math.floor(contextLimit * 0.2)
         const toCompact = findToolPartsToCompact(updatedMsgs, targetTokens)
 
         let autoCompacted = 0
         for (const part of toCompact) {
-          const summary = MicroCompact.summarizeToolResult(part.state.output, part.tool)
+          const summary = summarizeToolResult(part.state.output, part.tool)
           part.state.output = summary.summary
           part.state.metadata = {
             ...part.state.metadata,
@@ -205,36 +210,8 @@ export const layer: Layer.Layer<
         { sessionID: input.sessionID },
         { context: [], prompt: undefined },
       )
-      const defaultPrompt = `Provide a detailed prompt for continuing our conversation above.
-Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.
-The summary that you construct will be used so that another agent can read it and continue the work.
-Do not call any tools. Respond only with the summary text.
-Respond in the same language as the user's messages in the conversation.
-
-When constructing the summary, try to stick to this template:
----
-## Goal
-
-[What goal(s) is the user trying to accomplish?]
-
-## Instructions
-
-- [What important instructions did the user give you that are relevant]
-- [If there is a plan or spec, include information about it so next agent can continue using it]
-
-## Discoveries
-
-[What notable things were learned during this conversation that would be useful for the next agent to know when continuing the work]
-
-## Accomplished
-
-[What work has been completed, what work is still in progress, and what work is left?]
-
-## Relevant files / directories
-
-[Construct a structured list of relevant files that have been read, edited, or created that pertain to the task at hand. If all the files in a directory are relevant, include the path to the directory.]
----`
-
+      const compactContext = buildCompactContext(messages, DEFAULT_FULL_COMPACT_CONFIG)
+      const defaultPrompt = formatCompactPrompt(compactContext, DEFAULT_FULL_COMPACT_CONFIG)
       const prompt = compacting.prompt ?? [defaultPrompt, ...compacting.context].join("\n\n")
       const msgs = structuredClone(messages)
       yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })

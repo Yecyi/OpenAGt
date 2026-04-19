@@ -1,9 +1,16 @@
 import { Effect } from "effect"
 import { MessageV2 } from "../message-v2"
-import { Log } from "@/util"
-import { Token } from "@/util"
+import { Log, Token } from "@/util"
 
 const log = Log.create({ service: "compaction.full" })
+
+// Constants from Claude Code reference
+export const POST_COMPACT_MAX_FILES_TO_RESTORE = 5
+export const POST_COMPACT_TOKEN_BUDGET = 50_000
+export const POST_COMPACT_MAX_TOKENS_PER_FILE = 5_000
+export const POST_COMPACT_MAX_TOKENS_PER_SKILL = 5_000
+export const POST_COMPACT_SKILLS_TOKEN_BUDGET = 25_000
+export const MAX_COMPACT_STREAMING_RETRIES = 2
 
 export interface FullCompactConfig {
   summaryTemplate: string
@@ -11,6 +18,12 @@ export interface FullCompactConfig {
   maxReinjectTokens: number
   iterativeUpdate: boolean
   deduplicateSummaries: boolean
+  // Additional config from Claude Code reference
+  maxFilesToRestore?: number
+  tokenBudget?: number
+  maxTokensPerFile?: number
+  maxTokensPerSkill?: number
+  skillsTokenBudget?: number
 }
 
 export const DEFAULT_FULL_COMPACT_CONFIG: FullCompactConfig = {
@@ -47,7 +60,70 @@ When constructing the summary, try to stick to this template:
   maxReinjectTokens: 25_000,
   iterativeUpdate: true,
   deduplicateSummaries: true,
-})
+  maxFilesToRestore: POST_COMPACT_MAX_FILES_TO_RESTORE,
+  tokenBudget: POST_COMPACT_TOKEN_BUDGET,
+  maxTokensPerFile: POST_COMPACT_MAX_TOKENS_PER_FILE,
+  maxTokensPerSkill: POST_COMPACT_MAX_TOKENS_PER_SKILL,
+  skillsTokenBudget: POST_COMPACT_SKILLS_TOKEN_BUDGET,
+}
+
+/**
+ * Strip image blocks from user messages before sending for compaction.
+ * Images are not needed for generating a conversation summary and can
+ * cause the compaction API call itself to hit the prompt-too-long limit.
+ * Replaces image blocks with a text marker so the summary still notes
+ * that an image was shared.
+ */
+export function stripImagesFromMessages(messages: MessageV2.WithParts[]): MessageV2.WithParts[] {
+  return messages.map(message => {
+    if (message.info.role !== "user") {
+      return message
+    }
+
+    let hasMediaBlock = false
+
+    const updatedParts = message.parts.map(part => {
+      // Handle text parts - check for inline images
+      if (part.type === "text") {
+        // Text parts don't typically contain image blocks in our model
+        return part
+      }
+
+      // Handle file/attachment parts
+      if (part.type === "file") {
+        const mime = part.mime
+        // Check if it's an image or document
+        if (mime.startsWith("image/") || mime.startsWith("application/pdf") || mime.startsWith("document/")) {
+          hasMediaBlock = true
+          return {
+            ...part,
+            // Replace with text marker
+            type: "text" as const,
+            text: mime.startsWith("image/") ? "[image]" : "[document]",
+            mime: undefined,
+            filename: part.filename,
+          }
+        }
+        return part
+      }
+
+      // Handle tool parts - check for media in tool results
+      if (part.type === "tool" && part.state.output) {
+        // Check if output contains media indicators
+        // This is a simplified version - full implementation would parse structured output
+        return part
+      }
+
+      return part
+    })
+
+    if (!hasMediaBlock) {
+      return message
+    }
+
+    return { ...message, parts: updatedParts }
+  })
+}
 
 export interface ExistingSummary {
   content: string

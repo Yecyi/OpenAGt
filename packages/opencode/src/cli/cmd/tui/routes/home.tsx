@@ -1,6 +1,6 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
 import { createEffect, createSignal } from "solid-js"
-import { Logo } from "../component/logo"
+import { TextAttributes } from "@opentui/core"
 import { useProject } from "../context/project"
 import { useSync } from "../context/sync"
 import { Toast } from "../ui/toast"
@@ -9,6 +9,7 @@ import { useRouteData } from "@tui/context/route"
 import { usePromptRef } from "../context/prompt"
 import { useLocal } from "../context/local"
 import { TuiPluginRuntime } from "../plugin"
+import { useTheme } from "../context/theme"
 
 let once = false
 const placeholder = {
@@ -24,6 +25,7 @@ export function Home() {
   const [ref, setRef] = createSignal<PromptRef | undefined>()
   const args = useArgs()
   const local = useLocal()
+  const { theme } = useTheme()
   let sent = false
 
   const bind = (r: PromptRef | undefined) => {
@@ -59,7 +61,14 @@ export function Home() {
         <box height={4} minHeight={0} flexShrink={1} />
         <box flexShrink={0}>
           <TuiPluginRuntime.Slot name="home_logo" mode="replace">
-            <Logo />
+            <box flexDirection="row">
+              <text fg={theme.textMuted} attributes={TextAttributes.BOLD}>
+                Open
+              </text>
+              <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                AG
+              </text>
+            </box>
           </TuiPluginRuntime.Slot>
         </box>
         <box height={1} minHeight={0} flexShrink={1} />

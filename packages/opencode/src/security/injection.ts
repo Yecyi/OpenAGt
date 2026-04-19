@@ -106,8 +106,9 @@ export function sanitizeContent(content: string): { sanitized: string; removed: 
   let removed = 0
 
   for (const { pattern } of INJECTION_PATTERNS) {
+    const global = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g")
     const before = sanitized.length
-    sanitized = sanitized.replace(pattern, "")
+    sanitized = sanitized.replace(global, "")
     removed += before - sanitized.length
   }
 

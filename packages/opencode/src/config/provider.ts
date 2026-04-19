@@ -81,10 +81,23 @@ export class Info extends Schema.Class<Info>("ProviderConfig")({
   fallback: Schema.optional(
     Schema.Struct({
       enabled: Schema.optional(Schema.Boolean).annotate({ description: "Enable fallback on error" }),
+      chain: Schema.optional(
+        Schema.mutable(
+          Schema.Array(
+            Schema.Struct({
+              provider: Schema.String,
+              model: Schema.String,
+            }),
+          ),
+        ),
+      ).annotate({ description: "Ordered fallback chain: each entry is provider/model to try next" }),
       provider: Schema.optional(Schema.String).annotate({ description: "Fallback provider ID" }),
       model: Schema.optional(Schema.String).annotate({ description: "Fallback model ID" }),
       retryOnRateLimit: Schema.optional(Schema.Boolean).annotate({ description: "Fallback on rate limit (default: true)" }),
       retryOnServerError: Schema.optional(Schema.Boolean).annotate({ description: "Fallback on 5xx errors (default: true)" }),
+      maxRetries: Schema.optional(PositiveInt).annotate({
+        description: "Maximum fallback hops for a single request (default: 3)",
+      }),
     }),
   ).annotate({ description: "Fallback provider configuration for automatic failover" }),
   options: Schema.optional(

@@ -7,7 +7,7 @@ import { Log } from "../util"
 import { SessionRevert } from "./revert"
 import * as Session from "./session"
 import { Agent } from "../agent/agent"
-import { Provider } from "../provider"
+import { Provider, ProviderFallback } from "../provider"
 import { ModelID, ProviderID } from "../provider/schema"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import type { JSONSchema7 } from "@ai-sdk/provider"
@@ -34,7 +34,7 @@ import { ConfigMarkdown } from "../config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/shared/util/error"
 import { SessionProcessor } from "./processor"
-import { Tool } from "@/tool"
+import { PathOverlap, Tool, ToolPartition } from "@/tool"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
@@ -49,6 +49,7 @@ import { InstanceState } from "@/effect"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
+import { scanForInjection, sanitizeContent } from "@/security/injection"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -85,6 +86,7 @@ export const layer = Layer.effect(
     const sessions = yield* Session.Service
     const agents = yield* Agent.Service
     const provider = yield* Provider.Service
+    const providerFallback = yield* ProviderFallback.Service
     const processor = yield* SessionProcessor.Service
     const compaction = yield* SessionCompaction.Service
     const plugin = yield* Plugin.Service
@@ -351,6 +353,72 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return input.messages
     })
 
+    type RunningToolCall = {
+      safe: boolean
+      paths: string[]
+      toolCallId: string
+      toolName: string
+      input: Record<string, unknown>
+      done: Promise<unknown>
+    }
+
+    const normalizeToolInput = (value: unknown) =>
+      typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}
+
+    const hasPathConflict = (left: Record<string, unknown>, right: Record<string, unknown>) =>
+      PathOverlap.detectPathConflicts([
+        { toolName: "left", input: left },
+        { toolName: "right", input: right },
+      ]).length > 0
+
+    const createToolScheduler = () => {
+      let running: RunningToolCall[] = []
+      let unsafeTail = Promise.resolve()
+
+      const schedule = <T>(
+        call: ToolPartition.ToolCallItem,
+        execute: () => Promise<T>,
+      ) => {
+        const safe = ToolPartition.isConcurrencySafe(call.toolName)
+        const paths = PathOverlap.extractPathsFromInput(call.input)
+        const blockers = running
+          .filter((active) => {
+            if (!safe) return true
+            if (!active.safe) return true
+            if (!paths.length || !active.paths.length) return false
+            return hasPathConflict(call.input, active.input)
+          })
+          .map((active) => active.done.catch(() => undefined))
+        const start = () => Promise.all(blockers).then(() => execute())
+        const pending = safe ? start() : unsafeTail.then(start, start)
+        if (!safe) unsafeTail = pending.then(() => undefined, () => undefined)
+
+        const done = pending.finally(() => {
+          running = running.filter((active) => active.toolCallId !== call.toolCallId)
+        })
+        ToolPartition.partitionToolCalls([
+          ...running.map((active) => ({
+            toolCallId: active.toolCallId,
+            toolName: active.toolName,
+            input: active.input,
+          })),
+          call,
+        ])
+        running.push({
+          safe,
+          paths,
+          done,
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          input: call.input,
+        })
+
+        return pending
+      }
+
+      return { schedule }
+    }
+
     const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       agent: Agent.Info
       model: Provider.Model
@@ -364,6 +432,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const tools: Record<string, AITool> = {}
       const run = yield* runner()
       const promptOps = yield* ops()
+      const scheduler = createToolScheduler()
 
       const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
         sessionID: input.session.id,
@@ -408,34 +477,41 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           description: item.description,
           inputSchema: jsonSchema(schema),
           execute(args, options) {
-            return run.promise(
-              Effect.gen(function* () {
-                const ctx = context(args, options)
-                yield* plugin.trigger(
-                  "tool.execute.before",
-                  { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
-                  { args },
-                )
-                const result = yield* item.execute(args, ctx)
-                const output = {
-                  ...result,
-                  attachments: result.attachments?.map((attachment) => ({
-                    ...attachment,
-                    id: PartID.ascending(),
-                    sessionID: ctx.sessionID,
-                    messageID: input.processor.message.id,
-                  })),
-                }
-                yield* plugin.trigger(
-                  "tool.execute.after",
-                  { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
-                  output,
-                )
-                if (options.abortSignal?.aborted) {
-                  yield* input.processor.completeToolCall(options.toolCallId, output)
-                }
-                return output
-              }),
+            const call = {
+              toolCallId: options.toolCallId ?? ulid(),
+              toolName: item.id,
+              input: normalizeToolInput(args),
+            }
+            return scheduler.schedule(call, () =>
+              run.promise(
+                Effect.gen(function* () {
+                  const ctx = context(args, options)
+                  yield* plugin.trigger(
+                    "tool.execute.before",
+                    { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+                    { args },
+                  )
+                  const result = yield* item.execute(args, ctx)
+                  const output = {
+                    ...result,
+                    attachments: result.attachments?.map((attachment) => ({
+                      ...attachment,
+                      id: PartID.ascending(),
+                      sessionID: ctx.sessionID,
+                      messageID: input.processor.message.id,
+                    })),
+                  }
+                  yield* plugin.trigger(
+                    "tool.execute.after",
+                    { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
+                    output,
+                  )
+                  if (options.abortSignal?.aborted) {
+                    yield* input.processor.completeToolCall(options.toolCallId, output)
+                  }
+                  return output
+                }),
+              ),
             )
           },
         })
@@ -449,72 +525,80 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const transformed = ProviderTransform.schema(input.model, schema)
         item.inputSchema = jsonSchema(transformed)
         item.execute = (args, opts) =>
-          run.promise(
-            Effect.gen(function* () {
-              const ctx = context(args, opts)
-              yield* plugin.trigger(
-                "tool.execute.before",
-                { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
-                { args },
-              )
-              yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
-              const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.promise(() =>
-                execute(args, opts),
-              )
-              yield* plugin.trigger(
-                "tool.execute.after",
-                { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
-                result,
-              )
+          scheduler.schedule(
+            {
+              toolCallId: opts.toolCallId ?? ulid(),
+              toolName: key,
+              input: normalizeToolInput(args),
+            },
+            () =>
+              run.promise(
+                Effect.gen(function* () {
+                  const ctx = context(args, opts)
+                  yield* plugin.trigger(
+                    "tool.execute.before",
+                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+                    { args },
+                  )
+                  yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                  const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.promise(() =>
+                    execute(args, opts),
+                  )
+                  yield* plugin.trigger(
+                    "tool.execute.after",
+                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+                    result,
+                  )
 
-              const textParts: string[] = []
-              const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
-              for (const contentItem of result.content) {
-                if (contentItem.type === "text") textParts.push(contentItem.text)
-                else if (contentItem.type === "image") {
-                  attachments.push({
-                    type: "file",
-                    mime: contentItem.mimeType,
-                    url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
-                  })
-                } else if (contentItem.type === "resource") {
-                  const { resource } = contentItem
-                  if (resource.text) textParts.push(resource.text)
-                  if (resource.blob) {
-                    attachments.push({
-                      type: "file",
-                      mime: resource.mimeType ?? "application/octet-stream",
-                      url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
-                      filename: resource.uri,
-                    })
+                  const textParts: string[] = []
+                  const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
+                  for (const contentItem of result.content) {
+                    if (contentItem.type === "text") textParts.push(contentItem.text)
+                    else if (contentItem.type === "image") {
+                      attachments.push({
+                        type: "file",
+                        mime: contentItem.mimeType,
+                        url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
+                      })
+                    } else if (contentItem.type === "resource") {
+                      const { resource } = contentItem
+                      if (resource.text) textParts.push(resource.text)
+                      if (resource.blob) {
+                        attachments.push({
+                          type: "file",
+                          mime: resource.mimeType ?? "application/octet-stream",
+                          url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
+                          filename: resource.uri,
+                        })
+                      }
+                    }
                   }
-                }
-              }
 
-              const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
-              const metadata = {
-                ...result.metadata,
-                truncated: truncated.truncated,
-                ...(truncated.truncated && { outputPath: truncated.outputPath }),
-              }
+                  const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
+                  const metadata = {
+                    ...result.metadata,
+                    truncated: truncated.truncated,
+                    ...(truncated.truncated && { outputPath: truncated.outputPath }),
+                  }
 
-              const output = {
-                title: "",
-                metadata,
-                output: truncated.content,
-                attachments: attachments.map((attachment) => ({
-                  ...attachment,
-                  id: PartID.ascending(),
-                  sessionID: ctx.sessionID,
-                  messageID: input.processor.message.id,
-                })),
-                content: result.content,
-              }
-              if (opts.abortSignal?.aborted) {
-                yield* input.processor.completeToolCall(opts.toolCallId, output)
-              }
-              return output
-            }),
+                  const output = {
+                    title: "",
+                    metadata,
+                    output: truncated.content,
+                    attachments: attachments.map((attachment) => ({
+                      ...attachment,
+                      id: PartID.ascending(),
+                      sessionID: ctx.sessionID,
+                      messageID: input.processor.message.id,
+                    })),
+                    content: result.content,
+                  }
+                  if (opts.abortSignal?.aborted) {
+                    yield* input.processor.completeToolCall(opts.toolCallId, output)
+                  }
+                  return output
+                }),
+              ),
           )
         tools[key] = item
       }
@@ -961,6 +1045,32 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         id: part.id ? PartID.make(part.id) : PartID.ascending(),
       })
 
+      const guardInjectedContent = Effect.fn("SessionPrompt.guardInjectedContent")(function* (
+        source: string,
+        content: string,
+      ) {
+        const scan = scanForInjection(content)
+        if (scan.clean) return content
+
+        const high = scan.issues.filter((issue) => issue.severity === "high")
+        if (high.length > 0) {
+          const summary = high
+            .slice(0, 3)
+            .map((issue) => issue.description)
+            .join(", ")
+          const message = `Blocked content from ${source} due to high-severity prompt injection patterns: ${summary}`
+          yield* bus.publish(Session.Event.Error, {
+            sessionID: input.sessionID,
+            error: new NamedError.Unknown({ message }).toObject(),
+          })
+          return `[Blocked content from ${source} due to potential prompt injection patterns.]`
+        }
+
+        const sanitized = sanitizeContent(content)
+        if (sanitized.removed <= 0) return content
+        return `[Sanitized potentially unsafe content from ${source}; removed ${sanitized.removed} characters.]\n${sanitized.sanitized}`
+      })
+
       const resolvePart: (part: PromptInput["parts"][number]) => Effect.Effect<Draft<MessageV2.Part>[]> = Effect.fn(
         "SessionPrompt.resolveUserPart",
       )(function* (part) {
@@ -984,12 +1094,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               const items = Array.isArray(content.contents) ? content.contents : [content.contents]
               for (const c of items) {
                 if ("text" in c && c.text) {
+                  const safeText = yield* guardInjectedContent(`MCP resource ${part.filename}`, c.text)
                   pieces.push({
                     messageID: info.id,
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: c.text,
+                    text: safeText,
                   })
                 } else if ("blob" in c && c.blob) {
                   const mime = "mimeType" in c ? c.mimeType : part.mime
@@ -1021,6 +1132,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           switch (url.protocol) {
             case "data:":
               if (part.mime === "text/plain") {
+                const safeData = yield* guardInjectedContent(part.filename ?? "data-url", decodeDataUrl(part.url))
                 return [
                   {
                     messageID: info.id,
@@ -1034,7 +1146,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: decodeDataUrl(part.url),
+                    text: safeData,
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -1102,12 +1214,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 )
                 if (Exit.isSuccess(exit)) {
                   const result = exit.value
+                  const safeOutput = yield* guardInjectedContent(filepath, result.output)
                   pieces.push({
                     messageID: info.id,
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: result.output,
+                    text: safeOutput,
                   })
                   if (result.attachments?.length) {
                     pieces.push(
@@ -1175,7 +1288,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: exit.value.output,
+                    text: yield* guardInjectedContent(filepath, exit.value.output),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -1390,6 +1503,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             continue
           }
 
+          yield* compaction.prune({ sessionID }).pipe(Effect.ignore)
+          msgs = yield* MessageV2.filterCompactedEffect(sessionID)
+
           const agent = yield* agents.get(lastUser.agent)
           if (!agent) {
             const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
@@ -1402,127 +1518,148 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const isLastStep = step >= maxSteps
           msgs = yield* insertReminders({ messages: msgs, agent, session })
 
-          const msg: MessageV2.Assistant = {
-            id: MessageID.ascending(),
-            parentID: lastUser.id,
-            role: "assistant",
-            mode: agent.name,
-            agent: agent.name,
-            variant: lastUser.model.variant,
-            path: { cwd: ctx.directory, root: ctx.worktree },
-            cost: 0,
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            modelID: model.id,
-            providerID: model.providerID,
-            time: { created: Date.now() },
-            sessionID,
-          }
-          yield* sessions.updateMessage(msg)
-          const handle = yield* processor.create({
-            assistantMessage: msg,
-            sessionID,
-            model,
-          })
-
-          const outcome: "break" | "continue" = yield* Effect.gen(function* () {
-            const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
-            const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
-
-            const tools = yield* resolveTools({
-              agent,
-              session,
-              model,
-              tools: lastUser.tools,
-              processor: handle,
-              bypassAgentCheck,
-              messages: msgs,
+          let fallbackState = yield* providerFallback.createState(lastUser.model.providerID, lastUser.model.modelID)
+          let activeModel = model
+          let outcome: "break" | "continue" = "break"
+          while (true) {
+            const msg: MessageV2.Assistant = {
+              id: MessageID.ascending(),
+              parentID: lastUser.id,
+              role: "assistant",
+              mode: agent.name,
+              agent: agent.name,
+              variant: lastUser.model.variant,
+              path: { cwd: ctx.directory, root: ctx.worktree },
+              cost: 0,
+              tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              modelID: activeModel.id,
+              providerID: activeModel.providerID,
+              time: { created: Date.now() },
+              sessionID,
+            }
+            yield* sessions.updateMessage(msg)
+            const handle = yield* processor.create({
+              assistantMessage: msg,
+              sessionID,
+              model: activeModel,
             })
 
-            if (lastUser.format?.type === "json_schema") {
-              tools["StructuredOutput"] = createStructuredOutputTool({
-                schema: lastUser.format.schema,
-                onSuccess(output) {
-                  structured = output
-                },
+            outcome = yield* Effect.gen(function* () {
+              const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+              const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
+
+              const tools = yield* resolveTools({
+                agent,
+                session,
+                model: activeModel,
+                tools: lastUser.tools,
+                processor: handle,
+                bypassAgentCheck,
+                messages: msgs,
               })
-            }
 
-            if (step === 1)
-              yield* summary.summarize({ sessionID, messageID: lastUser.id }).pipe(Effect.ignore, Effect.forkIn(scope))
+              if (lastUser.format?.type === "json_schema") {
+                tools["StructuredOutput"] = createStructuredOutputTool({
+                  schema: lastUser.format.schema,
+                  onSuccess(output) {
+                    structured = output
+                  },
+                })
+              }
 
-            if (step > 1 && lastFinished) {
-              for (const m of msgs) {
-                if (m.info.role !== "user" || m.info.id <= lastFinished.id) continue
-                for (const p of m.parts) {
-                  if (p.type !== "text" || p.ignored || p.synthetic) continue
-                  if (!p.text.trim()) continue
-                  p.text = [
-                    "<system-reminder>",
-                    "The user sent the following message:",
-                    p.text,
-                    "",
-                    "Please address this message and continue with your tasks.",
-                    "</system-reminder>",
-                  ].join("\n")
+              if (step === 1)
+                yield* summary
+                  .summarize({ sessionID, messageID: lastUser.id })
+                  .pipe(Effect.ignore, Effect.forkIn(scope))
+
+              if (step > 1 && lastFinished) {
+                for (const m of msgs) {
+                  if (m.info.role !== "user" || m.info.id <= lastFinished.id) continue
+                  for (const p of m.parts) {
+                    if (p.type !== "text" || p.ignored || p.synthetic) continue
+                    if (!p.text.trim()) continue
+                    p.text = [
+                      "<system-reminder>",
+                      "The user sent the following message:",
+                      p.text,
+                      "",
+                      "Please address this message and continue with your tasks.",
+                      "</system-reminder>",
+                    ].join("\n")
+                  }
                 }
               }
-            }
 
-            yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
+              yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-            const [skills, env, instructions, modelMsgs] = yield* Effect.all([
-              sys.skills(agent),
-              Effect.sync(() => sys.environment(model)),
-              instruction.system().pipe(Effect.orDie),
-              MessageV2.toModelMessagesEffect(msgs, model),
-            ])
-            const system = [...env, ...(skills ? [skills] : []), ...instructions]
-            const format = lastUser.format ?? { type: "text" as const }
-            if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
-            const result = yield* handle.process({
-              user: lastUser,
-              agent,
-              permission: session.permission,
-              sessionID,
-              parentSessionID: session.parentID,
-              system,
-              messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
-              tools,
-              model,
-              toolChoice: format.type === "json_schema" ? "required" : undefined,
-            })
+              const [skills, env, instructions, modelMsgs] = yield* Effect.all([
+                sys.skills(agent),
+                Effect.sync(() => sys.environment(activeModel)),
+                instruction.system().pipe(Effect.orDie),
+                MessageV2.toModelMessagesEffect(msgs, activeModel),
+              ])
+              const system = [...env, ...(skills ? [skills] : []), ...instructions]
+              const format = lastUser.format ?? { type: "text" as const }
+              if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+              const result = yield* handle.process({
+                user: lastUser,
+                agent,
+                permission: session.permission,
+                sessionID,
+                parentSessionID: session.parentID,
+                system,
+                messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
+                tools,
+                model: activeModel,
+                toolChoice: format.type === "json_schema" ? "required" : undefined,
+              })
 
-            if (structured !== undefined) {
-              handle.message.structured = structured
-              handle.message.finish = handle.message.finish ?? "stop"
-              yield* sessions.updateMessage(handle.message)
-              return "break" as const
-            }
-
-            const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
-            if (finished && !handle.message.error) {
-              if (format.type === "json_schema") {
-                handle.message.error = new MessageV2.StructuredOutputError({
-                  message: "Model did not produce structured output",
-                  retries: 0,
-                }).toObject()
+              if (structured !== undefined) {
+                handle.message.structured = structured
+                handle.message.finish = handle.message.finish ?? "stop"
                 yield* sessions.updateMessage(handle.message)
                 return "break" as const
               }
-            }
 
-            if (result === "stop") return "break" as const
-            if (result === "compact") {
-              yield* compaction.create({
-                sessionID,
-                agent: lastUser.agent,
-                model: lastUser.model,
-                auto: true,
-                overflow: !handle.message.finish,
-              })
-            }
-            return "continue" as const
-          }).pipe(Effect.ensuring(instruction.clear(handle.message.id)))
+              const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
+              if (finished && !handle.message.error) {
+                if (format.type === "json_schema") {
+                  handle.message.error = new MessageV2.StructuredOutputError({
+                    message: "Model did not produce structured output",
+                    retries: 0,
+                  }).toObject()
+                  yield* sessions.updateMessage(handle.message)
+                  return "break" as const
+                }
+              }
+
+              if (result === "stop") return "break" as const
+              if (result === "compact") {
+                yield* compaction.create({
+                  sessionID,
+                  agent: lastUser.agent,
+                  model: lastUser.model,
+                  auto: true,
+                  overflow: !handle.message.finish,
+                })
+              }
+              return "continue" as const
+            }).pipe(Effect.ensuring(instruction.clear(handle.message.id)))
+
+            if (outcome === "continue") break
+            if (!handle.message.error || !fallbackState) break
+
+            const shouldFallback = yield* providerFallback.shouldFallback(handle.message.error, fallbackState)
+            if (!shouldFallback) break
+
+            const nextFallback = yield* providerFallback.next(fallbackState)
+            if (!nextFallback) break
+
+            fallbackState = nextFallback.state
+            activeModel = nextFallback.model
+            structured = undefined
+          }
+
           if (outcome === "break") break
           continue
         }
@@ -1684,6 +1821,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(ToolRegistry.defaultLayer),
     Layer.provide(Truncate.defaultLayer),
     Layer.provide(Provider.defaultLayer),
+    Layer.provide(ProviderFallback.defaultLayer),
     Layer.provide(Instruction.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
     Layer.provide(Plugin.defaultLayer),
