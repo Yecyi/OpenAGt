@@ -3,7 +3,7 @@ import { DialogSelect } from "@tui/ui/dialog-select"
 import { useRoute } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { createMemo, createResource, createSignal, onMount } from "solid-js"
-import { Locale } from "@/util"
+import { Locale, Token } from "@/util"
 import { useProject } from "@tui/context/project"
 import { useKeybind } from "../context/keybind"
 import { useTheme } from "../context/theme"
@@ -36,6 +36,26 @@ export function DialogSessionList() {
     if (!query) return undefined
     const result = await sdk.client.session.list({ search: query, limit: 30 })
     return result.data ?? []
+  })
+
+  // 计算 session 的 token 使用量
+  const sessionTokenInfo = createMemo(() => {
+    const info = new Map<string, { tokens: number; cost: number }>()
+    const messages = sync.data.message
+    for (const [sessionID, msgList] of Object.entries(messages)) {
+      let totalTokens = 0
+      let totalCost = 0
+      for (const msg of msgList) {
+        if (msg.role === "assistant") {
+          totalTokens += msg.tokens.input + msg.tokens.output + msg.tokens.reasoning
+          totalCost += msg.cost
+        }
+      }
+      if (totalTokens > 0) {
+        info.set(sessionID, { tokens: totalTokens, cost: totalCost })
+      }
+    }
+    return info
   })
 
   const currentSessionID = createMemo(() => (route.data.type === "session" ? route.data.sessionID : undefined))
@@ -127,6 +147,7 @@ export function DialogSessionList() {
         }
 
         let footer = ""
+        const tokenInfo = sessionTokenInfo().get(x.id)
         if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
           if (x.workspaceID) {
             let desc = "unknown"
@@ -144,11 +165,25 @@ export function DialogSessionList() {
                 >
                   ●
                 </span>
+                {tokenInfo && (
+                  <span style={{ fg: theme.textMuted }}>
+                    {" "}· {Locale.number(tokenInfo.tokens)} tokens
+                  </span>
+                )}
               </>
             )
           }
         } else {
-          footer = Locale.time(x.time.updated)
+          footer = (
+            <>
+              {Locale.time(x.time.updated)}
+              {tokenInfo && (
+                <span style={{ fg: theme.textMuted }}>
+                  {" "}· {Locale.number(tokenInfo.tokens)} tokens
+                </span>
+              )}
+            </>
+          )
         }
 
         const date = new Date(x.time.updated)

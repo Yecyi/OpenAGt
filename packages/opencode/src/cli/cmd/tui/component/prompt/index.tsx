@@ -28,7 +28,8 @@ import * as Clipboard from "../../util/clipboard"
 import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
 import { TuiEvent } from "../../event"
 import { iife } from "@/util/iife"
-import { Locale } from "@/util"
+import { Locale, Token } from "@/util"
+import { estimatePromptTokens } from "@/util/token-estimator"
 import { formatDuration } from "@/util/format"
 import { createColors, createFrames } from "../../ui/spinner.ts"
 import { useDialog } from "@tui/ui/dialog"
@@ -190,6 +191,58 @@ export function Prompt(props: PromptProps) {
     mode: "normal",
     extmarkToPartIndex: new Map(),
     interrupt: 0,
+  })
+
+  const promptEstimate = createMemo(() => {
+    if (!props.sessionID) return undefined
+
+    const text = store.prompt.input
+    const inputTokens = text ? Token.estimate(text) : 0
+
+    // 获取 model context limit
+    const msg = sync.data.message[props.sessionID] ?? []
+    const lastAssistant = msg.findLast((item): item is AssistantMessage => item.role === "assistant" && item.tokens.output > 0)
+
+    // 如果没有历史消息，使用默认的 context limit
+    let modelContextLimit = 200000 // 默认 200K
+    let historyTokens = 0
+
+    if (lastAssistant) {
+      const model = sync.data.provider.find((item) => item.id === lastAssistant.providerID)?.models[lastAssistant.modelID]
+      if (model?.limit.context) {
+        modelContextLimit = model.limit.context
+      }
+      // 获取历史已消耗 tokens
+      historyTokens = lastAssistant.tokens.input + lastAssistant.tokens.output
+    }
+
+    // System prompt 估算（约 500-1000 tokens）
+    const systemPromptEstimate = 750
+
+    // Tool definitions 估算（约 1000-2000 tokens，取决于工具数量）
+    const toolDefinitionsEstimate = 1500
+
+    return estimatePromptTokens(text, modelContextLimit, "", "", historyTokens)
+  })
+
+  const estimateLabel = createMemo(() => {
+    const est = promptEstimate()
+    const currentUsage = usage()
+
+    if (!est) {
+      return currentUsage ? currentUsage.context : undefined
+    }
+
+    const parts: string[] = []
+    parts.push(`${Locale.number(est.total)}`)
+    parts.push(`(${Locale.number(est.input)} in + ${Locale.number(est.output)} out)`)
+
+    if (currentUsage) {
+      parts.push(currentUsage.context)
+      if (currentUsage.cost) parts.push(currentUsage.cost)
+    }
+
+    return parts.join(" · ")
   })
 
   createEffect(
@@ -1334,20 +1387,16 @@ export function Prompt(props: PromptProps) {
             <box gap={2} flexDirection="row">
               <Switch>
                 <Match when={store.mode === "normal"}>
-                  <Switch>
-                    <Match when={usage()}>
-                      {(item) => (
-                        <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost].filter(Boolean).join(" · ")}
-                        </text>
-                      )}
-                    </Match>
-                    <Match when={true}>
-                      <text fg={theme.text}>
-                        {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
-                      </text>
-                    </Match>
-                  </Switch>
+                  <Show when={estimateLabel()}>
+                    <text fg={theme.textMuted} wrapMode="none">
+                      {estimateLabel()}
+                    </text>
+                  </Show>
+                  <Show when={!estimateLabel() && !usage()}>
+                    <text fg={theme.text}>
+                      {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
+                    </text>
+                  </Show>
                   <text fg={theme.text}>
                     {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>
                   </text>
