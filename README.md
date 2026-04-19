@@ -210,7 +210,6 @@ Contributions are welcome! Please read our contributing guidelines before submit
 ## References
 
 - [OpenAG](https://opencode.ai) — Base project
-- [Claude Code](https://claude.ai/code) — Reference implementation
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Reference implementation
 - [Vercel AI SDK](https://sdk.vercel.ai) — AI provider abstraction
 - [Effect Framework](https://effect.website) — Functional programming
