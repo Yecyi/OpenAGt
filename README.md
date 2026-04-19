@@ -1,12 +1,12 @@
 # OpenAG
 
-> An enhanced open-source AI coding agent built on [OpenAG](https://github.com/anomalyco/opencode), featuring advanced context compression, tool concurrency control, and Flutter-based mobile/desktop support.
+> An enhanced open-source AI coding agent built on [OpenCode](https://github.com/anomalyco/opencode), featuring advanced context compression, tool concurrency control, and Flutter-based mobile/desktop support.
 
 ---
 
 ## About OpenAG
 
-OpenAG is a research and development project that extends [OpenAG](https://opencode.ai) — the open-source AI coding agent — with enhanced algorithms, improved reliability, and native mobile application support.
+OpenAG is a research and development project that extends [OpenCode](https://opencode.ai) — the open-source AI coding agent — with enhanced algorithms, improved reliability, and native mobile application support.
 
 **Key Enhancements over OpenAG:**
 
@@ -209,7 +209,7 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ## References
 
-- [OpenAG](https://opencode.ai) — Base project
+- [OpenCode](https://opencode.ai) — Base project
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Reference implementation
 - [Vercel AI SDK](https://sdk.vercel.ai) — AI provider abstraction
 - [Effect Framework](https://effect.website) — Functional programming
