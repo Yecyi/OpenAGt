@@ -4,6 +4,7 @@ import { NamedError } from "@opencode-ai/shared/util/error"
 import { fileURLToPath } from "url"
 import { Effect, Layer } from "effect"
 import { Instance } from "../../src/project/instance"
+import { Config } from "../../src/config"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
@@ -15,7 +16,10 @@ void Log.init({ print: false })
 
 function run<A, E>(fx: Effect.Effect<A, E, SessionPrompt.Service | Session.Service>) {
   return Effect.runPromise(
-    fx.pipe(Effect.scoped, Effect.provide(Layer.mergeAll(SessionPrompt.defaultLayer, Session.defaultLayer))),
+    fx.pipe(
+      Effect.scoped,
+      Effect.provide(Layer.mergeAll(Config.defaultLayer, SessionPrompt.defaultLayer, Session.defaultLayer)),
+    ),
   )
 }
 

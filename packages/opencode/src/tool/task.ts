@@ -8,6 +8,7 @@ import { Agent } from "../agent/agent"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Effect } from "effect"
+import { TaskRuntime } from "../session/task-runtime"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): void
@@ -27,8 +28,24 @@ const parameters = z.object({
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
     )
     .optional(),
+  group_id: z.string().describe("Optional task group identifier for related subtasks").optional(),
+  depends_on: z.array(z.string()).describe("Optional task ids that must complete first").optional(),
+  task_kind: z.enum(["research", "implement", "verify", "generic"]).optional(),
+  return_mode: z.enum(["id", "summary"]).describe("Return task id or immediate summary").optional(),
+  metadata: z.record(z.string(), z.unknown()).describe("Optional structured metadata for scheduling").optional(),
   command: z.string().describe("The command that triggered this task").optional(),
 })
+
+type TaskMetadata = {
+  sessionId: SessionID
+  model: {
+    modelID: string
+    providerID: string
+  }
+  taskId?: SessionID
+  status?: "pending" | "completed"
+  groupId?: string
+}
 
 export const TaskTool = Tool.define(
   id,
@@ -36,6 +53,7 @@ export const TaskTool = Tool.define(
     const agent = yield* Agent.Service
     const config = yield* Config.Service
     const sessions = yield* Session.Service
+    const tasks = yield* TaskRuntime.Service
 
     const run = Effect.fn("TaskTool.execute")(function* (params: z.infer<typeof parameters>, ctx: Tool.Context) {
       const cfg = yield* config.get()
@@ -116,6 +134,41 @@ export const TaskTool = Tool.define(
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
 
       const messageID = MessageID.ascending()
+      const taskKind = params.task_kind ?? "generic"
+      const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
+
+      const record = yield* tasks.create({
+        parentSessionID: ctx.sessionID,
+        childSessionID: nextSession.id,
+        groupID: params.group_id,
+        taskKind,
+        subagentType: next.name,
+        description: params.description,
+        prompt: params.prompt,
+        dependsOn,
+        metadata: params.metadata,
+      })
+
+      const canRun = yield* tasks.canRun({ parentSessionID: ctx.sessionID, task: record })
+      if (!canRun) {
+        return {
+          title: params.description,
+          metadata: {
+            sessionId: nextSession.id,
+            model,
+            taskId: nextSession.id,
+            status: "pending",
+            groupId: params.group_id,
+          },
+          output: [
+            `task_id: ${nextSession.id} (pending)`,
+            "",
+            "<task_result>",
+            "Task created and queued pending dependency or write-class constraints.",
+            "</task_result>",
+          ].join("\n"),
+        }
+      }
 
       function cancel() {
         ops.cancel(nextSession.id)
@@ -127,36 +180,62 @@ export const TaskTool = Tool.define(
         }),
         () =>
           Effect.gen(function* () {
+            yield* tasks.setRunning(nextSession.id, ctx.sessionID)
             const parts = yield* ops.resolvePromptParts(params.prompt)
-            const result = yield* ops.prompt({
-              messageID,
-              sessionID: nextSession.id,
-              model: {
-                modelID: model.modelID,
-                providerID: model.providerID,
-              },
-              agent: next.name,
-              tools: {
-                ...(canTodo ? {} : { todowrite: false }),
-                ...(canTask ? {} : { task: false }),
-                ...Object.fromEntries((cfg.experimental?.primary_tools ?? []).map((item) => [item, false])),
-              },
-              parts,
-            })
+            const result = yield* ops
+              .prompt({
+                messageID,
+                sessionID: nextSession.id,
+                model: {
+                  modelID: model.modelID,
+                  providerID: model.providerID,
+                },
+                agent: next.name,
+                tools: {
+                  ...(canTodo ? {} : { todowrite: false }),
+                  ...(canTask ? {} : { task: false }),
+                  ...Object.fromEntries((cfg.experimental?.primary_tools ?? []).map((item) => [item, false])),
+                },
+                parts,
+              })
+              .pipe(
+                Effect.tap((message) =>
+                  tasks.complete({
+                    taskID: nextSession.id,
+                    parentSessionID: ctx.sessionID,
+                    result: message,
+                  }),
+                ),
+                Effect.tapError((error) =>
+                  tasks.fail({
+                    taskID: nextSession.id,
+                    parentSessionID: ctx.sessionID,
+                    error: error instanceof Error ? error.message : String(error),
+                  }),
+                ),
+              )
+
+            const summary = result.parts.findLast((item) => item.type === "text")?.text ?? ""
 
             return {
               title: params.description,
               metadata: {
                 sessionId: nextSession.id,
                 model,
+                taskId: nextSession.id,
+                status: "completed",
+                groupId: params.group_id,
               },
-              output: [
-                `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
-                "",
-                "<task_result>",
-                result.parts.findLast((item) => item.type === "text")?.text ?? "",
-                "</task_result>",
-              ].join("\n"),
+              output:
+                (params.return_mode ?? "id") === "summary"
+                  ? [
+                      `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
+                      "",
+                      "<task_result>",
+                      summary,
+                      "</task_result>",
+                    ].join("\n")
+                  : `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
             }
           }),
         () =>
@@ -169,7 +248,7 @@ export const TaskTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context) => run(params, ctx).pipe(Effect.orDie),
+      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context<TaskMetadata>) => run(params, ctx).pipe(Effect.orDie),
     }
   }),
 )

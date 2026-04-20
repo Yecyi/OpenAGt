@@ -1,6 +1,5 @@
 import z from "zod"
 import os from "os"
-import { createWriteStream } from "node:fs"
 import * as Tool from "./tool"
 import path from "path"
 import DESCRIPTION from "./bash.txt"
@@ -13,17 +12,48 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { fileURLToPath } from "url"
 import { Flag } from "@/flag/flag"
 import { Shell } from "@/shell/shell"
+import { ShellRunner } from "@/shell/runner"
+import { SandboxPolicy } from "@/sandbox/policy"
 
 import { BashArity } from "@/permission/arity"
 import * as Truncate from "./truncate"
 import { Plugin } from "@/plugin"
-import { Effect, Stream } from "effect"
+import { Effect } from "effect"
+import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { commandClassifier } from "../security/command-classifier"
+import { ShellSecurity } from "../security/shell-security"
+import type { ShellDecision, ShellFinding, ShellRiskLevel } from "../security/shell-security"
+import type {
+  SandboxBackendPreference,
+  SandboxEnforcement,
+  SandboxFilesystemPolicy,
+  SandboxNetworkPolicy,
+} from "@/sandbox/types"
 
-const MAX_METADATA_LENGTH = 30_000
+type BashMetadata = {
+  output: string
+  exit: number | null
+  description: string
+  truncated: boolean
+  findings: ShellFinding[]
+  riskLevel: ShellRiskLevel
+  decision: ShellDecision
+  reviewApiVersion: 1
+  reviewMode: "disabled"
+  reviewStatus: "not_requested"
+  outputPath?: string
+  backendPreference?: SandboxBackendPreference
+  enforcement?: SandboxEnforcement
+  filesystemPolicy?: SandboxFilesystemPolicy
+  networkPolicy?: SandboxNetworkPolicy
+  allowedPaths?: string[]
+  writablePaths?: string[]
+  backendUsed?: string
+  terminationReason?: string
+}
+
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
 const PS = new Set(["powershell", "pwsh"])
 const CWD = new Set(["cd", "push-location", "set-location"])
@@ -51,6 +81,24 @@ const FILES = new Set([
 ])
 const FLAGS = new Set(["-destination", "-literalpath", "-path"])
 const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurse", "-verbose", "-whatif"])
+const PS_TOKENS = [
+  "$env:",
+  "${env:",
+  "$pshome",
+  "$pwd",
+  "write-host",
+  "write-output",
+  "get-content",
+  "set-content",
+  "copy-item",
+  "move-item",
+  "remove-item",
+  "new-item",
+  "set-location",
+  "push-location",
+  "pop-location",
+  "if ($?",
+]
 
 const Parameters = z.object({
   command: z.string().describe("The command to execute"),
@@ -77,11 +125,6 @@ type Scan = {
   dirs: Set<string>
   patterns: Set<string>
   always: Set<string>
-}
-
-type Chunk = {
-  text: string
-  size: number
 }
 
 export const log = Log.create({ service: "bash-tool" })
@@ -217,41 +260,22 @@ function pathArgs(list: Part[], ps: boolean) {
   return out
 }
 
-function preview(text: string) {
-  if (text.length <= MAX_METADATA_LENGTH) return text
-  return "...\n\n" + text.slice(-MAX_METADATA_LENGTH)
-}
-
-function tail(text: string, maxLines: number, maxBytes: number) {
-  const lines = text.split("\n")
-  if (lines.length <= maxLines && Buffer.byteLength(text, "utf-8") <= maxBytes) {
-    return {
-      text,
-      cut: false,
-    }
+function chooseShell(command: string) {
+  const acceptable = Shell.acceptable()
+  if (process.platform !== "win32") return acceptable
+  const text = command.trim().toLowerCase()
+  const hasPowerShellSyntax =
+    PS_TOKENS.some((item) => text.includes(item)) || /(^|[\s;(])&\s+["'a-z_$({]/i.test(text)
+  if (hasPowerShellSyntax) {
+    const preferred = Shell.preferred()
+    const name = Shell.name(preferred)
+    if (PS.has(name)) return preferred
+    const pwsh = Bun.which("pwsh")
+    if (pwsh) return pwsh
+    const powershell = Bun.which("powershell")
+    if (powershell) return powershell
   }
-
-  const out: string[] = []
-  let bytes = 0
-  for (let i = lines.length - 1; i >= 0 && out.length < maxLines; i--) {
-    const size = Buffer.byteLength(lines[i], "utf-8") + (out.length > 0 ? 1 : 0)
-    if (bytes + size > maxBytes) {
-      if (out.length === 0) {
-        const buf = Buffer.from(lines[i], "utf-8")
-        let start = buf.length - maxBytes
-        if (start < 0) start = 0
-        while (start < buf.length && (buf[start] & 0xc0) === 0x80) start++
-        out.unshift(buf.subarray(start).toString("utf-8"))
-      }
-      break
-    }
-    out.unshift(lines[i])
-    bytes += size
-  }
-  return {
-    text: out.join("\n"),
-    cut: true,
-  }
+  return acceptable
 }
 
 const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolean) {
@@ -260,7 +284,11 @@ const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolea
   return tree.rootNode
 })
 
-const ask = Effect.fn("BashTool.ask")(function* (ctx: Tool.Context, scan: Scan) {
+const ask = Effect.fn("BashTool.ask")(function* (
+  ctx: Tool.Context,
+  scan: Scan,
+  metadata: Record<string, unknown>,
+) {
   if (scan.dirs.size > 0) {
     const globs = Array.from(scan.dirs).map((dir) => {
       if (process.platform === "win32") return AppFileSystem.normalizePathPattern(path.join(dir, "*"))
@@ -279,28 +307,43 @@ const ask = Effect.fn("BashTool.ask")(function* (ctx: Tool.Context, scan: Scan) 
     permission: "bash",
     patterns: Array.from(scan.patterns),
     always: Array.from(scan.always),
-    metadata: {},
+    metadata,
   })
 })
 
-function cmd(shell: string, name: string, command: string, cwd: string, env: NodeJS.ProcessEnv) {
-  if (process.platform === "win32" && PS.has(name)) {
-    return ChildProcess.make(shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], {
-      cwd,
-      env,
-      stdin: "ignore",
-      detached: false,
-    })
-  }
-
-  return ChildProcess.make(command, [], {
-    shell,
-    cwd,
-    env,
-    stdin: "ignore",
-    detached: process.platform !== "win32",
+const askShellExecute = Effect.fn(
+  "BashTool.askShellExecute",
+)(function* (
+  ctx: Tool.Context,
+  input: {
+    patterns: string[]
+    metadata: Record<string, unknown>
+  },
+) {
+  yield* ctx.ask({
+    permission: "shell_execute",
+    patterns: input.patterns,
+    always: [],
+    metadata: input.metadata,
   })
-}
+})
+
+const askShellNetwork = Effect.fn(
+  "BashTool.askShellNetwork",
+)(function* (
+  ctx: Tool.Context,
+  input: {
+    patterns: string[]
+    metadata: Record<string, unknown>
+  },
+) {
+  yield* ctx.ask({
+    permission: "shell_network",
+    patterns: input.patterns,
+    always: [],
+    metadata: input.metadata,
+  })
+})
 
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
@@ -335,23 +378,43 @@ export const BashTool = Tool.define(
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner
     const fs = yield* AppFileSystem.Service
-    const trunc = yield* Truncate.Service
     const plugin = yield* Plugin.Service
+    const shellSecurity = yield* ShellSecurity.Service
+    const shellRunner = yield* ShellRunner.Service
+    const sandboxPolicy = yield* SandboxPolicy.Service
 
     const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
-      const lines = yield* spawner
-        .lines(ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text]))
-        .pipe(Effect.catch(() => Effect.succeed([] as string[])))
-      const file = lines[0]?.trim()
+      const handle = yield* spawner
+        .spawn(
+          ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text], {
+            cwd: Instance.directory,
+            extendEnv: true,
+            stdin: "ignore",
+            stderr: "ignore",
+          }),
+        )
+        .pipe(Effect.scoped)
+        .pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (!handle) return
+      const output = yield* Stream.decodeText(handle.stdout).pipe(
+        Stream.runCollect,
+        Effect.map((chunk) => [...chunk].join("")),
+        Effect.catch(() => Effect.succeed("")),
+      )
+      const file = output.split(/\r?\n/)[0]?.trim()
       if (!file) return
       return AppFileSystem.normalizePath(file)
     })
 
     const resolvePath = Effect.fn("BashTool.resolvePath")(function* (text: string, root: string, shell: string) {
       if (process.platform === "win32") {
-        if (Shell.posix(shell) && text.startsWith("/") && AppFileSystem.windowsPath(text) === text) {
+        if (Shell.posix(shell) && text.startsWith("/")) {
           const file = yield* cygpath(shell, text)
           if (file) return file
+          if (text === "/tmp" || text.startsWith("/tmp/")) {
+            const suffix = text.slice("/tmp".length).replaceAll("/", path.sep)
+            return AppFileSystem.normalizePath(path.join(os.tmpdir(), suffix))
+          }
         }
         return AppFileSystem.normalizePath(path.resolve(root, AppFileSystem.windowsPath(text)))
       }
@@ -410,239 +473,131 @@ export const BashTool = Tool.define(
       }
     })
 
-    const run = Effect.fn("BashTool.run")(function* (
-      input: {
-        shell: string
-        name: string
-        command: string
-        cwd: string
-        env: NodeJS.ProcessEnv
-        timeout: number
-        description: string
-      },
-      ctx: Tool.Context,
-    ) {
-      const bytes = Truncate.MAX_BYTES
-      const lines = Truncate.MAX_LINES
-      const keep = bytes * 2
-      let full = ""
-      let last = ""
-      const list: Chunk[] = []
-      let used = 0
-      let file = ""
-      let sink: ReturnType<typeof createWriteStream> | undefined
-      let cut = false
-      let expired = false
-      let aborted = false
-
-      yield* ctx.metadata({
-        metadata: {
-          output: "",
-          description: input.description,
-        },
-      })
-
-      const code: number | null = yield* Effect.scoped(
-        Effect.gen(function* () {
-          const handle = yield* spawner.spawn(cmd(input.shell, input.name, input.command, input.cwd, input.env))
-
-          yield* Effect.forkScoped(
-            Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
-              const size = Buffer.byteLength(chunk, "utf-8")
-              list.push({ text: chunk, size })
-              used += size
-              while (used > keep && list.length > 1) {
-                const item = list.shift()
-                if (!item) break
-                used -= item.size
-                cut = true
-              }
-
-              last = preview(last + chunk)
-
-              if (file) {
-                sink?.write(chunk)
-              } else {
-                full += chunk
-                if (Buffer.byteLength(full, "utf-8") > bytes) {
-                  return trunc.write(full).pipe(
-                    Effect.andThen((next) =>
-                      Effect.sync(() => {
-                        file = next
-                        cut = true
-                        sink = createWriteStream(next, { flags: "a" })
-                        full = ""
-                      }),
-                    ),
-                    Effect.andThen(
-                      ctx.metadata({
-                        metadata: {
-                          output: last,
-                          description: input.description,
-                        },
-                      }),
-                    ),
-                  )
-                }
-              }
-
-              return ctx.metadata({
-                metadata: {
-                  output: last,
-                  description: input.description,
-                },
-              })
-            }),
-          )
-
-          const abort = Effect.callback<void>((resume) => {
-            if (ctx.abort.aborted) return resume(Effect.void)
-            const handler = () => resume(Effect.void)
-            ctx.abort.addEventListener("abort", handler, { once: true })
-            return Effect.sync(() => ctx.abort.removeEventListener("abort", handler))
-          })
-
-          const timeout = Effect.sleep(`${input.timeout + 100} millis`)
-
-          const exit = yield* Effect.raceAll([
-            handle.exitCode.pipe(Effect.map((code) => ({ kind: "exit" as const, code }))),
-            abort.pipe(Effect.map(() => ({ kind: "abort" as const, code: null }))),
-            timeout.pipe(Effect.map(() => ({ kind: "timeout" as const, code: null }))),
-          ])
-
-          if (exit.kind === "abort") {
-            aborted = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-          if (exit.kind === "timeout") {
-            expired = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-
-          return exit.kind === "exit" ? exit.code : null
-        }),
-      ).pipe(Effect.orDie)
-
-      const meta: string[] = []
-      if (expired) {
-        meta.push(
-          `bash tool terminated command after exceeding timeout ${input.timeout} ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.`,
-        )
-      }
-      if (aborted) meta.push("User aborted the command")
-      const raw = list.map((item) => item.text).join("")
-      const end = tail(raw, lines, bytes)
-      if (end.cut) cut = true
-      if (!file && end.cut) {
-        file = yield* trunc.write(raw)
-      }
-
-      let output = end.text
-      if (!output) output = "(no output)"
-
-      if (cut && file) {
-        output = `...output truncated...\n\nFull output saved to: ${file}\n\n` + output
-      }
-
-      if (meta.length > 0) {
-        output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
-      }
-      if (sink) {
-        const stream = sink
-        yield* Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              stream.end(() => resolve())
-              stream.on("error", () => resolve())
-            }),
-        )
-      }
-
-      return {
-        title: input.description,
-        metadata: {
-          output: last || preview(output),
-          exit: code,
-          description: input.description,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
-        },
-        output,
-      }
-    })
-
-    return () =>
-      Effect.sync(() => {
-        const shell = Shell.acceptable()
-        const name = Shell.name(shell)
-        const chain =
-          name === "powershell"
+    return {
+      description: DESCRIPTION.replaceAll("${directory}", Instance.directory)
+        .replaceAll("${os}", process.platform)
+        .replaceAll("${shell}", Shell.name(Shell.acceptable()))
+        .replaceAll(
+          "${chaining}",
+          Shell.name(Shell.acceptable()) === "powershell"
             ? "If the commands depend on each other and must run sequentially, avoid '&&' in this shell because Windows PowerShell 5.1 does not support it. Use PowerShell conditionals such as `cmd1; if ($?) { cmd2 }` when later commands must depend on earlier success."
-            : "If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m \"message\" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead."
-        log.info("bash tool using shell", { shell })
+            : "If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m \"message\" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.",
+        )
+        .replaceAll("${maxLines}", String(Truncate.MAX_LINES))
+        .replaceAll("${maxBytes}", String(Truncate.MAX_BYTES)),
+      parameters: Parameters,
+      execute: (params: z.infer<typeof Parameters>, ctx: Tool.Context<BashMetadata>): Effect.Effect<Tool.ExecuteResult<BashMetadata>, never, never> =>
+        Effect.gen(function* () {
+          const shell = chooseShell(params.command)
+          const name = Shell.name(shell)
+          log.info("bash tool using shell", { shell })
+          const cwd = params.workdir ? yield* resolvePath(params.workdir, Instance.directory, shell) : Instance.directory
+          if (params.timeout !== undefined && params.timeout < 0) {
+            throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
+          }
 
-        return {
-          description: DESCRIPTION.replaceAll("${directory}", Instance.directory)
-            .replaceAll("${os}", process.platform)
-            .replaceAll("${shell}", name)
-            .replaceAll("${chaining}", chain)
-            .replaceAll("${maxLines}", String(Truncate.MAX_LINES))
-            .replaceAll("${maxBytes}", String(Truncate.MAX_BYTES)),
-          parameters: Parameters,
-          execute: (params: z.infer<typeof Parameters>, ctx: Tool.Context) =>
-            Effect.gen(function* () {
-              const cwd = params.workdir
-                ? yield* resolvePath(params.workdir, Instance.directory, shell)
-                : Instance.directory
-              if (params.timeout !== undefined && params.timeout < 0) {
-                throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
-              }
+          const timeout = params.timeout ?? DEFAULT_TIMEOUT
+          const ps = PS.has(name)
+          const root = yield* parse(params.command, ps)
+          const scan = yield* collect(root, cwd, ps, shell)
+          if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
 
-              // Security check: classify command for dangerous patterns
-              const classification = commandClassifier.classify(params.command)
-              if (classification.riskLevel === "high") {
-                // High risk commands are blocked immediately
-                log.warn("high-risk command blocked", {
-                  riskLevel: classification.riskLevel,
-                  warnings: classification.warnings,
-                  matchedPatterns: classification.matchedPatterns,
-                })
-                const errorMsg = `Dangerous command blocked: ${classification.warnings.join("; ")}`
-                return {
-                  title: "Bash Command Blocked",
-                  metadata: { output: errorMsg, exit: null, description: params.description ?? "", truncated: false },
-                  output: errorMsg,
-                }
-              } else if (classification.riskLevel === "medium") {
-                // Medium risk commands get logged as warnings but proceed
-                // The permission system will handle the actual confirmation
-                log.warn("medium-risk command detected", {
-                  riskLevel: classification.riskLevel,
-                  warnings: classification.warnings,
-                })
-              }
+          const security = yield* shellSecurity.analyze({
+            command: params.command,
+            shell,
+            cwd,
+          })
+          const externalPaths = Array.from(scan.dirs)
+          const permissionMetadata = shellSecurity.createPermissionMetadata({
+            result: security,
+            description: params.description ?? "Shell command",
+            workdir: cwd,
+            externalPaths,
+          })
+          const policy = yield* sandboxPolicy.resolve({
+            result: security,
+            cwd,
+            externalPaths,
+          })
+          const metadata = {
+            ...permissionMetadata,
+            backendPreference: policy.backend_preference,
+            enforcement: policy.enforcement,
+            filesystemPolicy: policy.filesystem_policy,
+            networkPolicy: policy.network_policy,
+            allowedPathsSummary: policy.allowed_paths,
+            backendAvailability: policy.sandbox.backend,
+          }
 
-              const timeout = params.timeout ?? DEFAULT_TIMEOUT
-              const ps = PS.has(name)
-              const root = yield* parse(params.command, ps)
-              const scan = yield* collect(root, cwd, ps, shell)
-              if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
-              yield* ask(ctx, scan)
+          if (security.decision === "block") {
+            const errorMsg = `Dangerous command blocked: ${security.explanation}`
+            return {
+              title: "Bash Command Blocked",
+              metadata: {
+                output: errorMsg,
+                exit: null as number | null,
+                description: params.description ?? "",
+                truncated: false,
+                findings: security.findings,
+                riskLevel: security.risk_level,
+                decision: security.decision,
+                reviewApiVersion: security.review_api_version,
+                reviewMode: security.review_mode,
+                reviewStatus: security.review_status,
+              } satisfies BashMetadata,
+              output: errorMsg,
+            }
+          }
 
-              return yield* run(
-                {
-                  shell,
-                  name,
-                  command: params.command,
-                  cwd,
-                  env: yield* shellEnv(ctx, cwd),
-                  timeout,
-                  description: params.description,
-                },
-                ctx,
-              )
-            }),
-        }
-      })
+          yield* ask(ctx, scan, metadata)
+          if (security.decision === "confirm") {
+            yield* askShellExecute(ctx, {
+              patterns: [security.normalized_command || params.command],
+              metadata,
+            })
+          }
+          if (policy.needs_network_permission) {
+            yield* askShellNetwork(ctx, {
+              patterns: [security.normalized_command || params.command],
+              metadata,
+            })
+          }
+
+          const env = yield* shellEnv(ctx, cwd)
+          return yield* shellRunner.run(
+            {
+              shell,
+              shellFamily: security.shell_family,
+              command: params.command,
+              cwd,
+              env,
+              timeout,
+              description: params.description ?? "Shell command",
+              enforcement: policy.enforcement,
+              backendPreference: policy.backend_preference,
+              filesystemPolicy: policy.filesystem_policy,
+              allowedPaths: policy.allowed_paths,
+              writablePaths: policy.writable_paths,
+              networkPolicy: policy.network_policy,
+              reportOnly: policy.sandbox.report_only,
+              failurePolicy: policy.sandbox.failure_policy,
+            },
+            ctx,
+          ).pipe(
+            Effect.map((result) => ({
+              ...result,
+              metadata: {
+                ...result.metadata,
+                findings: security.findings,
+                riskLevel: security.risk_level,
+                decision: security.decision,
+                reviewApiVersion: security.review_api_version,
+                reviewMode: security.review_mode,
+                reviewStatus: security.review_status,
+              },
+            })),
+          )
+        }),
+    }
   }),
 )

@@ -1,0 +1,200 @@
+import { Context, Effect, Layer } from "effect"
+import { createFrameParser, encodeFrame } from "./protocol"
+import { fileURLToPath } from "url"
+import {
+  SANDBOX_PROTOCOL_VERSION,
+  type SandboxBackendStatus,
+  type SandboxExecRequest,
+  type SandboxExecResult,
+} from "./types"
+
+type Pending = {
+  onStdout: (chunk: string) => void
+  onStderr: (chunk: string) => void
+  resolve: (result: SandboxExecResult) => void
+  reject: (error: Error) => void
+}
+
+export interface Interface {
+  readonly capabilities: () => Effect.Effect<SandboxBackendStatus[]>
+  readonly exec: (input: {
+    request: SandboxExecRequest
+    onStdout: (chunk: string) => void
+    onStderr: (chunk: string) => void
+    abort?: AbortSignal
+  }) => Effect.Effect<SandboxExecResult>
+}
+
+export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxBroker") {}
+
+function brokerScript() {
+  return fileURLToPath(new URL("./broker-main.ts", import.meta.url))
+}
+
+export const layer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    const proc = Bun.spawn({
+      cmd: [process.execPath, brokerScript()],
+      cwd: process.cwd(),
+      env: process.env,
+      stderr: "inherit",
+      stdout: "pipe",
+      stdin: "pipe",
+    })
+    const pending = new Map<string, Pending>()
+    let capabilities: SandboxBackendStatus[] | undefined
+    let ready = false
+    let waiters: Array<(value: SandboxBackendStatus[]) => void> = []
+    const fail = (error: Error) => {
+      for (const item of pending.values()) item.reject(error)
+      pending.clear()
+      for (const item of waiters) item([])
+      waiters = []
+    }
+    const parser = createFrameParser(
+      (frame) => {
+        if (frame.type === "broker.hello") {
+          ready = frame.protocol_version === SANDBOX_PROTOCOL_VERSION
+          return
+        }
+        if (frame.type === "broker.capabilities") {
+          capabilities = frame.backends
+          const current = waiters
+          waiters = []
+          for (const item of current) item(frame.backends)
+          return
+        }
+        if (frame.type === "exec.exit") {
+          const item = pending.get(frame.result.request_id)
+          if (!item) return
+          pending.delete(frame.result.request_id)
+          item.resolve(frame.result)
+          return
+        }
+        if (!("request_id" in frame)) return
+        const item = pending.get(frame.request_id)
+        if (!item) return
+        if (frame.type === "exec.stdout") {
+          item.onStdout(frame.chunk)
+          return
+        }
+        if (frame.type === "exec.stderr") {
+          item.onStderr(frame.chunk)
+          return
+        }
+        if (frame.type === "exec.error") {
+          pending.delete(frame.request_id)
+          item.reject(new Error(frame.error))
+        }
+      },
+      fail,
+    )
+    ;(async () => {
+      try {
+        const reader = proc.stdout.getReader()
+        while (true) {
+          const next = await reader.read()
+          if (next.done) break
+          if (next.value) parser(next.value)
+        }
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)))
+      }
+    })()
+
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(async () => {
+        try {
+          for (const requestID of pending.keys()) {
+            try {
+              proc.stdin.write(
+                encodeFrame({
+                  type: "exec.abort",
+                  protocol_version: SANDBOX_PROTOCOL_VERSION,
+                  request_id: requestID,
+                }),
+              )
+            } catch {}
+          }
+        } catch {}
+        try {
+          proc.stdin.end()
+        } catch {}
+        proc.kill()
+      }),
+    )
+
+    const send = (frame: Parameters<typeof encodeFrame>[0]) => {
+      try {
+        proc.stdin.write(encodeFrame(frame))
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+
+    const capabilitiesEffect = Effect.promise(
+      () =>
+        new Promise<SandboxBackendStatus[]>((resolve, reject) => {
+          if (!ready && proc.killed) {
+            reject(new Error("Sandbox broker failed to start"))
+            return
+          }
+          if (capabilities) {
+            resolve(capabilities)
+            return
+          }
+          waiters.push(resolve)
+        }),
+    )
+
+    const exec: Interface["exec"] = Effect.fn("SandboxBroker.exec")(function* (input) {
+      const result = yield* Effect.promise(
+        () =>
+          new Promise<SandboxExecResult>((resolve, reject) => {
+            const abort = () => {
+              try {
+                send({
+                  type: "exec.abort",
+                  protocol_version: SANDBOX_PROTOCOL_VERSION,
+                  request_id: input.request.request_id,
+                })
+              } catch {}
+            }
+            if (input.abort?.aborted) {
+              abort()
+            } else if (input.abort) {
+              input.abort.addEventListener("abort", abort, { once: true })
+            }
+            pending.set(input.request.request_id, {
+              onStdout: input.onStdout,
+              onStderr: input.onStderr,
+              resolve: (value) => {
+                if (input.abort) input.abort.removeEventListener("abort", abort)
+                resolve(value)
+              },
+              reject,
+            })
+            send({
+              type: "exec.start",
+              protocol_version: SANDBOX_PROTOCOL_VERSION,
+              request: input.request,
+            })
+          })
+      )
+      return result
+    })
+
+    return Service.of({
+      capabilities: () => capabilitiesEffect,
+      exec,
+    })
+  }),
+)
+
+export const defaultLayer = layer
+export const SandboxBroker = {
+  Service,
+  layer,
+  defaultLayer,
+}

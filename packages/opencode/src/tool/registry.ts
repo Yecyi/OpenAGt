@@ -7,6 +7,10 @@ import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
+import { TaskListTool } from "./task_list"
+import { TaskGetTool } from "./task_get"
+import { TaskWaitTool } from "./task_wait"
+import { TaskStopTool } from "./task_stop"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
@@ -45,6 +49,11 @@ import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
+import { ShellRunner } from "@/shell/runner"
+import { ShellSecurity } from "@/security/shell-security"
+import { TaskRuntime } from "@/session/task-runtime"
+import { SandboxBroker } from "@/sandbox/broker"
+import { SandboxPolicy } from "@/sandbox/policy"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -67,27 +76,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ToolRegistry") {}
 
-export const layer: Layer.Layer<
-  Service,
-  never,
-  | Config.Service
-  | Plugin.Service
-  | Question.Service
-  | Todo.Service
-  | Agent.Service
-  | Skill.Service
-  | Session.Service
-  | Provider.Service
-  | LSP.Service
-  | Instruction.Service
-  | AppFileSystem.Service
-  | Bus.Service
-  | HttpClient.HttpClient
-  | ChildProcessSpawner
-  | Ripgrep.Service
-  | Format.Service
-  | Truncate.Service
-> = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -98,6 +87,10 @@ export const layer: Layer.Layer<
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
+    const taskList = yield* TaskListTool
+    const taskGet = yield* TaskGetTool
+    const taskWait = yield* TaskWaitTool
+    const taskStop = yield* TaskStopTool
     const read = yield* ReadTool
     const question = yield* QuestionTool
     const todo = yield* TodoWriteTool
@@ -186,6 +179,10 @@ export const layer: Layer.Layer<
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
+          task_list: Tool.init(taskList),
+          task_get: Tool.init(taskGet),
+          task_wait: Tool.init(taskWait),
+          task_stop: Tool.init(taskStop),
           fetch: Tool.init(webfetch),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
@@ -207,6 +204,9 @@ export const layer: Layer.Layer<
           "lsp",
           "question",
           "skill",
+          "task_list",
+          "task_get",
+          "task_wait",
         ])
 
         function withConcurrencySafety(t: Tool.Def): Tool.Def {
@@ -228,6 +228,10 @@ export const layer: Layer.Layer<
             withConcurrencySafety(tool.edit),
             withConcurrencySafety(tool.write),
             withConcurrencySafety(tool.task),
+            withConcurrencySafety(tool.task_list),
+            withConcurrencySafety(tool.task_get),
+            withConcurrencySafety(tool.task_wait),
+            withConcurrencySafety(tool.task_stop),
             withConcurrencySafety(tool.fetch),
             withConcurrencySafety(tool.todo),
             withConcurrencySafety(tool.search),
@@ -283,7 +287,18 @@ export const layer: Layer.Layer<
             `- ${item.name}: ${item.description ?? "This subagent should only be called manually by the user."}`,
         )
         .join("\n")
-      return ["Available agent types and the tools they have access to:", description].join("\n")
+      return [
+        "Available agent types and the tools they have access to:",
+        "",
+        "Task orchestration protocol:",
+        "- Launch subagents with task",
+        "- Use task_wait to wait for completion",
+        "- Use task_get or task_list to inspect status and summaries",
+        "- Use task_stop to cancel queued or running tasks",
+        "- Research tasks can run in parallel; implement tasks should stay serialized unless write domains are clearly independent",
+        "",
+        description,
+      ].join("\n")
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
@@ -336,24 +351,30 @@ export const layer: Layer.Layer<
   }),
 )
 
-export const defaultLayer = Layer.suspend(() =>
-  layer.pipe(
-    Layer.provide(Config.defaultLayer),
-    Layer.provide(Plugin.defaultLayer),
-    Layer.provide(Question.defaultLayer),
-    Layer.provide(Todo.defaultLayer),
-    Layer.provide(Skill.defaultLayer),
-    Layer.provide(Agent.defaultLayer),
-    Layer.provide(Session.defaultLayer),
-    Layer.provide(Provider.defaultLayer),
-    Layer.provide(LSP.defaultLayer),
-    Layer.provide(Instruction.defaultLayer),
-    Layer.provide(AppFileSystem.defaultLayer),
-    Layer.provide(Bus.layer),
-    Layer.provide(FetchHttpClient.layer),
-    Layer.provide(Format.defaultLayer),
-    Layer.provide(CrossSpawnSpawner.defaultLayer),
-    Layer.provide(Ripgrep.defaultLayer),
-    Layer.provide(Truncate.defaultLayer),
-  ),
-)
+export const defaultLayer = Layer.suspend(() => {
+  const dependencies = Layer.mergeAll(
+    Config.defaultLayer,
+    Plugin.defaultLayer,
+    Question.defaultLayer,
+    Todo.defaultLayer,
+    Skill.defaultLayer,
+    Agent.defaultLayer,
+    Session.defaultLayer,
+    TaskRuntime.defaultLayer,
+    Provider.defaultLayer,
+    LSP.defaultLayer,
+    Instruction.defaultLayer,
+    AppFileSystem.defaultLayer,
+    Bus.defaultLayer,
+    SandboxBroker.defaultLayer,
+    SandboxPolicy.liveLayer,
+    ShellRunner.defaultLayer,
+    ShellSecurity.defaultLayer,
+    FetchHttpClient.layer,
+    Format.defaultLayer,
+    CrossSpawnSpawner.defaultLayer,
+    Ripgrep.defaultLayer,
+    Truncate.defaultLayer,
+  )
+  return layer.pipe(Layer.provide(dependencies))
+})

@@ -63,9 +63,19 @@ function pick() {
 function select(file: string | undefined, opts?: { acceptable?: boolean }) {
   if (file && (!opts?.acceptable || !BLACKLIST.has(name(file)))) return full(file)
   if (process.platform === "win32") {
+    if (opts?.acceptable) return fallback()
     const shell = pick()
     if (shell) return shell
   }
+  return fallback()
+}
+
+function acceptableSelect(file: string | undefined) {
+  if (process.platform !== "win32") return select(file, { acceptable: true })
+  if (!file) return fallback()
+  const shell = full(file)
+  if (BLACKLIST.has(name(shell))) return fallback()
+  if (posix(shell)) return shell
   return fallback()
 }
 
@@ -105,6 +115,6 @@ export function posix(file: string) {
 
 export const preferred = lazy(() => select(process.env.SHELL))
 
-export const acceptable = lazy(() => select(process.env.SHELL, { acceptable: true }))
+export const acceptable = lazy(() => acceptableSelect(process.env.SHELL))
 
 export * as Shell from "./shell"
