@@ -54,7 +54,7 @@
 - [基于 OpenCode 进行开发](#基于-opencode-进行开发)
 - [常见问题 (FAQ)](#常见问题-faq)
   - [这和 Claude Code 有什么不同？](#这和-claude-code-有什么不同)
-- [OpenAG 扩展](#openag-扩展)
+- [OpenAGt 扩展](#openagt-扩展)
   - [主要增强](#主要增强)
   - [核心模块文档](#核心模块文档)
 
@@ -154,9 +154,9 @@ OpenCode 内置两种 Agent，可用 `Tab` 键快速切换：
 
 ---
 
-## OpenAG 扩展
+## OpenAGt 扩展
 
-OpenAG 是基于 OpenCode 的增强版本，增加了以下高级功能。
+OpenAGt 是基于 OpenCode 的增强版本，增加了以下高级功能。
 
 ### 主要增强
 

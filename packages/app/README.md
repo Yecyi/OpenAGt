@@ -1,4 +1,4 @@
-# OpenAG Web Application
+# OpenAGt Web Application
 
 基于 SolidJS 的 Web 界面，提供会话管理和实时协作功能。
 
@@ -96,7 +96,7 @@ Web 应用通过 HTTP + SSE 与后端通信：
 
 ```
 ┌─────────────┐          HTTP/SSE           ┌─────────────┐
-│  SolidJS   │ ◀─────────────────────────▶ │   OpenAG   │
+│  SolidJS   │ ◀─────────────────────────▶ │   OpenAGt   │
 │  Web App   │      GET /api/session/:id   │   Server   │
 │            │      POST /api/prompt       │  (Hono)    │
 └─────────────┘      GET /api/stream       └─────────────┘

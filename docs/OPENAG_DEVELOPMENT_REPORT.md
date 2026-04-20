@@ -1,22 +1,22 @@
-<div align="center" style="width: 95%; max-width: 1400px; margin: 0 auto;"><font size="7">**OpenAG 深度分析与发展建议报告**</font></div>
+<div align="center" style="width: 95%; max-width: 1400px; margin: 0 auto;"><font size="7">**OpenAGt 深度分析与发展建议报告**</font></div>
 
-**基于 OpenAG vs Codex vs Hermes Agent 对比**
+**基于 OpenAGt vs Codex vs Hermes Agent 对比**
 
 ---
 
 ## 引言
 
-本报告深入分析 OpenAG 与业界领先产品（OpenAI Codex、Rust monorepo；Hermes Agent、Python 系统）在架构、功能、工程质量等方面的差距，并提出具体、可行的改进建议。
+本报告深入分析 OpenAGt 与业界领先产品（OpenAI Codex、Rust monorepo；Hermes Agent、Python 系统）在架构、功能、工程质量等方面的差距，并提出具体、可行的改进建议。
 
 **分析前提**：
 
-- OpenAG 是一个有潜力的开源项目，采用现代化的 Effect.ts 架构
+- OpenAGt 是一个有潜力的开源项目，采用现代化的 Effect.ts 架构
 - Codex 代表企业级 AI 编程工具的最高水平
 - Hermes Agent 代表高度可扩展的 AI Agent 系统
 
 ---
 
-## 一、OpenAG 当前状态评估
+## 一、OpenAGt 当前状态评估
 
 ### 1.1 架构优势（已具备）
 
@@ -75,7 +75,7 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**OpenAG 的安全现状**：
+**OpenAGt 的安全现状**：
 
 ```typescript
 // 仅基础的权限规则系统
@@ -99,7 +99,7 @@ const defaults = Permission.fromConfig({
 
 **差距影响**：
 
-- 用户无法在不受信任的环境中安全运行 OpenAG
+- 用户无法在不受信任的环境中安全运行 OpenAGt
 - 无法作为企业级工具部署（安全团队不会批准）
 - 危险命令没有多层防护
 
@@ -132,7 +132,7 @@ Workers execute tasks autonomously — especially research, implementation, or v
 }
 ```
 
-**OpenAG 的 subagent 实现**：
+**OpenAGt 的 subagent 实现**：
 
 ```typescript
 // 仅支持基本的 subagent，没有协调者模式
@@ -171,7 +171,7 @@ class ToolRegistry:
         return self._tools[tool_name].handler(args, task_id=task_id)
 ```
 
-**OpenAG 的工具分发**：
+**OpenAGt 的工具分发**：
 
 ```typescript
 // src/tool/executor.ts - 相对简单
@@ -197,7 +197,7 @@ class ContextCompressor:
         # 4. 保持工具调用因果链
 ```
 
-**OpenAG 的压缩策略**：
+**OpenAGt 的压缩策略**：
 
 ```typescript
 // src/session/compaction/
@@ -234,7 +234,7 @@ export const compaction = z.discriminatedUnion("type", [
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**OpenAG 的当前架构**：
+**OpenAGt 的当前架构**：
 
 ```typescript
 // 单一进程为主，缺少远程执行能力
@@ -430,7 +430,7 @@ class TrajectorySaver:
         """回放历史轨迹"""
 ```
 
-**OpenAG 设计草案**：
+**OpenAGt 设计草案**：
 
 ```typescript
 // src/session/trajectory.ts
@@ -477,7 +477,7 @@ pub struct ExecServer {
 }
 ```
 
-**OpenAG 设计草案**：
+**OpenAGt 设计草案**：
 
 ```typescript
 // src/server/exec-server.ts
@@ -528,7 +528,7 @@ class SkillsHub:
         """发布技能到市场"""
 ```
 
-**OpenAG 设计草案**：
+**OpenAGt 设计草案**：
 
 ```typescript
 // src/plugin/marketplace.ts
@@ -565,7 +565,7 @@ interface MarketplaceService {
 **当前问题**：
 
 ```
-OpenAG 的测试现状：
+OpenAGt 的测试现状：
 - bun test --timeout 30000
 - 没有测试覆盖率要求
 - 没有 CI 测试覆盖率 gate
@@ -682,7 +682,7 @@ jobs:
 
 ## 六、竞争优势分析
 
-### 6.1 OpenAG 的独特优势
+### 6.1 OpenAGt 的独特优势
 
 | 优势 | 说明 | 竞品差距 |
 |------|------|----------|
@@ -729,7 +729,7 @@ jobs:
 
 ## 附录：相关资源
 
-- [OpenAG GitHub](https://github.com/anomalyco/opencode)
+- [OpenAGt GitHub](https://github.com/anomalyco/opencode)
 - [Codex CLI (Rust monorepo)](https://github.com/openai/codex)
 - [Hermes Agent](https://github.com/cosmos-44/hermes-agent)
 - [Effect.ts 框架](https://effect.website/)
@@ -737,4 +737,4 @@ jobs:
 ---
 
 *报告生成时间：2026-04-19*
-*基于：OpenAG v1.14.17、Codex (Rust monorepo)、Hermes Agent (Python)*
+*基于：OpenAGt v1.14.17、Codex (Rust monorepo)、Hermes Agent (Python)*

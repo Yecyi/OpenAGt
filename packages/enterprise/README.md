@@ -1,4 +1,4 @@
-# OpenAG Enterprise
+# OpenAGt Enterprise
 
 企业级功能扩展包，提供高级安全、合规和管理功能。
 
@@ -76,7 +76,7 @@
 
 | 选项 | 提供商 | 说明 |
 |------|--------|------|
-| **OpenAG Cloud** | AWS/GCP/Azure | 完全托管服务 |
+| **OpenAGt Cloud** | AWS/GCP/Azure | 完全托管服务 |
 | **Private Cloud** | 客户云 | VPC 私有部署 |
 | **On-Premise** | 客户数据中心 | 物理机房部署 |
 
@@ -160,7 +160,7 @@ services:
 
 ```yaml
 # GitHub Actions
-- name: Run OpenAG Security Scan
+- name: Run OpenAGt Security Scan
   uses: opencode/enterprise-action@v1
   with:
     policy: enforce

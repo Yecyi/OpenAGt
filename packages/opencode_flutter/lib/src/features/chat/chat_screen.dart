@@ -216,9 +216,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: message.isAgent
-              ? OpenAGColors.surfaceContainerHigh
-              : OpenAGColors.primaryContainer,
-          border: Border.all(color: OpenAGColors.outlineVariant),
+              ? OpenAGtColors.surfaceContainerHigh
+              : OpenAGtColors.primaryContainer,
+          border: Border.all(color: OpenAGtColors.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +232,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     Icon(
                       Icons.smart_toy,
                       size: 16,
-                      color: OpenAGColors.onSurfaceVariant,
+                      color: OpenAGtColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -259,8 +259,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: OpenAGColors.surfaceContainerHigh,
-          border: Border.all(color: OpenAGColors.outlineVariant),
+          color: OpenAGtColors.surfaceContainerHigh,
+          border: Border.all(color: OpenAGtColors.outlineVariant),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -270,7 +270,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: OpenAGColors.onSurfaceVariant,
+                color: OpenAGtColors.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 8),
@@ -288,9 +288,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: OpenAGColors.surfaceContainerLowest,
+        color: OpenAGtColors.surfaceContainerLowest,
         border: Border(
-          top: BorderSide(color: OpenAGColors.outlineVariant),
+          top: BorderSide(color: OpenAGtColors.outlineVariant),
         ),
       ),
       child: SafeArea(
@@ -299,7 +299,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.attach_file),
               onPressed: () {},
-              color: OpenAGColors.onSurfaceVariant,
+              color: OpenAGtColors.onSurfaceVariant,
             ),
             Expanded(
               child: TextField(
@@ -317,8 +317,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               icon: Icon(
                 Icons.arrow_upward,
                 color: _isLoading
-                    ? OpenAGColors.onSurfaceVariant
-                    : OpenAGColors.primary,
+                    ? OpenAGtColors.onSurfaceVariant
+                    : OpenAGtColors.primary,
               ),
               onPressed: _isLoading ? null : _sendMessage,
             ),

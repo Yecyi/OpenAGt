@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "REPO=C:\Users\ycy20\.codex\worktrees\083c\OpenAG"
+for %%I in ("%~dp0..") do set "REPO=%%~fI"
 set "BUN=%USERPROFILE%\.bun\bin\bun.exe"
 if exist "%BUN%" goto run
 set "BUN=%USERPROFILE%\scoop\apps\bun\current\bun.exe"

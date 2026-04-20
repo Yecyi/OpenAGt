@@ -2,7 +2,7 @@
  * Claude Code Compatibility Adapter
  *
  * Provides compatibility layer to use Claude Code tools and workflows
- * within OpenAG. This allows smoother migration and hybrid usage.
+ * within OpenAGt. This allows smoother migration and hybrid usage.
  */
 
 import { Effect, Context } from "effect"
@@ -42,13 +42,13 @@ const CC_TOOL_MAPPINGS: Record<string, string> = {
   "NotebookEditTool": "notebook_edit",
 }
 
-// Reverse mapping (OpenAG -> CC)
+// Reverse mapping (OpenAGt -> CC)
 const OPENAG_TO_CC_MAPPINGS: Record<string, string> = Object.fromEntries(
   Object.entries(CC_TOOL_MAPPINGS).map(([cc, openag]) => [openag, cc])
 )
 
 /**
- * Convert CC-style tool call to OpenAG format
+ * Convert CC-style tool call to OpenAGt format
  */
 export function adaptCCToolCall(
   ccToolName: string,
@@ -70,7 +70,7 @@ export function adaptCCToolCall(
 }
 
 /**
- * Adapt CC tool input to OpenAG format
+ * Adapt CC tool input to OpenAGt format
  */
 function adaptInput(
   toolName: string,
@@ -142,7 +142,7 @@ function adaptInput(
 }
 
 /**
- * Convert OpenAG tool result to CC format
+ * Convert OpenAGt tool result to CC format
  */
 export function adaptToolResultToCC(
   openagTool: string,
@@ -201,9 +201,9 @@ export interface CCSessionMessage {
 }
 
 /**
- * Convert CC session format to OpenAG format
+ * Convert CC session format to OpenAGt format
  */
-export function convertCCSessionToOpenAG(
+export function convertCCSessionToOpenAGt(
   ccMessages: CCSessionMessage[]
 ): unknown[] {
   return ccMessages.map((msg) => ({
@@ -218,9 +218,9 @@ export function convertCCSessionToOpenAG(
 }
 
 /**
- * Convert OpenAG session format to CC format
+ * Convert OpenAGt session format to CC format
  */
-export function convertOpenAGSessionToCC(
+export function convertOpenAGtSessionToCC(
   openagMessages: unknown[]
 ): CCSessionMessage[] {
   return openagMessages.map((msg: any) => ({
@@ -278,7 +278,7 @@ export function parseCCSystemPrompt(prompt: string): CCSystemPromptComponents {
 }
 
 /**
- * Adapt CC system prompt to OpenAG format
+ * Adapt CC system prompt to OpenAGt format
  */
 export function adaptCCSystemPrompt(
   ccPrompt: string,
@@ -286,10 +286,10 @@ export function adaptCCSystemPrompt(
 ): string {
   const sections = parseCCSystemPrompt(ccPrompt)
 
-  // Build OpenAG-style system prompt
+  // Build OpenAGt-style system prompt
   let openagPrompt = sections.basePrompt
 
-  // Add OpenAG tools section
+  // Add OpenAGt tools section
   if (openagTools.length > 0) {
     const toolList = openagTools.map((t) => `- \`${t}\``).join("\n")
     openagPrompt += `\n\n## Available Tools\n\n${toolList}`
@@ -318,7 +318,7 @@ export interface CCTaskNotification {
 }
 
 /**
- * Convert OpenAG internal task state to CC notification format
+ * Convert OpenAGt internal task state to CC notification format
  */
 export function toCCTaskNotification(
   task: {
@@ -342,7 +342,7 @@ export function toCCTaskNotification(
 // ============================================================================
 
 /**
- * Map CC feature flags to OpenAG equivalents
+ * Map CC feature flags to OpenAGt equivalents
  */
 export const FEATURE_FLAG_MAP: Record<string, string | undefined> = {
   COORDINATOR_MODE: "OPENCODE_COORDINATOR_MODE",
@@ -353,9 +353,9 @@ export const FEATURE_FLAG_MAP: Record<string, string | undefined> = {
 }
 
 /**
- * Get OpenAG feature flag value from CC flag
+ * Get OpenAGt feature flag value from CC flag
  */
-export function getOpenAGFeatureFlag(ccFlag: string): string | undefined {
+export function getOpenAGtFeatureFlag(ccFlag: string): string | undefined {
   const openagFlag = FEATURE_FLAG_MAP[ccFlag]
   if (openagFlag) {
     return process.env[openagFlag]
@@ -369,7 +369,7 @@ export function getOpenAGFeatureFlag(ccFlag: string): string | undefined {
 export function isCCFeatureEnabled(ccFlag: string): boolean {
   // CC uses bun:bundle feature() which we can't replicate exactly
   // But we can check environment variables
-  return process.env[ccFlag] === "1" || getOpenAGFeatureFlag(ccFlag) === "1"
+  return process.env[ccFlag] === "1" || getOpenAGtFeatureFlag(ccFlag) === "1"
 }
 
 // ============================================================================
@@ -389,7 +389,7 @@ export interface CCPermissionContext {
 }
 
 /**
- * Convert OpenAG permission to CC format
+ * Convert OpenAGt permission to CC format
  */
 export function toCCPermissionContext(
   openagPerm: {
@@ -423,8 +423,8 @@ export const ccCompatibility = {
   adaptCCToolCall,
   adaptToolResultToCC,
   adaptCCSystemPrompt,
-  convertCCSessionToOpenAG,
-  convertOpenAGSessionToCC,
+  convertCCSessionToOpenAGt,
+  convertOpenAGtSessionToCC,
   toCCTaskNotification,
   isCCFeatureEnabled,
   toCCPermissionContext,

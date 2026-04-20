@@ -1,6 +1,6 @@
-# OpenAG Documentation
+# OpenAGt Documentation
 
-使用 [Mintlify](https://mintlify.com) 构建的 OpenAG 官方文档。
+使用 [Mintlify](https://mintlify.com) 构建的 OpenAGt 官方文档。
 
 ---
 

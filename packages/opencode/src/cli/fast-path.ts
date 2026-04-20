@@ -48,7 +48,7 @@ export function executeFastPath(args: string[]): { exit: boolean; code: number }
     case "--version":
     case "-v":
     case "version": {
-      console.log(`${VERSION} (OpenAG)`)
+      console.log(`${VERSION} (OpenAGt)`)
       return { exit: true, code: 0 }
     }
 
@@ -68,7 +68,7 @@ export function executeFastPath(args: string[]): { exit: boolean; code: number }
  * Get minimal help text without importing full CLI
  */
 function getHelpText(): string {
-  return `OpenAG ${VERSION}
+  return `OpenAGt ${VERSION}
 
 Usage: opencode [command] [options]
 
@@ -80,11 +80,11 @@ Commands:
   provider            Manage AI providers
   model               Manage models
   mcp                 Model Context Protocol tools
-  serve               Start the OpenAG server
+  serve               Start the OpenAGt server
   web                 Start the web UI
   debug               Debugging tools
   upgrade             Check for updates
-  uninstall           Uninstall OpenAG
+  uninstall           Uninstall OpenAGt
 
 Options:
   --version, -v       Show version number

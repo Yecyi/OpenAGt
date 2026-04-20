@@ -1,6 +1,6 @@
-# Effect Framework 在 OpenAG 中的应用
+# Effect Framework 在 OpenAGt 中的应用
 
-本文档介绍 OpenAG 中 Effect.ts 框架的使用模式、架构设计和最佳实践。
+本文档介绍 OpenAGt 中 Effect.ts 框架的使用模式、架构设计和最佳实践。
 
 ---
 
@@ -15,7 +15,7 @@
   - [MemoMap](#memomap)
 - [最佳实践](#最佳实践)
 - [常见模式](#常见模式)
-- [Effect 与 OpenAG 集成](#effect-与-openag-集成)
+- [Effect 与 OpenAGt 集成](#effect-与-openagt-集成)
 - [调试技巧](#调试技巧)
 - [资源](#资源)
 
@@ -23,7 +23,7 @@
 
 ## 概述
 
-OpenAG 使用 [Effect.ts](https://effect.website/) 作为核心框架，实现了函数式依赖注入模式。相比传统的命令式依赖注入（如 Angular 的 DI 或 Spring），Effect 提供了：
+OpenAGt 使用 [Effect.ts](https://effect.website/) 作为核心框架，实现了函数式依赖注入模式。相比传统的命令式依赖注入（如 Angular 的 DI 或 Spring），Effect 提供了：
 
 - **类型安全的依赖管理**：所有依赖通过类型系统管理
 - **组合性**：通过 Layer 和 Context 实现声明式组合
@@ -278,7 +278,7 @@ yield* Queue.offer(queue, "item")
 const item = yield* Queue.take(queue)
 ```
 
-## Effect 与 OpenAG 集成
+## Effect 与 OpenAGt 集成
 
 ### Bus Service
 

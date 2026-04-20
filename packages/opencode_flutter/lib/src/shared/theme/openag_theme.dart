@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class OpenAGColors {
+class OpenAGtColors {
   // Light theme - Level 0: Base canvas
   static const Color surface = Color(0xFFF9F9F9);
   static const Color surfaceContainerLow = Color(0xFFF3F3F3);
@@ -33,7 +33,7 @@ class OpenAGColors {
   static const Color primaryDark = Color(0xFFF0F0F0);
 }
 
-class OpenAGTheme {
+class OpenAGtTheme {
   static const String _newsreaderFamily = 'Newsreader';
   static const String _publicSansFamily = 'Public Sans';
 
@@ -42,27 +42,27 @@ class OpenAGTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: const ColorScheme.light(
-        surface: OpenAGColors.surface,
-        onSurface: OpenAGColors.onSurface,
-        primary: OpenAGColors.primary,
-        onPrimary: OpenAGColors.onPrimary,
-        primaryContainer: OpenAGColors.primaryContainer,
-        onPrimaryContainer: OpenAGColors.onPrimaryContainer,
-        secondary: OpenAGColors.onSurfaceVariant,
-        onSecondary: OpenAGColors.onPrimary,
-        secondaryContainer: OpenAGColors.surfaceContainerHighest,
-        onSecondaryContainer: OpenAGColors.onSurface,
-        outline: OpenAGColors.outline,
-        outlineVariant: OpenAGColors.outlineVariant,
-        error: OpenAGColors.error,
-        onError: OpenAGColors.onError,
-        errorContainer: OpenAGColors.errorContainer,
-        onErrorContainer: OpenAGColors.onErrorContainer,
+        surface: OpenAGtColors.surface,
+        onSurface: OpenAGtColors.onSurface,
+        primary: OpenAGtColors.primary,
+        onPrimary: OpenAGtColors.onPrimary,
+        primaryContainer: OpenAGtColors.primaryContainer,
+        onPrimaryContainer: OpenAGtColors.onPrimaryContainer,
+        secondary: OpenAGtColors.onSurfaceVariant,
+        onSecondary: OpenAGtColors.onPrimary,
+        secondaryContainer: OpenAGtColors.surfaceContainerHighest,
+        onSecondaryContainer: OpenAGtColors.onSurface,
+        outline: OpenAGtColors.outline,
+        outlineVariant: OpenAGtColors.outlineVariant,
+        error: OpenAGtColors.error,
+        onError: OpenAGtColors.onError,
+        errorContainer: OpenAGtColors.errorContainer,
+        onErrorContainer: OpenAGtColors.onErrorContainer,
       ),
-      scaffoldBackgroundColor: OpenAGColors.surface,
+      scaffoldBackgroundColor: OpenAGtColors.surface,
       appBarTheme: const AppBarTheme(
-        backgroundColor: OpenAGColors.surface,
-        foregroundColor: OpenAGColors.primary,
+        backgroundColor: OpenAGtColors.surface,
+        foregroundColor: OpenAGtColors.primary,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
@@ -71,7 +71,7 @@ class OpenAGTheme {
           fontWeight: FontWeight.w700,
           fontStyle: FontStyle.italic,
           letterSpacing: -0.5,
-          color: OpenAGColors.primary,
+          color: OpenAGtColors.primary,
         ),
       ),
       textTheme: _buildTextTheme(Brightness.light),
@@ -80,25 +80,25 @@ class OpenAGTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.zero,
         ),
-        color: OpenAGColors.surfaceContainerLowest,
+        color: OpenAGtColors.surfaceContainerLowest,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: OpenAGColors.surfaceContainerHighest,
+        fillColor: OpenAGtColors.surfaceContainerHighest,
         border: const OutlineInputBorder(
           borderRadius: BorderRadius.zero,
           borderSide: BorderSide.none,
         ),
         focusedBorder: UnderlineInputBorder(
           borderRadius: BorderRadius.zero,
-          borderSide: BorderSide(color: OpenAGColors.primary, width: 2),
+          borderSide: BorderSide(color: OpenAGtColors.primary, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: OpenAGColors.primary,
-          foregroundColor: OpenAGColors.onPrimary,
+          backgroundColor: OpenAGtColors.primary,
+          foregroundColor: OpenAGtColors.onPrimary,
           elevation: 0,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.zero,
@@ -108,8 +108,8 @@ class OpenAGTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: OpenAGColors.primary,
-          side: const BorderSide(color: OpenAGColors.primary),
+          foregroundColor: OpenAGtColors.primary,
+          side: const BorderSide(color: OpenAGtColors.primary),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.zero,
           ),
@@ -117,7 +117,7 @@ class OpenAGTheme {
         ),
       ),
       dividerTheme: const DividerThemeData(
-        color: OpenAGColors.outlineVariant,
+        color: OpenAGtColors.outlineVariant,
         thickness: 1,
         space: 1,
       ),
@@ -128,10 +128,10 @@ class OpenAGTheme {
         ),
       ),
       navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: OpenAGColors.surfaceContainerLow,
-        selectedIconTheme: IconThemeData(color: OpenAGColors.primary),
-        unselectedIconTheme: IconThemeData(color: OpenAGColors.onSurfaceVariant),
-        indicatorColor: OpenAGColors.surfaceContainerHighest,
+        backgroundColor: OpenAGtColors.surfaceContainerLow,
+        selectedIconTheme: IconThemeData(color: OpenAGtColors.primary),
+        unselectedIconTheme: IconThemeData(color: OpenAGtColors.onSurfaceVariant),
+        indicatorColor: OpenAGtColors.surfaceContainerHighest,
       ),
     );
   }
@@ -141,7 +141,7 @@ class OpenAGTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: const ColorScheme.dark(
-        surface: OpenAGColors.surfaceDark,
+        surface: OpenAGtColors.surfaceDark,
         onSurface: Color(0xFFF0F0F0),
         primary: Color(0xFFF0F0F0),
         onPrimary: Color(0xFF1A1A1A),
@@ -158,9 +158,9 @@ class OpenAGTheme {
         errorContainer: Color(0xFF93000A),
         onErrorContainer: Color(0xFFFFDAD6),
       ),
-      scaffoldBackgroundColor: OpenAGColors.surfaceDark,
+      scaffoldBackgroundColor: OpenAGtColors.surfaceDark,
       appBarTheme: const AppBarTheme(
-        backgroundColor: OpenAGColors.surfaceDark,
+        backgroundColor: OpenAGtColors.surfaceDark,
         foregroundColor: Color(0xFFF0F0F0),
         elevation: 0,
         centerTitle: false,
@@ -179,7 +179,7 @@ class OpenAGTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.zero,
         ),
-        color: OpenAGColors.surfaceContainerLowestDark,
+        color: OpenAGtColors.surfaceContainerLowestDark,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -215,9 +215,9 @@ class OpenAGTheme {
 
   static TextTheme _buildTextTheme(Brightness brightness) {
     final Color textColor =
-        brightness == Brightness.light ? OpenAGColors.onSurface : const Color(0xFFF0F0F0);
+        brightness == Brightness.light ? OpenAGtColors.onSurface : const Color(0xFFF0F0F0);
     final Color textColorVariant =
-        brightness == Brightness.light ? OpenAGColors.onSurfaceVariant : const Color(0xFFB0B0B0);
+        brightness == Brightness.light ? OpenAGtColors.onSurfaceVariant : const Color(0xFFB0B0B0);
 
     return TextTheme(
       displayLarge: TextStyle(

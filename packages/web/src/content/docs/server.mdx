@@ -1,12 +1,12 @@
 ---
 title: Server
-description: Interact with openAG server over HTTP.
+description: Interact with OpenAGt server over HTTP.
 ---
 
 import config from "../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-The `openag serve` command runs a headless HTTP server that exposes an OpenAPI endpoint that an openAG client can use.
+The `openag serve` command runs a headless HTTP server that exposes an OpenAPI endpoint that an OpenAGt client can use.
 
 ---
 
@@ -51,10 +51,10 @@ client that talks to the server. The server exposes an OpenAPI 3.1 spec
 endpoint. This endpoint is also used to generate an [SDK](/docs/sdk).
 
 :::tip
-Use the openag server to interact with openag programmatically.
+Use the OpenAGt server to interact with OpenAGt programmatically.
 :::
 
-This architecture lets openag support multiple clients and allows you to interact with openag programmatically.
+This architecture lets OpenAGt support multiple clients and allows you to interact with OpenAGt programmatically.
 
 You can run `openag serve` to start a standalone server. If you have the
 openag TUI running, `openag serve` will start a new server.
@@ -83,7 +83,7 @@ For example, `http://localhost:4096/doc`. Use the spec to generate clients or in
 
 ## APIs
 
-The openag server exposes the following APIs.
+The OpenAGt server exposes the following APIs.
 
 ---
 

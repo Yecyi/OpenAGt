@@ -20,23 +20,23 @@ const placeholder = {
 const wordmark = [
   {
     open: "  ██████  ██████  ███████ ███    ██ ",
-    ag: "   █████   ██████ ",
+    agt: "   █████   ██████  █████ ",
   },
   {
     open: " ██    ██ ██   ██ ██      ████   ██ ",
-    ag: "  ██   ██ ██       ",
+    agt: "  ██   ██ ██         ██  ",
   },
   {
     open: " ██    ██ ██████  █████   ██ ██  ██ ",
-    ag: "  ███████ ██   ███ ",
+    agt: "  ███████ ██   ███   ██  ",
   },
   {
     open: " ██    ██ ██      ██      ██  ██ ██ ",
-    ag: "  ██   ██ ██    ██ ",
+    agt: "  ██   ██ ██    ██   ██  ",
   },
   {
     open: "  ██████  ██      ███████ ██   ████ ",
-    ag: "  ██   ██  ██████  ",
+    agt: "  ██   ██  ██████    ██  ",
   },
 ]
 
@@ -91,7 +91,7 @@ export function Home() {
                     {line.open}
                   </text>
                   <text fg={theme.text} attributes={TextAttributes.BOLD}>
-                    {line.ag}
+                    {line.agt}
                   </text>
                 </box>
               ))}

@@ -108,7 +108,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           Icon(
             Icons.terminal,
             size: 64,
-            color: OpenAGColors.onSurfaceVariant,
+            color: OpenAGtColors.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
           Text(
@@ -178,7 +178,7 @@ class _SessionTile extends StatelessWidget {
       key: Key(session.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: OpenAGColors.error,
+        color: OpenAGtColors.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         child: const Icon(Icons.delete, color: Colors.white),
@@ -189,12 +189,12 @@ class _SessionTile extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: OpenAGColors.surfaceContainerHighest,
-            border: Border.all(color: OpenAGColors.outlineVariant),
+            color: OpenAGtColors.surfaceContainerHighest,
+            border: Border.all(color: OpenAGtColors.outlineVariant),
           ),
           child: Icon(
             session.status == 'active' ? Icons.terminal : Icons.folder,
-            color: OpenAGColors.onSurfaceVariant,
+            color: OpenAGtColors.onSurfaceVariant,
             size: 20,
           ),
         ),
@@ -212,7 +212,7 @@ class _SessionTile extends StatelessWidget {
         ),
         trailing: const Icon(
           Icons.chevron_right,
-          color: OpenAGColors.onSurfaceVariant,
+          color: OpenAGtColors.onSurfaceVariant,
         ),
         onTap: onTap,
       ),

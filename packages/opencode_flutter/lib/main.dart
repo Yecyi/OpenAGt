@@ -21,8 +21,8 @@ class OpenCodeFlutterApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'OpenCode',
-      theme: OpenAGTheme.lightTheme,
-      darkTheme: OpenAGTheme.darkTheme,
+      theme: OpenAGtTheme.lightTheme,
+      darkTheme: OpenAGtTheme.darkTheme,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       home: const ServerConnectionScreen(),
@@ -106,7 +106,7 @@ class _ServerConnectionScreenState extends ConsumerState<ServerConnectionScreen>
             Icon(
               Icons.terminal,
               size: 80,
-              color: OpenAGColors.primary,
+              color: OpenAGtColors.primary,
             ),
             const SizedBox(height: 24),
             Text(
@@ -120,7 +120,7 @@ class _ServerConnectionScreenState extends ConsumerState<ServerConnectionScreen>
             Text(
               'Connect to your OpenCode server',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: OpenAGColors.onSurfaceVariant,
+                    color: OpenAGtColors.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -140,7 +140,7 @@ class _ServerConnectionScreenState extends ConsumerState<ServerConnectionScreen>
               Text(
                 _error!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: OpenAGColors.error,
+                      color: OpenAGtColors.error,
                     ),
                 textAlign: TextAlign.center,
               ),

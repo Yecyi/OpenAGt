@@ -1,6 +1,6 @@
-# OpenAG Web Documentation
+# OpenAGt Web Documentation
 
-基于 Astro + Starlight 构建的 OpenAG 官方文档站点。
+基于 Astro + Starlight 构建的 OpenAGt 官方文档站点。
 
 ---
 
@@ -129,7 +129,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components'
 import { defineConfig } from '@astrojs/starlight'
 
 export default defineConfig({
-  title: 'OpenAG',
+  title: 'OpenAGt',
   description: 'Enhanced AI coding agent',
   
   social: {
