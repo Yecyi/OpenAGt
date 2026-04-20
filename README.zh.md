@@ -43,6 +43,23 @@
 
 ---
 
+## 目录
+
+- [安装](#安装)
+- [桌面应用程序 (BETA)](#桌面应用程序-beta)
+  - [安装目录](#安装目录)
+- [Agents](#agents)
+- [文档](#文档)
+- [参与贡献](#参与贡献)
+- [基于 OpenCode 进行开发](#基于-opencode-进行开发)
+- [常见问题 (FAQ)](#常见问题-faq)
+  - [这和 Claude Code 有什么不同？](#这和-claude-code-有什么不同)
+- [OpenAG 扩展](#openag-扩展)
+  - [主要增强](#主要增强)
+  - [核心模块文档](#核心模块文档)
+
+---
+
 ### 安装
 
 ```bash
@@ -121,7 +138,7 @@ OpenCode 内置两种 Agent，可用 `Tab` 键快速切换：
 
 ### 基于 OpenCode 进行开发
 
-如果你在项目名中使用了 “opencode”（如 “opencode-dashboard” 或 “opencode-mobile”），请在 README 里注明该项目不是 OpenCode 团队官方开发，且不存在隶属关系。
+如果你在项目名中使用了 "opencode"（如 "opencode-dashboard" 或 "opencode-mobile"），请在 README 里注明该项目不是 OpenCode 团队官方开发，且不存在隶属关系。
 
 ### 常见问题 (FAQ)
 
@@ -134,6 +151,31 @@ OpenCode 内置两种 Agent，可用 `Tab` 键快速切换：
 - 内置 LSP 支持。
 - 聚焦终端界面 (TUI)。OpenCode 由 Neovim 爱好者和 [terminal.shop](https://terminal.shop) 的创建者打造，会持续探索终端的极限。
 - 客户端/服务器架构。可在本机运行，同时用移动设备远程驱动。TUI 只是众多潜在客户端之一。
+
+---
+
+## OpenAG 扩展
+
+OpenAG 是基于 OpenCode 的增强版本，增加了以下高级功能。
+
+### 主要增强
+
+- **三层渐进式压缩** — 上下文管理，减少 40-55% Token 使用
+- **工具并发分区** — 并行执行，吞吐量提升 2-3 倍
+- **Provider 降级链** — 自动故障转移
+- **Prompt 注入防护** — 安全扫描
+- **Flutter 移动客户端** — 远程控制（计划中）
+
+### 核心模块文档
+
+| 文档 | 描述 |
+|------|------|
+| [README.md](./README.md) | 完整技术文档（英文） |
+| [packages/opencode/README.md](./packages/opencode/README.md) | 核心引擎 |
+| [packages/opencode/src/effect/README.md](./packages/opencode/src/effect/README.md) | Effect Framework |
+| [packages/opencode/src/acp/README.md](./packages/opencode/src/acp/README.md) | ACP 协议 |
+| [packages/opencode/src/sync/README.md](./packages/opencode/src/sync/README.md) | 事件溯源 |
+| [packages/opencode/src/provider/README.md](./packages/opencode/src/provider/README.md) | LLM Provider |
 
 ---
 

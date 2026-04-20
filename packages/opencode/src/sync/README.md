@@ -1,73 +1,145 @@
-tl;dr All of these APIs work, are properly type-checked, and are sync events are backwards compatible with `Bus`:
+# SyncEvent 事件溯源系统
 
-```ts
-// The schema from `Updated` typechecks the object correctly
-SyncEvent.run(Updated, { sessionID: id, info: { title: "foo" } })
+OpenAG 的会话同步和事件溯源实现，支持多设备同步和会话回放。
 
-// `subscribeAll` passes a generic sync event
-SyncEvent.subscribeAll((event) => {
-  // These will be type-checked correctly
-  event.id
-  event.seq
-  // This will be unknown because we are listening for all events,
-  // and this API is only used to record them
-  event.data
+---
+
+## 目录
+
+- [核心概念](#核心概念)
+- [设计目标](#设计目标)
+  - [单写者同步](#1-单写者同步)
+  - [向后兼容](#2-向后兼容)
+- [事件定义](#事件定义)
+- [核心 API](#核心-api)
+- [事件流](#事件流)
+- [与 Bus 集成](#与-bus-集成)
+- [数据库表设计](#数据库表设计)
+- [调试](#调试)
+- [性能优化](#性能优化)
+- [局限性](#局限性)
+- [测试](#测试)
+
+---
+
+## 核心概念
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           事件溯源架构                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐         ┌─────────────────┐                        │
+│  │    Domain      │         │   Projector    │                        │
+│  │    Event       │────────▶│   (处理器)      │                        │
+│  │  { id, seq,   │         │                 │                        │
+│  │    data }      │         │ 更新数据库状态   │                        │
+│  └─────────────────┘         └─────────────────┘                        │
+│           │                                                    │
+│           ▼                                                    │
+│  ┌─────────────────┐         ┌─────────────────┐                        │
+│  │ EventStore     │         │     Bus        │                        │
+│  │ (持久化)        │         │   (发布订阅)   │                        │
+│  └─────────────────┘         └─────────────────┘                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 设计目标
+
+### 1. 单写者同步
+
+系统设计为**单一写者多读者**模式：
+
+```
+┌─────────────────┐                      ┌─────────────────┐
+│   主设备         │                      │   从设备         │
+│  (可写)         │◀──── Sync Events ───│  (只读)        │
+└─────────────────┘                      └─────────────────┘
+         │                                        │
+         │                                        ▼
+         │                              ┌─────────────────┐
+         │                              │  Replay Events  │
+         │                              │  本地重建状态    │
+         │                              └─────────────────┘
+```
+
+**为什么单一写者？**
+- 不需要复杂的分布式时钟
+- 序列号 (seq) 提供自然的全序
+- 简化冲突解决
+
+### 2. 向后兼容
+
+SyncEvent 与现有 Bus 系统无缝集成：
+
+```typescript
+// SyncEvent 自动重新发布为 BusEvent
+SyncEvent.run(Created, { sessionID, info })
+
+// 现有 Bus 订阅者继续工作
+Bus.subscribe(Created, (event) => {
+  // event 仍是 { type, properties } 格式
 })
-
-// This works, but you shouldn't publish sync event like this (should fail in the future)
-Bus.publish(Updated, { sessionID: id, info: { title: "foo" } })
-
-// Update event is fully type-checked
-Bus.subscribe(Updated, (event) => event.properties.info.title)
-
-// Update event is fully type-checked
-client.subscribe("session.updated", (evt) => evt.properties.info.title)
 ```
 
-# Goal
+## 事件定义
 
-## Syncing with only one writer
+### 定义格式
 
-This system defines a basic event sourcing system for session replayability. The goal is to allow for one device to control and modify the session, and allow multiple other devices to "sync" session data. The sync works by getting a log of events to replay and replaying them locally.
-
-Because only one device is allowed to write, we don't need any kind of sophisticated distributed system clocks or causal ordering. We implement total ordering with a simple sequence id (a number) and increment it by one every time we generate an event.
-
-## Bus event integration and backwards compatibility
-
-This initial implementation aims to be fully backwards compatible. We should be able to land this without any visible changes to the user.
-
-An existing `Bus` abstraction to send events already exists. We already send events like `session.created` through the system. We should not duplicate this.
-
-The difference in event sourcing is events are sent _before_ the mutation happens, and "projectors" handle the effects and perform the mutations. This difference is subtle, and a necessary change for syncing to work.
-
-So the goal is:
-
-- Introduce a new syncing abstraction to handle event sourcing and projectors
-- Seamlessly integrate these new events into the same existing `Bus` abstraction
-- Maintain full backwards compatibility to reduce risk
-
-## My approach
-
-This directory introduces a new abstraction: `SyncEvent`. This handles all of the event sourcing.
-
-There are now "sync events" which are different than "bus events". Bus events are defined like this:
-
-```ts
-const Diff = BusEvent.define(
-  "session.diff",
-  z.object({
-    sessionID: SessionID.zod,
-    diff: Snapshot.FileDiff.array(),
-  }),
-)
-```
-
-You can do `Bus.publish(Diff, { ... })` to push these events, and `Bus.subscribe(Diff, handler)` to listen to them.
-
-Sync events are a lower-level abstraction which are similar, but also handle the requirements for recording and replaying. Defining them looks like this:
-
-```ts
+```typescript
 const Created = SyncEvent.define({
+  type: "session.created",
+  version: 1,
+  aggregate: "sessionID",  // 聚合根字段
+  schema: z.object({
+    sessionID: SessionID.zod,
+    info: Info,
+  }),
+})
+```
+
+### 版本控制
+
+```typescript
+// 事件演进
+const Updated = SyncEvent.define({
+  type: "session.updated",
+  version: 2,  // 版本号
+  aggregate: "sessionID",
+  schema: z.object({
+    sessionID: SessionID.zod,
+    info: partialSchema(Info),  // 新版本只包含变更
+  }),
+  // 向后兼容：提供旧版本 schema 用于 Bus
+  busSchema: z.object({
+    sessionID: SessionID.zod,
+    info: Info,  // 旧版本完整对象
+  })
+})
+```
+
+### 聚合根
+
+每个事件关联一个聚合根 (aggregate)：
+
+```typescript
+// aggregate 字段用于：
+// 1. 序列号隔离
+// 2. 并发控制
+// 3. 查询优化
+SyncEvent.run(Created, { sessionID: "abc", info })
+// sessionID 是聚合根
+```
+
+## 核心 API
+
+### 定义事件
+
+```typescript
+import { SyncEvent } from "./sync"
+
+export const SessionCreated = SyncEvent.define({
   type: "session.created",
   version: 1,
   aggregate: "sessionID",
@@ -76,76 +148,8 @@ const Created = SyncEvent.define({
     info: Info,
   }),
 })
-```
 
-Not too different, except they track a version and an "aggregate" field (will explain that later).
-
-You do this to run an event, which is kind of like `Bus.publish` except that it runs through the event sourcing system:
-
-```
-SyncEvent.run(Created, { ... })
-```
-
-The data passed as the second argument is properly type-checked based on the schema defined in `Created`.
-
-Importantly, **sync events automatically re-publish as bus events**. This makes them backwards compatible, and allows the `Bus` to still be the single abstraction that the system uses to listen for individual events.
-
-**We have upgraded many of the session events to be sync events** (all of the ones that mutate the db). Sync and bus events are largely compatible. Here are the differences:
-
-### Event shape
-
-- The shape of the events are slightly different. A sync event has the `type`, `id`, `seq`, `aggregateID`, and `data` fields. A bus event has the `type` and `properties` fields. `data` and `properties` are largely the same thing. This conversion is automatically handled when the sync system re-published the event throught the bus.
-
-The reason for this is because sync events need to track more information. I chose not to copy the `properties` naming to more clearly disambiguate the event types.
-
-### Event flow
-
-There is no way to subscribe to individual sync events in `SyncEvent`. You can use `subscribeAll` to receive _all_ of the events, which is needed for clients that want to record them.
-
-To listen for individual events, use `Bus.subscribe`. You can pass in a sync event definition to it: `Bus.subscribe(Created, handler)`. This is fully supported.
-
-You should never "publish" a sync event however: `Bus.publish(Created, ...)`. I would like to force this to be a type error in the future. You should never be touching the db directly, and should not be manually handling these events.
-
-### Backwards compatibility
-
-The system install projectors in `server/projectors.js`. It calls `SyncEvent.init` to do this. It also installs a hook for dynamically converting an event at runtime (`convertEvent`).
-
-This allows you to "reshape" an event from the sync system before it's published to the bus. This should be avoided, but might be necessary for temporary backwards compat.
-
-The only time we use this is the `session.updated` event. Previously this event contained the entire session object. The sync even only contains the fields updated. We convert the event to contain to full object for backwards compatibility (but ideally we'd remove this).
-
-It's very important that types are correct when working with events. Event definitions have a `schema` which carries the defintiion of the event shape (provided by a zod schema, inferred into a TypeScript type). Examples:
-
-```ts
-// The schema from `Updated` typechecks the object correctly
-SyncEvent.run(Updated, { sessionID: id, info: { title: "foo" } })
-
-// `subscribeAll` passes a generic sync event
-SyncEvent.subscribeAll((event) => {
-  // These will be type-checked correctly
-  event.id
-  event.seq
-  // This will be unknown because we are listening for all events,
-  // and this API is only used to record them
-  event.data
-})
-
-// This works, but you shouldn't publish sync event like this (should fail in the future)
-Bus.publish(Updated, { sessionID: id, info: { title: "foo" } })
-
-// Update event is fully type-checked
-Bus.subscribe(Updated, (event) => event.properties.info.title)
-
-// Update event is fully type-checked
-client.subscribe("session.updated", (evt) => evt.properties.info.title)
-```
-
-The last two examples look similar to `SyncEvent.run`, but they were the cause of a lot of grief. Those are existing APIs that we can't break, but we are passing in the new sync event definitions to these APIs, which sometimes have a different event shape.
-
-I previously mentioned the runtime conversion of events, but we still need to the types to work! To do that, the `define` API supports an optional `busSchema` prop to give it the schema for backwards compatibility. For example this is the full definition of `Session.Update`:
-
-```ts
-const Update = SyncEvent.define({
+export const SessionUpdated = SyncEvent.define({
   type: "session.updated",
   version: 1,
   aggregate: "sessionID",
@@ -155,25 +159,284 @@ const Update = SyncEvent.define({
   }),
   busSchema: z.object({
     sessionID: SessionID.zod,
-    info: Info,
+    info: Info,  // 转换为 Bus 格式
   }),
 })
 ```
 
-_Important_: the conversion done in `convertEvent` is not automatically type-checked with `busSchema`. It's very important they match, but because we need this at type-checking time this needs to live here.
+### 运行事件
 
-Internally, the way this works is `busSchema` is stored on a `properties` field which is what the bus system expects. Doing this made everything with `Bus` "just work". This is why you can pass a sync event to the bus APIs.
+```typescript
+// 同步运行事件
+SyncEvent.run(Created, { sessionID, info })
 
-_Alternatives_
+// 可选：运行但不发布到 Bus
+SyncEvent.run(Updated, { sessionID, info }, { publish: false })
+```
 
-These are some other paths I explored:
+### 事件重放
 
-- Providing a way to subscribe to individual sync events, and change all the instances of `Bus.subscribe` in our code to it. Then you are directly only working with sync events always.
-  - Two big problems. First, `Bus` is instance-scoped, and we'd need to make the sync event system instance-scoped too for backwards compat. If we didn't, those listeners would get calls for events they weren't expecting.
-  - Second, we can't change consumers of our SDK. So they still have to use the old events, and we might as well stick with them for consistency
-- Directly add sync event support to bus system
-  - I explored adding sync events to the bus, but due to backwards compat, it only made it more complicated (still need to support both shapes)
-- I explored a `convertSchema` function to convert the event schema at runtime so we didn't need `busSchema`
-  - Fatal flaw: we need type-checking done earlier. We can't do this at run-time. This worked for consumers of our SDK (because it gets generated TS types from the converted schema) but breaks for our internal usage of `Bus.subscribe` calls
+```typescript
+// 从远程获取序列化事件
+const events: SerializedEvent[] = await fetchEvents(sessionID)
 
-I explored many other permutations of the above solutions. What we have today I think is the best balance of backwards compatibility while opening a path forward for the new events.
+// 重放单个事件
+for (const event of events) {
+  SyncEvent.replay(event)
+}
+
+// 或批量重放
+SyncEvent.replayAll(events)
+```
+
+### 投影器 (Projector)
+
+```typescript
+// 定义投影器
+const projectors: Array<[Definition, ProjectorFunc]> = [
+  [SessionCreated, (db, data) => {
+    db.insert(SessionTable).values({
+      id: data.sessionID,
+      ...toRow(data.info)
+    }).run()
+  }],
+  [SessionUpdated, (db, data) => {
+    db.update(SessionTable)
+      .set(toRow(data.info))
+      .where(eq(SessionTable.id, data.sessionID))
+      .run()
+  }]
+]
+
+// 初始化同步系统
+SyncEvent.init({ projectors })
+```
+
+## 事件流
+
+```
+用户操作
+    │
+    ▼
+SyncEvent.run(Event, data)
+    │
+    ▼
+Database.transaction (IMMEDIATE)
+    │
+    ├─▶ projector(db, data)
+    │       │
+    │       ▼
+    │    更新业务表
+    │
+    ├─▶ EventSequenceTable
+    │       │ seq = last + 1
+    │       ▼
+    │    INSERT ON CONFLICT UPDATE
+    │
+    ├─▶ EventTable
+    │       │ 完整事件持久化
+    │       ▼
+    │    INSERT
+    │
+    └─▶ Bus.publish
+            │
+            ▼
+         全局事件通知
+```
+
+## 与 Bus 集成
+
+### 事件形状对比
+
+| 属性 | SyncEvent | BusEvent |
+|------|-----------|----------|
+| `type` | ✓ | ✓ |
+| `id` | ✓ | - |
+| `seq` | ✓ | - |
+| `aggregateID` | ✓ | - |
+| `data` | ✓ | - |
+| `properties` | - | ✓ |
+
+### 转换机制
+
+```typescript
+// SyncEvent 自动转换格式
+// SyncEvent.data → BusEvent.properties
+
+// 自定义转换 (向后兼容)
+SyncEvent.init({
+  projectors,
+  convertEvent: (type, data) => {
+    if (type === "session.updated") {
+      // 新版本只有部分字段
+      // 补全为完整对象供旧订阅者使用
+      return { sessionID: data.sessionID, info: fullInfo }
+    }
+    return data
+  }
+})
+```
+
+## 数据库表设计
+
+### EventSequence
+
+记录每个聚合的最新序列号：
+
+```sql
+CREATE TABLE event_sequence (
+  aggregate_id TEXT PRIMARY KEY,
+  seq INTEGER NOT NULL
+);
+```
+
+### Event
+
+存储完整事件：
+
+```sql
+CREATE TABLE event (
+  id TEXT PRIMARY KEY,
+  aggregate_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  data TEXT NOT NULL  -- JSON
+);
+
+CREATE INDEX idx_event_aggregate ON event(aggregate_id);
+CREATE INDEX idx_event_seq ON event(aggregate_id, seq);
+```
+
+## 调试
+
+### 查看事件流
+
+```typescript
+// 订阅所有事件
+SyncEvent.subscribeAll((event) => {
+  console.log("Event:", {
+    type: event.type,
+    seq: event.seq,
+    aggregateID: event.aggregateID
+  })
+})
+```
+
+### 检查事件一致性
+
+```typescript
+// 验证序列号连续性
+const events = await fetchEvents(sessionID)
+for (let i = 1; i < events.length; i++) {
+  if (events[i].seq !== events[i-1].seq + 1) {
+    console.error("Gap detected at", i)
+  }
+}
+```
+
+## 性能优化
+
+### 1. 批量重放
+
+```typescript
+// 批量重放比单个重放高效
+const batchSize = 100
+for (let i = 0; i < events.length; i += batchSize) {
+  const batch = events.slice(i, i + batchSize)
+  SyncEvent.replayAll(batch)
+}
+```
+
+### 2. 快照
+
+对于长会话，定期创建快照：
+
+```typescript
+// 定期快照
+if (seq % 100 === 0) {
+  createSnapshot(sessionID, seq)
+}
+
+// 从快照恢复
+const snapshot = getLatestSnapshot(sessionID)
+if (snapshot && snapshot.seq >= fromSeq) {
+  restoreFromSnapshot(snapshot)
+  fromSeq = snapshot.seq + 1
+}
+```
+
+### 3. 索引优化
+
+```sql
+-- 聚合查询
+CREATE INDEX idx_event_aggregate_seq ON event(aggregate_id, seq DESC);
+
+-- 类型查询
+CREATE INDEX idx_event_type ON event(type);
+```
+
+## 局限性
+
+### 当前限制
+
+1. **无内置冲突解决** - 依赖单一写者假设
+2. **无版本迁移** - 需要手动处理 schema 演化
+3. **无快照策略** - 需要外部实现
+
+### 未来增强
+
+```typescript
+// 1. 快照支持
+interface Snapshot {
+  aggregateID: string
+  seq: number
+  state: any
+  createdAt: number
+}
+
+// 2. 版本迁移
+SyncEvent.migrate(Updated, (oldEvent) => ({
+  ...oldEvent,
+  // 转换逻辑
+}))
+
+// 3. 冲突检测
+interface ConflictError {
+  aggregateID: string
+  expectedSeq: number
+  actualSeq: number
+}
+```
+
+## 测试
+
+```typescript
+// 单元测试
+test("SessionCreated persists event", async () => {
+  SyncEvent.reset()
+  SyncEvent.init({ projectors })
+
+  SyncEvent.run(SessionCreated, { sessionID, info })
+
+  const events = db.select().from(EventTable).all()
+  expect(events).toHaveLength(1)
+  expect(events[0].type).toBe("session.created")
+})
+
+// 重放测试
+test("replayAll restores state", async () => {
+  // ... setup
+  const events = captureEvents()
+
+  // ... clear state
+  SyncEvent.replayAll(events)
+
+  const session = db.select().from(SessionTable).get()
+  expect(session).toMatchObject(expected)
+})
+```
+
+## 参考资料
+
+- [CQRS 和事件溯源](https://martinfowler.com/eaaDev/EventSourcing.html)
+- [Axon Framework 事件溯源](https://docs.axoniq.io/axon-framework/events/)
