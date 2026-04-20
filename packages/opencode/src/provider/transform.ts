@@ -213,11 +213,18 @@ function normalizeMessages(
   return msgs
 }
 
-function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
-  const system = msgs.filter((msg) => msg.role === "system").slice(0, 2)
-  const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
+type CacheZone = "static" | "semiStatic" | "dynamic"
 
-  const providerOptions = {
+interface ModelMessageWithCache extends ModelMessage {
+  providerOptions?: Record<string, unknown> & {
+    opencode?: {
+      cacheZone?: CacheZone
+    }
+  }
+}
+
+function getCacheProviderOptions(model: Provider.Model): Record<string, unknown> {
+  return {
     anthropic: {
       cacheControl: { type: "ephemeral" },
     },
@@ -237,8 +244,46 @@ function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage
       cacheControl: { type: "ephemeral" },
     },
   }
+}
 
-  for (const msg of unique([...system, ...final])) {
+function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
+  const providerOptions = getCacheProviderOptions(model)
+
+  const systemMessages = msgs.filter((msg) => msg.role === "system")
+
+  const staticMessages: ModelMessage[] = []
+  const semiStaticMessages: ModelMessage[] = []
+  const dynamicMessages: ModelMessage[] = []
+
+  for (const msg of systemMessages) {
+    const zone = (msg as ModelMessageWithCache).providerOptions?.opencode?.cacheZone
+    if (zone === "static") {
+      staticMessages.push(msg)
+    } else if (zone === "semiStatic") {
+      semiStaticMessages.push(msg)
+    } else {
+      dynamicMessages.push(msg)
+    }
+  }
+
+  const messagesToCache: ModelMessage[] = []
+
+  if (staticMessages.length > 0) {
+    const lastStatic = staticMessages[staticMessages.length - 1]
+    if (lastStatic) messagesToCache.push(lastStatic)
+  }
+
+  if (semiStaticMessages.length > 0) {
+    const lastSemiStatic = semiStaticMessages[semiStaticMessages.length - 1]
+    if (lastSemiStatic) messagesToCache.push(lastSemiStatic)
+  }
+
+  if (messagesToCache.length === 0) {
+    const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
+    messagesToCache.push(...final.slice(0, 2))
+  }
+
+  for (const msg of unique(messagesToCache)) {
     const useMessageLevelOptions =
       model.providerID === "anthropic" ||
       model.providerID.includes("bedrock") ||
@@ -793,6 +838,7 @@ export function options(input: {
   model: Provider.Model
   sessionID: string
   providerOptions?: Record<string, any>
+  staticBlocksHash?: string
 }): Record<string, any> {
   const result: Record<string, any> = {}
 
@@ -807,7 +853,10 @@ export function options(input: {
 
   if (input.model.api.npm === "@ai-sdk/azure") {
     result["store"] = true
-    result["promptCacheKey"] = input.sessionID
+    // B-P2-1: Salt the prompt cache key with static blocks hash
+    result["promptCacheKey"] = input.staticBlocksHash
+      ? `${input.sessionID}:${input.staticBlocksHash}`
+      : input.sessionID
   }
 
   if (input.model.api.npm === "@openrouter/ai-sdk-provider" || input.model.api.npm === "@llmgateway/ai-sdk-provider") {
@@ -904,18 +953,24 @@ export function options(input: {
     }
 
     if (input.model.providerID.startsWith("opencode")) {
-      result["promptCacheKey"] = input.sessionID
+      result["promptCacheKey"] = input.staticBlocksHash
+        ? `${input.sessionID}:${input.staticBlocksHash}`
+        : input.sessionID
       result["include"] = ["reasoning.encrypted_content"]
       result["reasoningSummary"] = "auto"
     }
   }
 
   if (input.model.providerID === "venice") {
-    result["promptCacheKey"] = input.sessionID
+    result["promptCacheKey"] = input.staticBlocksHash
+      ? `${input.sessionID}:${input.staticBlocksHash}`
+      : input.sessionID
   }
 
   if (input.model.providerID === "openrouter") {
-    result["prompt_cache_key"] = input.sessionID
+    result["prompt_cache_key"] = input.staticBlocksHash
+      ? `${input.sessionID}:${input.staticBlocksHash}`
+      : input.sessionID
   }
   if (input.model.api.npm === "@ai-sdk/gateway") {
     result["gateway"] = {

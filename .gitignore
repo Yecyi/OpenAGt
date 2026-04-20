@@ -29,3 +29,14 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Local editor/runtime state (machine-specific)
+.cursor/
+.obsidian/workspace.json
+
+# Local reference code drops
+Code Reference/codex/
+Code Reference/hermes-agent/
+
+# Transient binary/temp artifacts
+packages/opencode/.*.tmp/

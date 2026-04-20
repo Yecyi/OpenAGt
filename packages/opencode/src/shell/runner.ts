@@ -11,6 +11,9 @@ import type {
   SandboxFilesystemPolicy,
   SandboxNetworkPolicy,
 } from "@/sandbox/types"
+import { Log } from "@/util"
+
+const log = Log.create({ service: "shell.runner" })
 
 export type RunInput = {
   shell: string
@@ -28,6 +31,7 @@ export type RunInput = {
   networkPolicy: SandboxNetworkPolicy
   reportOnly: boolean
   failurePolicy: "closed" | "confirm_downgrade" | "fallback"
+  riskLevel?: "safe" | "low" | "medium" | "high"
 }
 
 export type RunResult = {
@@ -118,6 +122,21 @@ export const layer = Layer.effect(
                   : item.name === "landlock",
             )
           : capabilities.find((item) => item.name === input.backendPreference)
+
+      // B-P0-4: Advisory refusal on medium+ risk when broker absent
+      // If enforcement is advisory and no preferred backend is available and risk is medium or high, refuse
+      const MEDIUM_RISK_LEVELS = ["medium", "high"]
+      if (
+        input.enforcement === "advisory" &&
+        !preferred?.available &&
+        input.riskLevel &&
+        MEDIUM_RISK_LEVELS.includes(input.riskLevel)
+      ) {
+        throw new Error(
+          `Command with ${input.riskLevel} risk level cannot be executed in advisory mode when sandbox backend is unavailable. ` +
+            `Risk level: ${input.riskLevel}, enforcement: advisory, backend: unavailable`,
+        )
+      }
 
       if (input.enforcement === "required" && input.failurePolicy === "closed" && !preferred?.available) {
         throw new Error(preferred?.reason ?? "Required sandbox backend unavailable")
@@ -211,6 +230,9 @@ export const layer = Layer.effect(
       terminationReason = result.termination_reason
       expired = result.termination_reason === "timeout"
       aborted = result.termination_reason === "abort"
+
+      // C-1: Emit sandbox backend_used metric
+      log.info("sandbox.backend_used", { backend: result.backend_used })
 
       const raw = chunks.map((item) => item.text).join("")
       const end = tail(raw, lines, bytes)

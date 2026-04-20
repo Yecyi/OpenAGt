@@ -15,6 +15,33 @@ import type { Provider } from "@/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
+import { Log } from "@/util"
+
+const log = Log.create({ service: "system-prompt" })
+
+interface MemoEntry {
+  hash: string
+  value: string | undefined
+  timestamp: number
+}
+
+const skillsMemo = new Map<string, MemoEntry>()
+const environmentMemo = new Map<string, MemoEntry>()
+
+function computeHash(input: string): string {
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36)
+}
+
+function getSkillsMemoKey(agent: Agent.Info): string {
+  const permissionHash = computeHash(JSON.stringify(agent.permission))
+  return `${agent.name}:${permissionHash}`
+}
 
 export function provider(model: Provider.Model) {
   if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
@@ -32,8 +59,13 @@ export function provider(model: Provider.Model) {
   return [PROMPT_DEFAULT]
 }
 
+export interface EnvironmentResult {
+  static: string[]
+  semiStatic: string[]
+}
+
 export interface Interface {
-  readonly environment: (model: Provider.Model) => string[]
+  readonly environment: (model: Provider.Model) => EnvironmentResult
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
 }
 
@@ -46,34 +78,60 @@ export const layer = Layer.effect(
 
     return Service.of({
       environment(model) {
+        const memoKey = getSkillsMemoKey({ name: "environment", permission: [] } as Agent.Info)
+        const dateStr = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date())
+        const hash = computeHash(dateStr)
+
+        const cached = environmentMemo.get(memoKey)
+        if (cached && cached.hash === hash) {
+          return cached.value as EnvironmentResult
+        }
+
         const project = Instance.project
-        return [
-          [
-            `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
-            `Here is some useful information about the environment you are running in:`,
-            `<env>`,
-            `  Working directory: ${Instance.directory}`,
-            `  Workspace root folder: ${Instance.worktree}`,
-            `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
-            `  Platform: ${process.platform}`,
-            `  Today's date: ${new Date().toDateString()}`,
-            `</env>`,
-          ].join("\n"),
-        ]
+        const staticParts = [
+          `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
+          `Here is some useful information about the environment you are running in:`,
+          `<env>`,
+          `  Working directory: ${Instance.directory}`,
+          `  Workspace root folder: ${Instance.worktree}`,
+          `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
+          `  Platform: ${process.platform}`,
+          `</env>`,
+        ].join("\n")
+
+        const semiStaticParts = [`<env>`, `  Today's date: ${dateStr}`, `</env>`].join("\n")
+
+        const result: EnvironmentResult = {
+          static: [staticParts],
+          semiStatic: [semiStaticParts],
+        }
+
+        environmentMemo.set(memoKey, { hash, value: result, timestamp: Date.now() })
+
+        return result
       },
 
       skills: Effect.fn("SystemPrompt.skills")(function* (agent: Agent.Info) {
         if (Permission.disabled(["skill"], agent.permission).has("skill")) return
 
+        const memoKey = getSkillsMemoKey(agent)
         const list = yield* skill.available(agent)
+        const hash = computeHash(JSON.stringify(list.map((s) => s.id).sort()))
 
-        return [
+        const cached = skillsMemo.get(memoKey)
+        if (cached && cached.hash === hash) {
+          return cached.value as string | undefined
+        }
+
+        const result = [
           "Skills provide specialized instructions and workflows for specific tasks.",
           "Use the skill tool to load a skill when a task matches its description.",
-          // the agents seem to ingest the information about skills a bit better if we present a more verbose
-          // version of them here and a less verbose version in tool description, rather than vice versa.
           Skill.fmt(list, { verbose: true }),
         ].join("\n")
+
+        skillsMemo.set(memoKey, { hash, value: result, timestamp: Date.now() })
+
+        return result
       }),
     })
   }),

@@ -34,6 +34,13 @@ const SAFE_WRAPPER_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
   { name: "nohup", pattern: /^nohup\s+--?\s*/i },
 ]
 
+// env wrapper: only allow VAR=VALUE assignments with no shell metacharacters
+// Refuse to strip env -i (resets all environment variables)
+const ENV_SAFE_PATTERN = /^(?:env\s+)([A-Za-z_][A-Za-z0-9_]*=[^\s;&|`$<>{}()\[\]]+\s*)+/
+const ENV_DANGEROUS_PATTERN = /^env\s+(-i|--ignore-environment)\b/
+
+const SHELL_METACHAR_PATTERN = /[;&|`$<>{}()\[\]\\!*?"'#%@]/
+
 /**
  * Wrapper stripper for removing safe command wrappers
  */
@@ -44,12 +51,33 @@ export class WrapperStripper {
   strip(command: string): string {
     let result = command.trim()
 
+    // Check for dangerous env -i first
+    if (ENV_DANGEROUS_PATTERN.test(result)) {
+      return result.trim()
+    }
+
+    // Check for safe env VAR=VALUE pattern
+    const envMatch = result.match(/^(env\s+)(.+)/i)
+    if (envMatch) {
+      const [, envPrefix, envArgs] = envMatch
+      // Only strip if all env arguments are VAR=VALUE with no shell metacharacters
+      const vars = envArgs.trim().split(/\s+/)
+      const allSafe = vars.every((v) => {
+        if (v.includes("=")) {
+          const [key] = v.split("=")
+          return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && !SHELL_METACHAR_PATTERN.test(v)
+        }
+        return false
+      })
+      if (allSafe) {
+        result = envPrefix + envArgs
+      }
+    }
+
     for (const { pattern } of SAFE_WRAPPER_PATTERNS) {
       const before = result
       result = result.replace(pattern, "")
       if (result !== before) {
-        // Successfully stripped a wrapper, continue stripping
-        // Some commands may have multiple wrappers (e.g., nice timeout)
         continue
       }
     }

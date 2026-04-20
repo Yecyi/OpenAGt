@@ -427,7 +427,44 @@ export const BashTool = Tool.define(
       if (!file || dynamic(file, ps)) return
       const next = ps ? provider(file) : file
       if (!next) return
-      return yield* resolvePath(next, cwd, shell)
+      const resolved = yield* resolvePath(next, cwd, shell)
+
+      // B-P1-1: Symlink canonicalization
+      // After resolvePath, call fs.realpath() to resolve symlinks
+      if (resolved) {
+        try {
+          const realPath = yield* Effect.promise(() => fs.realpath(resolved).catch(() => resolved))
+          if (realPath && realPath !== resolved) {
+            log.info("symlink canonicalized", { original: resolved, real: realPath })
+            // Check if the real path is outside the allowed area
+            if (!Instance.containsPath(realPath)) {
+              // Add both the symlink path and real path to scan.dirs for permission checking
+              const symlinkDir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
+              const realDir = (yield* fs.isDir(realPath)) ? realPath : path.dirname(realPath)
+              scan.dirs.add(symlinkDir)
+              scan.dirs.add(realDir)
+            }
+            return realPath
+          }
+        } catch {
+          // If realpath fails, fall back to resolved path
+          // On Windows, junctions have different semantics so we use a different approach
+          if (process.platform === "win32") {
+            try {
+              const linkTarget = yield* Effect.promise(() => fs.readlink(resolved).catch(() => null))
+              if (linkTarget) {
+                const realPath = path.isAbsolute(linkTarget) ? linkTarget : path.resolve(path.dirname(resolved), linkTarget)
+                log.info("windows junction resolved", { original: resolved, target: realPath })
+                return realPath
+              }
+            } catch {
+              // Ignore readlink errors
+            }
+          }
+        }
+      }
+
+      return resolved
     })
 
     const collect = Effect.fn("BashTool.collect")(function* (root: Node, cwd: string, ps: boolean, shell: string) {
@@ -437,10 +474,41 @@ export const BashTool = Tool.define(
         always: new Set<string>(),
       }
 
-      for (const node of commands(root)) {
+      const allCommands = commands(root)
+      const MAX_SUBCOMMANDS = 32
+
+      if (allCommands.length > MAX_SUBCOMMANDS) {
+        log.warn("command chain exceeds max subcommands", { count: allCommands.length, max: MAX_SUBCOMMANDS })
+      }
+
+      let maxRisk: "safe" | "low" | "medium" | "high" = "safe"
+      const allFindings: Array<{ severity: string; evidence: string }> = []
+      const riskDistribution: Record<string, number> = { safe: 0, low: 0, medium: 0, high: 0 }
+
+      for (let i = 0; i < Math.min(allCommands.length, MAX_SUBCOMMANDS); i++) {
+        const node = allCommands[i]
         const command = parts(node)
         const tokens = command.map((item) => item.text)
         const cmd = ps ? tokens[0]?.toLowerCase() : tokens[0]
+        const subCmd = source(node)
+
+        // Analyze each subcommand for risk
+        const subSecurity = yield* shellSecurity.analyze({
+          command: subCmd,
+          shell,
+          cwd,
+        })
+
+        // Track max risk across all subcommands
+        const riskLevels: Record<string, number> = { safe: 0, low: 1, medium: 2, high: 3 }
+        const subRisk = riskLevels[subSecurity.risk_level] ?? 0
+        const maxRiskNum = riskLevels[maxRisk] ?? 0
+        if (subRisk > maxRiskNum) {
+          maxRisk = subSecurity.risk_level
+        }
+        // C-1: Track risk level distribution
+        riskDistribution[subSecurity.risk_level] = (riskDistribution[subSecurity.risk_level] || 0) + 1
+        allFindings.push(...subSecurity.findings.map((f) => ({ severity: f.severity, evidence: f.evidence })))
 
         if (cmd && FILES.has(cmd)) {
           for (const arg of pathArgs(command, ps)) {
@@ -453,10 +521,22 @@ export const BashTool = Tool.define(
         }
 
         if (tokens.length && (!cmd || !CWD.has(cmd))) {
-          scan.patterns.add(source(node))
+          scan.patterns.add(subCmd)
           scan.always.add(BashArity.prefix(tokens).join(" ") + " *")
         }
       }
+
+      // Log compound classification
+      if (allCommands.length > 1) {
+        log.info("compound command classified", {
+          subcommands: allCommands.length,
+          maxRisk,
+          findingsCount: allFindings.length,
+        })
+      }
+
+      // C-1: Emit shell.risk_level_distribution metric
+      log.info("shell.risk_level_distribution", riskDistribution)
 
       return scan
     })
@@ -581,6 +661,7 @@ export const BashTool = Tool.define(
               networkPolicy: policy.network_policy,
               reportOnly: policy.sandbox.report_only,
               failurePolicy: policy.sandbox.failure_policy,
+              riskLevel: security.risk_level,
             },
             ctx,
           ).pipe(

@@ -248,12 +248,14 @@ export const layer: Layer.Layer<
         sessionID: input.sessionID,
         model,
       })
+      const noToolSystem = "You are in a conversation summarization mode. Do not call any tools. Respond only with the requested summary text."
+
       const result = yield* processor.process({
         user: userMessage,
         agent,
         sessionID: input.sessionID,
         tools: {},
-        system: [],
+        system: [noToolSystem],
         messages: [
           ...modelMessages,
           {
@@ -262,6 +264,7 @@ export const layer: Layer.Layer<
           },
         ],
         model,
+        toolChoice: "none",
       })
 
       if (result === "compact") {

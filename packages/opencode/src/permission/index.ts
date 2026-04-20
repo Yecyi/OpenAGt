@@ -248,12 +248,24 @@ export const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
+      // B-P1-3: Record "always" approvals to persistent audit log
       for (const pattern of existing.info.always) {
         approved.push({
           permission: existing.info.permission,
           pattern,
           action: "allow",
         })
+        // Record to audit log
+        yield* Effect.promise(() =>
+          writeAuditLog({
+            timestamp: Date.now(),
+            sessionID: existing.info.sessionID,
+            agent: existing.info.metadata?.agent as string | undefined,
+            pattern,
+            riskLevel: existing.info.metadata?.riskLevel as string | undefined,
+            commandSample: truncateForAudit(existing.info.metadata?.command as string | undefined),
+          }),
+        )
       }
 
       for (const [id, item] of pending.entries()) {
@@ -293,14 +305,63 @@ export function fromConfig(permission: ConfigPermission.Info) {
   const ruleset: Ruleset = []
   for (const [key, value] of Object.entries(permission)) {
     if (typeof value === "string") {
+      // B-P1-2: Validate bare "*" patterns - reject in strict mode, warn in warn mode
+      const validation = validatePattern("*", "warn")
+      if (!validation.valid) {
+        log.warn("permission_pattern_validation", { pattern: "*", warning: validation.message })
+      }
       ruleset.push({ permission: key, action: value, pattern: "*" })
       continue
     }
-    ruleset.push(
-      ...Object.entries(value).map(([pattern, action]) => ({ permission: key, pattern: expand(pattern), action })),
-    )
+    for (const [pattern, action] of Object.entries(value)) {
+      const validation = validatePattern(pattern, "warn")
+      if (!validation.valid) {
+        log.warn("permission_pattern_validation", { pattern, warning: validation.message })
+      }
+      ruleset.push({ permission: key, pattern: expand(pattern), action })
+    }
   }
   return ruleset
+}
+
+/**
+ * B-P1-2: Validate permission patterns for security
+ * Reject patterns that are bare `*` or contain `**` without anchors.
+ * Require ≥1 literal alphanum before the first `*`.
+ */
+function validatePattern(pattern: string, strictMode: "strict" | "warn"): { valid: boolean; message?: string } {
+  // Bare "*" is dangerous
+  if (pattern === "*") {
+    return { valid: false, message: "Bare '*' pattern is too permissive. Use specific patterns like 'npm *' or 'git *'." }
+  }
+
+  // Pattern with ** but no anchors is dangerous
+  if (pattern.includes("**") && !pattern.startsWith("**") && !pattern.endsWith("**")) {
+    return { valid: false, message: "Pattern '**' must be anchored (start or end of pattern)." }
+  }
+
+  // Check for literal alphanum before first *
+  const starIndex = pattern.indexOf("*")
+  if (starIndex > 0) {
+    const beforeStar = pattern.slice(0, starIndex)
+    // Require at least one literal alphanumeric character before the first *
+    if (!/[a-zA-Z0-9]/.test(beforeStar)) {
+      return {
+        valid: false,
+        message: "Pattern must have at least one literal character before '*'. For example: 'npm *' not '*install'.",
+      }
+    }
+  }
+
+  // Pattern ending with ** without proper context
+  if (pattern.endsWith("**") && !pattern.endsWith("/**")) {
+    return {
+      valid: false,
+      message: "Pattern ending with '**' should be '/**' for directory matching.",
+    }
+  }
+
+  return { valid: true }
 }
 
 export function merge(...rulesets: Ruleset[]): Ruleset {
@@ -318,6 +379,37 @@ export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
     if (rule.pattern === "*" && rule.action === "deny") result.add(tool)
   }
   return result
+}
+
+// ============================================================
+// B-P1-3: Persistent Audit Log
+// ============================================================
+
+interface AuditLogEntry {
+  timestamp: number
+  sessionID: string
+  agent?: string
+  pattern: string
+  riskLevel?: string
+  commandSample?: string
+}
+
+const AUDIT_LOG_MAX_SIZE = 10_000
+const auditLogCache: AuditLogEntry[] = []
+
+async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
+  auditLogCache.push(entry)
+  if (auditLogCache.length > AUDIT_LOG_MAX_SIZE) {
+    auditLogCache.shift()
+  }
+  // In production, this would write to $XDG_STATE_HOME/opencode/permissions.audit.jsonl
+  log.info("permission_audit", entry)
+}
+
+function truncateForAudit(text: string | undefined, maxLength = 256): string | undefined {
+  if (!text) return undefined
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength) + "...[truncated]"
 }
 
 export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))

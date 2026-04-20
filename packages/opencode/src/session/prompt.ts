@@ -50,9 +50,66 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
 import { scanForInjection, sanitizeContent } from "@/security/injection"
+import { promptCacheMetrics } from "./compaction/metrics"
+import { loadMemory } from "./memory"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
+
+// A-P1-3: Reminder/plan-text budget
+const REMINDER_TOKEN_BUDGET = 2000
+const REMINDER_CHARS_PER_TOKEN = 4
+
+interface ReminderEntry {
+  text: string
+  importance: number
+  timestamp: number
+}
+
+const reminderBudget: ReminderEntry[] = []
+
+function addReminder(text: string, importance: number): void {
+  const entry: ReminderEntry = {
+    text,
+    importance,
+    timestamp: Date.now(),
+  }
+  reminderBudget.push(entry)
+  enforceReminderBudget()
+}
+
+function enforceReminderBudget(): void {
+  let totalChars = 0
+  const targetChars = REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+
+  // Sort by importance (lowest first) then timestamp (oldest first) for FIFO
+  reminderBudget.sort((a, b) => {
+    if (a.importance !== b.importance) return a.importance - b.importance
+    return a.timestamp - b.timestamp
+  })
+
+  // Evict lowest importance reminders until we fit the budget
+  while (reminderBudget.length > 0) {
+    totalChars = reminderBudget.reduce((sum, r) => sum + r.text.length, 0)
+    if (totalChars <= targetChars) break
+    reminderBudget.shift()
+  }
+}
+
+function getReminders(): string[] {
+  // Sort by timestamp to maintain FIFO order for same importance
+  return [...reminderBudget]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((r) => r.text)
+}
+
+async function computeSHA256(text: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(text)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16)
+}
 
 const STRUCTURED_OUTPUT_DESCRIPTION = `Use this tool to return your final response in the requested structured format.
 
@@ -228,6 +285,8 @@ export const layer = Layer.effect(
 
       if (!Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE) {
         if (input.agent.name === "plan") {
+          // A-P1-3: Add to reminder budget with high importance
+          addReminder(PROMPT_PLAN, 8)
           userMessage.parts.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
@@ -239,6 +298,8 @@ export const layer = Layer.effect(
         }
         const wasPlan = input.messages.some((msg) => msg.info.role === "assistant" && msg.info.agent === "plan")
         if (wasPlan && input.agent.name === "build") {
+          // A-P1-3: Add to reminder budget with high importance
+          addReminder(BUILD_SWITCH, 8)
           userMessage.parts.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
@@ -255,12 +316,15 @@ export const layer = Layer.effect(
       if (input.agent.name !== "plan" && assistantMessage?.info.agent === "plan") {
         const plan = Session.plan(input.session)
         if (!(yield* fsys.existsSafe(plan))) return input.messages
+        const text = `${BUILD_SWITCH}\n\nA plan file exists at ${plan}. You should execute on the plan defined within it`
+        // A-P1-3: Add to reminder budget with high importance
+        addReminder(text, 8)
         const part = yield* sessions.updatePart({
           id: PartID.ascending(),
           messageID: userMessage.info.id,
           sessionID: userMessage.info.sessionID,
           type: "text",
-          text: `${BUILD_SWITCH}\n\nA plan file exists at ${plan}. You should execute on the plan defined within it`,
+          text,
           synthetic: true,
         })
         userMessage.parts.push(part)
@@ -1595,13 +1659,31 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
               yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-              const [skills, env, instructions, modelMsgs] = yield* Effect.all([
+              // A-P2-1: Load session memory for resume
+              const sessionMemory = yield* Effect.promise(() => loadMemory(sessionID))
+
+              const [skills, envResult, instructions, modelMsgs] = yield* Effect.all([
                 sys.skills(agent),
                 Effect.sync(() => sys.environment(activeModel)),
                 instruction.system().pipe(Effect.orDie),
                 MessageV2.toModelMessagesEffect(msgs, activeModel),
               ])
-              const system = [...env, ...(skills ? [skills] : []), ...instructions]
+
+              // A-P1-2: Compute static hash for cache telemetry
+              const staticHash = yield* Effect.promise(() => computeSHA256(envResult.static.join("")))
+              promptCacheMetrics.recordStaticHash(staticHash)
+
+              const memorySection = sessionMemory
+                ? [`\n## Session Memory\n${sessionMemory}\n`]
+                : []
+
+              const system = [
+                ...envResult.static,
+                ...envResult.semiStatic,
+                ...memorySection,
+                ...(skills ? [skills] : []),
+                ...instructions,
+              ]
               const format = lastUser.format ?? { type: "text" as const }
               if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
               const result = yield* handle.process({

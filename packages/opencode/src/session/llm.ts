@@ -29,6 +29,14 @@ const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 type Result = Awaited<ReturnType<typeof streamText>>
 
+async function computeSHA256(text: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(text)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 8)
+}
+
 export type StreamInput = {
   user: MessageV2.User
   sessionID: string
@@ -123,6 +131,9 @@ const live: Layer.Layer<
         system.push(header, rest.join("\n"))
       }
 
+      // B-P2-1: Compute static blocks hash for cache key salting
+      const staticBlocksHash = yield* Effect.promise(() => computeSHA256(input.system.join("")))
+
       const variant =
         !input.small && input.model.variants && input.user.model.variant
           ? input.model.variants[input.user.model.variant]
@@ -133,6 +144,7 @@ const live: Layer.Layer<
             model: input.model,
             sessionID: input.sessionID,
             providerOptions: item.options,
+            staticBlocksHash,
           })
       const options: Record<string, any> = pipe(
         base,

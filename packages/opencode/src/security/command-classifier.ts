@@ -271,11 +271,58 @@ export class CommandClassifier {
     return { matches, warnings }
   }
 
-  private checkDangerousRedirections(cmd: string): { matches: string[]; warnings: string[] } {
+  private checkDangerousRedirections(cmd: string, astNode?: { type: string; text: () => string; children?: readonly { type: string; text: () => string; children?: readonly unknown[] }[] }): { matches: string[]; warnings: string[] } {
     const matches: string[] = []
     const warnings: string[] = []
 
-    if (/\|.*(?:sh|bash|python|ruby|perl|php)/i.test(cmd)) {
+    // B-P2-2: AST-based pipe-to-interpreter detection
+    // Walk pipeline nodes for pipe → command(name ∈ {sh,bash,python,...})
+    if (astNode) {
+      const dangerousInterpreters = new Set([
+        "sh", "bash", "zsh", "dash", "fish", "pwsh", "powershell",
+        "python", "python3", "python2", "ruby", "perl", "php", "node", "nodejs",
+        "lua", "tclsh", "wish", "expect", "python3.11", "python3.12",
+      ])
+
+      const walkNode = (node: { type: string; text: () => string; children?: readonly unknown[] }): boolean => {
+        // Check for pipeline
+        if (node.type === "pipeline") {
+          const children = node.children as Array<{ type: string; text: () => string; children?: readonly unknown[] }> | undefined
+          if (children && children.length >= 2) {
+            // Check if any command in the pipeline is an interpreter
+            for (const child of children) {
+              if (child.type === "command") {
+                const cmdChildren = child.children as Array<{ type: string; text: () => string }> | undefined
+                if (cmdChildren && cmdChildren.length > 0) {
+                  const firstChild = cmdChildren[0]
+                  if (firstChild?.type === "command_name" || firstChild?.type === "word") {
+                    const cmdName = firstChild.text().toLowerCase().replace(/^["']|["']$/g, "")
+                    if (dangerousInterpreters.has(cmdName)) {
+                      matches.push(`ast_pipe_to_interpreter: ${cmdName}`)
+                      warnings.push(`Command pipes output to dangerous interpreter: ${cmdName}`)
+                      return true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Recurse into children
+        if (node.children) {
+          for (const child of node.children as Array<{ type: string; text: () => string; children?: readonly unknown[] }>) {
+            if (walkNode(child)) return true
+          }
+        }
+        return false
+      }
+
+      walkNode(astNode)
+    }
+
+    // Fallback to regex-based detection for non-AST cases
+    if (matches.length === 0 && /\|.*(?:sh|bash|python|ruby|perl|php)/i.test(cmd)) {
       matches.push("pipe_to_interpreter")
       warnings.push("Command pipes output to a shell interpreter")
     }
@@ -287,9 +334,54 @@ export class CommandClassifier {
     const matches: string[] = []
     const warnings: string[] = []
 
+    // Basic IFS detection
     if (/\$IFS|\$\{[^}]*IFS}/.test(cmd)) {
       matches.push("ifs_injection")
       warnings.push("Command contains IFS variable injection")
+    }
+
+    // Detect variable-name splitting over shell builtin names: ${I}${FS}, ${PATH}, ${LD_*}
+    // Pattern: ${VAR} followed by more ${VAR} where VAR is a shell builtin/env var
+    const shellBuiltinVars = ["IFS", "PATH", "HOME", "USER", "SHELL", "PWD", "TERM", "PS1", "PS2", "PS4"]
+    const envPrefixVars = ["LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH"]
+    const allDangerousVars = [...shellBuiltinVars, ...envPrefixVars, "LD_", "DYLD_", "PS"]
+
+    // Match ${VAR}${VAR} pattern
+    const tokenConcatPattern = /\$=\{([A-Z_]+)\}\$\{([A-Z_]+)\}/g
+    let concatMatch
+    while ((concatMatch = tokenConcatPattern.exec(cmd)) !== null) {
+      const [, var1, var2] = concatMatch
+      if (allDangerousVars.some((v) => var1.startsWith(v) || var2.startsWith(v))) {
+        matches.push(`ifs_obfuscation_token_concat: ${concatMatch[0]}`)
+        warnings.push(`Command contains token-concatenation obfuscation: ${concatMatch[0]}`)
+      }
+    }
+
+    // Match $VAR$VAR pattern (c$I$FS""at style)
+    const bareConcatPattern = /\$[A-Za-z_][A-Za-z0-9_]*\$[A-Za-z_][A-Za-z0-9_]*/g
+    let bareMatch
+    while ((bareMatch = bareConcatPattern.exec(cmd)) !== null) {
+      const token = bareMatch[0]
+      // Check if this looks like shell builtin concatenation
+      const vars = token.slice(1).split("$").filter(Boolean)
+      if (vars.some((v) => shellBuiltinVars.includes(v) || allDangerousVars.some((d) => v.startsWith(d)))) {
+        matches.push(`ifs_obfuscation_bare_concat: ${token}`)
+        warnings.push(`Command contains bare token-concatenation obfuscation: ${token}`)
+      }
+    }
+
+    // Match mid-token expansion like c${IFS}at
+    const midTokenPattern = /[a-zA-Z]\$\{[A-Z_]+}[a-zA-Z]/
+    if (midTokenPattern.test(cmd)) {
+      matches.push("ifs_obfuscation_midtoken")
+      warnings.push("Command contains mid-token variable expansion obfuscation")
+    }
+
+    // Match quoted IFS forms like "$IFS" or '$IFS'
+    const quotedIfsPattern = /["']?\$IFS["']?|\$\{IFS\}/
+    if (quotedIfsPattern.test(cmd)) {
+      matches.push("ifs_quoted_form")
+      warnings.push("Command contains quoted IFS variable")
     }
 
     return { matches, warnings }

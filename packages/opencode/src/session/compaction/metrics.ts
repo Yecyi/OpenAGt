@@ -5,7 +5,13 @@
  * threshold adjustments and compression optimization.
  */
 
+import path from "path"
+import os from "os"
+import fs from "fs"
 import { calculateToolImportance } from "./importance"
+import { Log } from "@/util"
+
+const log = Log.create({ service: "compaction.metrics" })
 
 // ============================================================
 // Types
@@ -42,6 +48,30 @@ export interface ThresholdAdjustment {
   confidence: "low" | "medium" | "high"
 }
 
+export interface PromptCacheMetrics {
+  staticHash: string | null
+  staticHashStable: boolean
+  cacheHitRatio: number
+  dynamicBytes: number
+}
+
+export interface CompactionEvent {
+  tier: "micro" | "auto" | "semantic" | "full"
+  durationMs: number
+  tokenReductionPct: number
+  tokensSaved: number
+}
+
+export interface SecurityEvent {
+  type: "permission_grant" | "compound_classification" | "symlink_correction" | "advisory_refusal" | "block"
+  timestamp: number
+  sessionID: string
+  pattern?: string
+  riskLevel?: "safe" | "low" | "medium" | "high"
+  commandSample?: string
+  findings?: string[]
+}
+
 // ============================================================
 // Compression Tracker
 // ============================================================
@@ -65,6 +95,8 @@ export class CompressionTracker {
     toolName: string,
     originalTokens: number,
     compressedTokens: number,
+    tier?: "micro" | "auto" | "semantic" | "full",
+    durationMs?: number,
   ): void {
     const tokensSaved = originalTokens - compressedTokens
 
@@ -105,6 +137,18 @@ export class CompressionTracker {
 
     // Recalculate quality score
     this.updateQualityScore()
+
+    // C-1: Emit compaction tier_chosen, duration_ms, token_reduction_pct metrics
+    if (tier) {
+      log.info("compaction.tier_chosen", { tier, toolName, tokensSaved })
+    }
+    if (durationMs !== undefined) {
+      log.info("compaction.duration_ms", { tier, durationMs })
+    }
+    if (this.metrics.totalCompressed > 0 && originalTokens > 0) {
+      const tokenReductionPct = (tokensSaved / originalTokens) * 100
+      log.info("compaction.token_reduction_pct", { tier, tokenReductionPct })
+    }
   }
 
   /**
@@ -289,6 +333,177 @@ export class CompressionTracker {
 // ============================================================
 
 export const compressionTracker = new CompressionTracker()
+
+// ============================================================
+// Prompt Cache Metrics Tracker
+// ============================================================
+
+export class PromptCacheMetricsTracker {
+  private previousStaticHash: string | null = null
+  private cacheHits = 0
+  private cacheMisses = 0
+  private dynamicBytesTotal = 0
+
+  recordStaticHash(hash: string): void {
+    if (this.previousStaticHash !== null && this.previousStaticHash !== hash) {
+      log.warn("prompt static hash changed within session", {
+        previous: this.previousStaticHash,
+        current: hash,
+      })
+    }
+    this.previousStaticHash = hash
+
+    // C-1: Emit static hash metric
+    log.info("prompt.static_hash", { hash })
+  }
+
+  recordCacheHit(): void {
+    this.cacheHits++
+    // C-1: Emit cache hit ratio metric
+    log.info("prompt.cache_hit_ratio", { ratio: this.getCacheHitRatio(), hits: this.cacheHits, misses: this.cacheMisses })
+  }
+
+  recordCacheMiss(): void {
+    this.cacheMisses++
+    // C-1: Emit cache hit ratio metric
+    log.info("prompt.cache_hit_ratio", { ratio: this.getCacheHitRatio(), hits: this.cacheHits, misses: this.cacheMisses })
+  }
+
+  recordDynamicBytes(bytes: number): void {
+    this.dynamicBytesTotal += bytes
+    // C-1: Emit dynamic bytes metric
+    log.info("prompt.dynamic_bytes", { bytes, total: this.dynamicBytesTotal })
+  }
+
+  getCacheHitRatio(): number {
+    const total = this.cacheHits + this.cacheMisses
+    if (total === 0) return 0
+    return this.cacheHits / total
+  }
+
+  getMetrics(): PromptCacheMetrics {
+    return {
+      staticHash: this.previousStaticHash,
+      staticHashStable: this.previousStaticHash !== null,
+      cacheHitRatio: this.getCacheHitRatio(),
+      dynamicBytes: this.dynamicBytesTotal,
+    }
+  }
+
+  reset(): void {
+    this.previousStaticHash = null
+    this.cacheHits = 0
+    this.cacheMisses = 0
+    this.dynamicBytesTotal = 0
+  }
+}
+
+export const promptCacheMetrics = new PromptCacheMetricsTracker()
+
+// ============================================================
+// Security Audit Event Tracker
+// ============================================================
+
+export class SecurityAuditTracker {
+  private events: SecurityEvent[] = []
+  private readonly maxEvents = 1000
+
+  recordEvent(event: Omit<SecurityEvent, "timestamp">): void {
+    const fullEvent: SecurityEvent = {
+      ...event,
+      timestamp: Date.now(),
+    }
+    this.events.push(fullEvent)
+    if (this.events.length > this.maxEvents) {
+      this.events.shift()
+    }
+
+    // C-2: Emit to unified security event stream
+    const logEntry = {
+      type: fullEvent.type,
+      timestamp: fullEvent.timestamp,
+      sessionID: fullEvent.sessionID,
+      pattern: fullEvent.pattern,
+      riskLevel: fullEvent.riskLevel,
+      commandSample: fullEvent.commandSample ? this.truncateCommand(fullEvent.commandSample) : undefined,
+      findings: fullEvent.findings,
+    }
+    log.info("security_audit_event", logEntry)
+
+    // Write to persistent audit file (async, non-blocking)
+    void this.writeToAuditFile(logEntry)
+  }
+
+  private async writeToAuditFile(entry: Record<string, unknown>): Promise<void> {
+    try {
+      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
+      const auditDir = path.join(stateHome, "opencode")
+      const auditFile = path.join(auditDir, "security.audit.jsonl")
+
+      // Ensure directory exists
+      await fs.promises.mkdir(auditDir, { recursive: true })
+
+      // Redact command strings >256 bytes
+      if (entry.commandSample && typeof entry.commandSample === "string" && entry.commandSample.length > 256) {
+        entry.commandSample = entry.commandSample.slice(0, 256) + "...[redacted]"
+      }
+
+      const line = JSON.stringify(entry) + "\n"
+      await fs.promises.appendFile(auditFile, line, "utf-8")
+    } catch (error) {
+      // Non-blocking - don't fail on audit errors
+      log.warn("failed to write security audit log", { error })
+    }
+  }
+
+  private truncateCommand(cmd: string, maxLength = 256): string {
+    if (cmd.length <= maxLength) return cmd
+    return cmd.slice(0, maxLength) + "...[truncated]"
+  }
+
+  recordPermissionGrant(sessionID: string, pattern: string): void {
+    this.recordEvent({ type: "permission_grant", sessionID, pattern })
+  }
+
+  recordCompoundClassification(sessionID: string, pattern: string, riskLevel: "safe" | "low" | "medium" | "high", findings: string[]): void {
+    this.recordEvent({
+      type: "compound_classification",
+      sessionID,
+      pattern,
+      riskLevel,
+      findings,
+    })
+  }
+
+  recordSymlinkCorrection(sessionID: string, commandSample: string): void {
+    this.recordEvent({ type: "symlink_correction", sessionID, commandSample })
+  }
+
+  recordAdvisoryRefusal(sessionID: string, commandSample: string, riskLevel: "medium" | "high"): void {
+    this.recordEvent({
+      type: "advisory_refusal",
+      sessionID,
+      commandSample,
+      riskLevel,
+    })
+  }
+
+  recordBlock(sessionID: string, commandSample: string, riskLevel: "medium" | "high", findings: string[]): void {
+    this.recordEvent({
+      type: "block",
+      sessionID,
+      commandSample,
+      riskLevel,
+      findings,
+    })
+  }
+
+  getRecentEvents(count = 100): SecurityEvent[] {
+    return this.events.slice(-count)
+  }
+}
+
+export const securityAudit = new SecurityAuditTracker()
 
 // ============================================================
 // Utility Functions

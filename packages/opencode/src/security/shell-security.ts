@@ -209,18 +209,38 @@ export const layer = Layer.effect(
 
     const analyze = Effect.fn("ShellSecurity.analyze")(function* (input: AnalyzeInput) {
       const shell_family = mapShellFamily(input.shell)
+
+      // Classify original command first
+      const originalClassification = commandClassifier.classify(input.command)
+
+      // Strip wrappers and classify stripped command
       const stripped = wrapperStripper.stripAll(input.command)
-      const classification = commandClassifier.classify(stripped)
-      const features = buildFeatures(input.command, wrapperStripper.getWrapperNames(input.command), stripped, classification.warnings)
+      const strippedClassification = commandClassifier.classify(stripped)
+
+      // Take max risk level between original and stripped
+      const riskLevels: Record<string, number> = { safe: 0, low: 1, medium: 2, high: 3 }
+      const originalRisk = riskLevels[originalClassification.riskLevel] ?? 0
+      const strippedRisk = riskLevels[strippedClassification.riskLevel] ?? 0
+      const finalRisk = originalRisk >= strippedRisk
+        ? originalClassification.riskLevel
+        : strippedClassification.riskLevel
+      const finalWarnings = [...originalClassification.warnings, ...strippedClassification.warnings]
+      const finalPatterns = [...originalClassification.matchedPatterns, ...strippedClassification.matchedPatterns]
+
+      // Check if becomes dangerous after strip
+      const becomesDangerous = wrapperStripper.becomesDangerousAfterStrip(input.command)
+      const finalRiskForDecision = becomesDangerous ? "high" : finalRisk
+
+      const features = buildFeatures(input.command, wrapperStripper.getWrapperNames(input.command), stripped, finalWarnings)
       const findings = buildFindings({
-        warnings: classification.warnings,
-        matchedPatterns: classification.matchedPatterns,
-        risk: classification.riskLevel,
+        warnings: finalWarnings,
+        matchedPatterns: finalPatterns,
+        risk: finalRiskForDecision,
       })
       const decision = decisionFor({
-        risk: classification.riskLevel,
+        risk: finalRiskForDecision,
         command: stripped,
-        warnings: classification.warnings,
+        warnings: finalWarnings,
       })
       const sandbox_requirement: ShellSandboxRequirement = {
         enforcement: decision === "confirm" ? "required" : "advisory",
@@ -238,11 +258,11 @@ export const layer = Layer.effect(
         shell_family,
         features,
         findings,
-        risk_level: classification.riskLevel,
+        risk_level: finalRiskForDecision,
         decision,
         sandbox_requirement,
         explanation:
-          classification.warnings[0] ??
+          finalWarnings[0] ??
           (decision === "allow" ? "No risky shell features detected." : "Shell command requires manual review."),
         review_candidates: reviewCandidates({ findings, decision }),
         review_api_version: 1,

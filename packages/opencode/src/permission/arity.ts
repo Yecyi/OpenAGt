@@ -1,10 +1,47 @@
 export function prefix(tokens: string[]) {
+  // Special-case env: skip VAR=VAL tokens and return inner command's arity
+  if (tokens[0]?.toLowerCase() === "env") {
+    let innerIndex = 1
+    while (innerIndex < tokens.length) {
+      const token = tokens[innerIndex]
+      // If we hit a token that's not VAR=VAL, use the arity of that command
+      if (!token.includes("=") || !/^[A-Za-z_][A-Za-z0-9_]*=./.test(token)) {
+        const innerTokens = tokens.slice(innerIndex)
+        return [tokens[0], ...prefix(innerTokens)]
+      }
+      innerIndex++
+    }
+    // All remaining tokens were VAR=VAL, treat as arity 1
+    return tokens.slice(0, 1)
+  }
+
+  // Special-case sudo, doas, unbuffer, ionice: skip options and return inner command's arity
+  const sudoLike = ["sudo", "doas", "unbuffer", "ionice"]
+  if (sudoLike.includes(tokens[0]?.toLowerCase() ?? "")) {
+    let innerIndex = 1
+    // Skip flags and options
+    while (innerIndex < tokens.length && tokens[innerIndex]?.startsWith("-")) {
+      innerIndex++
+    }
+    if (innerIndex < tokens.length) {
+      const innerTokens = tokens.slice(innerIndex)
+      return [tokens[0], ...prefix(innerTokens)]
+    }
+    return tokens.slice(0, 1)
+  }
+
   for (let len = tokens.length; len > 0; len--) {
     const prefix = tokens.slice(0, len).join(" ")
     const arity = ARITY[prefix]
     if (arity !== undefined) return tokens.slice(0, arity)
   }
   if (tokens.length === 0) return []
+
+  // If command contains '/', treat as absolute-path tool with higher arity
+  if (tokens[0]?.includes("/")) {
+    return tokens.slice(0, Math.min(2, tokens.length))
+  }
+
   return tokens.slice(0, 1)
 }
 
