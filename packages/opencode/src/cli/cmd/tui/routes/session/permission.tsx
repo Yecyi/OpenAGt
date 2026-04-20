@@ -129,6 +129,64 @@ function TextBody(props: { title: string; description?: string; icon?: string })
   )
 }
 
+function ShellPermissionBody(props: { request: PermissionRequest; command: string }) {
+  const { theme } = useTheme()
+  const meta = props.request.metadata ?? {}
+  const riskLevel = typeof meta["riskLevel"] === "string" ? meta["riskLevel"] : undefined
+  const reason = typeof meta["reason"] === "string" ? meta["reason"] : undefined
+  const sandboxMode = typeof meta["sandboxMode"] === "string" ? meta["sandboxMode"] : undefined
+  const workdir = typeof meta["workdir"] === "string" ? normalizePath(meta["workdir"]) : undefined
+  const findings = Array.isArray(meta["findings"])
+    ? meta["findings"]
+        .map((item) =>
+          typeof item === "object" && item !== null && "evidence" in item && typeof item.evidence === "string"
+            ? item.evidence
+            : "",
+        )
+        .filter(Boolean)
+        .slice(0, 4)
+    : []
+  const externalPaths = Array.isArray(meta["externalPaths"])
+    ? meta["externalPaths"].filter((item): item is string => typeof item === "string").slice(0, 4)
+    : []
+
+  return (
+    <box flexDirection="column" gap={1} paddingLeft={1}>
+      <Show when={props.command}>
+        <text fg={theme.text}>{"$ " + props.command}</text>
+      </Show>
+      <Show when={riskLevel || sandboxMode || workdir}>
+        <box flexDirection="column">
+          <Show when={riskLevel}>
+            <text fg={theme.textMuted}>{"Risk: " + riskLevel}</text>
+          </Show>
+          <Show when={sandboxMode}>
+            <text fg={theme.textMuted}>{"Sandbox: " + sandboxMode}</text>
+          </Show>
+          <Show when={workdir}>
+            <text fg={theme.textMuted}>{"Workdir: " + workdir}</text>
+          </Show>
+        </box>
+      </Show>
+      <Show when={reason}>
+        <text fg={theme.textMuted}>{"Reason: " + reason}</text>
+      </Show>
+      <Show when={findings.length > 0}>
+        <box flexDirection="column">
+          <text fg={theme.textMuted}>Findings</text>
+          <For each={findings}>{(item) => <text fg={theme.text}>{"- " + item}</text>}</For>
+        </box>
+      </Show>
+      <Show when={externalPaths.length > 0}>
+        <box flexDirection="column">
+          <text fg={theme.textMuted}>External paths</text>
+          <For each={externalPaths}>{(item) => <text fg={theme.text}>{"- " + normalizePath(item)}</text>}</For>
+        </box>
+      </Show>
+    </box>
+  )
+}
+
 export function PermissionPrompt(props: { request: PermissionRequest }) {
   const sdk = useSDK()
   const sync = useSync()
@@ -286,17 +344,29 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
             if (permission === "bash") {
               const title =
                 typeof data.description === "string" && data.description ? data.description : "Shell command"
-              const command = typeof data.command === "string" ? data.command : ""
+              const command =
+                typeof props.request.metadata?.command === "string"
+                  ? props.request.metadata.command
+                  : typeof data.command === "string"
+                    ? data.command
+                    : ""
               return {
                 icon: "#",
                 title,
-                body: (
-                  <Show when={command}>
-                    <box paddingLeft={1}>
-                      <text fg={theme.text}>{"$ " + command}</text>
-                    </box>
-                  </Show>
-                ),
+                body: <ShellPermissionBody request={props.request} command={command} />,
+              }
+            }
+
+            if (permission === "shell_execute") {
+              const title =
+                typeof props.request.metadata?.description === "string" && props.request.metadata.description
+                  ? props.request.metadata.description
+                  : "High-risk shell command"
+              const command = typeof props.request.metadata?.command === "string" ? props.request.metadata.command : ""
+              return {
+                icon: "!",
+                title,
+                body: <ShellPermissionBody request={props.request} command={command} />,
               }
             }
 

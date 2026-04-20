@@ -10,10 +10,15 @@ import type { SessionPrompt } from "../../src/session/prompt"
 import { MessageID, PartID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
+import { TaskGetTool } from "../../src/tool/task_get"
+import { TaskListTool } from "../../src/tool/task_list"
+import { TaskStopTool } from "../../src/tool/task_stop"
+import { TaskWaitTool } from "../../src/tool/task_wait"
 import { Truncate } from "../../src/tool"
 import { ToolRegistry } from "../../src/tool"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { TaskRuntime } from "../../src/session/task-runtime"
 
 afterEach(async () => {
   await Instance.disposeAll()
@@ -30,6 +35,7 @@ const it = testEffect(
     Config.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
     Session.defaultLayer,
+    TaskRuntime.defaultLayer,
     Truncate.defaultLayer,
     ToolRegistry.defaultLayer,
   ),
@@ -382,6 +388,125 @@ describe("tool.task", () => {
           },
         },
       },
+    ),
+  )
+
+  it.live("task runtime exposes task_list, task_get, task_wait, and task_stop", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const task = yield* TaskTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const taskList = yield* TaskListTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const taskGet = yield* TaskGetTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const taskWait = yield* TaskWaitTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const taskStop = yield* TaskStopTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const promptOps = stubOps({ text: "researched" })
+
+        const result = yield* task.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+            task_kind: "research",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        const listed = yield* taskList.execute(
+          {},
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(listed.output).toContain(result.metadata.taskId)
+
+        const got = yield* taskGet.execute(
+          { task_id: result.metadata.taskId },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(got.output).toContain("completed")
+
+        const waited = yield* taskWait.execute(
+          { task_ids: [result.metadata.taskId], mode: "all", timeout_ms: 1000 },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(waited.output).toContain("completed")
+
+        const stopped = yield* taskStop.execute(
+          { task_id: result.metadata.taskId, reason: "user-stop" },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(stopped.output).toContain("cancelled")
+      }),
+    ),
+  )
+
+  it.live("implement tasks remain pending behind another running implement task", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const tasks = yield* TaskRuntime.Service
+        const { chat } = yield* seed()
+        const first = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_a" as never,
+          taskKind: "implement",
+          subagentType: "general",
+          description: "first implement",
+          prompt: "do first",
+          dependsOn: [],
+        })
+        yield* tasks.setRunning(first.task_id, chat.id)
+        const second = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_b" as never,
+          taskKind: "implement",
+          subagentType: "general",
+          description: "second implement",
+          prompt: "do second",
+          dependsOn: [],
+        })
+        const canRun = yield* tasks.canRun({ parentSessionID: chat.id, task: second })
+        expect(canRun).toBe(false)
+      }),
     ),
   )
 })

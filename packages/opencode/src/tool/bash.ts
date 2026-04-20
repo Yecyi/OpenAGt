@@ -1,6 +1,5 @@
 import z from "zod"
 import os from "os"
-import { createWriteStream } from "node:fs"
 import * as Tool from "./tool"
 import path from "path"
 import DESCRIPTION from "./bash.txt"
@@ -13,17 +12,18 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { fileURLToPath } from "url"
 import { Flag } from "@/flag/flag"
 import { Shell } from "@/shell/shell"
+import { ShellRunner } from "@/shell/runner"
 
 import { BashArity } from "@/permission/arity"
 import * as Truncate from "./truncate"
 import { Plugin } from "@/plugin"
-import { Effect, Stream } from "effect"
+import { Effect } from "effect"
+import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { commandClassifier } from "../security/command-classifier"
+import { ShellSecurity } from "../security/shell-security"
 
-const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
 const PS = new Set(["powershell", "pwsh"])
 const CWD = new Set(["cd", "push-location", "set-location"])
@@ -77,11 +77,6 @@ type Scan = {
   dirs: Set<string>
   patterns: Set<string>
   always: Set<string>
-}
-
-type Chunk = {
-  text: string
-  size: number
 }
 
 export const log = Log.create({ service: "bash-tool" })
@@ -217,50 +212,17 @@ function pathArgs(list: Part[], ps: boolean) {
   return out
 }
 
-function preview(text: string) {
-  if (text.length <= MAX_METADATA_LENGTH) return text
-  return "...\n\n" + text.slice(-MAX_METADATA_LENGTH)
-}
-
-function tail(text: string, maxLines: number, maxBytes: number) {
-  const lines = text.split("\n")
-  if (lines.length <= maxLines && Buffer.byteLength(text, "utf-8") <= maxBytes) {
-    return {
-      text,
-      cut: false,
-    }
-  }
-
-  const out: string[] = []
-  let bytes = 0
-  for (let i = lines.length - 1; i >= 0 && out.length < maxLines; i--) {
-    const size = Buffer.byteLength(lines[i], "utf-8") + (out.length > 0 ? 1 : 0)
-    if (bytes + size > maxBytes) {
-      if (out.length === 0) {
-        const buf = Buffer.from(lines[i], "utf-8")
-        let start = buf.length - maxBytes
-        if (start < 0) start = 0
-        while (start < buf.length && (buf[start] & 0xc0) === 0x80) start++
-        out.unshift(buf.subarray(start).toString("utf-8"))
-      }
-      break
-    }
-    out.unshift(lines[i])
-    bytes += size
-  }
-  return {
-    text: out.join("\n"),
-    cut: true,
-  }
-}
-
 const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolean) {
   const tree = yield* Effect.promise(() => parser().then((p) => (ps ? p.ps : p.bash).parse(command)))
   if (!tree) throw new Error("Failed to parse command")
   return tree.rootNode
 })
 
-const ask = Effect.fn("BashTool.ask")(function* (ctx: Tool.Context, scan: Scan) {
+const ask = Effect.fn("BashTool.ask")(function* (
+  ctx: Tool.Context,
+  scan: Scan,
+  metadata: Record<string, unknown>,
+) {
   if (scan.dirs.size > 0) {
     const globs = Array.from(scan.dirs).map((dir) => {
       if (process.platform === "win32") return AppFileSystem.normalizePathPattern(path.join(dir, "*"))
@@ -279,28 +241,26 @@ const ask = Effect.fn("BashTool.ask")(function* (ctx: Tool.Context, scan: Scan) 
     permission: "bash",
     patterns: Array.from(scan.patterns),
     always: Array.from(scan.always),
-    metadata: {},
+    metadata,
   })
 })
 
-function cmd(shell: string, name: string, command: string, cwd: string, env: NodeJS.ProcessEnv) {
-  if (process.platform === "win32" && PS.has(name)) {
-    return ChildProcess.make(shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], {
-      cwd,
-      env,
-      stdin: "ignore",
-      detached: false,
-    })
-  }
-
-  return ChildProcess.make(command, [], {
-    shell,
-    cwd,
-    env,
-    stdin: "ignore",
-    detached: process.platform !== "win32",
+const askShellExecute = Effect.fn(
+  "BashTool.askShellExecute",
+)(function* (
+  ctx: Tool.Context,
+  input: {
+    patterns: string[]
+    metadata: Record<string, unknown>
+  },
+) {
+  yield* ctx.ask({
+    permission: "shell_execute",
+    patterns: input.patterns,
+    always: [],
+    metadata: input.metadata,
   })
-}
+})
 
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
@@ -335,14 +295,28 @@ export const BashTool = Tool.define(
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner
     const fs = yield* AppFileSystem.Service
-    const trunc = yield* Truncate.Service
     const plugin = yield* Plugin.Service
+    const shellSecurity = yield* ShellSecurity.Service
+    const shellRunner = yield* ShellRunner.Service
 
     const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
-      const lines = yield* spawner
-        .lines(ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text]))
-        .pipe(Effect.catch(() => Effect.succeed([] as string[])))
-      const file = lines[0]?.trim()
+      const handle = yield* spawner
+        .spawn(
+          ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text], {
+            cwd: Instance.directory,
+            extendEnv: true,
+            stdin: "ignore",
+            stderr: "ignore",
+          }),
+        )
+        .pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (!handle) return
+      const output = yield* Stream.decodeText(handle.stdout).pipe(
+        Stream.runCollect,
+        Effect.map((chunk) => [...chunk].join("")),
+        Effect.catch(() => Effect.succeed("")),
+      )
+      const file = output.split(/\r?\n/)[0]?.trim()
       if (!file) return
       return AppFileSystem.normalizePath(file)
     })
@@ -410,167 +384,6 @@ export const BashTool = Tool.define(
       }
     })
 
-    const run = Effect.fn("BashTool.run")(function* (
-      input: {
-        shell: string
-        name: string
-        command: string
-        cwd: string
-        env: NodeJS.ProcessEnv
-        timeout: number
-        description: string
-      },
-      ctx: Tool.Context,
-    ) {
-      const bytes = Truncate.MAX_BYTES
-      const lines = Truncate.MAX_LINES
-      const keep = bytes * 2
-      let full = ""
-      let last = ""
-      const list: Chunk[] = []
-      let used = 0
-      let file = ""
-      let sink: ReturnType<typeof createWriteStream> | undefined
-      let cut = false
-      let expired = false
-      let aborted = false
-
-      yield* ctx.metadata({
-        metadata: {
-          output: "",
-          description: input.description,
-        },
-      })
-
-      const code: number | null = yield* Effect.scoped(
-        Effect.gen(function* () {
-          const handle = yield* spawner.spawn(cmd(input.shell, input.name, input.command, input.cwd, input.env))
-
-          yield* Effect.forkScoped(
-            Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
-              const size = Buffer.byteLength(chunk, "utf-8")
-              list.push({ text: chunk, size })
-              used += size
-              while (used > keep && list.length > 1) {
-                const item = list.shift()
-                if (!item) break
-                used -= item.size
-                cut = true
-              }
-
-              last = preview(last + chunk)
-
-              if (file) {
-                sink?.write(chunk)
-              } else {
-                full += chunk
-                if (Buffer.byteLength(full, "utf-8") > bytes) {
-                  return trunc.write(full).pipe(
-                    Effect.andThen((next) =>
-                      Effect.sync(() => {
-                        file = next
-                        cut = true
-                        sink = createWriteStream(next, { flags: "a" })
-                        full = ""
-                      }),
-                    ),
-                    Effect.andThen(
-                      ctx.metadata({
-                        metadata: {
-                          output: last,
-                          description: input.description,
-                        },
-                      }),
-                    ),
-                  )
-                }
-              }
-
-              return ctx.metadata({
-                metadata: {
-                  output: last,
-                  description: input.description,
-                },
-              })
-            }),
-          )
-
-          const abort = Effect.callback<void>((resume) => {
-            if (ctx.abort.aborted) return resume(Effect.void)
-            const handler = () => resume(Effect.void)
-            ctx.abort.addEventListener("abort", handler, { once: true })
-            return Effect.sync(() => ctx.abort.removeEventListener("abort", handler))
-          })
-
-          const timeout = Effect.sleep(`${input.timeout + 100} millis`)
-
-          const exit = yield* Effect.raceAll([
-            handle.exitCode.pipe(Effect.map((code) => ({ kind: "exit" as const, code }))),
-            abort.pipe(Effect.map(() => ({ kind: "abort" as const, code: null }))),
-            timeout.pipe(Effect.map(() => ({ kind: "timeout" as const, code: null }))),
-          ])
-
-          if (exit.kind === "abort") {
-            aborted = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-          if (exit.kind === "timeout") {
-            expired = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-
-          return exit.kind === "exit" ? exit.code : null
-        }),
-      ).pipe(Effect.orDie)
-
-      const meta: string[] = []
-      if (expired) {
-        meta.push(
-          `bash tool terminated command after exceeding timeout ${input.timeout} ms. If this command is expected to take longer and is not waiting for interactive input, retry with a larger timeout value in milliseconds.`,
-        )
-      }
-      if (aborted) meta.push("User aborted the command")
-      const raw = list.map((item) => item.text).join("")
-      const end = tail(raw, lines, bytes)
-      if (end.cut) cut = true
-      if (!file && end.cut) {
-        file = yield* trunc.write(raw)
-      }
-
-      let output = end.text
-      if (!output) output = "(no output)"
-
-      if (cut && file) {
-        output = `...output truncated...\n\nFull output saved to: ${file}\n\n` + output
-      }
-
-      if (meta.length > 0) {
-        output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
-      }
-      if (sink) {
-        const stream = sink
-        yield* Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              stream.end(() => resolve())
-              stream.on("error", () => resolve())
-            }),
-        )
-      }
-
-      return {
-        title: input.description,
-        metadata: {
-          output: last || preview(output),
-          exit: code,
-          description: input.description,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
-        },
-        output,
-      }
-    })
-
     return () =>
       Effect.sync(() => {
         const shell = Shell.acceptable()
@@ -598,48 +411,81 @@ export const BashTool = Tool.define(
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
 
-              // Security check: classify command for dangerous patterns
-              const classification = commandClassifier.classify(params.command)
-              if (classification.riskLevel === "high") {
-                // High risk commands are blocked immediately
-                log.warn("high-risk command blocked", {
-                  riskLevel: classification.riskLevel,
-                  warnings: classification.warnings,
-                  matchedPatterns: classification.matchedPatterns,
-                })
-                const errorMsg = `Dangerous command blocked: ${classification.warnings.join("; ")}`
-                return {
-                  title: "Bash Command Blocked",
-                  metadata: { output: errorMsg, exit: null, description: params.description ?? "", truncated: false },
-                  output: errorMsg,
-                }
-              } else if (classification.riskLevel === "medium") {
-                // Medium risk commands get logged as warnings but proceed
-                // The permission system will handle the actual confirmation
-                log.warn("medium-risk command detected", {
-                  riskLevel: classification.riskLevel,
-                  warnings: classification.warnings,
-                })
-              }
-
               const timeout = params.timeout ?? DEFAULT_TIMEOUT
               const ps = PS.has(name)
               const root = yield* parse(params.command, ps)
               const scan = yield* collect(root, cwd, ps, shell)
               if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
-              yield* ask(ctx, scan)
 
-              return yield* run(
+              const security = yield* shellSecurity.analyze({
+                command: params.command,
+                shell,
+                cwd,
+              })
+              const externalPaths = Array.from(scan.dirs)
+              const permissionMetadata = shellSecurity.createPermissionMetadata({
+                result: security,
+                description: params.description ?? "Shell command",
+                workdir: cwd,
+                externalPaths,
+              })
+
+              if (security.decision === "block") {
+                const errorMsg = `Dangerous command blocked: ${security.explanation}`
+                return {
+                  title: "Bash Command Blocked",
+                  metadata: {
+                    output: errorMsg,
+                    exit: null,
+                    description: params.description ?? "",
+                    truncated: false,
+                    findings: security.findings,
+                    riskLevel: security.risk_level,
+                    decision: security.decision,
+                    reviewApiVersion: security.review_api_version,
+                    reviewMode: security.review_mode,
+                    reviewStatus: security.review_status,
+                  },
+                  output: errorMsg,
+                }
+              }
+
+              yield* ask(ctx, scan, permissionMetadata)
+              if (security.decision === "confirm") {
+                yield* askShellExecute(ctx, {
+                  patterns: [security.normalized_command || params.command],
+                  metadata: permissionMetadata,
+                })
+              }
+
+              const env = yield* shellEnv(ctx, cwd)
+              return yield* shellRunner.run(
                 {
                   shell,
-                  name,
+                  shellFamily: security.shell_family,
                   command: params.command,
                   cwd,
-                  env: yield* shellEnv(ctx, cwd),
+                  env,
                   timeout,
-                  description: params.description,
+                  description: params.description ?? "Shell command",
+                  sandboxMode: security.sandbox_requirement.mode,
+                  filesystemScope: security.sandbox_requirement.filesystemScope,
+                  networkAccess: security.sandbox_requirement.networkAccess,
                 },
                 ctx,
+              ).pipe(
+                Effect.map((result) => ({
+                  ...result,
+                  metadata: {
+                    ...result.metadata,
+                    findings: security.findings,
+                    riskLevel: security.risk_level,
+                    decision: security.decision,
+                    reviewApiVersion: security.review_api_version,
+                    reviewMode: security.review_mode,
+                    reviewStatus: security.review_status,
+                  },
+                })),
               )
             }),
         }
