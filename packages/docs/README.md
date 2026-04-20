@@ -1,44 +1,100 @@
-# Mintlify Starter Kit
+# OpenAG Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+使用 [Mintlify](https://mintlify.com) 构建的 OpenAG 官方文档。
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+---
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## 目录
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+- [技术栈](#技术栈)
+- [目录结构](#目录结构)
+- [开发](#开发)
+- [内容规范](#内容规范)
+  - [页面结构](#页面结构)
+  - [组件使用](#组件使用)
+  - [导航配置](#导航配置)
+- [发布](#发布)
+- [相关文档](#相关文档)
 
-## Development
+---
 
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 文档框架 | Mintlify |
+| 部署 | GitHub Pages |
+| 编辑 | MDX |
+
+## 目录结构
 
 ```
+docs/
+├── docs/                  # 文档内容
+│   ├── getting-started/  # 入门指南
+│   ├── guides/           # 使用指南
+│   └── api/              # API 参考
+├── public/               # 静态资源
+├── mint.json            # Mintlify 配置
+└── package.json
+```
+
+## 开发
+
+```bash
+# 安装 Mintlify CLI
 npm i -g mint
-```
 
-Run the following command at the root of your documentation, where your `docs.json` is located:
-
-```
+# 本地预览
 mint dev
+# 访问 http://localhost:3000
 ```
 
-View your local preview at `http://localhost:3000`.
+## 内容规范
 
-## Publishing changes
+### 页面结构
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+```markdown
+---
+title: 页面标题
+description: 简短描述
+---
 
-## Need help?
+# 大标题
 
-### Troubleshooting
+内容...
+```
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+### 组件使用
 
-### Resources
+Mintlify 提供丰富的组件：
 
-- [Mintlify documentation](https://mintlify.com/docs)
+- `<Card>` - 信息卡片
+- `<CodeGroup>` - 代码分组
+- `<ResponseField>` - API 响应字段
+- `<RequestExample>` - 请求示例
+
+### 导航配置
+
+在 `mint.json` 中配置侧边栏和导航：
+
+```json
+{
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["getting-started/introduction"]
+    }
+  ]
+}
+```
+
+## 发布
+
+通过 GitHub App 自动部署到生产环境。推送到默认分支后会自动发布更改。
+
+## 相关文档
+
+- [Mintlify 文档](https://mintlify.com/docs)
+- [Mintlify Starter Kit](https://starter.mintlify.com/quickstart)
+- [主 README](../../README.md)

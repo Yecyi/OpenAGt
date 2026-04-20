@@ -1,50 +1,118 @@
-## Usage
+# OpenAG Web Application
 
-Dependencies for these templates are managed with [pnpm](https://pnpm.io) using `pnpm up -Lri`.
+基于 SolidJS 的 Web 界面，提供会话管理和实时协作功能。
 
-This is the reason you see a `pnpm-lock.yaml`. That said, any package manager will work. This file can safely be removed once you clone a template.
+---
 
-```bash
-$ npm install # or pnpm install or yarn install
+## 目录
+
+- [技术栈](#技术栈)
+- [目录结构](#目录结构)
+- [开发](#开发)
+  - [环境变量](#环境变量)
+  - [E2E 测试](#e2e-测试)
+- [与后端通信](#与后端通信)
+- [部署](#部署)
+- [相关文档](#相关文档)
+
+---
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 前端框架 | SolidJS |
+| 构建工具 | Vite |
+| 样式 | CSS Modules + CSS Variables |
+| 测试 | Playwright (E2E) |
+| 状态管理 | SolidJS createStore |
+
+## 目录结构
+
+```
+app/
+├── src/
+│   ├── App.tsx              # 根组件
+│   ├── index.tsx            # 入口文件
+│   ├── routes/              # 路由
+│   │   └── index.tsx
+│   ├── components/          # UI 组件
+│   │   ├── Chat/            # 聊天组件
+│   │   ├── Editor/          # 编辑器组件
+│   │   ├── Terminal/        # 终端模拟器
+│   │   └── Settings/        # 设置面板
+│   ├── stores/              # 状态管理
+│   └── lib/                 # 工具函数
+├── public/                  # 静态资源
+├── test/
+│   └── e2e/                 # E2E 测试
+├── package.json
+└── vite.config.ts
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
-
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm run dev` or `npm start`
-
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.<br>
-
-### `npm run build`
-
-Builds the app for production to the `dist` folder.<br>
-It correctly bundles Solid in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
-
-## E2E Testing
-
-Playwright starts the Vite dev server automatically via `webServer`, and UI tests expect an opencode backend at `localhost:4096` by default.
+## 开发
 
 ```bash
+# 安装依赖
+pnpm install
+
+# 开发模式
+pnpm dev
+# 访问 http://localhost:3000
+
+# 构建生产版本
+pnpm build
+
+# E2E 测试
+pnpm test:e2e:local
+```
+
+### 环境变量
+
+| 变量 | 描述 | 默认值 |
+|------|------|--------|
+| `PLAYWRIGHT_SERVER_HOST` | 后端地址 | `localhost` |
+| `PLAYWRIGHT_SERVER_PORT` | 后端端口 | `4096` |
+| `PLAYWRIGHT_PORT` | Vite 端口 | `3000` |
+
+### E2E 测试
+
+Playwright 自动启动 Vite dev server，要求后端运行在 `localhost:4096`。
+
+```bash
+# 安装 Playwright 浏览器
 bunx playwright install chromium
+
+# 运行所有 E2E 测试
 bun run test:e2e:local
+
+# 运行指定测试
 bun run test:e2e:local -- --grep "settings"
 ```
 
-Environment options:
+## 与后端通信
 
-- `PLAYWRIGHT_SERVER_HOST` / `PLAYWRIGHT_SERVER_PORT` (backend address, default: `localhost:4096`)
-- `PLAYWRIGHT_PORT` (Vite dev server port, default: `3000`)
-- `PLAYWRIGHT_BASE_URL` (override base URL, default: `http://localhost:<PLAYWRIGHT_PORT>`)
+Web 应用通过 HTTP + SSE 与后端通信：
 
-## Deployment
+```
+┌─────────────┐          HTTP/SSE           ┌─────────────┐
+│  SolidJS   │ ◀─────────────────────────▶ │   OpenAG   │
+│  Web App   │      GET /api/session/:id   │   Server   │
+│            │      POST /api/prompt       │  (Hono)    │
+└─────────────┘      GET /api/stream       └─────────────┘
+```
 
-You can deploy the `dist` folder to any static host provider (netlify, surge, now, etc.)
+## 部署
+
+构建产物 (`dist/`) 可部署到任意静态托管服务：
+
+- Netlify
+- Vercel
+- Surge
+- Cloudflare Pages
+
+## 相关文档
+
+- [主 README](../../README.md)
+- [SolidJS 文档](https://solidjs.com)
+- [Vite 配置](https://vitejs.dev)
