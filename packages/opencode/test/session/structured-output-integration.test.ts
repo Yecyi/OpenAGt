@@ -6,6 +6,7 @@ import { SessionPrompt } from "../../src/session/prompt"
 import { Log } from "../../src/util"
 import { Instance } from "../../src/project/instance"
 import { MessageV2 } from "../../src/session/message-v2"
+import { Config } from "../../src/config"
 
 const projectRoot = path.join(__dirname, "../..")
 void Log.init({ print: false })
@@ -23,7 +24,10 @@ async function withInstance<T>(fn: () => Promise<T>): Promise<T> {
 
 function run<A, E>(fx: Effect.Effect<A, E, SessionPrompt.Service | Session.Service>) {
   return Effect.runPromise(
-    fx.pipe(Effect.scoped, Effect.provide(Layer.mergeAll(SessionPrompt.defaultLayer, Session.defaultLayer))),
+    fx.pipe(
+      Effect.scoped,
+      Effect.provide(Layer.mergeAll(Config.defaultLayer, SessionPrompt.defaultLayer, Session.defaultLayer)),
+    ),
   )
 }
 

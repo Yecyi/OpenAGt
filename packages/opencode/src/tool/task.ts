@@ -29,12 +29,23 @@ const parameters = z.object({
     )
     .optional(),
   group_id: z.string().describe("Optional task group identifier for related subtasks").optional(),
-  depends_on: z.array(SessionID.zod).describe("Optional task ids that must complete first").optional(),
+  depends_on: z.array(z.string()).describe("Optional task ids that must complete first").optional(),
   task_kind: z.enum(["research", "implement", "verify", "generic"]).optional(),
   return_mode: z.enum(["id", "summary"]).describe("Return task id or immediate summary").optional(),
   metadata: z.record(z.string(), z.unknown()).describe("Optional structured metadata for scheduling").optional(),
   command: z.string().describe("The command that triggered this task").optional(),
 })
+
+type TaskMetadata = {
+  sessionId: SessionID
+  model: {
+    modelID: string
+    providerID: string
+  }
+  taskId?: SessionID
+  status?: "pending" | "completed"
+  groupId?: string
+}
 
 export const TaskTool = Tool.define(
   id,
@@ -124,7 +135,7 @@ export const TaskTool = Tool.define(
 
       const messageID = MessageID.ascending()
       const taskKind = params.task_kind ?? "generic"
-      const dependsOn = params.depends_on ?? []
+      const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
 
       const record = yield* tasks.create({
         parentSessionID: ctx.sessionID,
@@ -237,7 +248,7 @@ export const TaskTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context) => run(params, ctx).pipe(Effect.orDie),
+      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context<TaskMetadata>) => run(params, ctx).pipe(Effect.orDie),
     }
   }),
 )

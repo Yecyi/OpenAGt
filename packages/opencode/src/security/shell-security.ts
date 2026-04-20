@@ -2,14 +2,18 @@ import { Context, Effect, Layer } from "effect"
 import { Shell } from "@/shell/shell"
 import { commandClassifier } from "./command-classifier"
 import { WrapperStripper } from "./wrapper-stripper"
+import type {
+  SandboxBackendPreference,
+  SandboxEnforcement,
+  SandboxFilesystemPolicy,
+  SandboxNetworkPolicy,
+} from "@/sandbox/types"
 
 export type ShellFamily = "powershell" | "posix" | "cmd"
 export type ShellDecision = "allow" | "confirm" | "block"
 export type ShellRiskLevel = "safe" | "low" | "medium" | "high"
 export type ReviewMode = "disabled"
 export type ReviewStatus = "not_requested"
-export type SandboxMode = "process" | "landlock" | "seatbelt" | "container"
-export type NetworkAccess = "inherited" | "none" | "limited" | "full"
 export type ReviewAPIVersion = 1
 
 export type ShellFinding = {
@@ -37,9 +41,12 @@ export type ShellReviewCandidate = {
 }
 
 export type ShellSandboxRequirement = {
-  mode: SandboxMode
-  networkAccess: NetworkAccess
-  filesystemScope: string[]
+  enforcement: SandboxEnforcement
+  backend_preference: SandboxBackendPreference
+  filesystem_policy: SandboxFilesystemPolicy
+  network_policy: SandboxNetworkPolicy
+  allowed_paths: string[]
+  writable_paths: string[]
 }
 
 export type ShellFeatures = {
@@ -80,7 +87,12 @@ export type ShellPermissionMetadata = {
   decision: ShellDecision
   findings: ShellFinding[]
   workdir: string
-  sandboxMode: SandboxMode
+  backendPreference: SandboxBackendPreference
+  enforcement: SandboxEnforcement
+  filesystemPolicy: SandboxFilesystemPolicy
+  networkPolicy: SandboxNetworkPolicy
+  allowedPathsSummary: string[]
+  backendAvailability: string
   externalPaths: string[]
   reason: string
   reviewApiVersion: ReviewAPIVersion
@@ -112,6 +124,7 @@ function findingCategory(message: string): ShellFinding["category"] {
 
 function shouldBlock(input: { command: string; risk: ShellRiskLevel; warnings: string[] }) {
   const lower = input.command.toLowerCase()
+  if (/(curl|wget).*\|.*(sh|bash|zsh|pwsh|powershell|cmd)(\s|$)/i.test(lower)) return true
   if (input.risk !== "high") return false
   if (/(curl|wget).*\|.*(sh|bash|zsh|pwsh|powershell|cmd)/i.test(lower)) return true
   if (/(^|[\s;&|])eval[\s(]/i.test(lower)) return true
@@ -120,7 +133,6 @@ function shouldBlock(input: { command: string; risk: ShellRiskLevel; warnings: s
   return input.warnings.some((item) => {
     const warning = item.toLowerCase()
     return (
-      warning.includes("command substitution") ||
       warning.includes("control characters") ||
       warning.includes("newline") ||
       warning.includes("dangerous environment variable")
@@ -210,11 +222,13 @@ export const layer = Layer.effect(
         command: stripped,
         warnings: classification.warnings,
       })
-      const filesystemScope = [input.cwd]
       const sandbox_requirement: ShellSandboxRequirement = {
-        mode: "process",
-        networkAccess: "inherited",
-        filesystemScope,
+        enforcement: decision === "confirm" ? "required" : "advisory",
+        backend_preference: "auto",
+        filesystem_policy: "workspace_write",
+        network_policy: "none",
+        allowed_paths: [input.cwd],
+        writable_paths: [input.cwd],
       }
 
       const result: ShellSecurityResult = {
@@ -253,7 +267,12 @@ export const layer = Layer.effect(
       decision: input.result.decision,
       findings: input.result.findings,
       workdir: input.workdir,
-      sandboxMode: input.result.sandbox_requirement.mode,
+      backendPreference: input.result.sandbox_requirement.backend_preference,
+      enforcement: input.result.sandbox_requirement.enforcement,
+      filesystemPolicy: input.result.sandbox_requirement.filesystem_policy,
+      networkPolicy: input.result.sandbox_requirement.network_policy,
+      allowedPathsSummary: input.result.sandbox_requirement.allowed_paths,
+      backendAvailability: "pending",
       externalPaths: input.externalPaths,
       reason: input.result.explanation,
       reviewApiVersion: input.result.review_api_version,

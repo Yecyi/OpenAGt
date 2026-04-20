@@ -1,8 +1,17 @@
 import z from "zod"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
+import { SessionID } from "@/session/schema"
+
+const parameters = z.object({
+  task_id: z.string(),
+  reason: z.string().optional(),
+})
+
+type TaskStopMetadata = {
+  task: TaskRuntime.TaskRecord
+}
 
 export const TaskStopTool = Tool.define(
   "task_stop",
@@ -11,14 +20,11 @@ export const TaskStopTool = Tool.define(
 
     return {
       description: "Cancel a task and record a stop reason.",
-      parameters: z.object({
-        task_id: SessionID.zod,
-        reason: z.string().optional(),
-      }),
-      execute: (params, ctx) =>
+      parameters,
+      execute: (params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskStopMetadata>, never, never> =>
         Effect.gen(function* () {
           const record = yield* tasks.cancel({
-            taskID: params.task_id,
+            taskID: SessionID.make(params.task_id),
             parentSessionID: ctx.sessionID,
             reason: params.reason,
           })
@@ -29,7 +35,7 @@ export const TaskStopTool = Tool.define(
               task: record,
             },
           }
-        }),
+        }).pipe(Effect.orDie),
     }
   }),
 )

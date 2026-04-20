@@ -29,6 +29,7 @@ import { SessionRevert } from "../../src/session/revert"
 import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
+import { TaskRuntime } from "../../src/session/task-runtime"
 import { Skill } from "../../src/skill"
 import { SystemPrompt } from "../../src/session/system"
 import { Shell } from "../../src/shell/shell"
@@ -39,6 +40,10 @@ import { Log } from "../../src/util"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { Ripgrep } from "../../src/file/ripgrep"
 import { Format } from "../../src/format"
+import { SandboxBroker } from "../../src/sandbox/broker"
+import { SandboxPolicy } from "../../src/sandbox/policy"
+import { ShellRunner } from "../../src/shell/runner"
+import { ShellSecurity } from "../../src/security/shell-security"
 import { provideTmpdirInstance, provideTmpdirServer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
@@ -167,6 +172,11 @@ function makeHttp() {
     mcp,
     AppFileSystem.defaultLayer,
     status,
+    TaskRuntime.defaultLayer,
+    SandboxBroker.defaultLayer,
+    SandboxPolicy.liveLayer,
+    ShellRunner.defaultLayer,
+    ShellSecurity.defaultLayer,
   ).pipe(Layer.provideMerge(infra))
   const question = Question.layer.pipe(Layer.provideMerge(deps))
   const todo = Todo.layer.pipe(Layer.provideMerge(deps))
@@ -232,9 +242,15 @@ const cfg = {
       },
     },
   },
-}
+  experimental: {
+    sandbox: {
+      backend: "process",
+      failure_policy: "fallback",
+    },
+  },
+} as const satisfies Partial<Config.Info>
 
-function providerCfg(url: string) {
+function providerCfg(url: string): Partial<Config.Info> {
   return {
     ...cfg,
     provider: {

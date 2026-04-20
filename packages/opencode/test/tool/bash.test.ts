@@ -16,14 +16,50 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Plugin } from "../../src/plugin"
 import { ShellRunner } from "../../src/shell/runner"
 import { ShellSecurity } from "../../src/security/shell-security"
+import { SandboxBroker } from "../../src/sandbox/broker"
+import { SandboxPolicy } from "../../src/sandbox/policy"
+import { Config } from "../../src/config"
+
+const config = Layer.succeed(
+  Config.Service,
+  Config.Service.of({
+    get: () =>
+      Effect.succeed({
+        experimental: {
+          sandbox: {
+            enabled: true,
+            backend: "process",
+            failure_policy: "fallback",
+            report_only: false,
+            broker_idle_ttl_ms: 300_000,
+          },
+        },
+      }),
+    getGlobal: () => Effect.succeed({}),
+    getConsoleState: () =>
+      Effect.succeed({
+        consoleManagedProviders: [],
+        activeOrgName: undefined,
+        switchableOrgCount: 0,
+      }),
+    update: () => Effect.void,
+    updateGlobal: () => Effect.succeed({}),
+    invalidate: () => Effect.void,
+    directories: () => Effect.succeed([]),
+    waitForDependencies: () => Effect.void,
+  }),
+)
 
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
     CrossSpawnSpawner.defaultLayer,
     AppFileSystem.defaultLayer,
+    config,
     Plugin.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    SandboxBroker.defaultLayer,
+    SandboxPolicy.layer.pipe(Layer.provide(config)),
     ShellRunner.defaultLayer,
     ShellSecurity.defaultLayer,
   ),

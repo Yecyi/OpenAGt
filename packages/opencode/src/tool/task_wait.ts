@@ -1,8 +1,18 @@
 import z from "zod"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
+import { SessionID } from "@/session/schema"
+
+const parameters = z.object({
+  task_ids: z.array(z.string()),
+  mode: z.enum(["all", "any"]).optional(),
+  timeout_ms: z.number().optional(),
+})
+
+type TaskWaitMetadata = {
+  tasks: TaskRuntime.TaskResult[]
+}
 
 export const TaskWaitTool = Tool.define(
   "task_wait",
@@ -11,16 +21,12 @@ export const TaskWaitTool = Tool.define(
 
     return {
       description: "Wait for one or more tasks to reach a terminal state.",
-      parameters: z.object({
-        task_ids: z.array(SessionID.zod),
-        mode: z.enum(["all", "any"]).optional(),
-        timeout_ms: z.number().optional(),
-      }),
-      execute: (params, ctx) =>
+      parameters,
+      execute: (params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskWaitMetadata>, never, never> =>
         Effect.gen(function* () {
           const result = yield* tasks.wait({
             parentSessionID: ctx.sessionID,
-            taskIDs: params.task_ids,
+            taskIDs: params.task_ids.map((item) => SessionID.make(item)),
             mode: params.mode ?? "all",
             timeoutMs: params.timeout_ms,
           })
@@ -31,7 +37,7 @@ export const TaskWaitTool = Tool.define(
               tasks: result,
             },
           }
-        }),
+        }).pipe(Effect.orDie),
     }
   }),
 )

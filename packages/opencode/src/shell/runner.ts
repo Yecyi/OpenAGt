@@ -1,13 +1,16 @@
-import { Context, Effect, Fiber, Layer } from "effect"
-import * as Stream from "effect/Stream"
-import { ChildProcess } from "effect/unstable/process"
-import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
+import { Context, Effect, Fiber, Layer, Queue } from "effect"
 import { createWriteStream } from "node:fs"
 import { EnvSanitizer } from "@/security/env-sanitizer"
-import type { NetworkAccess, SandboxMode, ShellFamily } from "@/security/shell-security"
+import type { ShellFamily } from "@/security/shell-security"
 import type { Tool } from "@/tool"
 import * as Truncate from "@/tool/truncate"
-import { Shell } from "./shell"
+import { SandboxBroker } from "@/sandbox/broker"
+import type {
+  SandboxBackendPreference,
+  SandboxEnforcement,
+  SandboxFilesystemPolicy,
+  SandboxNetworkPolicy,
+} from "@/sandbox/types"
 
 export type RunInput = {
   shell: string
@@ -17,9 +20,14 @@ export type RunInput = {
   timeout: number
   description: string
   env?: NodeJS.ProcessEnv
-  sandboxMode: SandboxMode
-  filesystemScope: string[]
-  networkAccess: NetworkAccess
+  enforcement: SandboxEnforcement
+  backendPreference: SandboxBackendPreference
+  filesystemPolicy: SandboxFilesystemPolicy
+  allowedPaths: string[]
+  writablePaths: string[]
+  networkPolicy: SandboxNetworkPolicy
+  reportOnly: boolean
+  failurePolicy: "closed" | "confirm_downgrade" | "fallback"
 }
 
 export type RunResult = {
@@ -31,9 +39,14 @@ export type RunResult = {
     description: string
     truncated: boolean
     outputPath?: string
-    sandboxMode: SandboxMode
-    networkAccess: NetworkAccess
-    filesystemScope: string[]
+    backendPreference: SandboxBackendPreference
+    enforcement: SandboxEnforcement
+    filesystemPolicy: SandboxFilesystemPolicy
+    networkPolicy: SandboxNetworkPolicy
+    allowedPaths: string[]
+    writablePaths: string[]
+    backendUsed?: string
+    terminationReason?: string
   }
 }
 
@@ -66,26 +79,6 @@ function sanitizeEnv(env: NodeJS.ProcessEnv | undefined) {
   return new EnvSanitizer(base).sanitize()
 }
 
-function makeProcess(input: RunInput, env: NodeJS.ProcessEnv) {
-  const name = Shell.name(input.shell)
-  if (process.platform === "win32" && (name === "powershell" || name === "pwsh")) {
-    return ChildProcess.make(input.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", input.command], {
-      cwd: input.cwd,
-      env,
-      stdin: "ignore",
-      detached: false,
-    })
-  }
-
-  return ChildProcess.make(input.command, [], {
-    shell: input.shell,
-    cwd: input.cwd,
-    env,
-    stdin: "ignore",
-    detached: process.platform !== "win32",
-  })
-}
-
 export interface Interface {
   readonly run: (input: RunInput, ctx: Tool.Context) => Effect.Effect<RunResult>
 }
@@ -95,9 +88,8 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Sh
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner
+    const broker = yield* SandboxBroker.Service
     const truncate = yield* Truncate.Service
-
     const run = Effect.fn("ShellRunner.run")(function* (input: RunInput, ctx: Tool.Context) {
       const bytes = Truncate.MAX_BYTES
       const lines = Truncate.MAX_LINES
@@ -109,92 +101,116 @@ export const layer = Layer.effect(
       let cut = false
       let expired = false
       let aborted = false
+      let backendUsed = ""
+      let terminationReason = ""
       let used = 0
       const chunks: Array<{ text: string; size: number }> = []
       const env = sanitizeEnv(input.env)
+      const requestID = `${ctx.sessionID}:${ctx.callID || "shell"}:${Date.now()}`
+      const capabilities = yield* broker.capabilities()
+      const preferred =
+        input.backendPreference === "auto"
+          ? capabilities.find((item) =>
+              process.platform === "darwin"
+                ? item.name === "seatbelt"
+                : process.platform === "win32"
+                  ? item.name === "windows_native"
+                  : item.name === "landlock",
+            )
+          : capabilities.find((item) => item.name === input.backendPreference)
+
+      if (input.enforcement === "required" && input.failurePolicy === "closed" && !preferred?.available) {
+        throw new Error(preferred?.reason ?? "Required sandbox backend unavailable")
+      }
 
       yield* ctx.metadata({
         metadata: {
           output: "",
           description: input.description,
-          sandboxMode: input.sandboxMode,
-          networkAccess: input.networkAccess,
-          filesystemScope: input.filesystemScope,
+          backendPreference: input.backendPreference,
+          enforcement: input.enforcement,
+          filesystemPolicy: input.filesystemPolicy,
+          networkPolicy: input.networkPolicy,
+          allowedPaths: input.allowedPaths,
+          writablePaths: input.writablePaths,
         },
       })
 
-      const code = yield* Effect.scoped(
-        Effect.gen(function* () {
-          const handle = yield* spawner.spawn(makeProcess(input, env))
-          const pump = yield* Effect.forkScoped(
-            Stream.runForEach(Stream.decodeText(handle.all), (text) => {
-              const size = Buffer.byteLength(text, "utf-8")
-              chunks.push({ text, size })
-              used += size
-              while (used > keep && chunks.length > 1) {
-                const item = chunks.shift()
-                if (!item) break
-                used -= item.size
-                cut = true
-              }
-
-              last = preview(last + text)
-              if (file) {
-                sink?.write(text)
-              } else {
-                full += text
-                if (Buffer.byteLength(full, "utf-8") > bytes) {
-                  return truncate.write(full).pipe(
-                    Effect.andThen((next) =>
-                      Effect.sync(() => {
-                        file = next
-                        sink = createWriteStream(next, { flags: "a" })
-                        full = ""
-                        cut = true
-                      }),
-                    ),
-                  )
-                }
-              }
-
-              return ctx.metadata({
+      const updates = yield* Queue.unbounded<string>()
+      let metadataClosed = false
+      const metadataFiber = Effect.runFork(
+        Effect.forever(
+          Queue.take(updates).pipe(
+            Effect.flatMap((output) =>
+              ctx.metadata({
                 metadata: {
-                  output: last,
+                  output,
                   description: input.description,
-                  sandboxMode: input.sandboxMode,
-                  networkAccess: input.networkAccess,
-                  filesystemScope: input.filesystemScope,
+                  backendPreference: input.backendPreference,
+                  enforcement: input.enforcement,
+                  filesystemPolicy: input.filesystemPolicy,
+                  networkPolicy: input.networkPolicy,
+                  allowedPaths: input.allowedPaths,
+                  writablePaths: input.writablePaths,
                 },
-              })
-            }),
-          )
+              }),
+            ),
+          ),
+        ).pipe(Effect.catch(() => Effect.void)),
+      )
 
-          const abort = Effect.callback<void>((resume) => {
-            if (ctx.abort.aborted) return resume(Effect.void)
-            const handler = () => resume(Effect.void)
-            ctx.abort.addEventListener("abort", handler, { once: true })
-            return Effect.sync(() => ctx.abort.removeEventListener("abort", handler))
-          })
-          const timeout = Effect.sleep(`${input.timeout + 100} millis`)
-          const exit = yield* Effect.raceAll([
-            handle.exitCode.pipe(Effect.map((result) => ({ kind: "exit" as const, code: result }))),
-            abort.pipe(Effect.map(() => ({ kind: "abort" as const, code: null }))),
-            timeout.pipe(Effect.map(() => ({ kind: "timeout" as const, code: null }))),
-          ])
+      const push = (text: string) => {
+        const size = Buffer.byteLength(text, "utf-8")
+        chunks.push({ text, size })
+        used += size
+        while (used > keep && chunks.length > 1) {
+          const item = chunks.shift()
+          if (!item) break
+          used -= item.size
+          cut = true
+        }
+        last = preview(last + text)
+        if (!metadataClosed) {
+          Effect.runFork(Queue.offer(updates, last).pipe(Effect.asVoid))
+        }
+        if (file) {
+          sink?.write(text)
+          return
+        }
+        full += text
+      }
 
-          if (exit.kind === "abort") {
-            aborted = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-          if (exit.kind === "timeout") {
-            expired = true
-            yield* handle.kill({ forceKillAfter: "3 seconds" }).pipe(Effect.orDie)
-          }
-
-          yield* Fiber.join(pump).pipe(Effect.catchAllCause(() => Effect.void))
-          return exit.kind === "exit" ? exit.code : null
-        }),
-      ).pipe(Effect.orDie)
+      const result = yield* broker.exec({
+        request: {
+          request_id: requestID,
+          command: input.command,
+          shell_family: input.shellFamily,
+          shell: input.shell,
+          cwd: input.cwd,
+          timeout_ms: input.timeout,
+          description: input.description,
+          env,
+          env_policy: "sanitize",
+          enforcement: input.enforcement,
+          backend_preference: input.backendPreference,
+          filesystem_policy: input.filesystemPolicy,
+          allowed_paths: input.allowedPaths,
+          writable_paths: input.writablePaths,
+          network_policy: input.networkPolicy,
+        },
+        abort: ctx.abort,
+        onStdout: (text) => {
+          push(text)
+        },
+        onStderr: (text) => {
+          push(text)
+        },
+      })
+      const code = result.exit_code
+      backendUsed = result.backend_used
+      terminationReason = result.termination_reason
+      expired = result.termination_reason === "timeout"
+      aborted = result.termination_reason === "abort"
 
       const raw = chunks.map((item) => item.text).join("")
       const end = tail(raw, lines, bytes)
@@ -222,6 +238,9 @@ export const layer = Layer.effect(
             }),
         )
       }
+      metadataClosed = true
+      yield* Queue.shutdown(updates).pipe(Effect.ignore)
+      yield* Fiber.await(metadataFiber).pipe(Effect.ignore)
 
       return {
         title: input.description,
@@ -232,9 +251,14 @@ export const layer = Layer.effect(
           description: input.description,
           truncated: cut,
           ...(cut && file ? { outputPath: file } : {}),
-          sandboxMode: input.sandboxMode,
-          networkAccess: input.networkAccess,
-          filesystemScope: input.filesystemScope,
+          backendPreference: input.backendPreference,
+          enforcement: input.enforcement,
+          filesystemPolicy: input.filesystemPolicy,
+          networkPolicy: input.networkPolicy,
+          allowedPaths: input.allowedPaths,
+          writablePaths: input.writablePaths,
+          backendUsed,
+          terminationReason,
         },
       }
     })
@@ -243,6 +267,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(Truncate.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(Truncate.defaultLayer), Layer.provide(SandboxBroker.defaultLayer))
 
 export * as ShellRunner from "./runner"

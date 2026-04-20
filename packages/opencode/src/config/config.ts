@@ -42,6 +42,7 @@ import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@/npm"
+import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
 
 const log = Log.create({ service: "config" })
 
@@ -225,6 +226,19 @@ const InfoSchema = Schema.Struct({
       mcp_timeout: Schema.optional(PositiveInt).annotate({
         description: "Timeout in milliseconds for model context protocol (MCP) requests",
       }),
+      sandbox: Schema.optional(
+        Schema.Struct({
+          enabled: Schema.optional(Schema.Boolean),
+          backend: Schema.optional(
+            Schema.Literals(["auto", "seatbelt", "windows_native", "landlock", "process"] satisfies SandboxBackendPreference[]),
+          ),
+          failure_policy: Schema.optional(
+            Schema.Literals(["closed", "confirm_downgrade", "fallback"] satisfies SandboxFailurePolicy[]),
+          ),
+          report_only: Schema.optional(Schema.Boolean),
+          broker_idle_ttl_ms: Schema.optional(PositiveInt),
+        }),
+      ),
     }),
   ),
 })

@@ -48,6 +48,7 @@ import { Instruction } from "../../src/session/instruction"
 import { SessionProcessor } from "../../src/session/processor"
 import { SessionRunState } from "../../src/session/run-state"
 import { SessionStatus } from "../../src/session/status"
+import { TaskRuntime } from "../../src/session/task-runtime"
 import { Snapshot } from "../../src/snapshot"
 import { ToolRegistry } from "../../src/tool"
 import { Truncate } from "../../src/tool"
@@ -55,6 +56,10 @@ import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { Ripgrep } from "../../src/file/ripgrep"
 import { Format } from "../../src/format"
+import { SandboxBroker } from "../../src/sandbox/broker"
+import { SandboxPolicy } from "../../src/sandbox/policy"
+import { ShellRunner } from "../../src/shell/runner"
+import { ShellSecurity } from "../../src/security/shell-security"
 
 void Log.init({ print: false })
 
@@ -122,6 +127,11 @@ function makeHttp() {
     mcp,
     AppFileSystem.defaultLayer,
     status,
+    TaskRuntime.defaultLayer,
+    SandboxBroker.defaultLayer,
+    SandboxPolicy.liveLayer,
+    ShellRunner.defaultLayer,
+    ShellSecurity.defaultLayer,
   ).pipe(Layer.provideMerge(infra))
   const question = Question.layer.pipe(Layer.provideMerge(deps))
   const todo = Todo.layer.pipe(Layer.provideMerge(deps))
@@ -158,7 +168,7 @@ function makeHttp() {
 
 const it = testEffect(makeHttp())
 
-const providerCfg = (url: string) => ({
+const providerCfg = (url: string): Partial<Config.Info> => ({
   provider: {
     test: {
       name: "Test",
@@ -185,7 +195,13 @@ const providerCfg = (url: string) => ({
       },
     },
   },
-})
+  experimental: {
+    sandbox: {
+      backend: "process",
+      failure_policy: "fallback",
+    },
+  },
+} as const)
 
 it.live("tool execution produces non-empty session diff (snapshot race)", () =>
   provideTmpdirServer(

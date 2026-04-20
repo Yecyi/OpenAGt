@@ -3,6 +3,12 @@ import { Effect } from "effect"
 import * as Tool from "./tool"
 import { TaskRuntime } from "@/session/task-runtime"
 
+const parameters = z.object({})
+
+type TaskListMetadata = {
+  tasks: TaskRuntime.TaskRecord[]
+}
+
 export const TaskListTool = Tool.define(
   "task_list",
   Effect.gen(function* () {
@@ -10,8 +16,8 @@ export const TaskListTool = Tool.define(
 
     return {
       description: "List task state for the current session, including pending, running, and completed subtasks.",
-      parameters: z.object({}),
-      execute: (_params, ctx) =>
+      parameters,
+      execute: (_params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskListMetadata>, never, never> =>
         Effect.gen(function* () {
           const records = yield* tasks.list(ctx.sessionID)
           const output = records.length
@@ -26,7 +32,7 @@ export const TaskListTool = Tool.define(
               tasks: records,
             },
           }
-        }),
+        }).pipe(Effect.orDie),
     }
   }),
 )

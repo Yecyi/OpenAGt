@@ -52,6 +52,8 @@ import { Permission } from "@/permission"
 import { ShellRunner } from "@/shell/runner"
 import { ShellSecurity } from "@/security/shell-security"
 import { TaskRuntime } from "@/session/task-runtime"
+import { SandboxBroker } from "@/sandbox/broker"
+import { SandboxPolicy } from "@/sandbox/policy"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -74,30 +76,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ToolRegistry") {}
 
-export const layer: Layer.Layer<
-  Service,
-  never,
-  | Config.Service
-  | Plugin.Service
-  | Question.Service
-  | Todo.Service
-  | Agent.Service
-  | Skill.Service
-  | Session.Service
-  | TaskRuntime.Service
-  | Provider.Service
-  | LSP.Service
-  | Instruction.Service
-  | AppFileSystem.Service
-  | Bus.Service
-  | ShellRunner.Service
-  | ShellSecurity.Service
-  | HttpClient.HttpClient
-  | ChildProcessSpawner
-  | Ripgrep.Service
-  | Format.Service
-  | Truncate.Service
-> = Layer.effect(
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
@@ -372,27 +351,30 @@ export const layer: Layer.Layer<
   }),
 )
 
-export const defaultLayer = Layer.suspend(() =>
-  layer.pipe(
-    Layer.provide(Config.defaultLayer),
-    Layer.provide(Plugin.defaultLayer),
-    Layer.provide(Question.defaultLayer),
-    Layer.provide(Todo.defaultLayer),
-    Layer.provide(Skill.defaultLayer),
-    Layer.provide(Agent.defaultLayer),
-    Layer.provide(Session.defaultLayer),
-    Layer.provide(TaskRuntime.defaultLayer),
-    Layer.provide(Provider.defaultLayer),
-    Layer.provide(LSP.defaultLayer),
-    Layer.provide(Instruction.defaultLayer),
-    Layer.provide(AppFileSystem.defaultLayer),
-    Layer.provide(Bus.layer),
-    Layer.provide(ShellRunner.layer),
-    Layer.provide(ShellSecurity.layer),
-    Layer.provide(FetchHttpClient.layer),
-    Layer.provide(Format.defaultLayer),
-    Layer.provide(CrossSpawnSpawner.defaultLayer),
-    Layer.provide(Ripgrep.defaultLayer),
-    Layer.provide(Truncate.defaultLayer),
-  ),
-)
+export const defaultLayer = Layer.suspend(() => {
+  const dependencies = Layer.mergeAll(
+    Config.defaultLayer,
+    Plugin.defaultLayer,
+    Question.defaultLayer,
+    Todo.defaultLayer,
+    Skill.defaultLayer,
+    Agent.defaultLayer,
+    Session.defaultLayer,
+    TaskRuntime.defaultLayer,
+    Provider.defaultLayer,
+    LSP.defaultLayer,
+    Instruction.defaultLayer,
+    AppFileSystem.defaultLayer,
+    Bus.defaultLayer,
+    SandboxBroker.defaultLayer,
+    SandboxPolicy.liveLayer,
+    ShellRunner.defaultLayer,
+    ShellSecurity.defaultLayer,
+    FetchHttpClient.layer,
+    Format.defaultLayer,
+    CrossSpawnSpawner.defaultLayer,
+    Ripgrep.defaultLayer,
+    Truncate.defaultLayer,
+  )
+  return layer.pipe(Layer.provide(dependencies))
+})

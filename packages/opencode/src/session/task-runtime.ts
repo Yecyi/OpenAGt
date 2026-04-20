@@ -1,5 +1,5 @@
 import z from "zod"
-import { Context, Effect, Layer, Option } from "effect"
+import { Context, Effect, Layer, Option, Stream } from "effect"
 import { Storage } from "@/storage"
 import { SessionID } from "./schema"
 import { Bus } from "@/bus"
@@ -142,33 +142,33 @@ export interface Interface {
     prompt: string
     dependsOn: SessionID[]
     metadata?: Record<string, unknown>
-  }) => Effect.Effect<TaskRecord>
-  readonly setRunning: (taskID: SessionID, parentSessionID: SessionID) => Effect.Effect<TaskRecord>
+  }) => Effect.Effect<TaskRecord, Error>
+  readonly setRunning: (taskID: SessionID, parentSessionID: SessionID) => Effect.Effect<TaskRecord, Error>
   readonly complete: (input: {
     taskID: SessionID
     parentSessionID: SessionID
     result?: MessageV2.WithParts
     output?: string
-  }) => Effect.Effect<TaskRecord>
+  }) => Effect.Effect<TaskRecord, Error>
   readonly fail: (input: {
     taskID: SessionID
     parentSessionID: SessionID
     error: string
-  }) => Effect.Effect<TaskRecord>
+  }) => Effect.Effect<TaskRecord, Error>
   readonly cancel: (input: {
     taskID: SessionID
     parentSessionID: SessionID
     reason?: string
-  }) => Effect.Effect<TaskRecord>
-  readonly get: (input: { taskID: SessionID; parentSessionID: SessionID }) => Effect.Effect<Option.Option<TaskRecord>>
-  readonly list: (parentSessionID: SessionID) => Effect.Effect<TaskRecord[]>
+  }) => Effect.Effect<TaskRecord, Error>
+  readonly get: (input: { taskID: SessionID; parentSessionID: SessionID }) => Effect.Effect<Option.Option<TaskRecord>, Error>
+  readonly list: (parentSessionID: SessionID) => Effect.Effect<TaskRecord[], Error>
   readonly wait: (input: {
     parentSessionID: SessionID
     taskIDs: SessionID[]
     mode: "all" | "any"
     timeoutMs?: number
-  }) => Effect.Effect<TaskResult[]>
-  readonly canRun: (input: { parentSessionID: SessionID; task: TaskRecord }) => Effect.Effect<boolean>
+  }) => Effect.Effect<TaskResult[], Error>
+  readonly canRun: (input: { parentSessionID: SessionID; task: TaskRecord }) => Effect.Effect<boolean, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/TaskRuntime") {}
@@ -188,10 +188,16 @@ export const layer = Layer.effect(
 
     const refreshGroup = Effect.fn("TaskRuntime.refreshGroup")(function* (record: TaskRecord) {
       if (!record.group_id) return
-      const tasks = (yield* storage.list(["task", record.parent_session_id]))
-        .map((key) => key[key.length - 1] as SessionID)
-        .map((taskID) => storage.read<TaskRecord>(taskKey(record.parent_session_id, taskID)).pipe(Effect.option))
-      const all = (yield* Effect.all(tasks, { concurrency: "unbounded" }))
+      const tasks = yield* storage.list(["task", record.parent_session_id])
+      const records = yield* Effect.all(
+        tasks.map((key) =>
+          storage.read<TaskRecord>(taskKey(record.parent_session_id, key[key.length - 1] as SessionID)).pipe(
+            Effect.option,
+          ),
+        ),
+        { concurrency: "unbounded" },
+      )
+      const all = records
         .filter(Option.isSome)
         .map((item) => item.value)
         .filter((item) => item.group_id === record.group_id)
@@ -239,16 +245,17 @@ export const layer = Layer.effect(
       return yield* storage.read<TaskRecord>(taskKey(input.parentSessionID, input.taskID)).pipe(Effect.option)
     })
 
-    const update = Effect.fn("TaskRuntime.update")(function* (
+    const update = (
       parentSessionID: SessionID,
       taskID: SessionID,
       fn: (draft: TaskRecord) => void,
-    ) {
-      const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), fn)
-      yield* refreshGroup(record)
-      yield* publishUpdate(record)
-      return record
-    })
+    ): Effect.Effect<TaskRecord, Error> =>
+      Effect.gen(function* () {
+        const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), fn)
+        yield* refreshGroup(record)
+        yield* publishUpdate(record)
+        return record
+      })
 
     const setRunning: Interface["setRunning"] = Effect.fn("TaskRuntime.setRunning")(function* (taskID, parentSessionID) {
       return yield* update(parentSessionID, taskID, (draft) => {
@@ -306,9 +313,7 @@ export const layer = Layer.effect(
       const keys = yield* storage.list(["task", parentSessionID])
       const items = yield* Effect.all(
         keys.map((key) =>
-          storage.read<TaskRecord>(key).pipe(
-            Effect.catch(() => Effect.succeed(undefined)),
-          ),
+          storage.read<TaskRecord>(key).pipe(Effect.catch(() => Effect.succeed(undefined))),
         ),
         { concurrency: "unbounded" },
       )
@@ -349,16 +354,14 @@ export const layer = Layer.effect(
         Stream.take(1),
         Stream.runHead,
       )
-      const effect = stream.pipe(
+      const waitForRecords = stream.pipe(
         Effect.map((records) => (Option.isSome(records) ? records.value : [])),
         Effect.map((records) => records.filter((item) => input.taskIDs.includes(item.task_id)).map(resultFromRecord)),
       )
-      if (!input.timeoutMs) return yield* effect
-      return yield* effect.pipe(
+      if (!input.timeoutMs) return yield* waitForRecords
+      return yield* waitForRecords.pipe(
         Effect.timeout(`${input.timeoutMs} millis`),
-        Effect.flatMap((records) =>
-          Option.isSome(records) ? Effect.succeed(records.value) : Effect.fail(new Error("Task wait timed out"))
-        ),
+        Effect.catchTag("TimeoutError", () => Effect.fail(new Error("Task wait timed out"))),
       )
     })
 
