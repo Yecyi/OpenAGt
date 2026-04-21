@@ -7,7 +7,7 @@
     </picture>
   </a>
 </p>
-<p align="center">寮€婧愮殑 AI Coding Agent銆?/p>
+<p align="center">开源的 AI Coding Agent</p>
 <p align="center">
   <a href="https://github.com/Yecyi/OpenAGt/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/openagt-ai"><img alt="npm" src="https://img.shields.io/npm/v/openagt-ai?style=flat-square" /></a>
@@ -16,81 +16,81 @@
 
 <p align="center">
   <a href="README.md">English</a> |
-  <a href="README.zh.md">绠€浣撲腑鏂?/a> |
-  <a href="README.zht.md">绻侀珨涓枃</a> |
-  <a href="README.ko.md">頃滉淡鞏?/a> |
+  <a href="README.zh.md">简体中文</a> |
+  <a href="README.zht.md">繁体中文</a> |
+  <a href="README.ko.md">한국어</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Espa帽ol</a> |
-  <a href="README.fr.md">Fran莽ais</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.fr.md">Français</a> |
   <a href="README.it.md">Italiano</a> |
   <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">鏃ユ湰瑾?/a> |
+  <a href="README.ja.md">日本語</a> |
   <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">袪褍褋褋泻懈泄</a> |
+  <a href="README.ru.md">Русский</a> |
   <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">丕賱毓乇亘賷丞</a> |
+  <a href="README.ar.md">العربية</a> |
   <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Portugu锚s (Brasil)</a> |
-  <a href="README.th.md">喙勦笚喔?/a> |
-  <a href="README.tr.md">T眉rk莽e</a> |
-  <a href="README.uk.md">校泻褉邪褩薪褋褜泻邪</a> |
-  <a href="README.bn.md">唳唳傕Σ唳?/a> |
-  <a href="README.gr.md">螘位位畏谓喂魏维</a> |
-  <a href="README.vi.md">Ti岷縩g Vi峄噒</a>
+  <a href="README.br.md">Português (Brasil)</a> |
+  <a href="README.th.md">ภาษาไทย</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.uk.md">Українська</a> |
+  <a href="README.bn.md">বাংলা</a> |
+  <a href="README.gr.md">Ελληνικά</a> |
+  <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
 [![OpenAGt Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://github.com/Yecyi/OpenAGt)
 
 ---
 
-## 鐩綍
+## 目录
 
-- [瀹夎](#瀹夎)
-- [妗岄潰搴旂敤绋嬪簭 (BETA)](#妗岄潰搴旂敤绋嬪簭-beta)
-  - [瀹夎鐩綍](#瀹夎鐩綍)
+- [安装](#安装)
+- [桌面应用程序 (BETA)](#桌面应用程序-beta)
+  - [安装目录](#安装目录)
 - [Agents](#agents)
-- [鏂囨。](#鏂囨。)
-- [鍙備笌璐＄尞](#鍙備笌璐＄尞)
-- [鍩轰簬 OpenAGt 杩涜寮€鍙慮(#鍩轰簬-openagt-杩涜寮€鍙?
-- [甯歌闂 (FAQ)](#甯歌闂-faq)
-  - [杩欏拰 Claude Code 鏈変粈涔堜笉鍚岋紵](#杩欏拰-claude-code-鏈変粈涔堜笉鍚?
-- [OpenAGt 鎵╁睍](#openagt-鎵╁睍)
-  - [涓昏澧炲己](#涓昏澧炲己)
-  - [鏍稿績妯″潡鏂囨。](#鏍稿績妯″潡鏂囨。)
+- [文档](#文档)
+- [参与贡献](#参与贡献)
+- [基于 OpenAGt 进行开源](#基于-openagt-进行开源)
+- [常见问题 (FAQ)](#常见问题-faq)
+  - [这和 Claude Code 有什么不同？](#这和-claude-code-有什么不同)
+- [OpenAGt 扩展](#openagt-扩展)
+  - [主要增强](#主要增强)
+  - [核心模块文档](#核心模块文档)
 
 ---
 
-### 瀹夎
+### 安装
 
 ```bash
-# 鐩存帴瀹夎 (YOLO)
+# 直接安装 (YOLO)
 curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
 
-# 杞欢鍖呯鐞嗗櫒
-npm i -g openagt-ai@latest        # 涔熷彲浣跨敤 bun/pnpm/yarn
+# 软件包管理器
+npm i -g openagt-ai@latest        # 也可使用 bun/pnpm/yarn
 scoop install openagt             # Windows
 choco install openagt             # Windows
-brew install anomalyco/tap/openagt # macOS 鍜?Linux锛堟帹鑽愶紝濮嬬粓淇濇寔鏈€鏂帮級
-brew install openagt              # macOS 鍜?Linux锛堝畼鏂?brew formula锛屾洿鏂伴鐜囪緝浣庯級
+brew install anomalyco/tap/openagt # macOS 和 Linux（推荐，始终保持最新）
+brew install openagt              # macOS 和 Linux（官方 brew formula，更新频率较低）
 sudo pacman -S openagt            # Arch Linux (Stable)
 paru -S openagt-bin               # Arch Linux (Latest from AUR)
-mise use -g openagt               # 浠绘剰绯荤粺
-nix run nixpkgs#openagt           # 鎴栫敤 github:anomalyco/openagt 鑾峰彇鏈€鏂?dev 鍒嗘敮
+mise use -g openagt               # 任意系统
+nix run nixpkgs#openagt           # 或用 github:anomalyco/openagt 获取最新 dev 分支
 ```
 
 > [!TIP]
-> 瀹夎鍓嶈鍏堢Щ闄?0.1.x 涔嬪墠鐨勬棫鐗堟湰銆?
+> 安装前请先移除 0.1.x 之前的旧版本。
 
-### 妗岄潰搴旂敤绋嬪簭 (BETA)
+### 桌面应用程序 (BETA)
 
-OpenAGt 涔熸彁渚涙闈㈢増搴旂敤銆傚彲鐩存帴浠?[鍙戝竷椤?(releases page)](https://github.com/Yecyi/OpenAGt/releases) 鎴?[github.com/Yecyi/OpenAGt/download](https://github.com/Yecyi/OpenAGt/download) 涓嬭浇銆?
+OpenAGt 也提供桌面版应用。可直接从 [发布页](https://github.com/Yecyi/OpenAGt/releases) 或 [github.com/Yecyi/OpenAGt/download](https://github.com/Yecyi/OpenAGt/download) 下载。
 
-| 骞冲彴                  | 涓嬭浇鏂囦欢                              |
+| 平台                  | 下载文件                              |
 | --------------------- | ------------------------------------- |
 | macOS (Apple Silicon) | `openagt-desktop-darwin-aarch64.dmg` |
 | macOS (Intel)         | `openagt-desktop-darwin-x64.dmg`     |
 | Windows               | `openagt-desktop-windows-x64.exe`    |
-| Linux                 | `.deb`銆乣.rpm` 鎴?AppImage            |
+| Linux                 | `.deb`、`.rpm` 或 `AppImage`         |
 
 ```bash
 # macOS (Homebrew Cask)
@@ -99,84 +99,84 @@ brew install --cask openagt-desktop
 scoop bucket add extras; scoop install extras/openagt-desktop
 ```
 
-#### 瀹夎鐩綍
+#### 安装目录
 
-瀹夎鑴氭湰鎸夌収浠ヤ笅浼樺厛绾у喅瀹氬畨瑁呰矾寰勶細
+安装脚本按照以下优先级决定安装路径：
 
-1. `$OPENCODE_INSTALL_DIR` - 鑷畾涔夊畨瑁呯洰褰?
-2. `$XDG_BIN_DIR` - 绗﹀悎 XDG 鍩虹鐩綍瑙勮寖鐨勮矾寰?
-3. `$HOME/bin` - 濡傛灉瀛樺湪鎴栧彲鍒涘缓鐨勭敤鎴蜂簩杩涘埗鐩綍
-4. `$HOME/.openagt/bin` - 榛樿澶囩敤璺緞
+1. `$OPENCODE_INSTALL_DIR` - 自定义安装目录
+2. `$XDG_BIN_DIR` - 符合 XDG 基础目录规范的路径
+3. `$HOME/bin` - 如果存在或可创建的用户二级目录
+4. `$HOME/.openagt/bin` - 默认备选路径
 
 ```bash
-# 绀轰緥
+# 示例
 OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
 XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
 ```
 
 ### Agents
 
-OpenAGt 鍐呯疆涓ょ Agent锛屽彲鐢?`Tab` 閿揩閫熷垏鎹細
+OpenAGt 内置两种 Agent，可用 `Tab` 键快速切换：
 
-- **build** - 榛樿妯″紡锛屽叿澶囧畬鏁存潈闄愶紝閫傚悎寮€鍙戝伐浣?
-- **plan** - 鍙妯″紡锛岄€傚悎浠ｇ爜鍒嗘瀽涓庢帰绱?
-  - 榛樿鎷掔粷淇敼鏂囦欢
-  - 杩愯 bash 鍛戒护鍓嶄細璇㈤棶
-  - 渚夸簬鎺㈢储鏈煡浠ｇ爜搴撴垨瑙勫垝鏀瑰姩
+- **build** - 默认模式，具备完整权限，适合开发工作
+- **plan** - 只读模式，适合代码分析与回顾
+  - 默认拒绝修改文件
+  - 运行 bash 命令前会询问
+  - 便于探索未知代码库或规划改动
 
-鍙﹀杩樺寘鍚竴涓?**general** 瀛?Agent锛岀敤浜庡鏉傛悳绱㈠拰澶氭浠诲姟锛屽唴閮ㄤ娇鐢紝涔熷彲鍦ㄦ秷鎭腑杈撳叆 `@general` 璋冪敤銆?
+另外还包含一个 **general** 通用 Agent，用于复合搜索和多步任务，内部使用，也可在消息中输入 `@general` 调用。
 
-浜嗚В鏇村 [Agents](https://github.com/Yecyi/OpenAGt/docs/agents) 鐩稿叧淇℃伅銆?
+了解更多 [Agents](https://github.com/Yecyi/OpenAGt/docs/agents) 相关信息。
 
-### 鏂囨。
+### 文档
 
-鏇村閰嶇疆璇存槑璇锋煡鐪嬫垜浠殑 [**瀹樻柟鏂囨。**](https://github.com/Yecyi/OpenAGt/docs)銆?
+更多配置说明请查看我们的 [**官方文档**](https://github.com/Yecyi/OpenAGt/docs)。
 
-### 鍙備笌璐＄尞
+### 参与贡献
 
-濡傛湁鍏磋叮璐＄尞浠ｇ爜锛岃鍦ㄦ彁浜?PR 鍓嶉槄璇?[璐＄尞鎸囧崡 (Contributing Docs)](./CONTRIBUTING.md)銆?
+如有兴趣贡献代码，请在提交 PR 前阅读[贡献指南 (Contributing Docs)](./CONTRIBUTING.md)。
 
-### 鍩轰簬 OpenAGt 杩涜寮€鍙?
+### 基于 OpenAGt 进行开源
 
-濡傛灉浣犲湪椤圭洰鍚嶄腑浣跨敤浜?"openagt"锛堝 "openagt-dashboard" 鎴?"openagt-mobile"锛夛紝璇峰湪 README 閲屾敞鏄庤椤圭洰涓嶆槸 OpenAGt 鍥㈤槦瀹樻柟寮€鍙戯紝涓斾笉瀛樺湪闅跺睘鍏崇郴銆?
+如果你在项目名中使用 "openagt"（如 "openagt-dashboard" 或 "openagt-mobile"），请在 README 中声明该项目不是 OpenAGt 团队官方开发，也不存在任何附属关系。
 
-### 甯歌闂 (FAQ)
+### 常见问题 (FAQ)
 
-#### 杩欏拰 Claude Code 鏈変粈涔堜笉鍚岋紵
+#### 这和 Claude Code 有什么不同？
 
-鍔熻兘涓婂緢鐩镐技锛屽叧閿樊寮傦細
+功能上很相似，关键差异：
 
-- 100% 寮€婧愩€?
-- 涓嶇粦瀹氱壒瀹氭彁渚涘晢銆傛帹鑽愪娇鐢?[OpenAGt Zen](https://github.com/Yecyi/OpenAGt/zen) 鐨勬ā鍨嬶紝浣嗕篃鍙惌閰?Claude銆丱penAI銆丟oogle 鐢氳嚦鏈湴妯″瀷銆傛ā鍨嬭凯浠ｄ細缂╁皬宸紓銆侀檷浣庢垚鏈紝鍥犳淇濇寔 provider-agnostic 寰堥噸瑕併€?
-- 鍐呯疆 LSP 鏀寔銆?
-- 鑱氱劍缁堢鐣岄潰 (TUI)銆侽penCode 鐢?Neovim 鐖卞ソ鑰呭拰 [terminal.shop](https://terminal.shop) 鐨勫垱寤鸿€呮墦閫狅紝浼氭寔缁帰绱㈢粓绔殑鏋侀檺銆?
-- 瀹㈡埛绔?鏈嶅姟鍣ㄦ灦鏋勩€傚彲鍦ㄦ湰鏈鸿繍琛岋紝鍚屾椂鐢ㄧЩ鍔ㄨ澶囪繙绋嬮┍鍔ㄣ€俆UI 鍙槸浼楀娼滃湪瀹㈡埛绔箣涓€銆?
+- 100% 开源。
+- 不绑定特定提供商。推荐使用 [OpenAGt Zen](https://github.com/Yecyi/OpenAGt/zen) 的模式，但也可兼容 Claude、OpenAI、Google 甚至本地模型。模型互换：缩小误差、降低成本，因此保持 provider-agnostic 很重要。
+- 内置 LSP 支持。
+- 专注终端界面 (TUI)。OpenCode 用 Neovim 粉丝和 [terminal.shop](https://terminal.shop) 创建者的风格打造，会持续探索终点的极限。
+- 客户端-服务器架构。可在本地运行，同时用移动设备远程驱动。TUI 只是众多客户端之一。
 
 ---
 
-## OpenAGt 鎵╁睍
+## OpenAGt 扩展
 
-OpenAGt 鏄熀浜?OpenAGt 鐨勫寮虹増鏈紝澧炲姞浜嗕互涓嬮珮绾у姛鑳姐€?
+OpenAGt 是基于 OpenAGt 的增强版本，增加了以下高级功能。
 
-### 涓昏澧炲己
+### 主要增强
 
-- **涓夊眰娓愯繘寮忓帇缂?* 鈥?涓婁笅鏂囩鐞嗭紝鍑忓皯 40-55% Token 浣跨敤
-- **宸ュ叿骞跺彂鍒嗗尯** 鈥?骞惰鎵ц锛屽悶鍚愰噺鎻愬崌 2-3 鍊?
-- **Provider 闄嶇骇閾?* 鈥?鑷姩鏁呴殰杞Щ
-- **Prompt 娉ㄥ叆闃叉姢** 鈥?瀹夊叏鎵弿
-- **Flutter 绉诲姩瀹㈡埛绔?* 鈥?杩滅▼鎺у埗锛堣鍒掍腑锛?
+- **三层渐进式压缩** — 上下文管理，减少 40-55% Token 使用
+- **工具并发分区** — 并行执行，延迟降低 2-3 倍
+- **Provider 降级链** — 自动故障切换
+- **Prompt 注入防护** — 安全扫描
+- **Flutter 移动客户端** — 远程控制（计划中）
 
-### 鏍稿績妯″潡鏂囨。
+### 核心模块文档
 
-| 鏂囨。 | 鎻忚堪 |
+| 文档 | 描述 |
 |------|------|
-| [README.md](./README.md) | 瀹屾暣鎶€鏈枃妗ｏ紙鑻辨枃锛?|
-| [packages/openagt/README.md](./packages/openagt/README.md) | 鏍稿績寮曟搸 |
+| [README.md](./README.md) | 完整技术文档（英文） |
+| [packages/openagt/README.md](./packages/openagt/README.md) | 核心智能体引擎 |
 | [packages/openagt/src/effect/README.md](./packages/openagt/src/effect/README.md) | Effect Framework |
-| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP 鍗忚 |
-| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | 浜嬩欢婧簮 |
+| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP 协议 |
+| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | 事件溯源 |
 | [packages/openagt/src/provider/README.md](./packages/openagt/src/provider/README.md) | LLM Provider |
 
 ---
 
-**鍔犲叆鎴戜滑鐨勭ぞ鍖?* [椋炰功](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=738j8655-cd59-4633-a30a-1124e0096789&qr_code=true) | [X.com](https://x.com/openagt)
+**加入我们的社群：** [飞书](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=738j8655-cd59-4633-a30a-1124e0096789&qr_code=true) | [X.com](https://x.com/openagt)

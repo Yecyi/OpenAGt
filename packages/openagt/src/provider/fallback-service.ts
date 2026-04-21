@@ -40,19 +40,58 @@ export interface Interface {
   readonly shouldFallback: (error: unknown, state: FallbackState) => Effect.Effect<boolean>
   /** Get fallback metrics for observability */
   readonly getMetrics: () => FallbackMetrics
+  /** Record an attempt for metrics */
+  readonly recordAttempt: (provider: string, success: boolean) => void
+  /** Reset metrics */
+  readonly resetMetrics: () => void
 }
 
 export interface FallbackMetrics {
+  totalAttempts: number
   totalFallbacks: number
+  fallbackRate: number
   fallbackByReason: Record<string, number>
   fallbackByProvider: Record<string, number>
+  hopLatencies: number[]
+  providerErrors: Record<string, number>
   lastFallback?: FallbackHopEvent
 }
 
 let metrics: FallbackMetrics = {
+  totalAttempts: 0,
   totalFallbacks: 0,
+  fallbackRate: 0,
   fallbackByReason: {},
   fallbackByProvider: {},
+  hopLatencies: [],
+  providerErrors: {},
+}
+
+let hopStartTime: number | null = null
+
+function recordHopLatency(durationMs: number): void {
+  metrics.hopLatencies.push(durationMs)
+  if (metrics.hopLatencies.length > 100) {
+    metrics.hopLatencies = metrics.hopLatencies.slice(-100)
+  }
+}
+
+function calculateFallbackRate(): number {
+  if (metrics.totalAttempts === 0) return 0
+  return Math.round((metrics.totalFallbacks / metrics.totalAttempts) * 100 * 100) / 100
+}
+
+export function resetMetrics(): void {
+  metrics = {
+    totalAttempts: 0,
+    totalFallbacks: 0,
+    fallbackRate: 0,
+    fallbackByReason: {},
+    fallbackByProvider: {},
+    hopLatencies: [],
+    providerErrors: {},
+  }
+  hopStartTime = null
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProviderFallback") {}
@@ -91,6 +130,7 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       providerID: string,
       modelID: string,
     ) {
+      hopStartTime = Date.now()
       const cfg = yield* config.get()
       const fallback = cfg.provider?.[providerID]?.fallback
       if (!fallback?.enabled) return undefined
@@ -144,6 +184,13 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
           metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] =
             (metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] ?? 0) + 1
           metrics.lastFallback = hopEvent
+
+          // Record hop latency
+          if (hopStartTime !== null) {
+            const latencyMs = Date.now() - hopStartTime
+            recordHopLatency(latencyMs)
+            hopStartTime = Date.now()
+          }
 
           // Emit fallback hop event to Bus for observability
           yield* bus.publish(FallbackHopEvent, hopEvent)
@@ -209,9 +256,23 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       return shouldRetry
     })
 
-    const getMetrics: Interface["getMetrics"] = () => metrics
+    const getMetrics: Interface["getMetrics"] = () => {
+      metrics.fallbackRate = calculateFallbackRate()
+      return metrics
+    }
 
-    return Service.of({ createState, next, shouldFallback, getMetrics })
+    const recordAttempt: Interface["recordAttempt"] = (provider: string, success: boolean) => {
+      metrics.totalAttempts++
+      if (!success) {
+        metrics.providerErrors[provider] = (metrics.providerErrors[provider] ?? 0) + 1
+      }
+    }
+
+    const resetMetricsFn: Interface["resetMetrics"] = () => {
+      resetMetrics()
+    }
+
+    return Service.of({ createState, next, shouldFallback, getMetrics: getMetrics, recordAttempt, resetMetrics: resetMetricsFn })
   }),
 )
 

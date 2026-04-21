@@ -440,3 +440,4 @@ test("replayAll restores state", async () => {
 
 - [CQRS 和事件溯源](https://martinfowler.com/eaaDev/EventSourcing.html)
 - [Axon Framework 事件溯源](https://docs.axoniq.io/axon-framework/events/)
+- [Bus 模块](../bus/) — 进程内 PubSub 事件总线

@@ -321,3 +321,4 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - [ACP 规范](https://agentclientprotocol.com/)
 - [TypeScript SDK](https://github.com/agentclientprotocol/typescript-sdk)
 - [协议示例](https://github.com/agentclientprotocol/typescript-sdk/tree/main/src/examples)
+- [Bus 模块](../bus/) — 进程内 PubSub 事件总线
