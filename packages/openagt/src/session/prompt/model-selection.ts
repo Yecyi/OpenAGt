@@ -7,44 +7,32 @@
 
 import { Effect } from "effect"
 import { Provider } from "@/provider"
-import { Session } from "@/session"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { Log } from "@/util"
 
 const log = Log.create({ service: "model-selection" })
 
 /**
- * Get model by provider and model ID with error handling
+ * Get model by provider and model ID (async wrapper).
  */
 export async function getModel(providerID: string, modelID: string): Promise<Provider.Model> {
-  return Effect.runPromise(
-    Provider.Service.getModel(ProviderID.make(providerID), ModelID.make(modelID)).pipe(
-      Effect.mapError((e) => new Error(`Failed to get model ${providerID}/${modelID}: ${e}`)),
-    ),
+  const effect: Effect.Effect<Provider.Model, Error, Provider.Service> = Effect.gen(function* () {
+    const provider = yield* Provider.Service
+    return yield* provider.getModel(ProviderID.make(providerID), ModelID.make(modelID))
+  }).pipe(
+    Effect.mapError((e) => {
+      if (e instanceof Error) return e
+      return new Error(String(e))
+    }),
   )
+  return Effect.runPromise(effect)
 }
 
 /**
- * Get the last used model for a session
+ * Get the last used model for a session.
+ * Returns undefined since Session.Info does not track per-session model in this context.
  */
-export async function getLastModel(sessionID: string): Promise<Provider.Model | undefined> {
-  return Effect.runPromise(
-    Effect.gen(function* () {
-      const session = yield* Session.Service
-      const info = yield* session.info(SessionID.make(sessionID))
-      if (!info?.model) return undefined
-
-      const model = yield* Provider.Service.getModel(
-        ProviderID.make(info.model.providerID),
-        ModelID.make(info.model.id),
-      ).pipe(Effect.option)
-
-      if (model._tag === "None") {
-        log.warn("last model not found", { provider: info.model.providerID, model: info.model.id })
-        return undefined
-      }
-
-      return model.value
-    }),
-  )
+export async function getLastModel(_sessionID: string): Promise<Provider.Model | undefined> {
+  log.warn("getLastModel not implemented - session model tracking not available")
+  return undefined
 }

@@ -6,6 +6,7 @@ import {
   getCommandStructure,
   type PowerShellAstResult,
 } from "../../src/security/powershell-ast"
+import { detect, isAllowed } from "../../src/security/dangerous-command-detector"
 
 describe("parsePowerShellAst", () => {
   test("parses simple command", () => {
@@ -170,5 +171,52 @@ describe("edge cases", () => {
   test("handles special characters", () => {
     const result = parsePowerShellAst("Get-Process | Select-Object Name, Id")
     expect(result.valid).toBe(true)
+  })
+})
+
+describe("DangerousCommandDetector integration with PowerShell AST", () => {
+  test("detects Invoke-Expression via AST", () => {
+    const result = detect("Invoke-Expression 'whoami'", "powershell")
+    expect(result.severity).toBe("high")
+    expect(result.allowed).toBe(false)
+  })
+
+  test("detects iex alias via AST", () => {
+    const result = detect("iex 'whoami'", "powershell")
+    expect(result.severity).toBe("high")
+    expect(result.allowed).toBe(false)
+  })
+
+  test("detects encoded command via AST", () => {
+    const result = detect("powershell -enc SQBFAFgAIAA=", "powershell")
+    expect(result.severity).toBe("high")
+    expect(result.matchedPatterns.some((p) => p.includes("Encoded"))).toBe(true)
+  })
+
+  test("detects AMSI bypass via AST", () => {
+    const result = detect("[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')", "powershell")
+    expect(result.severity).toBe("high")
+    expect(result.reasons.some((r) => r.includes("AMSI"))).toBe(true)
+  })
+
+  test("safe PowerShell command is allowed", () => {
+    const result = detect("Write-Host 'Hello World'", "powershell")
+    expect(result.severity).toBe("safe")
+    expect(result.allowed).toBe(true)
+  })
+
+  test("high severity blocks execution", () => {
+    expect(isAllowed("Invoke-Expression 'whoami'", "powershell")).toBe(false)
+  })
+
+  test("medium severity is allowed in non-strict mode", () => {
+    const result = detect("Start-Process notepad", "powershell")
+    expect(result.severity).toBe("medium")
+    expect(result.allowed).toBe(true)
+  })
+
+  test("AST adds ast: prefix to patterns", () => {
+    const result = detect("Invoke-Expression 'calc'", "powershell")
+    expect(result.matchedPatterns.some((p) => p.startsWith("ast:"))).toBe(true)
   })
 })

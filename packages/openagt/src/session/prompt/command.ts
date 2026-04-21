@@ -5,8 +5,7 @@
  * Handles command template variable substitution
  */
 
-import { Agent } from "@/agent/agent"
-import { AgentInfo } from "@/agent/agent"
+import { Agent, type Info as AgentInfo } from "@/agent/agent"
 
 export interface CommandTemplateContext {
   agent?: AgentInfo
@@ -21,7 +20,7 @@ export interface CommandTemplateContext {
 export function processTemplate(template: string, context: CommandTemplateContext): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
     if (key === "agent" && context.agent) {
-      return context.agent.id
+      return context.agent.name
     }
     if (key === "session" && context.sessionID) {
       return context.sessionID
@@ -32,7 +31,7 @@ export function processTemplate(template: string, context: CommandTemplateContex
     if (context[key] !== undefined) {
       return String(context[key])
     }
-    return match // Keep original if not found
+    return match
   })
 }
 

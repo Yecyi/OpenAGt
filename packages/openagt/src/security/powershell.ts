@@ -189,7 +189,7 @@ export function validatePowerShellCommand(command: string): CmdletValidationResu
     const upperCommand = command.toUpperCase()
     const upperCmdlet = cmdlet.toUpperCase()
     const matched = upperCommand.includes(upperCmdlet)
-    const severity: DangerSeverity = HIGH_SEVERITY_CMDLETS.includes(cmdlet) ? "high" : "medium"
+    const severity: DangerSeverity = (HIGH_SEVERITY_CMDLETS as readonly string[]).includes(cmdlet) ? "high" : "medium"
 
     if (matched && severity === "high") {
       highestSeverity = "high"

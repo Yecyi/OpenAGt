@@ -5,8 +5,15 @@
  * This complements the existing sandbox module with additional resource controls.
  */
 
-import { spawn, type ChildProcess } from "bun"
+import { spawn } from "bun"
 import { Effect, Layer, Context } from "effect"
+
+type BunChildProcess = {
+  kill: () => void
+  exited: Promise<number>
+  stdout: ReadableStream<Uint8Array> | null
+  stderr: ReadableStream<Uint8Array> | null
+}
 
 export interface ResourceLimits {
   maxMemory?: number
@@ -27,6 +34,7 @@ export interface ProcessSandboxResult {
   exitCode: number | null
   timedOut: boolean
   killed: boolean
+  outputTruncated?: boolean
 }
 
 export interface ProcessSandboxStats {
@@ -134,6 +142,7 @@ export async function spawnWithSandbox(
   let killed = false
   let stdoutData = ""
   let stderrData = ""
+  let outputTruncated = false
 
   return new Promise<ProcessSandboxResult>((resolve) => {
     const child = spawn({
@@ -159,18 +168,35 @@ export async function spawnWithSandbox(
           }, timeoutMs)
         : undefined
 
-    const processStream = async (stream: ReadableStream<Uint8Array> | null, collector: string[]) => {
+    const processStream = async (
+      stream: ReadableStream<Uint8Array> | null,
+      collector: string[],
+      maxSize?: number,
+    ) => {
       if (!stream) return
       const reader = stream.getReader()
+      let totalSize = 0
       while (true) {
         const next = await reader.read().catch(() => ({ done: true, value: undefined }))
         if (next.done || !next.value) break
-        collector.push(new TextDecoder().decode(next.value))
+
+        const chunk = next.value
+        totalSize += chunk.byteLength
+
+        if (maxSize && totalSize > maxSize) {
+          collector.push(new TextDecoder().decode(chunk.slice(0, maxSize - totalSize + chunk.byteLength)))
+          outputTruncated = true
+          reader.releaseLock()
+          break
+        }
+
+        collector.push(new TextDecoder().decode(chunk))
       }
     }
 
-    const stdoutPromise = processStream(child.stdout, [])
-    const stderrPromise = processStream(child.stderr, [])
+    const maxFileSizeBytes = limits?.maxFileSize
+    const stdoutPromise = processStream(child.stdout, [], maxFileSizeBytes)
+    const stderrPromise = processStream(child.stderr, [], maxFileSizeBytes)
 
     child.exited
       .then((exitCode) => {
@@ -184,6 +210,7 @@ export async function spawnWithSandbox(
             exitCode,
             timedOut,
             killed,
+            outputTruncated,
           })
         })
       })
@@ -287,9 +314,9 @@ export async function spawnBatchWithSandbox(
 // Kill Management
 // ============================================================
 
-const activeProcesses = new Map<number, ChildProcess>()
+const activeProcesses = new Map<number, BunChildProcess>()
 
-export function registerProcess(pid: number, process: ChildProcess): void {
+export function registerProcess(pid: number, process: BunChildProcess): void {
   activeProcesses.set(pid, process)
   stats.totalSpawned++
   stats.currentRunning++
@@ -332,12 +359,39 @@ export interface ResourceUsage {
   cpuPercent?: number
 }
 
+export interface ResourceUsage {
+  pid: number
+  memoryMB?: number
+  cpuPercent?: number
+  timestamp: number
+}
+
+function getWindowsResourceUsage(pid: number): ResourceUsage {
+  const usage: ResourceUsage = { pid, timestamp: Date.now() }
+
+  try {
+    const { execSync } = require("child_process")
+    const result = execSync(
+      `powershell -NoLogo -NoProfile -Command "Get-Process -Id ${pid} | Select-Object WorkingSet64 | ConvertTo-Json -Compress"`,
+      { encoding: "utf8", timeout: 5000 },
+    )
+    const json = JSON.parse(result.trim())
+    if (json && json.WorkingSet64) {
+      usage.memoryMB = Math.round(json.WorkingSet64 / 1024 / 1024)
+    }
+  } catch {
+    // Process might have exited or not be accessible
+  }
+
+  return usage
+}
+
 export function getResourceUsage(pid: number): ResourceUsage {
-  const usage: ResourceUsage = { pid }
+  const usage: ResourceUsage = { pid, timestamp: Date.now() }
 
   try {
     if (process.platform === "win32") {
-      return usage
+      return getWindowsResourceUsage(pid)
     }
 
     const fs = require("fs")
@@ -371,40 +425,15 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pr
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const spawnFn = Effect.fn("ProcessSandbox.spawn")(function* (command: string, options?: ProcessSandboxOptions) {
-      return yield* Effect.promise(() => spawnWithSandbox(command, options))
-    })
-
-    const spawnBatchFn = Effect.fn("ProcessSandbox.spawnBatch")(function* (
-      commands: string[],
-      options?: BatchSandboxOptions,
-    ) {
-      return yield* Effect.promise(() => spawnBatchWithSandbox(commands, options))
-    })
-
-    const killFn = Effect.fn("ProcessSandbox.kill")(function* (pid: number) {
-      return killProcessByPid(pid)
-    })
-
-    const killAllFn = Effect.fn("ProcessSandbox.killAll")(function* () {
-      return killAllProcesses()
-    })
-
-    const getStatsFn = Effect.fn("ProcessSandbox.getStats")(function* () {
-      return getSandboxStats()
-    })
-
-    const getUsageFn = Effect.fn("ProcessSandbox.getUsage")(function* (pid: number) {
-      return getResourceUsage(pid)
-    })
-
     return Service.of({
-      spawn: spawnFn,
-      spawnBatch: spawnBatchFn,
-      kill: killFn,
-      killAll: killAllFn,
-      getStats: getStatsFn,
-      getUsage: getUsageFn,
+      spawn: (command: string, options?: ProcessSandboxOptions) =>
+        Effect.promise(() => spawnWithSandbox(command, options)),
+      spawnBatch: (commands: string[], options?: BatchSandboxOptions) =>
+        Effect.promise(() => spawnBatchWithSandbox(commands, options)),
+      kill: (pid: number) => Effect.succeed(killProcessByPid(pid)),
+      killAll: Effect.sync(() => killAllProcesses()),
+      getStats: Effect.succeed(getSandboxStats()),
+      getUsage: (pid: number) => Effect.succeed(getResourceUsage(pid)),
     })
   }),
 )

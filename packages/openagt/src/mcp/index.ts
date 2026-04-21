@@ -30,6 +30,7 @@ import { EffectBridge } from "@/effect"
 import { InstanceState } from "@/effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
+import { checkToolsQuality } from "./tool-quality"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
@@ -243,6 +244,14 @@ export interface Interface {
   readonly supportsOAuth: (mcpName: string) => Effect.Effect<boolean>
   readonly hasStoredTokens: (mcpName: string) => Effect.Effect<boolean>
   readonly getAuthStatus: (mcpName: string) => Effect.Effect<AuthStatus>
+  readonly checkToolQualityReport: () => Effect.Effect<ToolQualityReport | undefined>
+}
+
+interface ToolQualityReport {
+  serverCount: number
+  toolCount: number
+  averageScore: number
+  lowQualityTools: string[]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/MCP") {}
@@ -913,6 +922,22 @@ export const layer = Layer.effect(
       supportsOAuth,
       hasStoredTokens,
       getAuthStatus,
+      checkToolQualityReport: Effect.fn("MCP.checkToolQualityReport")(function* () {
+        const s = yield* InstanceState.get(state)
+        const allTools = Object.entries(s.defs).flatMap(([clientName, tools]) =>
+          tools.map((tool) => ({ tool, clientName })),
+        )
+
+        if (allTools.length === 0) return undefined
+
+        const result = checkToolsQuality(allTools)
+        return {
+          serverCount: Object.keys(s.clients).length,
+          toolCount: allTools.length,
+          averageScore: result.averageScore,
+          lowQualityTools: result.lowQualityTools,
+        }
+      }),
     })
   }),
 )

@@ -31,6 +31,7 @@ export type AstNodeType =
   | "hashtable"
   | "pipeline"
   | "pipe"
+  | "comment"
 
 export interface AstNode {
   type: AstNodeType
@@ -208,13 +209,16 @@ function tokenize(input: string): Token[] {
       continue
     }
 
-    if (char === "$(" || (char === "(" && tokens.length > 0 && tokens[tokens.length - 1]?.type === "command")) {
-      if (char === "$") {
-        tokens.push({ type: "subexpression_start", value: "$(", start: pos, end: pos + 2 })
-        pos += 2
-      } else {
-        tokens.push({ type: "lparen", value: "(", start: pos, end: pos + 1 })
+    if (char === "$") {
+      const start = pos
+      pos++
+      if (pos < input.length && input[pos] === "(") {
+        tokens.push({ type: "subexpression_start", value: "$(", start, end: pos + 1 })
         pos++
+      } else {
+        // Just a variable start, already consumed the $
+        while (pos < input.length && /[a-zA-Z0-9_]/.test(input[pos])) pos++
+        tokens.push({ type: "variable", value: input.slice(start, pos), start, end: pos })
       }
       continue
     }
@@ -306,7 +310,13 @@ function buildAst(tokens: Token[]): AstNode {
         i++
         paramNode.children = [
           {
-            type: tokens[i].type === "command" ? "expression" : tokens[i].type,
+            type: tokens[i].type === "command"
+              ? "expression"
+              : (tokens[i].type === "comment"
+                ? "comment"
+                : tokens[i].type === "pipe"
+                  ? "pipe"
+                  : "expression") as AstNodeType,
             value: tokens[i].value,
             start: tokens[i].start,
             end: tokens[i].end,
@@ -380,7 +390,7 @@ const DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: s
   "remove-item": { severity: "medium", reason: "Item deletion" },
   "convertto-securestring": { severity: "medium", reason: "Credential conversion" },
   "convertfrom-securestring": { severity: "high", reason: "Credential extraction" },
-  "get-content": { severity: "low", reason: "File content reading" },
+  "get-content": { severity: "medium", reason: "File content reading" },
   "set-content": { severity: "medium", reason: "File content writing" },
   "out-file": { severity: "medium", reason: "File output" },
   "add-type": { severity: "high", reason: "Dynamic type loading" },

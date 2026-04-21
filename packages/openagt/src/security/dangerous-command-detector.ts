@@ -39,6 +39,14 @@ import {
   validatePowerShellCommand,
   getDangerousCmdletSummary,
 } from "./powershell"
+import { parsePowerShellAst } from "./powershell-ast"
+
+interface DangerCheck {
+  cmdlet: string
+  matched: boolean
+  severity: DangerSeverity
+  message?: string
+}
 import { commandClassifier } from "./command-classifier"
 import { WrapperStripper } from "./wrapper-stripper"
 
@@ -103,7 +111,7 @@ function detectBashDanger(command: string): BashDetectionResult {
     if (pattern.test(command)) {
       reasons.push(message)
       patterns.push(`cmd_subst:${message}`)
-      if (severity !== "high") severity = "medium"
+      severity = "medium"
     }
   }
 
@@ -111,7 +119,7 @@ function detectBashDanger(command: string): BashDetectionResult {
   if (containsDangerousPatterns(command)) {
     reasons.push("Contains code execution or package manager")
     patterns.push("dangerous_pattern")
-    if (severity !== "high") severity = "high"
+    severity = "high"
   }
 
   // Check for control characters
@@ -199,6 +207,21 @@ function detectPowerShellDanger(command: string): BashDetectionResult {
       patterns.push(`ps:${check.cmdlet}`)
     }
     severity = psResult.severity
+  }
+
+  // Enhanced AST-based detection for deeper analysis
+  const astResult = parsePowerShellAst(command)
+  if (astResult.valid && astResult.dangerousNodes.length > 0) {
+    for (const node of astResult.dangerousNodes) {
+      if (!reasons.some((r) => r.includes(node.reason))) {
+        reasons.push(node.reason)
+        patterns.push(`ast:${node.nodeType}`)
+        // Upgrade severity if AST finds high severity issues
+        if (node.severity === "high" && severity !== "high") {
+          severity = "high"
+        }
+      }
+    }
   }
 
   // Check for encoded commands

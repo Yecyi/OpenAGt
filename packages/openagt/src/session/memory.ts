@@ -179,7 +179,7 @@ export async function loadMemory(sessionID: SessionID): Promise<string | null> {
     if (stat.size > MAX_MEMORY_CHARS) {
       // Truncate if too large
       const fd = await fs.promises.open(memoryPath, "r")
-      const buffer = Buffer.allocate(MAX_MEMORY_CHARS)
+      const buffer = Buffer.alloc(MAX_MEMORY_CHARS)
       await fd.read(buffer, 0, MAX_MEMORY_CHARS, 0)
       await fd.close()
       return buffer.toString("utf-8")

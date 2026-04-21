@@ -16,6 +16,7 @@ import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 import { Log } from "@/util"
+import { DYNAMIC_BOUNDARY_MARKER, parsePromptSegments } from "./system-prompt"
 
 const log = Log.create({ service: "system-prompt" })
 
@@ -109,7 +110,7 @@ export const layer = Layer.effect(
 
         const result: EnvironmentResult = {
           static: [staticParts],
-          semiStatic: [semiStaticParts],
+          semiStatic: [`${semiStaticParts}\n\n${DYNAMIC_BOUNDARY_MARKER}`],
         }
 
         environmentMemo.set(memoKey, { hash, value: result, timestamp: Date.now() })

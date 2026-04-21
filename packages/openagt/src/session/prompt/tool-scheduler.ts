@@ -6,10 +6,17 @@
  */
 
 import { Effect, Layer, Context } from "effect"
-import { PathOverlap } from "@/tool/path-overlap"
-import { ToolPartition } from "@/tool/partition"
+import {
+  extractPathsFromInput as extractPaths,
+  pathsOverlap,
+  detectPathConflicts,
+} from "@/tool/path-overlap"
+import {
+  isConcurrencySafe,
+  partitionToolCalls,
+  type ToolCallItem as PartitionToolCallItem,
+} from "@/tool/partition"
 import { Tool } from "@/tool"
-import { ToolRegistry } from "@/tool/registry"
 import { Log } from "@/util"
 
 const log = Log.create({ service: "tool-scheduler" })
@@ -46,7 +53,7 @@ export interface ToolSchedule {
  */
 export function hasPathOverlap(tool1: RunningToolCall, tool2: RunningToolCall): boolean {
   if (!tool1.path || !tool2.path) return false
-  return PathOverlap.check(tool1.path, tool2.path)
+  return pathsOverlap([tool1.path], [tool2.path])
 }
 
 /**

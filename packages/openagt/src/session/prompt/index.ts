@@ -48,6 +48,3 @@ export {
 
 // Re-export model selection
 export { getModel, getLastModel } from "./model-selection"
-
-// Re-export constants
-export { REMINDER_TOKEN_BUDGET } from "./reminder"

@@ -5,17 +5,26 @@
  * Handles AI SDK tool creation and scheduling
  */
 
-import { Effect, Stream, Context, type ToolExecutionOptions } from "effect"
+import { Effect, Stream, Context } from "effect"
 import { Provider } from "@/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
-import { ToolRegistry } from "@/tool/registry"
-import { ToolPartition } from "@/tool/partition"
-import { PathOverlap } from "@/tool/path-overlap"
+import {
+  isConcurrencySafe as checkConcurrencySafe,
+  partitionToolCalls,
+  type ToolCallItem as PartitionToolCallItem,
+  type ToolBatch,
+} from "@/tool/partition"
+import {
+  extractPathsFromInput as extractPaths,
+  pathsOverlap,
+  detectPathConflicts,
+} from "@/tool/path-overlap"
 import { MCP } from "@/mcp"
 import { Plugin } from "@/plugin"
 import { Agent } from "@/agent/agent"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionID, PartID } from "@/session/schema"
+import { Session } from "@/session"
 import { SessionProcessor } from "@/session/processor"
 import { Permission } from "@/permission"
 import { ProviderTransform } from "@/provider"
@@ -54,7 +63,7 @@ export interface ToolResolutionContext {
 /**
  * Tool execution context passed to tool handlers
  */
-export interface ToolContext extends ToolExecutionOptions {
+export interface ToolContext {
   sessionID: SessionID
   callID: string
   extra: {
@@ -79,17 +88,17 @@ export function createToolScheduler() {
     typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 
   const hasPathConflict = (left: Record<string, unknown>, right: Record<string, unknown>) =>
-    PathOverlap.detectPathConflicts([
+    detectPathConflicts([
       { toolName: "left", input: left },
       { toolName: "right", input: right },
     ]).length > 0
 
   const schedule = <T>(
-    call: ToolPartition.ToolCallItem,
+    call: PartitionToolCallItem,
     execute: () => Promise<T>,
   ) => {
-    const safe = ToolPartition.isConcurrencySafe(call.toolName)
-    const paths = PathOverlap.extractPathsFromInput(call.input)
+    const safe = isConcurrencySafe(call.toolName)
+    const paths = extractPaths(call.input)
     const blockers = running
       .filter((active) => {
         if (!safe) return true
@@ -105,7 +114,7 @@ export function createToolScheduler() {
     const done = pending.finally(() => {
       running = running.filter((active) => active.toolCallId !== call.toolCallId)
     })
-    ToolPartition.partitionToolCalls([
+    partitionToolCalls([
       ...running.map((active) => ({
         toolCallId: active.toolCallId,
         toolName: active.toolName,
@@ -132,12 +141,12 @@ export function createToolScheduler() {
  * Check if a tool is concurrency-safe
  */
 export function isConcurrencySafe(toolName: string): boolean {
-  return ToolPartition.isConcurrencySafe(toolName)
+  return checkConcurrencySafe(toolName)
 }
 
 /**
  * Extract paths from tool input for conflict detection
  */
 export function extractPathsFromInput(input: Record<string, unknown>): string[] {
-  return PathOverlap.extractPathsFromInput(input)
+  return extractPaths(input)
 }
