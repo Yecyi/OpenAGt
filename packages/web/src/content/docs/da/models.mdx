@@ -3,13 +3,13 @@ title: Modeller
 description: Konfiguration af en LLM udbyder og model.
 ---
 
-OpenCode bruger [AI SDK](https://ai-sdk.dev/) og [Models.dev](https://models.dev) til at understøtte **75+ LLM udbydere** og det understøtter at køre lokale modeller.
+OpenAGt bruger [AI SDK](https://ai-sdk.dev/) og [Models.dev](https://models.dev) til at understøtte **75+ LLM udbydere** og det understøtter at køre lokale modeller.
 
 ---
 
 ## Udbydere
 
-De fleste populære udbydere er forudindlæst som standard. Hvis du har tilføjet legitimationsoplysningerne for en udbyder gennem kommandoen `/connect`, vil de være tilgængelige, når du starter OpenCode.
+De fleste populære udbydere er forudindlæst som standard. Hvis du har tilføjet legitimationsoplysningerne for en udbyder gennem kommandoen `/connect`, vil de være tilgængelige, når du starter OpenAGt.
 
 Få mere at vide om [providers](/docs/providers).
 
@@ -35,7 +35,7 @@ Overvej at bruge en af ​​de modeller, vi anbefaler.
 
 Der er dog kun få af dem, der er gode til både at generere kode og værktøjsopkald.
 
-Her er flere modeller, der fungerer godt med OpenCode, uden bestemt rækkefølge. (Dette er ikke en udtømmende liste og er heller ikke nødvendigvis opdateret):
+Her er flere modeller, der fungerer godt med OpenAGt, uden bestemt rækkefølge. (Dette er ikke en udtømmende liste og er heller ikke nødvendigvis opdateret):
 
 - GPT 5.2
 - GPT 5.1 Codex
@@ -49,16 +49,16 @@ Her er flere modeller, der fungerer godt med OpenCode, uden bestemt rækkefølge
 ## Indstil en standard
 
 For at indstille en af ​​disse som standardmodellen kan du indstille `model`-nøglen i din
-OpenCode konfig.
+OpenAGt konfig.
 
 ```json title="opencode.json" {3}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "model": "lmstudio/google/gemma-3n-e4b"
 }
 ```
 
-Her er det fulde ID `provider_id/model_id`. For eksempel, hvis du bruger [OpenCode Zen](/docs/zen), vil du bruge `opencode/gpt-5.1-codex` til GPT 5.1 Codex.
+Her er det fulde ID `provider_id/model_id`. For eksempel, hvis du bruger [OpenAGt Zen](/docs/zen), vil du bruge `opencode/gpt-5.1-codex` til GPT 5.1 Codex.
 
 Hvis du har konfigureret en [custom provider](/docs/providers#custom), er `provider_id` nøglen fra `provider` delen af ​​din konfiguration, og `model_id` er nøglen fra `provider.models`.
 
@@ -70,7 +70,7 @@ Du kan konfigurere en models muligheder globalt gennem konfigurationen.
 
 ```jsonc title="opencode.jsonc" {7-12,19-24}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -109,7 +109,7 @@ Du kan også definere brugerdefinerede varianter, der udvider de indbyggede. Var
 
 ```jsonc title="opencode.jsonc" {6-21}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "opencode": {
       "models": {
@@ -137,11 +137,11 @@ Du kan også definere brugerdefinerede varianter, der udvider de indbyggede. Var
 
 ## Varianter
 
-Mange modeller understøtter flere varianter med forskellige konfigurationer. OpenCode leveres med indbyggede standardvarianter til populære udbydere.
+Mange modeller understøtter flere varianter med forskellige konfigurationer. OpenAGt leveres med indbyggede standardvarianter til populære udbydere.
 
 ### Indbyggede varianter
 
-OpenCode leveres med standardvarianter for mange udbydere:
+OpenAGt leveres med standardvarianter for mange udbydere:
 
 **Anthropic**:
 
@@ -174,7 +174,7 @@ Du kan tilsidesætte eksisterende varianter eller tilføje dine egne:
 
 ```jsonc title="opencode.jsonc" {7-18}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "openai": {
       "models": {
@@ -203,15 +203,15 @@ Brug tastebindingen `variant_cycle` til hurtigt at skifte mellem varianter. [Lea
 
 ## Indlæsning af modeller
 
-Når OpenCode starter op, søger den efter modeller i følgende prioriterede rækkefølge:
+Når OpenAGt starter op, søger den efter modeller i følgende prioriterede rækkefølge:
 
 1. Kommandolinjeflaget `--model` eller `-m`. Formatet er det samme som i konfigurationsfilen: `provider_id/model_id`.
 
-2. Modellisten i OpenCode-konfigurationen.
+2. Modellisten i OpenAGt-konfigurationen.
 
    ```json title="opencode.json"
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "model": "anthropic/claude-sonnet-4-20250514"
    }
    ```

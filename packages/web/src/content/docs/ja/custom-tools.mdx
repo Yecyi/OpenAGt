@@ -1,33 +1,33 @@
 ---
-title: カスタムツール
-description: LLM が OpenCode で呼び出すことができるツールを作成します。
+title: 銈偣銈裤儬銉勩兗銉?
+description: LLM 銇?OpenAGt 銇у懠銇冲嚭銇欍亾銇ㄣ亴銇с亶銈嬨儎銉笺儷銈掍綔鎴愩仐銇俱仚銆?
 ---
 
-カスタムツールは、会話中に LLM が呼び出すことができる作成した関数です。これらは、OpenCode の[組み込みツール](/docs/tools) (`read`、`write`、`bash` など) と連携して動作します。
-
----
-
-## ツールの作成
-
-ツールは **TypeScript** または **JavaScript** ファイルとして定義されます。ただし、ツール定義では**任意の言語**で記述されたスクリプトを呼び出すことができます。TypeScript または JavaScript はツール定義自体にのみ使用されます。
+銈偣銈裤儬銉勩兗銉伅銆佷細瑭变腑銇?LLM 銇屽懠銇冲嚭銇欍亾銇ㄣ亴銇с亶銈嬩綔鎴愩仐銇熼枹鏁般仹銇欍€傘亾銈屻倝銇€丱penCode 銇甗绲勩伩杈笺伩銉勩兗銉玗(/docs/tools) (`read`銆乣write`銆乣bash` 銇仼) 銇ㄩ€ｆ惡銇椼仸鍕曚綔銇椼伨銇欍€?
 
 ---
 
-### 場所
+## 銉勩兗銉伄浣滄垚
 
-それらは次のように定義できます。
-
-- ローカルでは、プロジェクトの `.opencode/tools/` ディレクトリに配置します。
-- または、グローバルに、それらを `~/.config/opencode/tools/` に配置します。
+銉勩兗銉伅 **TypeScript** 銇俱仧銇?**JavaScript** 銉曘偂銈ゃ儷銇ㄣ仐銇﹀畾缇┿仌銈屻伨銇欍€傘仧銇犮仐銆併儎銉笺儷瀹氱京銇с伅**浠绘剰銇█瑾?*銇ц杩般仌銈屻仧銈广偗銉儣銉堛倰鍛笺伋鍑恒仚銇撱仺銇屻仹銇嶃伨銇欍€俆ypeScript 銇俱仧銇?JavaScript 銇儎銉笺儷瀹氱京鑷綋銇伄銇夸娇鐢ㄣ仌銈屻伨銇欍€?
 
 ---
 
-### 構造
+### 鍫存墍
 
-ツールを作成する最も簡単な方法は、型安全性と検証を提供する `tool()` ヘルパーを使用することです。
+銇濄倢銈夈伅娆°伄銈堛亞銇畾缇┿仹銇嶃伨銇欍€?
+
+- 銉兗銈儷銇с伅銆併儣銉偢銈с偗銉堛伄 `.opencode/tools/` 銉囥偅銉偗銉堛儶銇厤缃仐銇俱仚銆?
+- 銇俱仧銇€併偘銉兗銉愩儷銇€併仢銈屻倝銈?`~/.config/opencode/tools/` 銇厤缃仐銇俱仚銆?
+
+---
+
+### 妲嬮€?
+
+銉勩兗銉倰浣滄垚銇欍倠鏈€銈傜啊鍗樸仾鏂规硶銇€佸瀷瀹夊叏鎬с仺妞滆銈掓彁渚涖仚銈?`tool()` 銉樸儷銉戙兗銈掍娇鐢ㄣ仚銈嬨亾銇ㄣ仹銇欍€?
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**ファイル名**は**ツール名**になります。上記により `database` ツールが作成されます。
+**銉曘偂銈ゃ儷鍚?*銇?*銉勩兗銉悕**銇仾銈娿伨銇欍€備笂瑷樸伀銈堛倞 `database` 銉勩兗銉亴浣滄垚銇曘倢銇俱仚銆?
 
 ---
 
-#### ファイルごとに複数のツール
+#### 銉曘偂銈ゃ儷銇斻仺銇鏁般伄銉勩兗銉?
 
-単一のファイルから複数のツールをエクスポートすることもできます。各エクスポートは **`<filename>_<exportname>`** という名前の **別のツール** になります。
+鍗樹竴銇儠銈°偆銉亱銈夎鏁般伄銉勩兗銉倰銈ㄣ偗銈广儩銉笺儓銇欍倠銇撱仺銈傘仹銇嶃伨銇欍€傚悇銈ㄣ偗銈广儩銉笺儓銇?**`<filename>_<exportname>`** 銇ㄣ亜銇嗗悕鍓嶃伄 **鍒ャ伄銉勩兗銉?* 銇仾銈娿伨銇欍€?
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-これにより、`math_add` と `math_multiply` という 2 つのツールが作成されます。
+銇撱倢銇倛銈娿€乣math_add` 銇?`math_multiply` 銇ㄣ亜銇?2 銇ゃ伄銉勩兗銉亴浣滄垚銇曘倢銇俱仚銆?
 
 ---
 
-#### 組み込みツールとの名前の衝突
+#### 绲勩伩杈笺伩銉勩兗銉仺銇悕鍓嶃伄琛濈獊
 
-カスタムツールはツール名でキー設定されます。カスタムツールが組み込みツールと同じ名前を使用する場合、カスタムツールが優先されます。
+銈偣銈裤儬銉勩兗銉伅銉勩兗銉悕銇с偔銉艰ō瀹氥仌銈屻伨銇欍€傘偒銈广偪銉犮儎銉笺儷銇岀祫銇胯炯銇裤儎銉笺儷銇ㄥ悓銇樺悕鍓嶃倰浣跨敤銇欍倠鍫村悎銆併偒銈广偪銉犮儎銉笺儷銇屽劒鍏堛仌銈屻伨銇欍€?
 
-たとえば、このファイルは組み込みの `bash` ツールを置き換えます。
+銇熴仺銇堛伆銆併亾銇儠銈°偆銉伅绲勩伩杈笺伩銇?`bash` 銉勩兗銉倰缃亶鎻涖亪銇俱仚銆?
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-組み込みツールを意図的に置き換えたい場合を除き、一意の名前を使用することをお勧めします。組み込みツールを無効にしたいがオーバーライドしたくない場合は、[権限](/docs/permissions) を使用してください。
+绲勩伩杈笺伩銉勩兗銉倰鎰忓洺鐨勩伀缃亶鎻涖亪銇熴亜鍫村悎銈掗櫎銇嶃€佷竴鎰忋伄鍚嶅墠銈掍娇鐢ㄣ仚銈嬨亾銇ㄣ倰銇婂嫥銈併仐銇俱仚銆傜祫銇胯炯銇裤儎銉笺儷銈掔劇鍔广伀銇椼仧銇勩亴銈兗銉愩兗銉┿偆銉夈仐銇熴亸銇亜鍫村悎銇€乕妯╅檺](/docs/permissions) 銈掍娇鐢ㄣ仐銇︺亸銇犮仌銇勩€?
 :::
 
 ---
 
-### 引数
+### 寮曟暟
 
-引数の型を定義するには、`tool.schema` (つまり [Zod](https://zod.dev)) を使用できます。
+寮曟暟銇瀷銈掑畾缇┿仚銈嬨伀銇€乣tool.schema` (銇ゃ伨銈?[Zod](https://zod.dev)) 銈掍娇鐢ㄣ仹銇嶃伨銇欍€?
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-[Zod](https://zod.dev) を直接インポートしてプレーンオブジェクトを返すこともできます。
+[Zod](https://zod.dev) 銈掔洿鎺ャ偆銉炽儩銉笺儓銇椼仸銉椼儸銉笺兂銈儢銈搞偋銈儓銈掕繑銇欍亾銇ㄣ倐銇с亶銇俱仚銆?
 
 ```ts {6}
 import { z } from "zod"
@@ -134,12 +134,12 @@ export default {
 
 ---
 
-### コンテキスト
+### 銈炽兂銉嗐偔銈广儓
 
-ツールは現在のセッションに関するコンテキストを受け取ります。
+銉勩兗銉伅鐝惧湪銇偦銉冦偡銉с兂銇枹銇欍倠銈炽兂銉嗐偔銈广儓銈掑彈銇戝彇銈娿伨銇欍€?
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -152,18 +152,18 @@ export default tool({
 })
 ```
 
-セッションの作業ディレクトリには `context.directory` を使用します。
-git ワークツリーのルートには `context.worktree` を使用します。
+銈汇儍銈枫儳銉炽伄浣滄キ銉囥偅銉偗銉堛儶銇伅 `context.directory` 銈掍娇鐢ㄣ仐銇俱仚銆?
+git 銉兗銈儎銉兗銇儷銉笺儓銇伅 `context.worktree` 銈掍娇鐢ㄣ仐銇俱仚銆?
 
 ---
 
-## 例
+## 渚?
 
-### Python でのツールの作成
+### Python 銇с伄銉勩兗銉伄浣滄垚
 
-ツールは任意の言語で作成できます。以下は、Python を使用して 2 つの数値を加算する例です。
+銉勩兗銉伅浠绘剰銇█瑾炪仹浣滄垚銇с亶銇俱仚銆備互涓嬨伅銆丳ython 銈掍娇鐢ㄣ仐銇?2 銇ゃ伄鏁板€ゃ倰鍔犵畻銇欍倠渚嬨仹銇欍€?
 
-まず、ツールを Python スクリプトとして作成します。
+銇俱仛銆併儎銉笺儷銈?Python 銈广偗銉儣銉堛仺銇椼仸浣滄垚銇椼伨銇欍€?
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-次に、それを呼び出すツール定義を作成します。
+娆°伀銆併仢銈屻倰鍛笺伋鍑恒仚銉勩兗銉畾缇┿倰浣滄垚銇椼伨銇欍€?
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-ここでは、[`Bun.$`](https://bun.com/docs/runtime/shell) ユーティリティを使用して Python スクリプトを実行しています。
+銇撱亾銇с伅銆乕`Bun.$`](https://bun.com/docs/runtime/shell) 銉︺兗銉嗐偅銉儐銈ｃ倰浣跨敤銇椼仸 Python 銈广偗銉儣銉堛倰瀹熻銇椼仸銇勩伨銇欍€?

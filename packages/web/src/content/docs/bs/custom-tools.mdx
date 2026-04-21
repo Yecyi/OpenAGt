@@ -1,15 +1,15 @@
 ---
-title: Prilagođeni alati
-description: Kreirajte alate koje LLM može pozvati u otvorenom kodu.
+title: Prilago膽eni alati
+description: Kreirajte alate koje LLM mo啪e pozvati u otvorenom kodu.
 ---
 
-Prilagođeni alati su funkcije koje kreirate i koje LLM može pozvati tokom razgovora. Oni rade zajedno sa [ugrađenim opencode](/docs/tools) alatima kao što su `read`, `write` i `bash`.
+Prilago膽eni alati su funkcije koje kreirate i koje LLM mo啪e pozvati tokom razgovora. Oni rade zajedno sa [ugra膽enim opencode](/docs/tools) alatima kao 拧to su `read`, `write` i `bash`.
 
 ---
 
 ## Kreiranje alata
 
-Alati su definisani kao **TypeScript** ili **JavaScript** datoteke. Međutim, definicija alata može pozvati skripte napisane na **bilo kom jeziku** — TypeScript ili JavaScript se koriste samo za samu definiciju alata.
+Alati su definisani kao **TypeScript** ili **JavaScript** datoteke. Me膽utim, definicija alata mo啪e pozvati skripte napisane na **bilo kom jeziku** 鈥?TypeScript ili JavaScript se koriste samo za samu definiciju alata.
 
 ---
 
@@ -17,17 +17,17 @@ Alati su definisani kao **TypeScript** ili **JavaScript** datoteke. Međutim, de
 
 Mogu se definisati:
 
-- Lokalno postavljanjem u `.opencode/tools/` direktorij vašeg projekta.
+- Lokalno postavljanjem u `.opencode/tools/` direktorij va拧eg projekta.
 - Ili globalno, postavljanjem u `~/.config/opencode/tools/`.
 
 ---
 
 ### Struktura
 
-Najlakši način za kreiranje alata je korištenje pomoćnika `tool()` koji pruža sigurnost tipa i validaciju.
+Najlak拧i na膷in za kreiranje alata je kori拧tenje pomo膰nika `tool()` koji pru啪a sigurnost tipa i validaciju.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**ime datoteke** postaje **naziv alata**. Gore navedeno je kreirano pomoću `database` alata.
+**ime datoteke** postaje **naziv alata**. Gore navedeno je kreirano pomo膰u `database` alata.
 
 ---
 
-#### Više alata po datoteci
+#### Vi拧e alata po datoteci
 
-Također možete izvesti više alata iz jedne datoteke. Svaki izvoz postaje **poseban alat** pod nazivom **`<filename>_<exportname>`**:
+Tako膽er mo啪ete izvesti vi拧e alata iz jedne datoteke. Svaki izvoz postaje **poseban alat** pod nazivom **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -79,14 +79,14 @@ Ovo stvara dva alata: `math_add` i `math_multiply`.
 
 ---
 
-#### Sukob imena s ugrađenim alatima
+#### Sukob imena s ugra膽enim alatima
 
-Prilagođeni alati su prepoznati po imenu. Ako prilagođeni alat koristi isto ime kao ugrađeni alat, prilagođeni alat ima prednost.
+Prilago膽eni alati su prepoznati po imenu. Ako prilago膽eni alat koristi isto ime kao ugra膽eni alat, prilago膽eni alat ima prednost.
 
-Na primjer, ova datoteka zamjenjuje ugrađeni `bash` alat:
+Na primjer, ova datoteka zamjenjuje ugra膽eni `bash` alat:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-Preferirajte jedinstvena imena osim ako namjerno ne želite zamijeniti ugrađeni alat. Ako želite onemogućiti ugrađeni alat, ali ne i nadjačati ga, koristite [dozvole](/docs/permissions).
+Preferirajte jedinstvena imena osim ako namjerno ne 啪elite zamijeniti ugra膽eni alat. Ako 啪elite onemogu膰iti ugra膽eni alat, ali ne i nadja膷ati ga, koristite [dozvole](/docs/permissions).
 :::
 
 ---
 
 ### Argumenti
 
-Možete koristiti `tool.schema`, što je samo [Zod](https://zod.dev), da definirate tipove argumenata.
+Mo啪ete koristiti `tool.schema`, 拧to je samo [Zod](https://zod.dev), da definirate tipove argumenata.
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-Također možete direktno uvesti [Zod](https://zod.dev) i vratiti običan objekt:
+Tako膽er mo啪ete direktno uvesti [Zod](https://zod.dev) i vratiti obi膷an objekt:
 
 ```ts {6}
 import { z } from "zod"
@@ -139,7 +139,7 @@ export default {
 Alati primaju kontekst o trenutnoj sesiji:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -161,7 +161,7 @@ Koristite `context.worktree` za korijen git radnog stabla.
 
 ### Pisanje alata u Python-u
 
-Možete pisati svoje alate na bilo kom jeziku koji želite. Evo primjera koji zbraja dva broja koristeći Python.
+Mo啪ete pisati svoje alate na bilo kom jeziku koji 啪elite. Evo primjera koji zbraja dva broja koriste膰i Python.
 Prvo kreirajte alat kao Python skriptu:
 
 ```python title=".opencode/tools/add.py"
@@ -175,7 +175,7 @@ print(a + b)
 Zatim kreirajte definiciju alata koja ga poziva:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -192,4 +192,4 @@ export default tool({
 })
 ```
 
-Ovdje koristimo [`Bun.$`](https://bun.com/docs/runtime/shell) uslužni program za pokretanje Python skripte.
+Ovdje koristimo [`Bun.$`](https://bun.com/docs/runtime/shell) uslu啪ni program za pokretanje Python skripte.

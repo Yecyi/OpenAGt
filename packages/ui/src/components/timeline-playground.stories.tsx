@@ -11,7 +11,7 @@ import type {
   ToolPart,
   FilePart,
   AgentPart,
-} from "@opencode-ai/sdk/v2"
+} from "@openagt/sdk/v2"
 import { DataProvider } from "../context/data"
 import { FileComponentProvider } from "../context/file"
 import { SessionTurn } from "./session-turn"
@@ -318,7 +318,7 @@ const TOOL_SAMPLES = {
     tool: "bash",
     input: { command: "bun test --filter session", description: "Run session tests" },
     output:
-      "bun test v1.3.11\n\n✓ session-turn.test.tsx (3 tests) 45ms\n✓ message-part.test.tsx (7 tests) 120ms\n\nTest Suites: 2 passed, 2 total\nTests:       10 passed, 10 total\nTime:        0.89s",
+      "bun test v1.3.11\n\n鉁?session-turn.test.tsx (3 tests) 45ms\n鉁?message-part.test.tsx (7 tests) 120ms\n\nTest Suites: 2 passed, 2 total\nTests:       10 passed, 10 total\nTime:        0.89s",
     title: "Run session tests",
     metadata: { command: "bun test --filter session" },
   },
@@ -568,7 +568,7 @@ const BT = "basic-tool.css"
 /**
  * Source mapping for a CSS control.
  * - `anchor`: immutable text near the property (comment, selector, etc.) that
- *   won't change when values change — used to locate the right rule block.
+ *   won't change when values change 鈥?used to locate the right rule block.
  * - `prop`: the CSS property name whose value gets replaced.
  * - `format`: turns the slider number into a CSS value string.
  */
@@ -1170,10 +1170,10 @@ function Playground() {
         ? styles.getPropertyValue(ctrl.property).trim()
         : ((styles as any)[ctrl.property] as string)
       if (!raw) continue
-      // Shorthands may return "24px 0px" — take the first value
+      // Shorthands may return "24px 0px" 鈥?take the first value
       const num = parseFloat(raw.split(" ")[0])
       if (!Number.isFinite(num)) continue
-      // line-height returns px — convert back to % relative to font-size
+      // line-height returns px 鈥?convert back to % relative to font-size
       if (ctrl.unit === "%") {
         const fs = parseFloat(styles.fontSize)
         if (fs > 0) {
@@ -1617,7 +1617,7 @@ function Playground() {
             onClick={() => setPanels("generators", (v) => !v)}
           >
             Generate Messages
-            <span>{panels.generators ? "−" : "+"}</span>
+            <span>{panels.generators ? "鈭? : "+"}</span>
           </button>
           <Show when={panels.generators}>
             <div style={{ padding: "0 12px 12px", display: "flex", "flex-direction": "column", gap: "6px" }}>
@@ -1640,7 +1640,7 @@ function Playground() {
               </div>
               <Show when={loaded()}>
                 <div style={{ "font-size": "10px", color: "var(--text-weaker)", "line-height": "1.4" }}>
-                  {loaded()} • {session().title || session().id} • {state.messages.length} message
+                  {loaded()} 鈥?{session().title || session().id} 鈥?{state.messages.length} message
                   {state.messages.length === 1 ? "" : "s"}
                 </div>
               </Show>
@@ -1756,7 +1756,7 @@ function Playground() {
             onClick={() => setPanels("css", (v) => !v)}
           >
             CSS Controls
-            <span>{panels.css ? "−" : "+"}</span>
+            <span>{panels.css ? "鈭? : "+"}</span>
           </button>
           <Show when={panels.css}>
             <div style={{ padding: "0 12px 12px" }}>
@@ -1799,7 +1799,7 @@ function Playground() {
                       onClick={() => setCollapsed(group, (v) => !v)}
                     >
                       {group}
-                      <span style={{ "font-size": "10px" }}>{collapsed[group] ? "+" : "−"}</span>
+                      <span style={{ "font-size": "10px" }}>{collapsed[group] ? "+" : "鈭?}</span>
                     </button>
                     <Show when={!collapsed[group]}>
                       <div style={{ padding: "6px 0", display: "flex", "flex-direction": "column", gap: "8px" }}>
@@ -1876,7 +1876,7 @@ function Playground() {
             onClick={() => setPanels("export", (v) => !v)}
           >
             Export CSS
-            <span>{panels.export ? "−" : "+"}</span>
+            <span>{panels.export ? "鈭? : "+"}</span>
           </button>
           <Show when={panels.export}>
             <div style={{ padding: "0 12px 12px", display: "flex", "flex-direction": "column", gap: "8px" }}>

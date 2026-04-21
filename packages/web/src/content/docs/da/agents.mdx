@@ -15,7 +15,7 @@ Du kan skifte mellem agenter under en session eller kalde dem med `@`-omtalen.
 
 ## Typer
 
-Der er to typer agenter i OpenCode; primære agenter og subagenter.
+Der er to typer agenter i OpenAGt; primære agenter og subagenter.
 
 ---
 
@@ -27,7 +27,7 @@ Primære agenter er de vigtigste assistenter, du interagerer direkte med. Du kan
 Du kan bruge **Tab**-tasten til at skifte mellem primære agenter under en session.
 :::
 
-OpenCode leveres med indbyggede primære agenter, **Build** og **Plan**. Vi vil
+OpenAGt leveres med indbyggede primære agenter, **Build** og **Plan**. Vi vil
 se på disse nedenfor.
 
 ---
@@ -36,13 +36,13 @@ se på disse nedenfor.
 
 Subagenter er specialiserede assistenter, som primære agenter kan påbegynde sig til specifikke opgaver. Du kan også kalde dem manuelt ved at **@ nævne** dem i dine beskeder.
 
-OpenCode leveres med to indbyggede underagenter, **Generelt** og **Udforsk**. Vi vil se på dette nedenfor.
+OpenAGt leveres med to indbyggede underagenter, **Generelt** og **Udforsk**. Vi vil se på dette nedenfor.
 
 ---
 
 ## Indbyggede
 
-OpenCode leveres med to indbyggede primære agenter og to indbyggede subagenter.
+OpenAGt leveres med to indbyggede primære agenter og to indbyggede subagenter.
 
 ---
 
@@ -140,7 +140,7 @@ Konfigurer agent i din `opencode.json`-konfigurationsfil:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "agent": {
     "build": {
       "mode": "primary",
@@ -277,7 +277,7 @@ Temperaturværdier typisk fra 0,0 til 1,0:
 }
 ```
 
-Hvis ingen temperatur er angivet, bruger OpenCode modelspecifikke standardindstillinger; typisk 0 for de fleste modeller, 0,55 for Qwen-modeller.
+Hvis ingen temperatur er angivet, bruger OpenAGt modelspecifikke standardindstillinger; typisk 0 for de fleste modeller, 0,55 for Qwen-modeller.
 
 ---
 
@@ -337,7 +337,7 @@ Angiv en brugerdefineret systempromptfil for denne agent med `prompt`-konfigurat
 }
 ```
 
-Denne sti er i forhold til, hvor konfigurationsfilen er placeret. Så dette virker både for den globale OpenCode-konfiguration og den projektspecifikke konfiguration.
+Denne sti er i forhold til, hvor konfigurationsfilen er placeret. Så dette virker både for den globale OpenAGt-konfiguration og den projektspecifikke konfiguration.
 
 ---
 
@@ -359,7 +359,7 @@ Hvis du ikke angiver en model, bruger primære agenter [model konfigureret globa
 }
 ```
 
-Model-id'et i din OpenCode-konfiguration brugerformatet `provider/model-id`. For eksempel, hvis du bruger [OpenCode Zen](/docs/zen), vil du bruge `opencode/gpt-5.1-codex` til GPT 5.1 Codex.
+Model-id'et i din OpenAGt-konfiguration brugerformatet `provider/model-id`. For eksempel, hvis du bruger [OpenAGt Zen](/docs/zen), vil du bruge `opencode/gpt-5.1-codex` til GPT 5.1 Codex.
 
 ---
 
@@ -369,7 +369,7 @@ Kontroller, hvilke værktøjer der er tilgængelige i denne agent med `tools`-ko
 
 ```json title="opencode.json" {3-6,9-12}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "tools": {
     "write": true,
     "bash": true
@@ -393,7 +393,7 @@ Du kan også bruge jokertegn til at styre flere værktøjer på én gang. For ek
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "agent": {
     "readonly": {
       "tools": {
@@ -420,7 +420,7 @@ Du kan konfigurere tilladelser til at administrere, hvilke handlinger og agenter
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "permission": {
     "edit": "deny"
   }
@@ -431,7 +431,7 @@ Du kan tilsidesætte disse tilladelser pr. agent.
 
 ```json title="opencode.json" {3-5,8-10}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "permission": {
     "edit": "deny"
   },
@@ -468,7 +468,7 @@ Du kan indstille tilladelser til specifikke bash-kommandoer.
 
 ```json title="opencode.json" {7}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "agent": {
     "build": {
       "permission": {
@@ -486,7 +486,7 @@ Dette kan tage et globmønster.
 
 ```json title="opencode.json" {7}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "agent": {
     "build": {
       "permission": {
@@ -504,7 +504,7 @@ Da den sidste matchningsregel har forrang, skal du sætte jokertegnet `*` først
 
 ```json title="opencode.json" {8}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "agent": {
     "build": {
       "permission": {
@@ -697,7 +697,7 @@ Her er nogle almindelige use cases for forskellige agenter.
 Her er nogle eksempler på agenter, du kan finde nyttige.
 
 :::tip
-Har du en agent, du gerne vil dele? [Send en PR](https://github.com/anomalyco/opencode).
+Har du en agent, du gerne vil dele? [Send en PR](https://github.com/Yecyi/OpenAGt).
 :::
 
 ---

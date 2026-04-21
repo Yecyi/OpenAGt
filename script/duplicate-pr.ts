@@ -2,7 +2,7 @@
 
 import path from "path"
 import { pathToFileURL } from "bun"
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 import { parseArgs } from "util"
 
 async function main() {

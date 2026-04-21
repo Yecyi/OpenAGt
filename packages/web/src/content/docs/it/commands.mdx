@@ -42,17 +42,17 @@ Usa il comando digitando `/` seguito dal nome del comando.
 
 ## Configurazione
 
-Puoi aggiungere comandi personalizzati tramite la config di OpenCode o creando file markdown nella directory `commands/`.
+Puoi aggiungere comandi personalizzati tramite la config di OpenAGt o creando file markdown nella directory `commands/`.
 
 ---
 
 ### JSON
 
-Usa l'opzione `command` nella [config](/docs/config) di OpenCode:
+Usa l'opzione `command` nella [config](/docs/config) di OpenAGt:
 
 ```json title="opencode.jsonc" {4-12}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "command": {
     // This becomes the name of the command
     "test": {

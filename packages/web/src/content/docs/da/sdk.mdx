@@ -1,12 +1,12 @@
 ---
 title: SDK
-description: Typesikker JS-klient for åpen kodeserver.
+description: Typesikker JS-klient for 氓pen kodeserver.
 ---
 
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-Åpenkoden JS/TS SDK gir en typesikker klient for samhandling med serveren.
+脜penkoden JS/TS SDK gir en typesikker klient for samhandling med serveren.
 Brug den til at bygge integrasjoner og kontrollere opencode programmatisk.
 
 [Finn ut mer](/docs/server) om hvordan serveren fungerer. For eksempler, tjek ut [prosjektene](/docs/ecosystem#projects) bygget av fellesskapet.
@@ -18,7 +18,7 @@ Brug den til at bygge integrasjoner og kontrollere opencode programmatisk.
 Installer SDK fra npm:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
@@ -28,12 +28,12 @@ npm install @opencode-ai/sdk
 Opret en forekomst av opencode:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
 
-Dette starter både en server og en klient
+Dette starter b氓de en server og en klient
 
 #### Indstillinger
 
@@ -49,10 +49,10 @@ Dette starter både en server og en klient
 
 ## Konfig
 
-Du kan sende et konfigurasjonsobjekt for at tilpasse virkemåten. Forekomsten henter fortsatt din `opencode.json`, men du kan overstyre eller tilføje til konfigurasjon inline:
+Du kan sende et konfigurasjonsobjekt for at tilpasse virkem氓ten. Forekomsten henter fortsatt din `opencode.json`, men du kan overstyre eller tilf酶je til konfigurasjon inline:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -69,10 +69,10 @@ opencode.server.close()
 
 ## Kun klient
 
-Hvis du allerede har en kjørende forekomst av opencode, kan du oprete en klientforekomst for at koble til den:
+Hvis du allerede har en kj酶rende forekomst av opencode, kan du oprete en klientforekomst for at koble til den:
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
@@ -96,16 +96,16 @@ const client = createOpencodeClient({
 SDK inkluderer TypeScript-definisjoner for alle API-typer. Importer dem direkte:
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-Alle typer er generert fra serverens OpenAPI-spesifikasjon og tilgængelig i <a href={typesUrl}>types-filen</a>.
+Alle typer er generert fra serverens OpenAPI-spesifikasjon og tilg忙ngelig i <a href={typesUrl}>types-filen</a>.
 
 ---
 
 ## Fejl
 
-SDK kan gi feil som du kan fange opp og håndtere:
+SDK kan gi feil som du kan fange opp og h氓ndtere:
 
 ```typescript
 try {
@@ -119,9 +119,9 @@ try {
 
 ## Struktureret output
 
-Du kan anmode om struktureret JSON-output fra modellen ved at angive et `format` med et JSON-skema. Modellen vil bruge et `StructuredOutput`-værktøj til at returnere valideret JSON, der matcher dit skema.
+Du kan anmode om struktureret JSON-output fra modellen ved at angive et `format` med et JSON-skema. Modellen vil bruge et `StructuredOutput`-v忙rkt酶j til at returnere valideret JSON, der matcher dit skema.
 
-### Grundlæggende brug
+### Grundl忙ggende brug
 
 ```typescript
 const result = await client.session.prompt({
@@ -161,17 +161,17 @@ console.log(result.data.info.structured_output)
 
 ### JSON-skemaformat
 
-Når du bruger `type: 'json_schema'`, skal du angive:
+N氓r du bruger `type: 'json_schema'`, skal du angive:
 
 | Felt         | Type            | Beskrivelse                                                |
 | ------------ | --------------- | ---------------------------------------------------------- |
-| `type`       | `'json_schema'` | Påkrævet. Angiver JSON-skematilstand                       |
-| `schema`     | `object`        | Påkrævet. JSON-skemaobjekt, der definerer outputstrukturen |
-| `retryCount` | `number`        | Valgfri. Antal valideringsforsøg (standard: 2)             |
+| `type`       | `'json_schema'` | P氓kr忙vet. Angiver JSON-skematilstand                       |
+| `schema`     | `object`        | P氓kr忙vet. JSON-skemaobjekt, der definerer outputstrukturen |
+| `retryCount` | `number`        | Valgfri. Antal valideringsfors酶g (standard: 2)             |
 
-### Fejlhåndtering
+### Fejlh氓ndtering
 
-Hvis modellen ikke formår at producere gyldigt struktureret output efter alle forsøg, vil svaret inkludere en `StructuredOutputError`:
+Hvis modellen ikke form氓r at producere gyldigt struktureret output efter alle fors酶g, vil svaret inkludere en `StructuredOutputError`:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -182,16 +182,16 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 
 ### Bedste praksis
 
-1. **Giv klare beskrivelser** i dine skemaegenskaber for at hjælpe modellen med at forstå, hvilke data der skal udtrækkes
-2. **Brug `required`** til at angive, hvilke felter der skal være til stede
-3. **Hold skemaer fokuserede** - komplekse indlejrede skemaer kan være sværere for modellen at udfylde korrekt
-4. **Indstil passende `retryCount`** - øg for komplekse skemaer, sænk for enkle
+1. **Giv klare beskrivelser** i dine skemaegenskaber for at hj忙lpe modellen med at forst氓, hvilke data der skal udtr忙kkes
+2. **Brug `required`** til at angive, hvilke felter der skal v忙re til stede
+3. **Hold skemaer fokuserede** - komplekse indlejrede skemaer kan v忙re sv忙rere for modellen at udfylde korrekt
+4. **Indstil passende `retryCount`** - 酶g for komplekse skemaer, s忙nk for enkle
 
 ---
 
 ## API'er
 
-SDK avslører alle server-APIer gjennom en typesikker klient.
+SDK avsl酶rer alle server-APIer gjennom en typesikker klient.
 
 ---
 
@@ -216,8 +216,8 @@ console.log(health.data.version)
 
 | Metode         | Beskrivelse                     | Svar                                        |
 | -------------- | ------------------------------- | ------------------------------------------- |
-| `app.log()`    | Skriv en loggoppføring          | `boolean`                                   |
-| `app.agents()` | Liste alle tilgængelige agenter | <a href={typesUrl}><code>Agent[]</code></a> |
+| `app.log()`    | Skriv en loggoppf酶ring          | `boolean`                                   |
+| `app.agents()` | Liste alle tilg忙ngelige agenter | <a href={typesUrl}><code>Agent[]</code></a> |
 
 ---
 
@@ -244,7 +244,7 @@ const agents = await client.app.agents()
 | Metode              | Beskrivelse                | Svar                                           |
 | ------------------- | -------------------------- | ---------------------------------------------- |
 | `project.list()`    | Liste over alle prosjekter | <a href={typesUrl}><code>Prosjekt[]</code></a> |
-| `project.current()` | Få nåværende prosjekt      | <a href={typesUrl}><code>Prosjekt</code></a>   |
+| `project.current()` | F氓 n氓v忙rende prosjekt      | <a href={typesUrl}><code>Prosjekt</code></a>   |
 
 ---
 
@@ -264,7 +264,7 @@ const currentProject = await client.project.current()
 
 | Metode       | Beskrivelse       | Svar                                     |
 | ------------ | ----------------- | ---------------------------------------- |
-| `path.get()` | Få nuværende bane | <a href={typesUrl}><code>Path</code></a> |
+| `path.get()` | F氓 nuv忙rende bane | <a href={typesUrl}><code>Path</code></a> |
 
 ---
 
@@ -281,8 +281,8 @@ const pathInfo = await client.path.get()
 
 | Metode               | Beskrivelse                            | Svar                                                                                                  |
 | -------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `config.get()`       | Få konfigurasjonsinformasjon           | <a href={typesUrl}><code>Config</code></a>                                                            |
-| `config.providers()` | Liste leverandører og standardmodeller | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
+| `config.get()`       | F氓 konfigurasjonsinformasjon           | <a href={typesUrl}><code>Config</code></a>                                                            |
+| `config.providers()` | Liste leverand酶rer og standardmodeller | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
 
@@ -301,24 +301,24 @@ const { providers, default: defaults } = await client.config.providers()
 | Metode                                                     | Beskrivelse                       | Noter                                                                                                                                                                                                                              |
 | ---------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `session.list()`                                           | Liste sessioner                   | Returnerer <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                           |
-| `session.get({ path })`                                    | Få session                        | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
+| `session.get({ path })`                                    | F氓 session                        | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.children({ path })`                               | Liste over barnesessioner         | Returnerer <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                           |
 | `session.create({ body })`                                 | Opret session                     | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.delete({ path })`                                 | Slett session                     | Returnerer `boolean`                                                                                                                                                                                                               |
 | `session.update({ path, body })`                           | Opdater sessionegenskaper         | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.init({ path, body })`                             | Analyser appen og lag `AGENTS.md` | Returnerer `boolean`                                                                                                                                                                                                               |
-| `session.abort({ path })`                                  | Avbryt en løpesession             | Returnerer `boolean`                                                                                                                                                                                                               |
+| `session.abort({ path })`                                  | Avbryt en l酶pesession             | Returnerer `boolean`                                                                                                                                                                                                               |
 | `session.share({ path })`                                  | Del sessionen                     | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.unshare({ path })`                                | Slutt at dele sessionen           | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.summarize({ path, body })`                        | Oppsummer sessionen               | Returnerer `boolean`                                                                                                                                                                                                               |
 | `session.messages({ path })`                               | Liste meldinger i en session      | Returnerer `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                         |
-| `session.message({ path })`                                | Få meldingsdetaljer               | Returnerer `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                           |
-| `session.prompt({ path, body })`                           | Send melding                      | `body.noReply: true` returnerer UserMessage (kun kontekst). Standard returnerer <a href={typesUrl}><code>AssistantMessage</code></a> med AI svar. Understøtter `body.outputFormat` for [struktureret output](#struktureret-output) |
+| `session.message({ path })`                                | F氓 meldingsdetaljer               | Returnerer `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                           |
+| `session.prompt({ path, body })`                           | Send melding                      | `body.noReply: true` returnerer UserMessage (kun kontekst). Standard returnerer <a href={typesUrl}><code>AssistantMessage</code></a> med AI svar. Underst酶tter `body.outputFormat` for [struktureret output](#struktureret-output) |
 | `session.command({ path, body })`                          | Send kommando til session         | Returnerer `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                  |
-| `session.shell({ path, body })`                            | Kjør en shell-kommando            | Returnerer <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                    |
+| `session.shell({ path, body })`                            | Kj酶r en shell-kommando            | Returnerer <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                    |
 | `session.revert({ path, body })`                           | Tilbakestill en melding           | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
 | `session.unrevert({ path })`                               | Gjenopret nulstillete meldinger   | Returnerer <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                             |
-| `postSessionByIdPermissionsByPermissionId({ path, body })` | Svar på en tillatelsesforespørsel | Returnerer `boolean`                                                                                                                                                                                                               |
+| `postSessionByIdPermissionsByPermissionId({ path, body })` | Svar p氓 en tillatelsesforesp酶rsel | Returnerer `boolean`                                                                                                                                                                                                               |
 
 ---
 
@@ -357,17 +357,17 @@ await client.session.prompt({
 
 | Metode                    | Beskrivelse                        | Svar                                                                                       |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
-| `find.text({ query })`    | Søk etter tekst i filer            | En rekke matchobjekter med `path`, `lines`, `line_number`, `absolute_offset`, `submatches` |
+| `find.text({ query })`    | S酶k etter tekst i filer            | En rekke matchobjekter med `path`, `lines`, `line_number`, `absolute_offset`, `submatches` |
 | `find.files({ query })`   | Finn filer og kataloger etter navn | `string[]` (baner)                                                                         |
-| `find.symbols({ query })` | Finn arbeidsområdesymboler         | <a href={typesUrl}><code>Symbol[]</code></a>                                               |
+| `find.symbols({ query })` | Finn arbeidsomr氓desymboler         | <a href={typesUrl}><code>Symbol[]</code></a>                                               |
 | `file.read({ query })`    | Les en fil                         | `{ type: "raw" \| "patch", content: string }`                                              |
-| `file.status({ query? })` | Få status for sporede filer        | <a href={typesUrl}><code>Fil[]</code></a>                                                  |
+| `file.status({ query? })` | F氓 status for sporede filer        | <a href={typesUrl}><code>Fil[]</code></a>                                                  |
 
-`find.files` støtter nogle få valgfrie søkefelt:
+`find.files` st酶tter nogle f氓 valgfrie s酶kefelt:
 
 - `type`: `"file"` eller `"directory"`
-- `directory`: overstyr prosjektroten for søket
-- `limit`: maksimalt antall resultater (1–200)
+- `directory`: overstyr prosjektroten for s酶ket
+- `limit`: maksimalt antall resultater (1鈥?00)
 
 ---
 
@@ -399,13 +399,13 @@ const content = await client.file.read({
 | Metode                         | Beskrivelse                  | Svar      |
 | ------------------------------ | ---------------------------- | --------- |
 | `tui.appendPrompt({ body })`   | Legg til tekst i ledeteksten | `boolean` |
-| `tui.openHelp()`               | Åpne hjelpedialogen          | `boolean` |
-| `tui.openSessions()`           | Åpne sessionvelgeren         | `boolean` |
-| `tui.openThemes()`             | Åpne temavelgeren            | `boolean` |
-| `tui.openModels()`             | Åpne modellvelgeren          | `boolean` |
-| `tui.submitPrompt()`           | Send inn nuværende ledetekst | `boolean` |
+| `tui.openHelp()`               | 脜pne hjelpedialogen          | `boolean` |
+| `tui.openSessions()`           | 脜pne sessionvelgeren         | `boolean` |
+| `tui.openThemes()`             | 脜pne temavelgeren            | `boolean` |
+| `tui.openModels()`             | 脜pne modellvelgeren          | `boolean` |
+| `tui.submitPrompt()`           | Send inn nuv忙rende ledetekst | `boolean` |
 | `tui.clearPrompt()`            | Fjern ledeteksten            | `boolean` |
-| `tui.executeCommand({ body })` | Utfør en kommando            | `boolean` |
+| `tui.executeCommand({ body })` | Utf酶r en kommando            | `boolean` |
 | `tui.showToast({ body })`      | Vis toastvarsel              | `boolean` |
 
 ---
@@ -444,7 +444,7 @@ await client.auth.set({
 
 ---
 
-### Hændelser
+### H忙ndelser
 
 | Metode              | Beskrivelse                    | Svar                           |
 | ------------------- | ------------------------------ | ------------------------------ |

@@ -1,58 +1,58 @@
 ---
 title: SDK
-description: OpenCode サーバー用の型安全な JS クライアント。
+description: OpenAGt 銈点兗銉愩兗鐢ㄣ伄鍨嬪畨鍏ㄣ仾 JS 銈儵銈ゃ偄銉炽儓銆?
 ---
 
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-OpenCode JS/TS SDK は、サーバーと対話するための型安全なクライアントを提供します。
-これを使用して、統合を構築し、OpenCode をプログラムで制御します。
+OpenAGt JS/TS SDK 銇€併偟銉笺儛銉笺仺瀵捐┍銇欍倠銇熴倎銇瀷瀹夊叏銇偗銉┿偆銈兂銉堛倰鎻愪緵銇椼伨銇欍€?
+銇撱倢銈掍娇鐢ㄣ仐銇︺€佺当鍚堛倰妲嬬瘔銇椼€丱penCode 銈掋儣銉偘銉┿儬銇у埗寰°仐銇俱仚銆?
 
-[サーバーの仕組みについての詳細](/docs/server) をご覧ください。たとえば、コミュニティによって構築された [projects](/docs/ecosystem#projects) をチェックしてください。
+[銈点兗銉愩兗銇粫绲勩伩銇仱銇勩仸銇┏绱癩(/docs/server) 銈掋仈瑕с亸銇犮仌銇勩€傘仧銇ㄣ亪銇般€併偝銉熴儱銉嬨儐銈ｃ伀銈堛仯銇︽绡夈仌銈屻仧 [projects](/docs/ecosystem#projects) 銈掋儊銈с儍銈仐銇︺亸銇犮仌銇勩€?
 
 ---
 
-## インストール
+## 銈ゃ兂銈广儓銉笺儷
 
-npm から SDK をインストールします。
+npm 銇嬨倝 SDK 銈掋偆銉炽偣銉堛兗銉仐銇俱仚銆?
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
 
-## クライアントの作成
+## 銈儵銈ゃ偄銉炽儓銇綔鎴?
 
-OpenCode のインスタンスを作成します。
+OpenAGt 銇偆銉炽偣銈裤兂銈广倰浣滄垚銇椼伨銇欍€?
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
 
-これにより、サーバーとクライアントの両方が起動します
+銇撱倢銇倛銈娿€併偟銉笺儛銉笺仺銈儵銈ゃ偄銉炽儓銇浮鏂广亴璧峰嫊銇椼伨銇?
 
-#### オプション
+#### 銈儣銈枫儳銉?
 
-| オプション | タイプ        | 説明                                | デフォルト  |
+| 銈儣銈枫儳銉?| 銈裤偆銉?       | 瑾槑                                | 銉囥儠銈┿儷銉? |
 | ---------- | ------------- | ----------------------------------- | ----------- |
-| `hostname` | `string`      | サーバーのホスト名                  | `127.0.0.1` |
-| `port`     | `number`      | サーバーポート                      | `4096`      |
-| `signal`   | `AbortSignal` | キャンセルのためのアボート信号      | `undefined` |
-| `timeout`  | `number`      | サーバー起動のタイムアウト (ミリ秒) | `5000`      |
-| `config`   | `Config`      | 設定オブジェクト                    | `{}`        |
+| `hostname` | `string`      | 銈点兗銉愩兗銇儧銈广儓鍚?                 | `127.0.0.1` |
+| `port`     | `number`      | 銈点兗銉愩兗銉濄兗銉?                     | `4096`      |
+| `signal`   | `AbortSignal` | 銈儯銉炽偦銉伄銇熴倎銇偄銉溿兗銉堜俊鍙?     | `undefined` |
+| `timeout`  | `number`      | 銈点兗銉愩兗璧峰嫊銇偪銈ゃ儬銈偊銉?(銉熴儶绉? | `5000`      |
+| `config`   | `Config`      | 瑷畾銈儢銈搞偋銈儓                    | `{}`        |
 
 ---
 
-## 設定
+## 瑷畾
 
-設定オブジェクトを渡して動作をカスタマイズできます。インスタンスは引き続き `opencode.json` を取得しますが、設定をインラインでオーバーライドまたは追加することができます。
+瑷畾銈儢銈搞偋銈儓銈掓浮銇椼仸鍕曚綔銈掋偒銈广偪銉炪偆銈恒仹銇嶃伨銇欍€傘偆銉炽偣銈裤兂銈广伅寮曘亶缍氥亶 `opencode.json` 銈掑彇寰椼仐銇俱仚銇屻€佽ō瀹氥倰銈ゃ兂銉┿偆銉炽仹銈兗銉愩兗銉┿偆銉夈伨銇熴伅杩藉姞銇欍倠銇撱仺銇屻仹銇嶃伨銇欍€?
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -67,45 +67,45 @@ console.log(`Server running at ${opencode.server.url}`)
 opencode.server.close()
 ```
 
-## クライアントのみ
+## 銈儵銈ゃ偄銉炽儓銇伩
 
-すでに実行中の OpenCode のインスタンスがある場合は、それに接続するためのクライアントインスタンスを作成できます。
+銇欍仹銇疅琛屼腑銇?OpenAGt 銇偆銉炽偣銈裤兂銈广亴銇傘倠鍫村悎銇€併仢銈屻伀鎺ョ稓銇欍倠銇熴倎銇偗銉┿偆銈兂銉堛偆銉炽偣銈裤兂銈广倰浣滄垚銇с亶銇俱仚銆?
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
 })
 ```
 
-#### オプション
+#### 銈儣銈枫儳銉?
 
-| オプション      | タイプ     | 説明                                     | デフォルト              |
+| 銈儣銈枫儳銉?     | 銈裤偆銉?    | 瑾槑                                     | 銉囥儠銈┿儷銉?             |
 | --------------- | ---------- | ---------------------------------------- | ----------------------- |
-| `baseUrl`       | `string`   | サーバーの URL                           | `http://localhost:4096` |
-| `fetch`         | `function` | カスタムフェッチの実装                   | `globalThis.fetch`      |
-| `parseAs`       | `string`   | 応答解析方法                             | `auto`                  |
-| `responseStyle` | `string`   | 戻り値のスタイル: `data` または `fields` | `fields`                |
-| `throwOnError`  | `boolean`  | 返す代わりにエラーをスローする           | `false`                 |
+| `baseUrl`       | `string`   | 銈点兗銉愩兗銇?URL                           | `http://localhost:4096` |
+| `fetch`         | `function` | 銈偣銈裤儬銉曘偋銉冦儊銇疅瑁?                  | `globalThis.fetch`      |
+| `parseAs`       | `string`   | 蹇滅瓟瑙ｆ瀽鏂规硶                             | `auto`                  |
+| `responseStyle` | `string`   | 鎴汇倞鍊ゃ伄銈广偪銈ゃ儷: `data` 銇俱仧銇?`fields` | `fields`                |
+| `throwOnError`  | `boolean`  | 杩斻仚浠ｃ倧銈娿伀銈ㄣ儵銉笺倰銈广儹銉笺仚銈?          | `false`                 |
 
 ---
 
-## 型定義
+## 鍨嬪畾缇?
 
-SDK には、すべての API タイプの TypeScript 定義が含まれています。それらを直接インポートします。
+SDK 銇伅銆併仚銇广仸銇?API 銈裤偆銉椼伄 TypeScript 瀹氱京銇屽惈銇俱倢銇︺亜銇俱仚銆傘仢銈屻倝銈掔洿鎺ャ偆銉炽儩銉笺儓銇椼伨銇欍€?
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-すべてのタイプはサーバーの OpenAPI 仕様から生成され、<a href={typesUrl}>タイプファイル</a> で使用できます。
+銇欍伖銇︺伄銈裤偆銉椼伅銈点兗銉愩兗銇?OpenAPI 浠曟銇嬨倝鐢熸垚銇曘倢銆?a href={typesUrl}>銈裤偆銉椼儠銈°偆銉?/a> 銇т娇鐢ㄣ仹銇嶃伨銇欍€?
 
 ---
 
-## エラー
+## 銈ㄣ儵銉?
 
-SDK は、キャッチして処理できるエラーをスローできます。
+SDK 銇€併偔銉ｃ儍銉併仐銇﹀嚘鐞嗐仹銇嶃倠銈ㄣ儵銉笺倰銈广儹銉笺仹銇嶃伨銇欍€?
 
 ```typescript
 try {
@@ -117,11 +117,11 @@ try {
 
 ---
 
-## 構造化出力
+## 妲嬮€犲寲鍑哄姏
 
-`format` を JSON スキーマで指定することで、モデルから構造化された JSON 出力をリクエストできます。モデルは `StructuredOutput` ツールを使用して、スキーマに一致する検証済み JSON を返します。
+`format` 銈?JSON 銈广偔銉笺優銇ф寚瀹氥仚銈嬨亾銇ㄣ仹銆併儮銉囥儷銇嬨倝妲嬮€犲寲銇曘倢銇?JSON 鍑哄姏銈掋儶銈偍銈广儓銇с亶銇俱仚銆傘儮銉囥儷銇?`StructuredOutput` 銉勩兗銉倰浣跨敤銇椼仸銆併偣銈兗銉炪伀涓€鑷淬仚銈嬫瑷兼笀銇?JSON 銈掕繑銇椼伨銇欍€?
 
-### 基本的な使用法
+### 鍩烘湰鐨勩仾浣跨敤娉?
 
 ```typescript
 const result = await client.session.prompt({
@@ -152,26 +152,26 @@ console.log(result.data.info.structured_output)
 // { company: "Anthropic", founded: 2021, products: ["Claude", "Claude API"] }
 ```
 
-### 出力フォーマットの種類
+### 鍑哄姏銉曘偐銉笺優銉冦儓銇ó椤?
 
-| タイプ        | 説明                                                 |
+| 銈裤偆銉?       | 瑾槑                                                 |
 | ------------- | ---------------------------------------------------- |
-| `text`        | デフォルト。標準テキスト応答 (構造化出力なし)        |
-| `json_schema` | 提供されたスキーマに一致する検証済み JSON を返します |
+| `text`        | 銉囥儠銈┿儷銉堛€傛婧栥儐銈偣銉堝繙绛?(妲嬮€犲寲鍑哄姏銇仐)        |
+| `json_schema` | 鎻愪緵銇曘倢銇熴偣銈兗銉炪伀涓€鑷淬仚銈嬫瑷兼笀銇?JSON 銈掕繑銇椼伨銇?|
 
-### JSON スキーマフォーマット
+### JSON 銈广偔銉笺優銉曘偐銉笺優銉冦儓
 
-`type: 'json_schema'` を使用する場合は、以下を指定します:
+`type: 'json_schema'` 銈掍娇鐢ㄣ仚銈嬪牬鍚堛伅銆佷互涓嬨倰鎸囧畾銇椼伨銇?
 
-| フィールド   | タイプ          | 説明                                               |
+| 銉曘偅銉笺儷銉?  | 銈裤偆銉?         | 瑾槑                                               |
 | ------------ | --------------- | -------------------------------------------------- |
-| `type`       | `'json_schema'` | 必須。JSON スキーマモードを指定します              |
-| `schema`     | `object`        | 必須。出力構造を定義する JSON スキーマオブジェクト |
-| `retryCount` | `number`        | オプション。検証の再試行回数 (デフォルト: 2)       |
+| `type`       | `'json_schema'` | 蹇呴爤銆侸SON 銈广偔銉笺優銉兗銉夈倰鎸囧畾銇椼伨銇?             |
+| `schema`     | `object`        | 蹇呴爤銆傚嚭鍔涙閫犮倰瀹氱京銇欍倠 JSON 銈广偔銉笺優銈儢銈搞偋銈儓 |
+| `retryCount` | `number`        | 銈儣銈枫儳銉炽€傛瑷笺伄鍐嶈│琛屽洖鏁?(銉囥儠銈┿儷銉? 2)       |
 
-### エラー処理
+### 銈ㄣ儵銉煎嚘鐞?
 
-すべての再試行後にモデルが有効な構造化出力を生成できない場合、応答には `StructuredOutputError` が含まれます:
+銇欍伖銇︺伄鍐嶈│琛屽緦銇儮銉囥儷銇屾湁鍔广仾妲嬮€犲寲鍑哄姏銈掔敓鎴愩仹銇嶃仾銇勫牬鍚堛€佸繙绛斻伀銇?`StructuredOutputError` 銇屽惈銇俱倢銇俱仚:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -180,30 +180,30 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 }
 ```
 
-### ベストプラクティス
+### 銉欍偣銉堛儣銉┿偗銉嗐偅銈?
 
-1. **明確な説明を提供する**: モデルが抽出するデータを理解できるように、スキーマプロパティに明確な説明を提供します
-2. **`required` を使用する**: 存在する必要があるフィールドを指定します
-3. **スキーマを焦点を絞ったものにする**: 複雑なネストされたスキーマは、モデルが正しく入力するのが難しい場合があります
-4. **適切な `retryCount` を設定する**: 複雑なスキーマの場合は増やし、単純なスキーマの場合は減らします
+1. **鏄庣⒑銇鏄庛倰鎻愪緵銇欍倠**: 銉儑銉亴鎶藉嚭銇欍倠銉囥兗銈裤倰鐞嗚В銇с亶銈嬨倛銇嗐伀銆併偣銈兗銉炪儣銉儜銉嗐偅銇槑纰恒仾瑾槑銈掓彁渚涖仐銇俱仚
+2. **`required` 銈掍娇鐢ㄣ仚銈?*: 瀛樺湪銇欍倠蹇呰銇屻亗銈嬨儠銈ｃ兗銉儔銈掓寚瀹氥仐銇俱仚
+3. **銈广偔銉笺優銈掔劍鐐广倰绲炪仯銇熴倐銇伀銇欍倠**: 瑜囬洃銇儘銈广儓銇曘倢銇熴偣銈兗銉炪伅銆併儮銉囥儷銇屾銇椼亸鍏ュ姏銇欍倠銇亴闆ｃ仐銇勫牬鍚堛亴銇傘倞銇俱仚
+4. **閬╁垏銇?`retryCount` 銈掕ō瀹氥仚銈?*: 瑜囬洃銇偣銈兗銉炪伄鍫村悎銇銈勩仐銆佸崢绱斻仾銈广偔銉笺優銇牬鍚堛伅娓涖倝銇椼伨銇?
 
 ---
 
 ## API
 
-SDK は、型安全なクライアントを通じてすべてのサーバー API を公開します。
+SDK 銇€佸瀷瀹夊叏銇偗銉┿偆銈兂銉堛倰閫氥仒銇︺仚銇广仸銇偟銉笺儛銉?API 銈掑叕闁嬨仐銇俱仚銆?
 
 ---
 
 ### Global
 
-| メソッド          | 説明                                   | 戻り値                               |
+| 銉°偨銉冦儔          | 瑾槑                                   | 鎴汇倞鍊?                              |
 | ----------------- | -------------------------------------- | ------------------------------------ |
-| `global.health()` | サーバーの健全性とバージョンを確認する | `{ healthy: true, version: string }` |
+| `global.health()` | 銈点兗銉愩兗銇仴鍏ㄦ€с仺銉愩兗銈搞儳銉炽倰纰鸿獚銇欍倠 | `{ healthy: true, version: string }` |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 const health = await client.global.health()
@@ -214,14 +214,14 @@ console.log(health.data.version)
 
 ### App
 
-| メソッド       | 説明                                       | 戻り値                                      |
+| 銉°偨銉冦儔       | 瑾槑                                       | 鎴汇倞鍊?                                     |
 | -------------- | ------------------------------------------ | ------------------------------------------- |
-| `app.log()`    | ログエントリを書き込む                     | `boolean`                                   |
-| `app.agents()` | 利用可能なすべてのエージェントをリストする | <a href={typesUrl}><code>Agent[]</code></a> |
+| `app.log()`    | 銉偘銈ㄣ兂銉堛儶銈掓浉銇嶈炯銈€                     | `boolean`                                   |
+| `app.agents()` | 鍒╃敤鍙兘銇仚銇广仸銇偍銉笺偢銈с兂銉堛倰銉偣銉堛仚銈?| <a href={typesUrl}><code>Agent[]</code></a> |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Write a log entry
@@ -241,14 +241,14 @@ const agents = await client.app.agents()
 
 ### Project
 
-| メソッド            | 説明                             | 戻り値                                        |
+| 銉°偨銉冦儔            | 瑾槑                             | 鎴汇倞鍊?                                       |
 | ------------------- | -------------------------------- | --------------------------------------------- |
-| `project.list()`    | すべてのプロジェクトをリストする | <a href={typesUrl}><code>Project[]</code></a> |
-| `project.current()` | 現在のプロジェクトを取得         | <a href={typesUrl}><code>Project</code></a>   |
+| `project.list()`    | 銇欍伖銇︺伄銉椼儹銈搞偋銈儓銈掋儶銈广儓銇欍倠 | <a href={typesUrl}><code>Project[]</code></a> |
+| `project.current()` | 鐝惧湪銇儣銉偢銈с偗銉堛倰鍙栧緱         | <a href={typesUrl}><code>Project</code></a>   |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // List all projects
@@ -262,13 +262,13 @@ const currentProject = await client.project.current()
 
 ### Path
 
-| メソッド     | 説明             | 戻り値                                   |
+| 銉°偨銉冦儔     | 瑾槑             | 鎴汇倞鍊?                                  |
 | ------------ | ---------------- | ---------------------------------------- |
-| `path.get()` | 現在のパスを取得 | <a href={typesUrl}><code>Path</code></a> |
+| `path.get()` | 鐝惧湪銇儜銈广倰鍙栧緱 | <a href={typesUrl}><code>Path</code></a> |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Get current path information
@@ -279,14 +279,14 @@ const pathInfo = await client.path.get()
 
 ### Config
 
-| メソッド             | 説明                                         | 戻り値                                                                                                |
+| 銉°偨銉冦儔             | 瑾槑                                         | 鎴汇倞鍊?                                                                                               |
 | -------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `config.get()`       | 設定情報を取得する                           | <a href={typesUrl}><code>Config</code></a>                                                            |
-| `config.providers()` | プロバイダーとデフォルトのモデルをリストする | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
+| `config.get()`       | 瑷畾鎯呭牨銈掑彇寰椼仚銈?                          | <a href={typesUrl}><code>Config</code></a>                                                            |
+| `config.providers()` | 銉椼儹銉愩偆銉€銉笺仺銉囥儠銈┿儷銉堛伄銉儑銉倰銉偣銉堛仚銈?| `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 const config = await client.config.get()
@@ -298,31 +298,31 @@ const { providers, default: defaults } = await client.config.providers()
 
 ### Sessions
 
-| メソッド                                                   | 説明                                    | 詳細                                                                                                                                                                                                                                        |
+| 銉°偨銉冦儔                                                   | 瑾槑                                    | 瑭崇窗                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session.list()`                                           | セッションをリストする                  | 戻り値 <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                        |
-| `session.get({ path })`                                    | セッションを取得                        | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.children({ path })`                               | 子セッションをリストする                | 戻り値 <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                        |
-| `session.create({ body })`                                 | セッションの作成                        | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.delete({ path })`                                 | セッションを削除                        | 戻り値 `boolean`                                                                                                                                                                                                                            |
-| `session.update({ path, body })`                           | セッションのプロパティを更新する        | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.init({ path, body })`                             | アプリを分析して `AGENTS.md` を作成する | 戻り値 `boolean`                                                                                                                                                                                                                            |
-| `session.abort({ path })`                                  | 実行中のセッションを中止する            | 戻り値 `boolean`                                                                                                                                                                                                                            |
-| `session.share({ path })`                                  | セッションを共有する                    | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.unshare({ path })`                                | セッションの共有を解除                  | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.summarize({ path, body })`                        | セッションを要約する                    | 戻り値 `boolean`                                                                                                                                                                                                                            |
-| `session.messages({ path })`                               | セッション内のメッセージをリストする    | 戻り値 `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                                      |
-| `session.message({ path })`                                | メッセージの詳細を取得する              | 戻り値 `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                        |
-| `session.prompt({ path, body })`                           | プロンプトメッセージを送信する          | `body.noReply: true` は UserMessage (コンテキストのみ) を返します。デフォルトでは、AI 応答を含む <a href={typesUrl}><code>AssistantMessage</code></a> を返します。[構造化出力](#構造化出力) のための `body.outputFormat` をサポートします。 |
-| `session.command({ path, body })`                          | コマンドをセッションに送信              | 戻り値 `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                               |
-| `session.shell({ path, body })`                            | シェルコマンドを実行する                | 戻り値 <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                                 |
-| `session.revert({ path, body })`                           | メッセージを元に戻す                    | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `session.unrevert({ path })`                               | 元に戻したメッセージを復元する          | 戻り値 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
-| `postSessionByIdPermissionsByPermissionId({ path, body })` | 許可リクエストに応答する                | 戻り値 `boolean`                                                                                                                                                                                                                            |
+| `session.list()`                                           | 銈汇儍銈枫儳銉炽倰銉偣銉堛仚銈?                 | 鎴汇倞鍊?<a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                        |
+| `session.get({ path })`                                    | 銈汇儍銈枫儳銉炽倰鍙栧緱                        | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.children({ path })`                               | 瀛愩偦銉冦偡銉с兂銈掋儶銈广儓銇欍倠                | 鎴汇倞鍊?<a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                        |
+| `session.create({ body })`                                 | 銈汇儍銈枫儳銉炽伄浣滄垚                        | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.delete({ path })`                                 | 銈汇儍銈枫儳銉炽倰鍓婇櫎                        | 鎴汇倞鍊?`boolean`                                                                                                                                                                                                                            |
+| `session.update({ path, body })`                           | 銈汇儍銈枫儳銉炽伄銉椼儹銉戙儐銈ｃ倰鏇存柊銇欍倠        | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.init({ path, body })`                             | 銈儣銉倰鍒嗘瀽銇椼仸 `AGENTS.md` 銈掍綔鎴愩仚銈?| 鎴汇倞鍊?`boolean`                                                                                                                                                                                                                            |
+| `session.abort({ path })`                                  | 瀹熻涓伄銈汇儍銈枫儳銉炽倰涓銇欍倠            | 鎴汇倞鍊?`boolean`                                                                                                                                                                                                                            |
+| `session.share({ path })`                                  | 銈汇儍銈枫儳銉炽倰鍏辨湁銇欍倠                    | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.unshare({ path })`                                | 銈汇儍銈枫儳銉炽伄鍏辨湁銈掕В闄?                 | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.summarize({ path, body })`                        | 銈汇儍銈枫儳銉炽倰瑕佺磩銇欍倠                    | 鎴汇倞鍊?`boolean`                                                                                                                                                                                                                            |
+| `session.messages({ path })`                               | 銈汇儍銈枫儳銉冲唴銇儭銉冦偦銉笺偢銈掋儶銈广儓銇欍倠    | 鎴汇倞鍊?`{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                                      |
+| `session.message({ path })`                                | 銉°儍銈汇兗銈搞伄瑭崇窗銈掑彇寰椼仚銈?             | 鎴汇倞鍊?`{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                        |
+| `session.prompt({ path, body })`                           | 銉椼儹銉炽儣銉堛儭銉冦偦銉笺偢銈掗€佷俊銇欍倠          | `body.noReply: true` 銇?UserMessage (銈炽兂銉嗐偔銈广儓銇伩) 銈掕繑銇椼伨銇欍€傘儑銉曘偐銉儓銇с伅銆丄I 蹇滅瓟銈掑惈銈€ <a href={typesUrl}><code>AssistantMessage</code></a> 銈掕繑銇椼伨銇欍€俒妲嬮€犲寲鍑哄姏](#妲嬮€犲寲鍑哄姏) 銇仧銈併伄 `body.outputFormat` 銈掋偟銉濄兗銉堛仐銇俱仚銆?|
+| `session.command({ path, body })`                          | 銈炽優銉炽儔銈掋偦銉冦偡銉с兂銇€佷俊              | 鎴汇倞鍊?`{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                               |
+| `session.shell({ path, body })`                            | 銈枫偋銉偝銉炪兂銉夈倰瀹熻銇欍倠                | 鎴汇倞鍊?<a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                                 |
+| `session.revert({ path, body })`                           | 銉°儍銈汇兗銈搞倰鍏冦伀鎴汇仚                    | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `session.unrevert({ path })`                               | 鍏冦伀鎴汇仐銇熴儭銉冦偦銉笺偢銈掑京鍏冦仚銈?         | 鎴汇倞鍊?<a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                          |
+| `postSessionByIdPermissionsByPermissionId({ path, body })` | 瑷卞彲銉偗銈ㄣ偣銉堛伀蹇滅瓟銇欍倠                | 鎴汇倞鍊?`boolean`                                                                                                                                                                                                                            |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Create and manage sessions
@@ -355,7 +355,7 @@ await client.session.prompt({
 
 ### Files
 
-| メソッド                  | 説明                               | 戻り値                                                                                      |
+| 銉°偨銉冦儔                  | 瑾槑                               | 鎴汇倞鍊?                                                                                     |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------- |
 | `find.text({ query })`    | Search for text in files           | Array of match objects with `path`, `lines`, `line_number`, `absolute_offset`, `submatches` |
 | `find.files({ query })`   | Find files and directories by name | `string[]` (paths)                                                                          |
@@ -363,15 +363,15 @@ await client.session.prompt({
 | `file.read({ query })`    | Read a file                        | `{ type: "raw" \| "patch", content: string }`                                               |
 | `file.status({ query? })` | Get status for tracked files       | <a href={typesUrl}><code>File[]</code></a>                                                  |
 
-`find.files` は、いくつかのオプションのクエリフィールドをサポートしています。
+`find.files` 銇€併亜銇忋仱銇嬨伄銈儣銈枫儳銉炽伄銈偍銉儠銈ｃ兗銉儔銈掋偟銉濄兗銉堛仐銇︺亜銇俱仚銆?
 
-- `type`: `"file"` または `"directory"`
-- `directory`: 検索用のプロジェクトルートをオーバーライドします。
-- `limit`: 最大結果 (1 ～ 200)
+- `type`: `"file"` 銇俱仧銇?`"directory"`
+- `directory`: 妞滅储鐢ㄣ伄銉椼儹銈搞偋銈儓銉兗銉堛倰銈兗銉愩兗銉┿偆銉夈仐銇俱仚銆?
+- `limit`: 鏈€澶х祼鏋?(1 锝?200)
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Search and read files
@@ -396,21 +396,21 @@ const content = await client.file.read({
 
 ### TUI
 
-| メソッド                       | 説明                             | 戻り値    |
+| 銉°偨銉冦儔                       | 瑾槑                             | 鎴汇倞鍊?   |
 | ------------------------------ | -------------------------------- | --------- |
-| `tui.appendPrompt({ body })`   | プロンプトにテキストを追加します | `boolean` |
-| `tui.openHelp()`               | ヘルプダイアログを開く           | `boolean` |
-| `tui.openSessions()`           | セッションセレクターを開く       | `boolean` |
-| `tui.openThemes()`             | テーマセレクターを開く           | `boolean` |
-| `tui.openModels()`             | モデルセレクターを開く           | `boolean` |
-| `tui.submitPrompt()`           | 現在のプロンプトを送信します     | `boolean` |
-| `tui.clearPrompt()`            | プロンプトをクリア               | `boolean` |
-| `tui.executeCommand({ body })` | コマンドを実行する               | `boolean` |
-| `tui.showToast({ body })`      | トースト通知を表示               | `boolean` |
+| `tui.appendPrompt({ body })`   | 銉椼儹銉炽儣銉堛伀銉嗐偔銈广儓銈掕拷鍔犮仐銇俱仚 | `boolean` |
+| `tui.openHelp()`               | 銉樸儷銉椼儉銈ゃ偄銉偘銈掗枊銇?          | `boolean` |
+| `tui.openSessions()`           | 銈汇儍銈枫儳銉炽偦銉偗銈裤兗銈掗枊銇?      | `boolean` |
+| `tui.openThemes()`             | 銉嗐兗銉炪偦銉偗銈裤兗銈掗枊銇?          | `boolean` |
+| `tui.openModels()`             | 銉儑銉偦銉偗銈裤兗銈掗枊銇?          | `boolean` |
+| `tui.submitPrompt()`           | 鐝惧湪銇儣銉兂銉椼儓銈掗€佷俊銇椼伨銇?    | `boolean` |
+| `tui.clearPrompt()`            | 銉椼儹銉炽儣銉堛倰銈儶銈?              | `boolean` |
+| `tui.executeCommand({ body })` | 銈炽優銉炽儔銈掑疅琛屻仚銈?              | `boolean` |
+| `tui.showToast({ body })`      | 銉堛兗銈广儓閫氱煡銈掕〃绀?              | `boolean` |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Control TUI interface
@@ -427,13 +427,13 @@ await client.tui.showToast({
 
 ### Auth
 
-| メソッド            | 説明                   | 戻り値    |
+| 銉°偨銉冦儔            | 瑾槑                   | 鎴汇倞鍊?   |
 | ------------------- | ---------------------- | --------- |
-| `auth.set({ ... })` | 認証資格情報を設定する | `boolean` |
+| `auth.set({ ... })` | 瑾嶈璩囨牸鎯呭牨銈掕ō瀹氥仚銈?| `boolean` |
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 await client.auth.set({
@@ -446,13 +446,13 @@ await client.auth.set({
 
 ### Events
 
-| メソッド            | 説明                           | 戻り値                         |
+| 銉°偨銉冦儔            | 瑾槑                           | 鎴汇倞鍊?                        |
 | ------------------- | ------------------------------ | ------------------------------ |
-| `event.subscribe()` | サーバー送信イベントストリーム | サーバー送信イベントストリーム |
+| `event.subscribe()` | 銈点兗銉愩兗閫佷俊銈ゃ儥銉炽儓銈广儓銉兗銉?| 銈点兗銉愩兗閫佷俊銈ゃ儥銉炽儓銈广儓銉兗銉?|
 
 ---
 
-#### 例
+#### 渚?
 
 ```javascript
 // Listen to real-time events

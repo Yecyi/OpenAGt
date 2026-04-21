@@ -1,78 +1,78 @@
 ---
-title: 플러그인
-description: OpenCode를 확장하기 위해 자신만의 플러그인을 작성하세요.
+title: 頂岆煬攴胳澑
+description: OpenAGt毳?頇曥灔頃橁赴 鞙勴暣 鞛愳嫚毵岇潣 頂岆煬攴胳澑鞚?鞛戩劚頃橃劯鞖?
 ---
 
-플러그인은 다양한 이벤트와 사용자 정의 행동으로 후킹하여 opencode를 확장 할 수 있습니다. 플러그인을 사용하여 새로운 기능을 추가하거나, 외부 서비스와 통합하거나, opencode의 기본 동작을 수정할 수 있습니다.
+頂岆煬攴胳澑鞚€ 雼れ枒頃?鞚措菠韸胳檧 靷毄鞛?鞝曥潣 頄夒彊鞙茧 頉勴偣頃橃棳 opencode毳?頇曥灔 頃?靾?鞛堨姷雼堧嫟. 頂岆煬攴胳澑鞚?靷毄頃橃棳 靸堧鞖?旮半姤鞚?於旉皜頃橁卑雮? 鞕鸽秬 靹滊箘鞀れ檧 韱淀暕頃橁卑雮? opencode鞚?旮半掣 霃欖瀾鞚?靾橃爼頃?靾?鞛堨姷雼堧嫟.
 
-예를 들어, 커뮤니티에 의해 생성 된 [plugins](/docs/ecosystem#plugins)를 확인하십시오.
-
----
-
-## 플러그인 사용
-
-플러그인을 로드하는 두 가지 방법이 있습니다.
+鞓堧ゼ 霌れ柎, 旎る雼堩嫲鞐?鞚橅暣 靸濎劚 霅?[plugins](/docs/ecosystem#plugins)毳?頇曥澑頃橃嫮鞁滌槫.
 
 ---
 
-### 로컬 파일에서
+## 頂岆煬攴胳澑 靷毄
 
-플러그인 디렉토리에 JavaScript 또는 TypeScript 파일을 배치합니다.
-
-- `.opencode/plugins/` - 프로젝트 레벨 플러그인
-- `~/.config/opencode/plugins/` - 글로벌 플러그인
-
-이 디렉토리의 파일은 시작 시 자동으로 로드됩니다.
+頂岆煬攴胳澑鞚?搿滊摐頃橂姅 霊?臧€歆€ 氚╇矔鞚?鞛堨姷雼堧嫟.
 
 ---
 
-### npm에서
+### 搿滌滑 韺岇澕鞐愳劀
 
-config 파일에 npm 패키지를 지정합니다.
+頂岆煬攴胳澑 霐旊爥韱犽Μ鞐?JavaScript 霕愲姅 TypeScript 韺岇澕鞚?氚办箻頃╇媹雼?
+
+- `.opencode/plugins/` - 頂勲鞝濏姼 霠堧波 頂岆煬攴胳澑
+- `~/.config/opencode/plugins/` - 旮€搿滊矊 頂岆煬攴胳澑
+
+鞚?霐旊爥韱犽Μ鞚?韺岇澕鞚€ 鞁滌瀾 鞁?鞛愲彊鞙茧 搿滊摐霅╇媹雼?
+
+---
+
+### npm鞐愳劀
+
+config 韺岇澕鞐?npm 韺偆歆€毳?歆€鞝曧暕雼堧嫟.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-일반 패키지 및 스코프 npm 패키지 모두 지원됩니다.
+鞚茧皹 韺偆歆€ 氚?鞀れ綌頂?npm 韺偆歆€ 氇憪 歆€鞗愲惄雼堧嫟.
 
-[ecosystem](/docs/ecosystem#plugins)에서 사용할 수 있는 플러그인을 찾아보세요.
-
----
-
-### 플러그인이 설치되는 방법
-
-**npm 플러그인**은 시작시 Bun을 사용하여 자동으로 설치됩니다. 패키지와 그 의존성은 `~/.cache/opencode/node_modules/`에 캐시됩니다.
-
-**로컬 플러그인**은 플러그인 디렉토리에서 직접 로드됩니다. 외부 패키지를 사용하려면 구성 디렉토리 내에 `package.json`을 작성해야 하거나([의존성](#의존성) 참조), 플러그인을 npm에 게시하고 [config에 추가](/docs/config#plugins)해야 합니다.
+[ecosystem](/docs/ecosystem#plugins)鞐愳劀 靷毄頃?靾?鞛堧姅 頂岆煬攴胳澑鞚?彀眷晞氤挫劯鞖?
 
 ---
 
-### 로드 순서
+### 頂岆煬攴胳澑鞚?靹れ箻霅橂姅 氚╇矔
 
-플러그인은 모든 소스에서 로드되며 모든 후크는 순서대로 실행됩니다. 로드 순서는 다음과 같습니다:
+**npm 頂岆煬攴胳澑**鞚€ 鞁滌瀾鞁?Bun鞚?靷毄頃橃棳 鞛愲彊鞙茧 靹れ箻霅╇媹雼? 韺偆歆€鞕€ 攴?鞚橃〈靹膘潃 `~/.cache/opencode/node_modules/`鞐?旌愳嫓霅╇媹雼?
 
-1. 글로벌 구성 (`~/.config/opencode/opencode.json`)
-2. 프로젝트 구성 (`opencode.json`)
-3. 글로벌 플러그인 디렉토리 (`~/.config/opencode/plugins/`)
-4. 프로젝트 플러그인 디렉토리 (`.opencode/plugins/`)
-
-중복된 이름과 버전의 npm 패키지는 한 번만 로드됩니다. 하지만 로컬 플러그인과 npm 플러그인의 이름이 비슷하더라도 둘 다 별도로 로드됩니다.
+**搿滌滑 頂岆煬攴胳澑**鞚€ 頂岆煬攴胳澑 霐旊爥韱犽Μ鞐愳劀 歆侅爲 搿滊摐霅╇媹雼? 鞕鸽秬 韺偆歆€毳?靷毄頃橂牑氅?甑劚 霐旊爥韱犽Μ 雮挫棎 `package.json`鞚?鞛戩劚頃挫暭 頃橁卑雮?[鞚橃〈靹盷(#鞚橃〈靹? 彀胳“), 頂岆煬攴胳澑鞚?npm鞐?瓴岇嫓頃橁碃 [config鞐?於旉皜](/docs/config#plugins)頃挫暭 頃╇媹雼?
 
 ---
 
-## 플러그인 만들기
+### 搿滊摐 靾滌劀
 
-플러그인은 하나 이상의 플러그인 함수를 내보내는 **JavaScript/TypeScript 모듈**입니다. 각 함수는 context 객체를 수신하고 hooks 객체를 반환합니다.
+頂岆煬攴胳澑鞚€ 氇摖 靻岇姢鞐愳劀 搿滊摐霅橂┌ 氇摖 頉勴伂電?靾滌劀雽€搿?鞁ろ枆霅╇媹雼? 搿滊摐 靾滌劀電?雼れ潓瓿?臧欖姷雼堧嫟:
+
+1. 旮€搿滊矊 甑劚 (`~/.config/opencode/opencode.json`)
+2. 頂勲鞝濏姼 甑劚 (`opencode.json`)
+3. 旮€搿滊矊 頂岆煬攴胳澑 霐旊爥韱犽Μ (`~/.config/opencode/plugins/`)
+4. 頂勲鞝濏姼 頂岆煬攴胳澑 霐旊爥韱犽Μ (`.opencode/plugins/`)
+
+欷戨车霅?鞚措瓿?氩勳爠鞚?npm 韺偆歆€電?頃?氩堧 搿滊摐霅╇媹雼? 頃橃毵?搿滌滑 頂岆煬攴胳澑瓿?npm 頂岆煬攴胳澑鞚?鞚措鞚?牍勳姺頃橂崝霛茧弰 霊?雼?氤勲弰搿?搿滊摐霅╇媹雼?
 
 ---
 
-### 의존성
+## 頂岆煬攴胳澑 毵岆摛旮?
 
-로컬 플러그인 및 사용자 정의 도구는 외부 npm 패키지를 사용할 수 있습니다. config 디렉토리에 `package.json`을 추가하고 필요한 의존성을 명시하십시오.
+頂岆煬攴胳澑鞚€ 頃橂倶 鞚挫儊鞚?頂岆煬攴胳澑 頃垬毳?雮措炒雮措姅 **JavaScript/TypeScript 氇搱**鞛呺媹雼? 臧?頃垬電?context 臧濎泊毳?靾橃嫚頃橁碃 hooks 臧濎泊毳?氚橅櫂頃╇媹雼?
+
+---
+
+### 鞚橃〈靹?
+
+搿滌滑 頂岆煬攴胳澑 氚?靷毄鞛?鞝曥潣 霃勱惮電?鞕鸽秬 npm 韺偆歆€毳?靷毄頃?靾?鞛堨姷雼堧嫟. config 霐旊爥韱犽Μ鞐?`package.json`鞚?於旉皜頃橁碃 頃勳殧頃?鞚橃〈靹膘潉 氇呾嫓頃橃嫮鞁滌槫.
 
 ```json title=".opencode/package.json"
 {
@@ -82,7 +82,7 @@ config 파일에 npm 패키지를 지정합니다.
 }
 ```
 
-opencode는 시작 시 `bun install`을 실행하여 이를 설치합니다. 이후 플러그인 및 도구에서 가져올 수 있습니다.
+opencode電?鞁滌瀾 鞁?`bun install`鞚?鞁ろ枆頃橃棳 鞚措ゼ 靹れ箻頃╇媹雼? 鞚错泟 頂岆煬攴胳澑 氚?霃勱惮鞐愳劀 臧€鞝胳槵 靾?鞛堨姷雼堧嫟.
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -100,7 +100,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### 기본 구조
+### 旮半掣 甑“
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -112,22 +112,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-플러그인 함수가 받는 인자:
+頂岆煬攴胳澑 頃垬臧€ 氚涬姅 鞚胳瀽:
 
-- `project`: 현재 프로젝트 정보.
-- `directory`: 현재 작업 디렉토리.
-- `worktree`: git worktree 경로.
-- `client`: AI와 상호 작용을 위한 opencode SDK 클라이언트.
-- `$`: 명령어를 실행하기 위한 Bun의 [shell API](https://bun.com/docs/runtime/shell).
+- `project`: 順勳灛 頂勲鞝濏姼 鞝曤炒.
+- `directory`: 順勳灛 鞛戩梾 霐旊爥韱犽Μ.
+- `worktree`: git worktree 瓴诫.
+- `client`: AI鞕€ 靸來樃 鞛戩毄鞚?鞙勴暅 opencode SDK 韥措澕鞚挫柛韸?
+- `$`: 氇呺牴鞏措ゼ 鞁ろ枆頃橁赴 鞙勴暅 Bun鞚?[shell API](https://bun.com/docs/runtime/shell).
 
 ---
 
-### TypeScript 지원
+### TypeScript 歆€鞗?
 
-TypeScript 플러그인의 경우 플러그인 패키지에서 타입을 가져올 수 있습니다.
+TypeScript 頂岆煬攴胳澑鞚?瓴届毎 頂岆煬攴胳澑 韺偆歆€鞐愳劀 韮€鞛呾潉 臧€鞝胳槵 靾?鞛堨姷雼堧嫟.
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -138,45 +138,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### 이벤트
+### 鞚措菠韸?
 
-플러그인은 아래 예제 섹션에서 볼 수 있듯이 이벤트를 구독할 수 있습니다. 사용 가능한 이벤트 목록은 다음과 같습니다.
+頂岆煬攴胳澑鞚€ 鞎勲灅 鞓堨牅 靹轨厴鞐愳劀 氤?靾?鞛堧摨鞚?鞚措菠韸鸽ゼ 甑弲頃?靾?鞛堨姷雼堧嫟. 靷毄 臧€電ロ暅 鞚措菠韸?氇╇鞚€ 雼れ潓瓿?臧欖姷雼堧嫟.
 
-#### 명령어 이벤트
+#### 氇呺牴鞏?鞚措菠韸?
 
 - `command.executed`
 
-#### 파일 이벤트
+#### 韺岇澕 鞚措菠韸?
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### 설치 이벤트
+#### 靹れ箻 鞚措菠韸?
 
 - `installation.updated`
 
-#### LSP 이벤트
+#### LSP 鞚措菠韸?
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### 메시지 이벤트
+#### 氅旍嫓歆€ 鞚措菠韸?
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### 권한 이벤트
+#### 甓岉暅 鞚措菠韸?
 
 - `permission.asked`
 - `permission.replied`
 
-#### 서버 이벤트
+#### 靹滊矂 鞚措菠韸?
 
 - `server.connected`
 
-#### 세션 이벤트
+#### 靹胳厴 鞚措菠韸?
 
 - `session.created`
 - `session.compacted`
@@ -187,20 +187,20 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 - `session.status`
 - `session.updated`
 
-#### Todo 이벤트
+#### Todo 鞚措菠韸?
 
 - `todo.updated`
 
-#### 셸 이벤트
+#### 靺?鞚措菠韸?
 
 - `shell.env`
 
-#### 도구 이벤트
+#### 霃勱惮 鞚措菠韸?
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUI 이벤트
+#### TUI 鞚措菠韸?
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -208,15 +208,15 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-## 예제
+## 鞓堨牅
 
-opencode를 확장하기 위해 사용할 수 있는 플러그인 예제입니다.
+opencode毳?頇曥灔頃橁赴 鞙勴暣 靷毄頃?靾?鞛堧姅 頂岆煬攴胳澑 鞓堨牅鞛呺媹雼?
 
 ---
 
-### 알림 보내기
+### 鞎岆 氤措偞旮?
 
-특정 이벤트가 발생할 때 알림을 전송:
+韸轨爼 鞚措菠韸戈皜 氚滌儩頃?霑?鞎岆鞚?鞝勳啞:
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -231,17 +231,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-macOS에서 AppleScript를 실행하기 위해 `osascript`를 사용하고 있습니다. 여기서는 알림을 보내는 데 사용합니다.
+macOS鞐愳劀 AppleScript毳?鞁ろ枆頃橁赴 鞙勴暣 `osascript`毳?靷毄頃橁碃 鞛堨姷雼堧嫟. 鞐赴靹滊姅 鞎岆鞚?氤措偞電?雿?靷毄頃╇媹雼?
 
 :::note
-opencode 데스크톱 앱을 사용하는 경우 응답이 준비되어 있거나 세션 오류가 있을 때 시스템 알림을 자동으로 보낼 수 있습니다.
+opencode 雿办姢韥啽 鞎膘潉 靷毄頃橂姅 瓴届毎 鞚戨嫷鞚?欷€牍勲悩鞏?鞛堦卑雮?靹胳厴 鞓る臧€ 鞛堨潉 霑?鞁滌姢韰?鞎岆鞚?鞛愲彊鞙茧 氤措偧 靾?鞛堨姷雼堧嫟.
 :::
 
 ---
 
-### .env 보호
+### .env 氤错樃
 
-opencode가 `.env` 파일을 읽지 못하도록 방지:
+opencode臧€ `.env` 韺岇澕鞚?鞚届 氇豁晿霃勲 氚╈:
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -257,9 +257,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### Inject 환경 변수
+### Inject 頇橁步 氤€靾?
 
-모든 shell 실행(AI 도구 및 사용자 terminal)에 환경 변수 주입:
+氇摖 shell 鞁ろ枆(AI 霃勱惮 氚?靷毄鞛?terminal)鞐?頇橁步 氤€靾?欤检瀰:
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -274,12 +274,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### 사용자 정의 도구
+### 靷毄鞛?鞝曥潣 霃勱惮
 
-플러그인은 opencode에 사용자 정의 도구를 추가할 수 있습니다:
+頂岆煬攴胳澑鞚€ opencode鞐?靷毄鞛?鞝曥潣 霃勱惮毳?於旉皜頃?靾?鞛堨姷雼堧嫟:
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -299,23 +299,23 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-`tool` helper는 opencode가 호출할 수 있는 사용자 정의 도구를 만듭니다. Zod 스키마 함수를 받고 다음을 포함하는 도구 정의를 반환합니다:
+`tool` helper電?opencode臧€ 順胳稖頃?靾?鞛堧姅 靷毄鞛?鞝曥潣 霃勱惮毳?毵岆摥雼堧嫟. Zod 鞀ろ偆毵?頃垬毳?氚涥碃 雼れ潓鞚?韽暔頃橂姅 霃勱惮 鞝曥潣毳?氚橅櫂頃╇媹雼?
 
-- `description`: 도구가 하는 일
-- `args`: 도구의 인수에 대한 Zod 스키마
-- `execute`: 도구가 호출될 때 실행되는 함수
+- `description`: 霃勱惮臧€ 頃橂姅 鞚?
+- `args`: 霃勱惮鞚?鞚胳垬鞐?雽€頃?Zod 鞀ろ偆毵?
+- `execute`: 霃勱惮臧€ 順胳稖霅?霑?鞁ろ枆霅橂姅 頃垬
 
-사용자 정의 도구는 내장 도구와 함께 opencode에서 사용할 수 있습니다.
+靷毄鞛?鞝曥潣 霃勱惮電?雮挫灔 霃勱惮鞕€ 頃粯 opencode鞐愳劀 靷毄頃?靾?鞛堨姷雼堧嫟.
 
 :::note
-플러그인 도구가 내장 도구와 같은 이름을 사용하면 플러그인 도구가 우선순위를 갖습니다.
+頂岆煬攴胳澑 霃勱惮臧€ 雮挫灔 霃勱惮鞕€ 臧欖潃 鞚措鞚?靷毄頃橂┐ 頂岆煬攴胳澑 霃勱惮臧€ 鞖办劆靾滌渼毳?臧栰姷雼堧嫟.
 :::
 
 ---
 
-### 로깅
+### 搿滉箙
 
-구조화된 로깅을 위해 `console.log` 대신 `client.app.log()`를 사용하십시오:
+甑“頇旊悳 搿滉箙鞚?鞙勴暣 `console.log` 雽€鞁?`client.app.log()`毳?靷毄頃橃嫮鞁滌槫:
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -330,16 +330,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-레벨: `debug`, `info`, `warn`, `error`. [SDK 문서](https://opencode.ai/docs/sdk)를 참고하세요.
+霠堧波: `debug`, `info`, `warn`, `error`. [SDK 氍胳劀](https://github.com/Yecyi/OpenAGt/docs/sdk)毳?彀戈碃頃橃劯鞖?
 
 ---
 
-### Compaction 훅
+### Compaction 頉?
 
-세션이 압축될 때 포함되는 컨텍스트를 사용자 지정할 수 있습니다:
+靹胳厴鞚?鞎曥稌霅?霑?韽暔霅橂姅 旎厤鞀ろ姼毳?靷毄鞛?歆€鞝曧暊 靾?鞛堨姷雼堧嫟:
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -358,12 +358,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` 훅은 LLM이 연속 요약을 생성하기 전에 실행됩니다. 기본 압축 프롬프트가 놓칠 수 있는 도메인별 컨텍스트를 주입하는 데 사용하세요.
+`experimental.session.compacting` 頉呾潃 LLM鞚?鞐办啀 鞖旍暯鞚?靸濎劚頃橁赴 鞝勳棎 鞁ろ枆霅╇媹雼? 旮半掣 鞎曥稌 頂勲‖頂勴姼臧€ 雴撿範 靾?鞛堧姅 霃勲鞚鸽硠 旎厤鞀ろ姼毳?欤检瀰頃橂姅 雿?靷毄頃橃劯鞖?
 
-또한 `output.prompt`를 설정하여 압축 프롬프트를 완전히 대체할 수도 있습니다:
+霕愴暅 `output.prompt`毳?靹れ爼頃橃棳 鞎曥稌 頂勲‖頂勴姼毳?鞕勳爠頌?雽€觳错暊 靾橂弰 鞛堨姷雼堧嫟:
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -385,4 +385,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-`output.prompt`가 설정되면 기본 압축 프롬프트를 완전히 대체합니다. 이 경우 `output.context` 배열은 무시됩니다.
+`output.prompt`臧€ 靹れ爼霅橂┐ 旮半掣 鞎曥稌 頂勲‖頂勴姼毳?鞕勳爠頌?雽€觳错暕雼堧嫟. 鞚?瓴届毎 `output.context` 氚办棿鞚€ 氍挫嫓霅╇媹雼?

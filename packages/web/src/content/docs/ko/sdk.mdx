@@ -1,58 +1,58 @@
 ---
 title: SDK
-description: opencode 서버를 위한 타입 안전한 JS 클라이언트.
+description: opencode 靹滊矂毳?鞙勴暅 韮€鞛?鞎堨爠頃?JS 韥措澕鞚挫柛韸?
 ---
 
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-opencode JS/TS SDK는 서버와 상호 작용을 위한 유형 안전한 클라이언트를 제공합니다.
-통합 및 제어 opencode programmatically를 구축하는 데 사용됩니다.
+opencode JS/TS SDK電?靹滊矂鞕€ 靸來樃 鞛戩毄鞚?鞙勴暅 鞙犿槙 鞎堨爠頃?韥措澕鞚挫柛韸鸽ゼ 鞝滉车頃╇媹雼?
+韱淀暕 氚?鞝滌柎 opencode programmatically毳?甑稌頃橂姅 雿?靷毄霅╇媹雼?
 
-[Learn more](/docs/server) 서버가 어떻게 작동하나요? 예를 들어, 커뮤니티에 의해 구축 된 [projects](/docs/ecosystem#projects)를 확인하십시오.
+[Learn more](/docs/server) 靹滊矂臧€ 鞏措柣瓴?鞛戨彊頃橂倶鞖? 鞓堧ゼ 霌れ柎, 旎る雼堩嫲鞐?鞚橅暣 甑稌 霅?[projects](/docs/ecosystem#projects)毳?頇曥澑頃橃嫮鞁滌槫.
 
 ---
 
-## 설치
+## 靹れ箻
 
-npm에서 SDK 설치:
+npm鞐愳劀 SDK 靹れ箻:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
 
-## 클라이언트 만들기
+## 韥措澕鞚挫柛韸?毵岆摛旮?
 
-opencode의 인스턴스 만들기:
+opencode鞚?鞚胳姢韯挫姢 毵岆摛旮?
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
 
-서버와 클라이언트 모두 시작
+靹滊矂鞕€ 韥措澕鞚挫柛韸?氇憪 鞁滌瀾
 
-#### 옵션
+#### 鞓奠厴
 
-| 옵션       | 유형          | 설명                    | 기본        |
+| 鞓奠厴       | 鞙犿槙          | 靹る獏                    | 旮半掣        |
 | ---------- | ------------- | ----------------------- | ----------- |
-| `hostname` | `string`      | 서버 호스트명           | `127.0.0.1` |
-| `port`     | `number`      | 서버포트                | `4096`      |
-| `signal`   | `AbortSignal` | 취소 신호               | `undefined` |
-| `timeout`  | `number`      | 서버 시작시의 시간 아웃 | `5000`      |
-| `config`   | `Config`      | 구성 객체               | `{}`        |
+| `hostname` | `string`      | 靹滊矂 順胳姢韸鸽獏           | `127.0.0.1` |
+| `port`     | `number`      | 靹滊矂韽姼                | `4096`      |
+| `signal`   | `AbortSignal` | 旆唽 鞁犿樃               | `undefined` |
+| `timeout`  | `number`      | 靹滊矂 鞁滌瀾鞁滌潣 鞁滉皠 鞎勳泝 | `5000`      |
+| `config`   | `Config`      | 甑劚 臧濎泊               | `{}`        |
 
 ---
 
-## 구성
+## 甑劚
 
-구성 객체를 전달할 수 있습니다. 인스턴스는 여전히 `opencode.json`를 선택하지만 구성 인라인을 추가 할 수 있습니다.
+甑劚 臧濎泊毳?鞝勲嫭頃?靾?鞛堨姷雼堧嫟. 鞚胳姢韯挫姢電?鞐爠頌?`opencode.json`毳?靹犿儩頃橃毵?甑劚 鞚鸽澕鞚胳潉 於旉皜 頃?靾?鞛堨姷雼堧嫟.
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -67,45 +67,45 @@ console.log(`Server running at ${opencode.server.url}`)
 opencode.server.close()
 ```
 
-## 클라이언트만
+## 韥措澕鞚挫柛韸鸽
 
-opencode의 실행 인스턴스가 이미 있다면 클라이언트 인스턴스를 만들 수 있습니다.
+opencode鞚?鞁ろ枆 鞚胳姢韯挫姢臧€ 鞚措 鞛堧嫟氅?韥措澕鞚挫柛韸?鞚胳姢韯挫姢毳?毵岆摛 靾?鞛堨姷雼堧嫟.
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
 })
 ```
 
-#### 옵션
+#### 鞓奠厴
 
-| 옵션            | 유형       | 설명                              | 기본                    |
+| 鞓奠厴            | 鞙犿槙       | 靹る獏                              | 旮半掣                    |
 | --------------- | ---------- | --------------------------------- | ----------------------- |
-| `baseUrl`       | `string`   | 서버의 URL                        | `http://localhost:4096` |
-| `fetch`         | `function` | 사용자 정의 fetch 구현            | `globalThis.fetch`      |
-| `parseAs`       | `string`   | 응답 파싱 방법                    | `auto`                  |
-| `responseStyle` | `string`   | 반품 스타일: `data` 또는 `fields` | `fields`                |
-| `throwOnError`  | `boolean`  | 반품 시 오류                      | `false`                 |
+| `baseUrl`       | `string`   | 靹滊矂鞚?URL                        | `http://localhost:4096` |
+| `fetch`         | `function` | 靷毄鞛?鞝曥潣 fetch 甑槃            | `globalThis.fetch`      |
+| `parseAs`       | `string`   | 鞚戨嫷 韺岇嫳 氚╇矔                    | `auto`                  |
+| `responseStyle` | `string`   | 氚橅拡 鞀ろ儉鞚? `data` 霕愲姅 `fields` | `fields`                |
+| `throwOnError`  | `boolean`  | 氚橅拡 鞁?鞓る                      | `false`                 |
 
 ---
 
-## 타입
+## 韮€鞛?
 
-SDK에는 모든 API 유형의 TypeScript 정의가 포함되어 있습니다. 직접 가져 오기 :
+SDK鞐愲姅 氇摖 API 鞙犿槙鞚?TypeScript 鞝曥潣臧€ 韽暔霅橃柎 鞛堨姷雼堧嫟. 歆侅爲 臧€鞝?鞓り赴 :
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-모든 유형은 서버의 OpenAPI 사양에서 생성되며 <a href={typesUrl}>types 파일</a>에서 사용할 수 있습니다.
+氇摖 鞙犿槙鞚€ 靹滊矂鞚?OpenAPI 靷枒鞐愳劀 靸濎劚霅橂┌ <a href={typesUrl}>types 韺岇澕</a>鞐愳劀 靷毄頃?靾?鞛堨姷雼堧嫟.
 
 ---
 
-## 오류
+## 鞓る
 
-SDK는 잡을 수 있는 오류를 던질 수 있습니다:
+SDK電?鞛§潉 靾?鞛堧姅 鞓る毳?雿橃 靾?鞛堨姷雼堧嫟:
 
 ```typescript
 try {
@@ -117,11 +117,11 @@ try {
 
 ---
 
-## 구조화된 출력
+## 甑“頇旊悳 於滊牓
 
-JSON 스키마와 함께 `format`을 지정하여 모델에서 구조화된 JSON 출력을 요청할 수 있습니다. 모델은 `StructuredOutput` 도구를 사용하여 스키마와 일치하는 검증된 JSON을 반환합니다.
+JSON 鞀ろ偆毵堨檧 頃粯 `format`鞚?歆€鞝曧晿鞐?氇嵏鞐愳劀 甑“頇旊悳 JSON 於滊牓鞚?鞖旍箔頃?靾?鞛堨姷雼堧嫟. 氇嵏鞚€ `StructuredOutput` 霃勱惮毳?靷毄頃橃棳 鞀ろ偆毵堨檧 鞚检箻頃橂姅 瓴€歃濍悳 JSON鞚?氚橅櫂頃╇媹雼?
 
-### 기본 사용법
+### 旮半掣 靷毄氩?
 
 ```typescript
 const result = await client.session.prompt({
@@ -152,26 +152,26 @@ console.log(result.data.info.structured_output)
 // { company: "Anthropic", founded: 2021, products: ["Claude", "Claude API"] }
 ```
 
-### 출력 형식 유형
+### 於滊牓 順曥嫕 鞙犿槙
 
-| 유형          | 설명                                              |
+| 鞙犿槙          | 靹る獏                                              |
 | ------------- | ------------------------------------------------- |
-| `text`        | 기본값. 표준 텍스트 응답 (구조화된 출력 없음)     |
-| `json_schema` | 제공된 스키마와 일치하는 검증된 JSON을 반환합니다 |
+| `text`        | 旮半掣臧? 響滌 韰嶌姢韸?鞚戨嫷 (甑“頇旊悳 於滊牓 鞐嗢潓)     |
+| `json_schema` | 鞝滉车霅?鞀ろ偆毵堨檧 鞚检箻頃橂姅 瓴€歃濍悳 JSON鞚?氚橅櫂頃╇媹雼?|
 
-### JSON 스키마 형식
+### JSON 鞀ろ偆毵?順曥嫕
 
-`type: 'json_schema'`를 사용할 때 다음을 제공하십시오:
+`type: 'json_schema'`毳?靷毄頃?霑?雼れ潓鞚?鞝滉车頃橃嫮鞁滌槫:
 
-| 필드         | 유형            | 설명                                        |
+| 頃勲摐         | 鞙犿槙            | 靹る獏                                        |
 | ------------ | --------------- | ------------------------------------------- |
-| `type`       | `'json_schema'` | 필수. JSON 스키마 모드를 지정합니다         |
-| `schema`     | `object`        | 필수. 출력 구조를 정의하는 JSON 스키마 객체 |
-| `retryCount` | `number`        | 선택 사항. 검증 재시도 횟수 (기본값: 2)     |
+| `type`       | `'json_schema'` | 頃勳垬. JSON 鞀ろ偆毵?氇摐毳?歆€鞝曧暕雼堧嫟         |
+| `schema`     | `object`        | 頃勳垬. 於滊牓 甑“毳?鞝曥潣頃橂姅 JSON 鞀ろ偆毵?臧濎泊 |
+| `retryCount` | `number`        | 靹犿儩 靷暛. 瓴€歃?鞛嫓霃?須熿垬 (旮半掣臧? 2)     |
 
-### 오류 처리
+### 鞓る 觳橂Μ
 
-모델이 모든 재시도 후에도 유효한 구조화된 출력을 생성하지 못하면 응답에 `StructuredOutputError`가 포함됩니다:
+氇嵏鞚?氇摖 鞛嫓霃?頉勳棎霃?鞙犿毃頃?甑“頇旊悳 於滊牓鞚?靸濎劚頃橃 氇豁晿氅?鞚戨嫷鞐?`StructuredOutputError`臧€ 韽暔霅╇媹雼?
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -180,30 +180,30 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 }
 ```
 
-### 모범 사례
+### 氇矓 靷
 
-1. **명확한 설명 제공**: 모델이 추출할 데이터를 이해하는 데 도움이 되도록 스키마 속성에 명확한 설명을 제공하십시오.
-2. **`required` 사용**: 필수 필드를 지정하려면 `required`를 사용하십시오.
-3. **스키마를 집중적으로 유지**: 복잡한 중첩 스키마는 모델이 올바르게 채우기 더 어려울 수 있습니다.
-4. **적절한 `retryCount` 설정**: 복잡한 스키마의 경우 늘리고 단순한 스키마의 경우 줄이십시오.
+1. **氇呿檿頃?靹る獏 鞝滉车**: 氇嵏鞚?於旍稖頃?雿办澊韯半ゼ 鞚错暣頃橂姅 雿?霃勳泙鞚?霅橂弰搿?鞀ろ偆毵?靻嶌劚鞐?氇呿檿頃?靹る獏鞚?鞝滉车頃橃嫮鞁滌槫.
+2. **`required` 靷毄**: 頃勳垬 頃勲摐毳?歆€鞝曧晿霠る┐ `required`毳?靷毄頃橃嫮鞁滌槫.
+3. **鞀ろ偆毵堧ゼ 歆戩鞝侅溂搿?鞙犾**: 氤奠灐頃?欷戩博 鞀ろ偆毵堧姅 氇嵏鞚?鞓皵毳搓矊 毂勳毎旮?雿?鞏措牑鞖?靾?鞛堨姷雼堧嫟.
+4. **鞝侅爤頃?`retryCount` 靹れ爼**: 氤奠灐頃?鞀ろ偆毵堨潣 瓴届毎 電橂Μ瓿?雼垳頃?鞀ろ偆毵堨潣 瓴届毎 欷勳澊鞁嫓鞓?
 
 ---
 
 ## API
 
-SDK는 type-safe 클라이언트를 통해 모든 서버 API를 노출합니다.
+SDK電?type-safe 韥措澕鞚挫柛韸鸽ゼ 韱淀暣 氇摖 靹滊矂 API毳?雲胳稖頃╇媹雼?
 
 ---
 
-### 글로벌
+### 旮€搿滊矊
 
-| 메서드            | 설명                   | 응답                                 |
+| 氅旍劀霌?           | 靹る獏                   | 鞚戨嫷                                 |
 | ----------------- | ---------------------- | ------------------------------------ |
-| `global.health()` | 서버 건강 및 버전 확인 | `{ healthy: true, version: string }` |
+| `global.health()` | 靹滊矂 瓯搓皶 氚?氩勳爠 頇曥澑 | `{ healthy: true, version: string }` |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 const health = await client.global.health()
@@ -212,16 +212,16 @@ console.log(health.data.version)
 
 ---
 
-### 앱
+### 鞎?
 
-| 방법           | 설명                      | 응답                                        |
+| 氚╇矔           | 靹る獏                      | 鞚戨嫷                                        |
 | -------------- | ------------------------- | ------------------------------------------- |
-| `app.log()`    | 로그 항목 작성            | `boolean`                                   |
-| `app.agents()` | 이용 가능한 모든 에이전트 | <a href={typesUrl}><code>Agent[]</code></a> |
+| `app.log()`    | 搿滉犯 頃 鞛戩劚            | `boolean`                                   |
+| `app.agents()` | 鞚挫毄 臧€電ロ暅 氇摖 鞐愳澊鞝勴姼 | <a href={typesUrl}><code>Agent[]</code></a> |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Write a log entry
@@ -239,16 +239,16 @@ const agents = await client.app.agents()
 
 ---
 
-### 프로젝트
+### 頂勲鞝濏姼
 
-| 방법                | 설명                    | 응답                                          |
+| 氚╇矔                | 靹る獏                    | 鞚戨嫷                                          |
 | ------------------- | ----------------------- | --------------------------------------------- |
-| `project.list()`    | 모든 프로젝트 보기      | <a href={typesUrl}><code>Project[]</code></a> |
-| `project.current()` | 현재 프로젝트 가져 오기 | <a href={typesUrl}><code>Project</code></a>   |
+| `project.list()`    | 氇摖 頂勲鞝濏姼 氤搓赴      | <a href={typesUrl}><code>Project[]</code></a> |
+| `project.current()` | 順勳灛 頂勲鞝濏姼 臧€鞝?鞓り赴 | <a href={typesUrl}><code>Project</code></a>   |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // List all projects
@@ -260,15 +260,15 @@ const currentProject = await client.project.current()
 
 ---
 
-### 경로
+### 瓴诫
 
-| 방법         | 설명                | 응답                                     |
+| 氚╇矔         | 靹る獏                | 鞚戨嫷                                     |
 | ------------ | ------------------- | ---------------------------------------- |
-| `path.get()` | 현재 경로 가져 오기 | <a href={typesUrl}><code>Path</code></a> |
+| `path.get()` | 順勳灛 瓴诫 臧€鞝?鞓り赴 | <a href={typesUrl}><code>Path</code></a> |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Get current path information
@@ -277,16 +277,16 @@ const pathInfo = await client.path.get()
 
 ---
 
-### 구성
+### 甑劚
 
-| 방법                 | 설명                       | 응답                                                                                                  |
+| 氚╇矔                 | 靹る獏                       | 鞚戨嫷                                                                                                  |
 | -------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `config.get()`       | 구성 정보                  | <a href={typesUrl}><code>Config</code></a>                                                            |
-| `config.providers()` | 목록 제공업체 및 기본 모델 | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
+| `config.get()`       | 甑劚 鞝曤炒                  | <a href={typesUrl}><code>Config</code></a>                                                            |
+| `config.providers()` | 氇╇ 鞝滉车鞐呾泊 氚?旮半掣 氇嵏 | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 const config = await client.config.get()
@@ -296,33 +296,33 @@ const { providers, default: defaults } = await client.config.providers()
 
 ---
 
-### 세션
+### 靹胳厴
 
-| 메서드                                                     | 설명                          | 비고                                                                                                                                                                                                                               |
+| 氅旍劀霌?                                                    | 靹る獏                          | 牍勱碃                                                                                                                                                                                                                               |
 | ---------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session.list()`                                           | 세션 일람                     | <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                      |
-| `session.get({ path })`                                    | 세션 가져 오기                | <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                        |
-| `session.children({ path })`                               | 하위 세션 목록                | 반품 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `session.create({ body })`                                 | 세션 만들기                   | 리턴 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `session.delete({ path })`                                 | 세션 삭제                     | `boolean` 반품                                                                                                                                                                                                                     |
-| `session.update({ path, body })`                           | 업데이트 세션 속성            | 반품 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `session.init({ path, body })`                             | 앱 초기화 및 `AGENTS.md` 분석 | `boolean`를 반환                                                                                                                                                                                                                   |
-| `session.abort({ path })`                                  | 운영 중인 세션                | 반품 `boolean`                                                                                                                                                                                                                     |
-| `session.share({ path })`                                  | 공유 세션                     | 반품 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `session.unshare({ path })`                                | 공유 세션 취소                | 반품 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `session.summarize({ path, body })`                        | 세션 요약                     | 반품 `boolean`                                                                                                                                                                                                                     |
-| `session.messages({ path })`                               | 세션의 메시지 목록            | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part</code></a>`}[]`                                                                                                                      |
-| `session.message({ path })`                                | 메시지 상세정보               | 반품 `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                 |
-| `session.prompt({ path, body })`                           | prompt 메시지 보내기          | `body.noReply: true`는 UserMessage(컨텍스트 전용)를 반환합니다. 기본값은 AI 응답과 함께 <a href={typesUrl}><code>AssistantMessage</code></a>를 반환합니다. [구조화된 출력](#구조화된-출력)을 위한 `body.outputFormat`을 지원합니다 |
-| `session.command({ path, body })`                          | 세션으로 명령을 전송          | `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                             |
-| `session.shell({ path, body })`                            | shell 명령을 실행             | <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                               |
-| `session.revert({ path, body })`                           | 메시지 다시 변환              | <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                        |
-| `session.unrevert({ path })`                               | 메시지 되돌리기 취소          | 반품 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
-| `postSessionByIdPermissionsByPermissionId({ path, body })` | 허가 요청 대응                | 반품 `boolean`                                                                                                                                                                                                                     |
+| `session.list()`                                           | 靹胳厴 鞚茧瀸                     | <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                      |
+| `session.get({ path })`                                    | 靹胳厴 臧€鞝?鞓り赴                | <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                        |
+| `session.children({ path })`                               | 頃橃渼 靹胳厴 氇╇                | 氚橅拡 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `session.create({ body })`                                 | 靹胳厴 毵岆摛旮?                  | 毽劥 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `session.delete({ path })`                                 | 靹胳厴 靷牅                     | `boolean` 氚橅拡                                                                                                                                                                                                                     |
+| `session.update({ path, body })`                           | 鞐呺嵃鞚错姼 靹胳厴 靻嶌劚            | 氚橅拡 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `session.init({ path, body })`                             | 鞎?齑堦赴頇?氚?`AGENTS.md` 攵勳劃 | `boolean`毳?氚橅櫂                                                                                                                                                                                                                   |
+| `session.abort({ path })`                                  | 鞖挫榿 欷戩澑 靹胳厴                | 氚橅拡 `boolean`                                                                                                                                                                                                                     |
+| `session.share({ path })`                                  | 瓿奠湢 靹胳厴                     | 氚橅拡 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `session.unshare({ path })`                                | 瓿奠湢 靹胳厴 旆唽                | 氚橅拡 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `session.summarize({ path, body })`                        | 靹胳厴 鞖旍暯                     | 氚橅拡 `boolean`                                                                                                                                                                                                                     |
+| `session.messages({ path })`                               | 靹胳厴鞚?氅旍嫓歆€ 氇╇            | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part</code></a>`}[]`                                                                                                                      |
+| `session.message({ path })`                                | 氅旍嫓歆€ 靸侅劯鞝曤炒               | 氚橅拡 `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                 |
+| `session.prompt({ path, body })`                           | prompt 氅旍嫓歆€ 氤措偞旮?         | `body.noReply: true`電?UserMessage(旎厤鞀ろ姼 鞝勳毄)毳?氚橅櫂頃╇媹雼? 旮半掣臧掛潃 AI 鞚戨嫷瓿?頃粯 <a href={typesUrl}><code>AssistantMessage</code></a>毳?氚橅櫂頃╇媹雼? [甑“頇旊悳 於滊牓](#甑“頇旊悳-於滊牓)鞚?鞙勴暅 `body.outputFormat`鞚?歆€鞗愴暕雼堧嫟 |
+| `session.command({ path, body })`                          | 靹胳厴鞙茧 氇呺牴鞚?鞝勳啞          | `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                             |
+| `session.shell({ path, body })`                            | shell 氇呺牴鞚?鞁ろ枆             | <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                               |
+| `session.revert({ path, body })`                           | 氅旍嫓歆€ 雼れ嫓 氤€頇?             | <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                        |
+| `session.unrevert({ path })`                               | 氅旍嫓歆€ 霅橂弻毽赴 旆唽          | 氚橅拡 <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                   |
+| `postSessionByIdPermissionsByPermissionId({ path, body })` | 項堦皜 鞖旍箔 雽€鞚?               | 氚橅拡 `boolean`                                                                                                                                                                                                                     |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Create and manage sessions
@@ -353,25 +353,25 @@ await client.session.prompt({
 
 ---
 
-### 파일
+### 韺岇澕
 
-| 방법                      | 설명                         | 응답                                                                                   |
+| 氚╇矔                      | 靹る獏                         | 鞚戨嫷                                                                                   |
 | ------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
-| `find.text({ query })`    | 파일에서 텍스트 검색         | `path`, `lines`, `line_number`, `absolute_offset`, `submatches`와 일치하는 개체의 배열 |
-| `find.files({ query })`   | 이름의 파일 및 디렉토리 찾기 | `string[]` (경로)                                                                      |
-| `find.symbols({ query })` | 작업 공간 심볼 찾기          | <a href={typesUrl}><code>Symbol[]</code></a>                                           |
-| `file.read({ query })`    | 파일 보기                    | `{ type: "raw" \| "patch", content: string }`                                          |
-| `file.status({ query? })` | 트랙 된 파일 상태를 확인     | <a href={typesUrl}><code>File[]</code></a>                                             |
+| `find.text({ query })`    | 韺岇澕鞐愳劀 韰嶌姢韸?瓴€靸?        | `path`, `lines`, `line_number`, `absolute_offset`, `submatches`鞕€ 鞚检箻頃橂姅 臧滌泊鞚?氚办棿 |
+| `find.files({ query })`   | 鞚措鞚?韺岇澕 氚?霐旊爥韱犽Μ 彀娟赴 | `string[]` (瓴诫)                                                                      |
+| `find.symbols({ query })` | 鞛戩梾 瓿店皠 鞁臣 彀娟赴          | <a href={typesUrl}><code>Symbol[]</code></a>                                           |
+| `file.read({ query })`    | 韺岇澕 氤搓赴                    | `{ type: "raw" \| "patch", content: string }`                                          |
+| `file.status({ query? })` | 韸鸽灆 霅?韺岇澕 靸來儨毳?頇曥澑     | <a href={typesUrl}><code>File[]</code></a>                                             |
 
-`find.files`는 몇몇 선택적인 조회 분야를 지원합니다:
+`find.files`電?氇囯獓 靹犿儩鞝侅澑 臁绊殞 攵勳暭毳?歆€鞗愴暕雼堧嫟:
 
-- `type`: `"file"` 또는 `"directory"`
-- `directory`: 검색에 대한 프로젝트 루트를 override
-- `limit`: 최대 결과 (1-200)
+- `type`: `"file"` 霕愲姅 `"directory"`
+- `directory`: 瓴€靸夓棎 雽€頃?頂勲鞝濏姼 耄姼毳?override
+- `limit`: 斓滊寑 瓴瓣臣 (1-200)
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Search and read files
@@ -396,21 +396,21 @@ const content = await client.file.read({
 
 ### TUI
 
-| 방법                           | 설명                     | 응답      |
+| 氚╇矔                           | 靹る獏                     | 鞚戨嫷      |
 | ------------------------------ | ------------------------ | --------- |
-| `tui.appendPrompt({ body })`   | 프롬프트에 텍스트를 부여 | `boolean` |
-| `tui.openHelp()`               | 도움말 열기              | `boolean` |
-| `tui.openSessions()`           | 세션 선택 안내           | `boolean` |
-| `tui.openThemes()`             | 테마 선택 열기           | `boolean` |
-| `tui.openModels()`             | 모델 선택 안내           | `boolean` |
-| `tui.submitPrompt()`           | 현재 프롬프트 제출       | `boolean` |
-| `tui.clearPrompt()`            | 프롬프트 클리어          | `boolean` |
-| `tui.executeCommand({ body })` | 명령어 실행              | `boolean` |
-| `tui.showToast({ body })`      | 토스트 알림 표시         | `boolean` |
+| `tui.appendPrompt({ body })`   | 頂勲‖頂勴姼鞐?韰嶌姢韸鸽ゼ 攵€鞐?| `boolean` |
+| `tui.openHelp()`               | 霃勳泙毵?鞐搓赴              | `boolean` |
+| `tui.openSessions()`           | 靹胳厴 靹犿儩 鞎堧偞           | `boolean` |
+| `tui.openThemes()`             | 韰岆 靹犿儩 鞐搓赴           | `boolean` |
+| `tui.openModels()`             | 氇嵏 靹犿儩 鞎堧偞           | `boolean` |
+| `tui.submitPrompt()`           | 順勳灛 頂勲‖頂勴姼 鞝滌稖       | `boolean` |
+| `tui.clearPrompt()`            | 頂勲‖頂勴姼 韥措Μ鞏?         | `boolean` |
+| `tui.executeCommand({ body })` | 氇呺牴鞏?鞁ろ枆              | `boolean` |
+| `tui.showToast({ body })`      | 韱犾姢韸?鞎岆 響滌嫓         | `boolean` |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Control TUI interface
@@ -425,15 +425,15 @@ await client.tui.showToast({
 
 ---
 
-### 인증
+### 鞚胳
 
-| 방법                | 설명           | 응답      |
+| 氚╇矔                | 靹る獏           | 鞚戨嫷      |
 | ------------------- | -------------- | --------- |
-| `auth.set({ ... })` | 인증 자격 증명 | `boolean` |
+| `auth.set({ ... })` | 鞚胳 鞛愱博 歃濍獏 | `boolean` |
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 await client.auth.set({
@@ -444,15 +444,15 @@ await client.auth.set({
 
 ---
 
-### 이벤트
+### 鞚措菠韸?
 
-| 방법                | 설명                    | 응답                    |
+| 氚╇矔                | 靹る獏                    | 鞚戨嫷                    |
 | ------------------- | ----------------------- | ----------------------- |
-| `event.subscribe()` | 서버-sent 이벤트 스트림 | 서버-sent 이벤트 스트림 |
+| `event.subscribe()` | 靹滊矂-sent 鞚措菠韸?鞀ろ姼毽?| 靹滊矂-sent 鞚措菠韸?鞀ろ姼毽?|
 
 ---
 
-#### 예제
+#### 鞓堨牅
 
 ```javascript
 // Listen to real-time events

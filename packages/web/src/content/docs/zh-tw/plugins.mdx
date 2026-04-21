@@ -1,78 +1,78 @@
 ---
-title: 外掛
-description: 編寫自己的外掛來擴展 OpenCode。
+title: 澶栨帥
+description: 绶ㄥ鑷繁鐨勫鎺涗締鎿村睍 OpenAGt銆?
 ---
 
-外掛允許您透過掛鉤各種事件和自訂行為來擴展 OpenCode。您可以建立外掛來新增新功能、整合外部服務，或修改 OpenCode 的預設行為。
+澶栨帥鍏佽ū鎮ㄩ€忛亷鎺涢墹鍚勭ó浜嬩欢鍜岃嚜瑷傝鐐轰締鎿村睍 OpenAGt銆傛偍鍙互寤虹珛澶栨帥渚嗘柊澧炴柊鍔熻兘銆佹暣鍚堝閮ㄦ湇鍕欙紝鎴栦慨鏀?OpenAGt 鐨勯爯瑷鐐恒€?
 
-如需了解範例，請查看社群建立的[外掛](/docs/ecosystem#plugins)。
-
----
-
-## 使用外掛
-
-有兩種方式載入外掛。
+濡傞渶浜嗚В绡勪緥锛岃珛鏌ョ湅绀剧兢寤虹珛鐨刐澶栨帥](/docs/ecosystem#plugins)銆?
 
 ---
 
-### 從本地檔案載入
+## 浣跨敤澶栨帥
 
-將 JavaScript 或 TypeScript 檔案放置在外掛目錄中。
-
-- `.opencode/plugins/` - 專案級外掛
-- `~/.config/opencode/plugins/` - 全域外掛
-
-這些目錄中的檔案會在啟動時自動載入。
+鏈夊叐绋柟寮忚級鍏ュ鎺涖€?
 
 ---
 
-### 從 npm 載入
+### 寰炴湰鍦版獢妗堣級鍏?
 
-在設定檔中指定 npm 套件。
+灏?JavaScript 鎴?TypeScript 妾旀鏀剧疆鍦ㄥ鎺涚洰閷勪腑銆?
+
+- `.opencode/plugins/` - 灏堟绱氬鎺?
+- `~/.config/opencode/plugins/` - 鍏ㄥ煙澶栨帥
+
+閫欎簺鐩寗涓殑妾旀鏈冨湪鍟熷嫊鏅傝嚜鍕曡級鍏ャ€?
+
+---
+
+### 寰?npm 杓夊叆
+
+鍦ㄨō瀹氭獢涓寚瀹?npm 濂椾欢銆?
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-支援常規和帶作用域的 npm 套件。
+鏀彺甯歌鍜屽付浣滅敤鍩熺殑 npm 濂椾欢銆?
 
-瀏覽[生態系統](/docs/ecosystem#plugins)中的可用外掛。
-
----
-
-### 外掛的安裝方式
-
-**npm 外掛**在啟動時使用 Bun 自動安裝。套件及其相依套件會快取在 `~/.cache/opencode/node_modules/` 中。
-
-**本地外掛**直接從外掛目錄載入。如果需要使用外部套件，您必須在設定目錄中建立 `package.json`（參見[相依套件](#dependencies)），或者將外掛發布到 npm 並[將其新增到設定中](/docs/config#plugins)。
+鐎忚[鐢熸厠绯荤当](/docs/ecosystem#plugins)涓殑鍙敤澶栨帥銆?
 
 ---
 
-### 載入順序
+### 澶栨帥鐨勫畨瑁濇柟寮?
 
-外掛從所有來源載入，所有鉤子按順序執行。載入順序為：
+**npm 澶栨帥**鍦ㄥ暉鍕曟檪浣跨敤 Bun 鑷嫊瀹夎銆傚浠跺強鍏剁浉渚濆浠舵渻蹇彇鍦?`~/.cache/opencode/node_modules/` 涓€?
 
-1. 全域設定 (`~/.config/opencode/opencode.json`)
-2. 專案設定 (`opencode.json`)
-3. 全域外掛目錄 (`~/.config/opencode/plugins/`)
-4. 專案外掛目錄 (`.opencode/plugins/`)
-
-名稱和版本相同的重複 npm 套件只會載入一次。但本地外掛和名稱相似的 npm 外掛會分別獨立載入。
+**鏈湴澶栨帥**鐩存帴寰炲鎺涚洰閷勮級鍏ャ€傚鏋滈渶瑕佷娇鐢ㄥ閮ㄥ浠讹紝鎮ㄥ繀闋堝湪瑷畾鐩寗涓缓绔?`package.json`锛堝弮瑕媅鐩镐緷濂椾欢](#dependencies)锛夛紝鎴栬€呭皣澶栨帥鐧煎竷鍒?npm 涓灏囧叾鏂板鍒拌ō瀹氫腑](/docs/config#plugins)銆?
 
 ---
 
-## 建立外掛
+### 杓夊叆闋嗗簭
 
-外掛是一個 **JavaScript/TypeScript 模組**，它匯出一個或多個外掛函式。每個函式接收一個上下文物件，並回傳一個鉤子物件。
+澶栨帥寰炴墍鏈変締婧愯級鍏ワ紝鎵€鏈夐墹瀛愭寜闋嗗簭鍩疯銆傝級鍏ラ爢搴忕偤锛?
+
+1. 鍏ㄥ煙瑷畾 (`~/.config/opencode/opencode.json`)
+2. 灏堟瑷畾 (`opencode.json`)
+3. 鍏ㄥ煙澶栨帥鐩寗 (`~/.config/opencode/plugins/`)
+4. 灏堟澶栨帥鐩寗 (`.opencode/plugins/`)
+
+鍚嶇ū鍜岀増鏈浉鍚岀殑閲嶈 npm 濂椾欢鍙渻杓夊叆涓€娆°€備絾鏈湴澶栨帥鍜屽悕绋辩浉浼肩殑 npm 澶栨帥鏈冨垎鍒ョ崹绔嬭級鍏ャ€?
 
 ---
 
-### 相依套件
+## 寤虹珛澶栨帥
 
-本地外掛和自訂工具可以使用外部 npm 套件。在設定目錄中新增一個 `package.json`，列出所需的相依套件。
+澶栨帥鏄竴鍊?**JavaScript/TypeScript 妯＄祫**锛屽畠鍖嚭涓€鍊嬫垨澶氬€嬪鎺涘嚱寮忋€傛瘡鍊嬪嚱寮忔帴鏀朵竴鍊嬩笂涓嬫枃鐗╀欢锛屼甫鍥炲偝涓€鍊嬮墹瀛愮墿浠躲€?
+
+---
+
+### 鐩镐緷濂椾欢
+
+鏈湴澶栨帥鍜岃嚜瑷傚伐鍏峰彲浠ヤ娇鐢ㄥ閮?npm 濂椾欢銆傚湪瑷畾鐩寗涓柊澧炰竴鍊?`package.json`锛屽垪鍑烘墍闇€鐨勭浉渚濆浠躲€?
 
 ```json title=".opencode/package.json"
 {
@@ -82,7 +82,7 @@ description: 編寫自己的外掛來擴展 OpenCode。
 }
 ```
 
-OpenCode 會在啟動時執行 `bun install` 來安裝這些相依套件。之後您的外掛和工具就可以匯入它們了。
+OpenAGt 鏈冨湪鍟熷嫊鏅傚煼琛?`bun install` 渚嗗畨瑁濋€欎簺鐩镐緷濂椾欢銆備箣寰屾偍鐨勫鎺涘拰宸ュ叿灏卞彲浠ュ尟鍏ュ畠鍊戜簡銆?
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -100,7 +100,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### 基本結構
+### 鍩烘湰绲愭
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -112,22 +112,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-外掛函式接收以下參數：
+澶栨帥鍑藉紡鎺ユ敹浠ヤ笅鍙冩暩锛?
 
-- `project`：當前專案資訊。
-- `directory`：當前工作目錄。
-- `worktree`：git 工作樹路徑。
-- `client`：用於與 AI 互動的 OpenCode SDK 用戶端。
-- `$`：Bun 的 [Shell API](https://bun.com/docs/runtime/shell)，用於執行指令。
+- `project`锛氱暥鍓嶅皥妗堣硣瑷娿€?
+- `directory`锛氱暥鍓嶅伐浣滅洰閷勩€?
+- `worktree`锛歡it 宸ヤ綔妯硅矾寰戙€?
+- `client`锛氱敤鏂艰垏 AI 浜掑嫊鐨?OpenAGt SDK 鐢ㄦ埗绔€?
+- `$`锛欱un 鐨?[Shell API](https://bun.com/docs/runtime/shell)锛岀敤鏂煎煼琛屾寚浠ゃ€?
 
 ---
 
-### TypeScript 支援
+### TypeScript 鏀彺
 
-對於 TypeScript 外掛，您可以從外掛套件中匯入類型：
+灏嶆柤 TypeScript 澶栨帥锛屾偍鍙互寰炲鎺涘浠朵腑鍖叆椤炲瀷锛?
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -138,45 +138,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### 事件
+### 浜嬩欢
 
-外掛可以訂閱事件，如下方範例部分所示。以下是所有可用事件的列表。
+澶栨帥鍙互瑷傞柋浜嬩欢锛屽涓嬫柟绡勪緥閮ㄥ垎鎵€绀恒€備互涓嬫槸鎵€鏈夊彲鐢ㄤ簨浠剁殑鍒楄〃銆?
 
-#### 指令事件
+#### 鎸囦护浜嬩欢
 
 - `command.executed`
 
-#### 檔案事件
+#### 妾旀浜嬩欢
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### 安裝事件
+#### 瀹夎浜嬩欢
 
 - `installation.updated`
 
-#### LSP 事件
+#### LSP 浜嬩欢
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### 訊息事件
+#### 瑷婃伅浜嬩欢
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### 權限事件
+#### 娆婇檺浜嬩欢
 
 - `permission.asked`
 - `permission.replied`
 
-#### 伺服器事件
+#### 浼烘湇鍣ㄤ簨浠?
 
 - `server.connected`
 
-#### 工作階段事件
+#### 宸ヤ綔闅庢浜嬩欢
 
 - `session.created`
 - `session.compacted`
@@ -187,20 +187,20 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 - `session.status`
 - `session.updated`
 
-#### 待辦事項事件
+#### 寰呰睛浜嬮爡浜嬩欢
 
 - `todo.updated`
 
-#### Shell 事件
+#### Shell 浜嬩欢
 
 - `shell.env`
 
-#### 工具事件
+#### 宸ュ叿浜嬩欢
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUI 事件
+#### TUI 浜嬩欢
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -208,15 +208,15 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-## 範例
+## 绡勪緥
 
-以下是一些可用於擴展 OpenCode 的外掛範例。
+浠ヤ笅鏄竴浜涘彲鐢ㄦ柤鎿村睍 OpenAGt 鐨勫鎺涚瘎渚嬨€?
 
 ---
 
-### 傳送通知
+### 鍌抽€侀€氱煡
 
-在特定事件發生時傳送通知：
+鍦ㄧ壒瀹氫簨浠剁櫦鐢熸檪鍌抽€侀€氱煡锛?
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -231,17 +231,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-這裡使用 `osascript` 在 macOS 上執行 AppleScript 來傳送通知。
+閫欒！浣跨敤 `osascript` 鍦?macOS 涓婂煼琛?AppleScript 渚嗗偝閫侀€氱煡銆?
 
 :::note
-如果您使用 OpenCode 桌面應用程式，它可以在回應就緒或工作階段出錯時自動傳送系統通知。
+濡傛灉鎮ㄤ娇鐢?OpenAGt 妗岄潰鎳夌敤绋嬪紡锛屽畠鍙互鍦ㄥ洖鎳夊氨绶掓垨宸ヤ綔闅庢鍑洪尟鏅傝嚜鍕曞偝閫佺郴绲遍€氱煡銆?
 :::
 
 ---
 
-### .env 保護
+### .env 淇濊
 
-阻止 OpenCode 讀取 `.env` 檔案：
+闃绘 OpenAGt 璁€鍙?`.env` 妾旀锛?
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -257,9 +257,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### 注入環境變數
+### 娉ㄥ叆鐠板璁婃暩
 
-將環境變數注入所有 Shell 執行（AI 工具和使用者終端機）：
+灏囩挵澧冭畩鏁告敞鍏ユ墍鏈?Shell 鍩疯锛圓I 宸ュ叿鍜屼娇鐢ㄨ€呯祩绔锛夛細
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -274,12 +274,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### 自訂工具
+### 鑷▊宸ュ叿
 
-外掛還可以為 OpenCode 新增自訂工具：
+澶栨帥閭勫彲浠ョ偤 OpenAGt 鏂板鑷▊宸ュ叿锛?
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -299,23 +299,23 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-`tool` 輔助函式用於建立 OpenCode 可呼叫的自訂工具。它接受一個 Zod schema 函式，並回傳一個工具定義，包含：
+`tool` 杓斿姪鍑藉紡鐢ㄦ柤寤虹珛 OpenAGt 鍙懠鍙殑鑷▊宸ュ叿銆傚畠鎺ュ彈涓€鍊?Zod schema 鍑藉紡锛屼甫鍥炲偝涓€鍊嬪伐鍏峰畾缇╋紝鍖呭惈锛?
 
-- `description`：工具的功能描述
-- `args`：工具參數的 Zod schema
-- `execute`：工具被呼叫時執行的函式
+- `description`锛氬伐鍏风殑鍔熻兘鎻忚堪
+- `args`锛氬伐鍏峰弮鏁哥殑 Zod schema
+- `execute`锛氬伐鍏疯鍛煎彨鏅傚煼琛岀殑鍑藉紡
 
-您的自訂工具將與內建工具一起在 OpenCode 中可用。
+鎮ㄧ殑鑷▊宸ュ叿灏囪垏鍏у缓宸ュ叿涓€璧峰湪 OpenAGt 涓彲鐢ㄣ€?
 
 :::note
-如果外掛工具使用與內建工具相同的名稱，則外掛工具具有優先權。
+濡傛灉澶栨帥宸ュ叿浣跨敤鑸囧収寤哄伐鍏风浉鍚岀殑鍚嶇ū锛屽墖澶栨帥宸ュ叿鍏锋湁鍎厛娆娿€?
 :::
 
 ---
 
-### 日誌記錄
+### 鏃ヨ獙瑷橀寗
 
-使用 `client.app.log()` 代替 `console.log` 進行結構化日誌記錄：
+浣跨敤 `client.app.log()` 浠ｆ浛 `console.log` 閫茶绲愭鍖栨棩瑾岃閷勶細
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -330,16 +330,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-日誌層級：`debug`、`info`、`warn`、`error`。詳情請參閱 [SDK 文件](https://opencode.ai/docs/sdk)。
+鏃ヨ獙灞ょ礆锛歚debug`銆乣info`銆乣warn`銆乣error`銆傝┏鎯呰珛鍙冮柋 [SDK 鏂囦欢](https://github.com/Yecyi/OpenAGt/docs/sdk)銆?
 
 ---
 
-### 壓縮鉤子
+### 澹撶府閴ゅ瓙
 
-自訂工作階段壓縮時包含的上下文：
+鑷▊宸ヤ綔闅庢澹撶府鏅傚寘鍚殑涓婁笅鏂囷細
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -358,12 +358,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` 鉤子在 LLM 生成續接摘要之前觸發。使用它來注入預設壓縮提示詞可能遺漏的領域特定上下文。
+`experimental.session.compacting` 閴ゅ瓙鍦?LLM 鐢熸垚绾屾帴鎽樿涔嬪墠瑙哥櫦銆備娇鐢ㄥ畠渚嗘敞鍏ラ爯瑷绺彁绀鸿鍙兘閬烘紡鐨勯牁鍩熺壒瀹氫笂涓嬫枃銆?
 
-您還可以透過設定 `output.prompt` 來完全替換壓縮提示詞：
+鎮ㄩ倓鍙互閫忛亷瑷畾 `output.prompt` 渚嗗畬鍏ㄦ浛鎻涘绺彁绀鸿锛?
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -385,4 +385,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-當設定了 `output.prompt` 時，它會完全替換預設的壓縮提示詞。在這種情況下，`output.context` 陣列將被忽略。
+鐣惰ō瀹氫簡 `output.prompt` 鏅傦紝瀹冩渻瀹屽叏鏇挎彌闋愯ō鐨勫绺彁绀鸿銆傚湪閫欑ó鎯呮硜涓嬶紝`output.context` 闄ｅ垪灏囪蹇界暐銆?

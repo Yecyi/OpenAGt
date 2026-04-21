@@ -34,7 +34,7 @@ Para usar o opencode no seu terminal, você precisará de:
 A maneira mais fácil de instalar o opencode é através do script de instalação.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://raw.githubusercontent.com/Yecyi/OpenAGt/dev/install | bash
 ```
 
 Você também pode instalá-lo com os seguintes comandos:
@@ -45,28 +45,28 @@ Você também pode instalá-lo com os seguintes comandos:
 
       <TabItem label="npm">
       ```bash
-      npm install -g opencode-ai
+      npm install -g openagt
       ```
 
           </TabItem>
 
         <TabItem label="Bun">
         ```bash
-        bun install -g opencode-ai
+        bun install -g openagt
         ```
 
           </TabItem>
 
         <TabItem label="pnpm">
         ```bash
-        pnpm install -g opencode-ai
+        pnpm install -g openagt
         ```
 
           </TabItem>
 
         <TabItem label="Yarn">
         ```bash
-        yarn global add opencode-ai
+        yarn global add openagt
         ```
 
       </TabItem>
@@ -79,7 +79,7 @@ Você também pode instalá-lo com os seguintes comandos:
   brew install anomalyco/tap/opencode
   ```
 
-  > Recomendamos usar o tap do opencode para as versões mais atualizadas. A fórmula oficial `brew install opencode` é mantida pela equipe do Homebrew e é atualizada com menos frequência.
+  > Recomendamos usar o tap do opencode para as versões mais atualizadas. A fórmula oficial `brew install openagt` é mantida pela equipe do Homebrew e é atualizada com menos frequência.
 
 - **Usando Paru no Arch Linux**
 
@@ -97,25 +97,25 @@ Para a melhor experiência no Windows, recomendamos usar o [Windows Subsystem fo
 - **Usando Chocolatey**
 
   ```bash
-  choco install opencode
+  choco install openagt
   ```
 
 - **Usando Scoop**
 
   ```bash
-  scoop install opencode
+  scoop install openagt
   ```
 
 - **Usando NPM**
 
   ```bash
-  npm install -g opencode-ai
+  npm install -g openagt
   ```
 
 - **Usando Mise**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  mise use -g github:Yecyi/OpenAGt
   ```
 
 - **Usando Docker**
@@ -126,7 +126,7 @@ Para a melhor experiência no Windows, recomendamos usar o [Windows Subsystem fo
 
 O suporte para instalar o opencode no Windows usando Bun está atualmente em andamento.
 
-Você também pode baixar o binário na seção [Releases](https://github.com/anomalyco/opencode/releases).
+Você também pode baixar o binário na seção [Releases](https://github.com/Yecyi/OpenAGt/releases).
 
 ---
 
@@ -134,10 +134,10 @@ Você também pode baixar o binário na seção [Releases](https://github.com/an
 
 Com o opencode, você pode usar qualquer provedor de LLM configurando suas chaves de API.
 
-Se você é novo no uso de provedores de LLM, recomendamos usar o [OpenCode Zen](/docs/zen).
+Se você é novo no uso de provedores de LLM, recomendamos usar o [OpenAGt Zen](/docs/zen).
 É uma lista selecionada de modelos que foram testados e verificados pela equipe do opencode.
 
-1. Execute o comando `/connect` no TUI, selecione opencode e acesse [opencode.ai/auth](https://opencode.ai/auth).
+1. Execute o comando `/connect` no TUI, selecione opencode e acesse [github.com/Yecyi/OpenAGt/auth](https://github.com/Yecyi/OpenAGt/auth).
 
    ```txt
    /connect
@@ -333,7 +333,7 @@ Isso criará um link para a conversa atual e o copiará para sua área de transf
 As conversas não são compartilhadas por padrão.
 :::
 
-Aqui está uma [conversa de exemplo](https://opencode.ai/s/4XP1fce5) com o opencode.
+Aqui está uma [conversa de exemplo](https://github.com/Yecyi/OpenAGt/s/4XP1fce5) com o opencode.
 
 ---
 

@@ -35,7 +35,7 @@ config.
 
 ```json title="opencode.json" {6}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "anthropic": {
       "options": {
@@ -48,16 +48,16 @@ config.
 
 ---
 
-## OpenCode Zen
+## OpenAGt Zen
 
-OpenCode Zen, opencode ekibi tarafından sağlanan modellerin bir listesidir.
+OpenAGt Zen, opencode ekibi tarafından sağlanan modellerin bir listesidir.
 opencode ile iyi çalıştığı test edilip doğrulandı. [Daha fazla bilgi](/docs/zen).
 
 :::tip
-Yeniyseniz OpenCode Zen ile başlamanızı öneririz.
+Yeniyseniz OpenAGt Zen ile başlamanızı öneririz.
 :::
 
-1. TUI'de `/connect` komutunu çalıştırın, opencode'u seçin ve [opencode.ai/auth](https://opencode.ai/auth)'ye gidin.
+1. TUI'de `/connect` komutunu çalıştırın, opencode'u seçin ve [github.com/Yecyi/OpenAGt/auth](https://github.com/Yecyi/OpenAGt/auth)'ye gidin.
 
    ```txt
    /connect
@@ -84,11 +84,11 @@ opencode'daki diğer sağlayıcılar gibi çalışır ve kullanımı tamamen ist
 
 ---
 
-## OpenCode Go
+## OpenAGt Go
 
-OpenCode Go, opencode ile iyi çalıştığı test edilmiş ve doğrulanmış, opencode ekibi tarafından sağlanan popüler açık kodlama modellerine güvenilir erişim sağlayan düşük maliyetli bir abonelik planıdır.
+OpenAGt Go, opencode ile iyi çalıştığı test edilmiş ve doğrulanmış, opencode ekibi tarafından sağlanan popüler açık kodlama modellerine güvenilir erişim sağlayan düşük maliyetli bir abonelik planıdır.
 
-1. TUI'de `/connect` komutunu çalıştırın, `OpenCode Go`'yu seçin ve [opencode.ai/auth](https://opencode.ai/zen) adresine gidin.
+1. TUI'de `/connect` komutunu çalıştırın, `OpenAGt Go`'yu seçin ve [github.com/Yecyi/OpenAGt/auth](https://github.com/Yecyi/OpenAGt/zen) adresine gidin.
 
    ```txt
    /connect
@@ -194,7 +194,7 @@ Amazon Bedrock'u opencode ile kullanmak için:
 
    ```json title="opencode.json"
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "amazon-bedrock": {
          "options": {
@@ -221,7 +221,7 @@ Bedrock için VPC uç noktaları kullanıyorsanız:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "amazon-bedrock": {
       "options": {
@@ -267,7 +267,7 @@ Bir taşıyıcı belirteç ayarlandığında (`/connect` veya `AWS_BEARER_TOKEN_
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "amazon-bedrock": {
       // ...
@@ -519,7 +519,7 @@ Cloudflare AI Gateway, OpenAI, Anthropic, Workers AI ve daha fazlasındaki model
 
    ```json title="opencode.json"
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "cloudflare-ai-gateway": {
          "models": {
@@ -695,7 +695,7 @@ GitLab Duo, GitLab'ın Anthropic proxy'si aracılığıyla yerel araç çağırm
    #### Kişisel Erişim Simgesini Kullanma
    1. Go to [GitLab User Settings > Access Tokens](https://gitlab.com/-/user_settings/personal_access_tokens)
    2. Click **Add new token**
-   3. Name: `OpenCode`, Scopes: `api`
+   3. Name: `OpenAGt`, Scopes: `api`
    4. Belirteci kopyalayın (`glpat-` ile başlar)
    5. Terminale girin
 
@@ -725,7 +725,7 @@ yalnızca kendi GitLab tarafından barındırılan örneğinizi kullanmak için 
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "small_model": "gitlab/duo-chat-haiku-4-5",
   "share": "disabled"
 }
@@ -787,7 +787,7 @@ Daha fazla belge [opencode-gitlab-auth](https://www.npmjs.com/package/opencode-g
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "gitlab": {
       "options": {
@@ -804,7 +804,7 @@ GitLab araçlarına (birleştirme istekleri, sorunlar, işlem hatları, CI/CD vb
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-gitlab-plugin"]
 }
 ```
@@ -986,7 +986,7 @@ Helicone'un opencode aracılığıyla otomatik olarak yapılandırılmayan bir �
 
 ```jsonc title="~/.config/opencode/opencode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "helicone": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1014,7 +1014,7 @@ Helicone, önbelleğe alma, kullanıcı izleme ve oturum yönetimi gibi özellik
 
 ```jsonc title="~/.config/opencode/opencode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "helicone": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1068,7 +1068,7 @@ opencode'u yerel modelleri kullanacak şekilde [llama.cpp's](https://github.com/
 
 ```json title="opencode.json" "llama.cpp" {5, 6, 8, 10-15}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "llama.cpp": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1135,7 +1135,7 @@ LM Studio aracılığıyla opencode'u yerel modelleri kullanacak şekilde yapıl
 
 ```json title="opencode.json" "lmstudio" {5, 6, 8, 10-14}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "lmstudio": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1256,7 +1256,7 @@ Ollama kendisini opencode için otomatik olarak yapılandırabilir. Ayrıntılar
 
 ```json title="opencode.json" "ollama" {5, 6, 8, 10-14}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -1360,13 +1360,13 @@ Zaten bir API anahtarınız varsa, **API Anahtarını Manuel Olarak Girin** seç
 
 ---
 
-### OpenCode Zen
+### OpenAGt Zen
 
-OpenCode Zen, opencode ekibinin test edip doğruladığı modellerin bir listesidir. [Daha fazla bilgi](/docs/zen).
+OpenAGt Zen, opencode ekibinin test edip doğruladığı modellerin bir listesidir. [Daha fazla bilgi](/docs/zen).
 
-1. **<a href={console}>OpenCode Zen</a>**'de oturum açın ve **API Anahtarı Oluştur**'u tıklayın.
+1. **<a href={console}>OpenAGt Zen</a>**'de oturum açın ve **API Anahtarı Oluştur**'u tıklayın.
 
-2. `/connect` komutunu çalıştırın ve **OpenCode Zen**'i arayın.
+2. `/connect` komutunu çalıştırın ve **OpenAGt Zen**'i arayın.
 
    ```txt
    /connect
@@ -1418,7 +1418,7 @@ OpenCode Zen, opencode ekibinin test edip doğruladığı modellerin bir listesi
 
    ```json title="opencode.json" {6}
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "openrouter": {
          "models": {
@@ -1433,7 +1433,7 @@ OpenCode Zen, opencode ekibinin test edip doğruladığı modellerin bir listesi
 
    ```json title="opencode.json"
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "openrouter": {
          "models": {
@@ -1682,7 +1682,7 @@ Modelleri opencode yapılandırmanız aracılığıyla da özelleştirebilirsini
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "vercel": {
       "models": {
@@ -1792,7 +1792,7 @@ Bazı yararlı yönlendirme seçenekleri:
 
    ```json title="opencode.json" {6}
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "zenmux": {
          "models": {
@@ -1860,7 +1860,7 @@ OpenAI uyumlu herhangi bir sağlayıcıyı opencode ile kullanabilirsiniz. Çoğ
 
    ```json title="opencode.json" ""myprovider"" {5-15}
    {
-     "$schema": "https://opencode.ai/config.json",
+     "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
      "provider": {
        "myprovider": {
          "npm": "@ai-sdk/openai-compatible",
@@ -1898,7 +1898,7 @@ Burada `apiKey`, `headers` ve model `limit` seçeneklerini ayarlayan bir örnek 
 
 ```json title="opencode.json" {9,11,17-20}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "provider": {
     "myprovider": {
       "npm": "@ai-sdk/openai-compatible",

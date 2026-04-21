@@ -1,4 +1,4 @@
-import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Tooltip } from "@openagt/ui/tooltip"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import {
   children,
@@ -102,7 +102,7 @@ export function ServerRow(props: ServerRowProps) {
                     <span class="text-text-weaker">{language.t("server.row.noUsername")}</span>
                   )}
                 </span>
-                {conn().http.password && <span class="text-text-weak">••••••••</span>}
+                {conn().http.password && <span class="text-text-weak">鈥⑩€⑩€⑩€⑩€⑩€⑩€⑩€?/span>}
               </div>
             )}
           </Show>

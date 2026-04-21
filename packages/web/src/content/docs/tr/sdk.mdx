@@ -1,58 +1,58 @@
 ---
 title: SDK
-description: opencode sunucusu için type-safe JS istemcisi.
+description: opencode sunucusu i莽in type-safe JS istemcisi.
 ---
 
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-opencode JS/TS SDK, sunucu ile etkileşmek için type-safe bir istemci sağlar.
-opencode'u programatik olarak kontrol etmek ve entegrasyonlar oluşturmak için kullanabilirsiniz.
+opencode JS/TS SDK, sunucu ile etkile艧mek i莽in type-safe bir istemci sa臒lar.
+opencode'u programatik olarak kontrol etmek ve entegrasyonlar olu艧turmak i莽in kullanabilirsiniz.
 
-[Sunucu](/docs/server) sayfasında nasıl çalıştığını görebilir, örnekler için topluluğun oluşturduğu [projeler](/docs/ecosystem#projects) bölümüne bakabilirsiniz.
+[Sunucu](/docs/server) sayfas谋nda nas谋l 莽al谋艧t谋臒谋n谋 g枚rebilir, 枚rnekler i莽in toplulu臒un olu艧turdu臒u [projeler](/docs/ecosystem#projects) b枚l眉m眉ne bakabilirsiniz.
 
 ---
 
 ## Kurulum
 
-SDK'yı npm'den yükleyin:
+SDK'y谋 npm'den y眉kleyin:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
 
-## İstemci Oluşturma
+## 陌stemci Olu艧turma
 
-Bir opencode örneği oluşturun:
+Bir opencode 枚rne臒i olu艧turun:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
 
-Bu, hem bir sunucu hem de bir istemci başlatır
+Bu, hem bir sunucu hem de bir istemci ba艧lat谋r
 
-#### Seçenekler
+#### Se莽enekler
 
-| Seçenek    | Tip           | Açıklama                                      | Varsayılan  |
+| Se莽enek    | Tip           | A莽谋klama                                      | Varsay谋lan  |
 | ---------- | ------------- | --------------------------------------------- | ----------- |
-| `hostname` | `string`      | Sunucu ana bilgisayar adı                     | `127.0.0.1` |
-| `port`     | `number`      | Sunucu bağlantı noktası                       | `4096`      |
-| `signal`   | `AbortSignal` | İptal için durdurma sinyali                   | `undefined` |
-| `timeout`  | `number`      | Sunucu başlatma için ms cinsinden zaman aşımı | `5000`      |
-| `config`   | `Config`      | Yapılandırma nesnesi                          | `{}`        |
+| `hostname` | `string`      | Sunucu ana bilgisayar ad谋                     | `127.0.0.1` |
+| `port`     | `number`      | Sunucu ba臒lant谋 noktas谋                       | `4096`      |
+| `signal`   | `AbortSignal` | 陌ptal i莽in durdurma sinyali                   | `undefined` |
+| `timeout`  | `number`      | Sunucu ba艧latma i莽in ms cinsinden zaman a艧谋m谋 | `5000`      |
+| `config`   | `Config`      | Yap谋land谋rma nesnesi                          | `{}`        |
 
 ---
 
-## Yapılandırma
+## Yap谋land谋rma
 
-Davranışı özelleştirmek için bir yapılandırma nesnesi iletebilirsiniz. Örnek yine de `opencode.json` dosyanızı alır, ancak yapılandırmayı satır içi olarak geçersiz kılabilir veya ekleyebilirsiniz:
+Davran谋艧谋 枚zelle艧tirmek i莽in bir yap谋land谋rma nesnesi iletebilirsiniz. 脰rnek yine de `opencode.json` dosyan谋z谋 al谋r, ancak yap谋land谋rmay谋 sat谋r i莽i olarak ge莽ersiz k谋labilir veya ekleyebilirsiniz:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -67,45 +67,45 @@ console.log(`Server running at ${opencode.server.url}`)
 opencode.server.close()
 ```
 
-## Yalnızca istemci
+## Yaln谋zca istemci
 
-Halihazırda çalışan bir opencode örneğiniz varsa, ona bağlanmak için bir istemci örneği oluşturabilirsiniz:
+Halihaz谋rda 莽al谋艧an bir opencode 枚rne臒iniz varsa, ona ba臒lanmak i莽in bir istemci 枚rne臒i olu艧turabilirsiniz:
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
 })
 ```
 
-#### Seçenekler
+#### Se莽enekler
 
-| Seçenek         | Tip        | Açıklama                          | Varsayılan              |
+| Se莽enek         | Tip        | A莽谋klama                          | Varsay谋lan              |
 | --------------- | ---------- | --------------------------------- | ----------------------- |
 | `baseUrl`       | `string`   | Sunucunun URL'si                  | `http://localhost:4096` |
-| `fetch`         | `function` | Özel fetch uygulaması             | `globalThis.fetch`      |
-| `parseAs`       | `string`   | Yanıt ayrıştırma yöntemi          | `auto`                  |
-| `responseStyle` | `string`   | Dönüş stili: `data` veya `fields` | `fields`                |
-| `throwOnError`  | `boolean`  | Dönüş yerine hata fırlat          | `false`                 |
+| `fetch`         | `function` | 脰zel fetch uygulamas谋             | `globalThis.fetch`      |
+| `parseAs`       | `string`   | Yan谋t ayr谋艧t谋rma y枚ntemi          | `auto`                  |
+| `responseStyle` | `string`   | D枚n眉艧 stili: `data` veya `fields` | `fields`                |
+| `throwOnError`  | `boolean`  | D枚n眉艧 yerine hata f谋rlat          | `false`                 |
 
 ---
 
-## Türler
+## T眉rler
 
-SDK, tüm API türleri için TypeScript tanımlarını içerir. Bunları doğrudan içe aktarın:
+SDK, t眉m API t眉rleri i莽in TypeScript tan谋mlar谋n谋 i莽erir. Bunlar谋 do臒rudan i莽e aktar谋n:
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-Tüm tipler, sunucunun OpenAPI spesifikasyonundan oluşturulur ve <a href={typesUrl}>tipler dosyasında</a> mevcuttur.
+T眉m tipler, sunucunun OpenAPI spesifikasyonundan olu艧turulur ve <a href={typesUrl}>tipler dosyas谋nda</a> mevcuttur.
 
 ---
 
 ## Hatalar
 
-SDK, yakalayabileceğiniz ve işleyebileceğiniz hatalar fırlatabilir:
+SDK, yakalayabilece臒iniz ve i艧leyebilece臒iniz hatalar f谋rlatabilir:
 
 ```typescript
 try {
@@ -117,28 +117,28 @@ try {
 
 ---
 
-## Yapılandırılmış Çıktı
+## Yap谋land谋r谋lm谋艧 脟谋kt谋
 
-Bir JSON şeması ile `format` belirterek modelden yapılandırılmış JSON çıktısı isteyebilirsiniz. Model, şemanızla eşleşen doğrulanmış JSON'u döndürmek için bir `StructuredOutput` aracı kullanacaktır.
+Bir JSON 艧emas谋 ile `format` belirterek modelden yap谋land谋r谋lm谋艧 JSON 莽谋kt谋s谋 isteyebilirsiniz. Model, 艧eman谋zla e艧le艧en do臒rulanm谋艧 JSON'u d枚nd眉rmek i莽in bir `StructuredOutput` arac谋 kullanacakt谋r.
 
-### Temel Kullanım
+### Temel Kullan谋m
 
 ```typescript
 const result = await client.session.prompt({
   path: { id: sessionId },
   body: {
-    parts: [{ type: "text", text: "Anthropic'i araştırın ve şirket bilgileri sağlayın" }],
+    parts: [{ type: "text", text: "Anthropic'i ara艧t谋r谋n ve 艧irket bilgileri sa臒lay谋n" }],
     format: {
       type: "json_schema",
       schema: {
         type: "object",
         properties: {
-          company: { type: "string", description: "Şirket adı" },
-          founded: { type: "number", description: "Kuruluş yılı" },
+          company: { type: "string", description: "艦irket ad谋" },
+          founded: { type: "number", description: "Kurulu艧 y谋l谋" },
           products: {
             type: "array",
             items: { type: "string" },
-            description: "Ana ürünler",
+            description: "Ana 眉r眉nler",
           },
         },
         required: ["company", "founded"],
@@ -147,63 +147,63 @@ const result = await client.session.prompt({
   },
 })
 
-// Yapılandırılmış çıktıya erişin
+// Yap谋land谋r谋lm谋艧 莽谋kt谋ya eri艧in
 console.log(result.data.info.structured_output)
 // { company: "Anthropic", founded: 2021, products: ["Claude", "Claude API"] }
 ```
 
-### Çıktı Format Türleri
+### 脟谋kt谋 Format T眉rleri
 
-| Tür           | Açıklama                                                      |
+| T眉r           | A莽谋klama                                                      |
 | ------------- | ------------------------------------------------------------- |
-| `text`        | Varsayılan. Standart metin yanıtı (yapılandırılmış çıktı yok) |
-| `json_schema` | Sağlanan şema ile eşleşen doğrulanmış JSON döndürür           |
+| `text`        | Varsay谋lan. Standart metin yan谋t谋 (yap谋land谋r谋lm谋艧 莽谋kt谋 yok) |
+| `json_schema` | Sa臒lanan 艧ema ile e艧le艧en do臒rulanm谋艧 JSON d枚nd眉r眉r           |
 
-### JSON Şema Formatı
+### JSON 艦ema Format谋
 
-`type: 'json_schema'` kullanırken şunları sağlayın:
+`type: 'json_schema'` kullan谋rken 艧unlar谋 sa臒lay谋n:
 
-| Alan         | Tür             | Açıklama                                                      |
+| Alan         | T眉r             | A莽谋klama                                                      |
 | ------------ | --------------- | ------------------------------------------------------------- |
-| `type`       | `'json_schema'` | Gerekli. JSON şema modunu belirtir                            |
-| `schema`     | `object`        | Gerekli. Çıktı yapısını tanımlayan JSON Şema nesnesi          |
-| `retryCount` | `number`        | İsteğe bağlı. Doğrulama yeniden deneme sayısı (varsayılan: 2) |
+| `type`       | `'json_schema'` | Gerekli. JSON 艧ema modunu belirtir                            |
+| `schema`     | `object`        | Gerekli. 脟谋kt谋 yap谋s谋n谋 tan谋mlayan JSON 艦ema nesnesi          |
+| `retryCount` | `number`        | 陌ste臒e ba臒l谋. Do臒rulama yeniden deneme say谋s谋 (varsay谋lan: 2) |
 
-### Hata Yönetimi
+### Hata Y枚netimi
 
-Model, tüm yeniden denemelerden sonra geçerli bir yapılandırılmış çıktı üretemezse, yanıt bir `StructuredOutputError` içerecektir:
+Model, t眉m yeniden denemelerden sonra ge莽erli bir yap谋land谋r谋lm谋艧 莽谋kt谋 眉retemezse, yan谋t bir `StructuredOutputError` i莽erecektir:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
-  console.error("Yapılandırılmış çıktı üretilemedi:", result.data.info.error.message)
+  console.error("Yap谋land谋r谋lm谋艧 莽谋kt谋 眉retilemedi:", result.data.info.error.message)
   console.error("Denemeler:", result.data.info.error.retries)
 }
 ```
 
-### En İyi Uygulamalar
+### En 陌yi Uygulamalar
 
-1. **Açık açıklamalar sağlayın**: Modelin hangi verileri çıkaracağını anlamasına yardımcı olmak için şema özelliklerinde
-2. **`required` kullanın**: Hangi alanların mevcut olması gerektiğini belirtmek için
-3. **Şemaları odaklı tutun**: Karmaşık iç içe geçmiş şemaların model tarafından doğru doldurulması daha zor olabilir
-4. **Uygun `retryCount` ayarlayın**: Karmaşık şemalar için artırın, basit olanlar için azaltın
+1. **A莽谋k a莽谋klamalar sa臒lay谋n**: Modelin hangi verileri 莽谋karaca臒谋n谋 anlamas谋na yard谋mc谋 olmak i莽in 艧ema 枚zelliklerinde
+2. **`required` kullan谋n**: Hangi alanlar谋n mevcut olmas谋 gerekti臒ini belirtmek i莽in
+3. **艦emalar谋 odakl谋 tutun**: Karma艧谋k i莽 i莽e ge莽mi艧 艧emalar谋n model taraf谋ndan do臒ru doldurulmas谋 daha zor olabilir
+4. **Uygun `retryCount` ayarlay谋n**: Karma艧谋k 艧emalar i莽in art谋r谋n, basit olanlar i莽in azalt谋n
 
 ---
 
 ## API'ler
 
-SDK, tüm sunucu API'lerini type-safe bir istemci aracılığıyla sunar.
+SDK, t眉m sunucu API'lerini type-safe bir istemci arac谋l谋臒谋yla sunar.
 
 ---
 
 ### Global
 
-| Yöntem            | Açıklama                                | Yanıt                                |
+| Y枚ntem            | A莽谋klama                                | Yan谋t                                |
 | ----------------- | --------------------------------------- | ------------------------------------ |
-| `global.health()` | Sunucu sağlığını ve sürümünü kontrol et | `{ healthy: true, version: string }` |
+| `global.health()` | Sunucu sa臒l谋臒谋n谋 ve s眉r眉m眉n眉 kontrol et | `{ healthy: true, version: string }` |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 const health = await client.global.health()
@@ -214,14 +214,14 @@ console.log(health.data.version)
 
 ### App
 
-| Yöntem         | Açıklama                      | Yanıt                                       |
+| Y枚ntem         | A莽谋klama                      | Yan谋t                                       |
 | -------------- | ----------------------------- | ------------------------------------------- |
-| `app.log()`    | Bir günlük girdisi yaz        | `boolean`                                   |
-| `app.agents()` | Tüm mevcut agent'ları listele | <a href={typesUrl}><code>Agent[]</code></a> |
+| `app.log()`    | Bir g眉nl眉k girdisi yaz        | `boolean`                                   |
+| `app.agents()` | T眉m mevcut agent'lar谋 listele | <a href={typesUrl}><code>Agent[]</code></a> |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Write a log entry
@@ -241,14 +241,14 @@ const agents = await client.app.agents()
 
 ### Project
 
-| Yöntem              | Açıklama              | Yanıt                                         |
+| Y枚ntem              | A莽谋klama              | Yan谋t                                         |
 | ------------------- | --------------------- | --------------------------------------------- |
-| `project.list()`    | Tüm projeleri listele | <a href={typesUrl}><code>Project[]</code></a> |
+| `project.list()`    | T眉m projeleri listele | <a href={typesUrl}><code>Project[]</code></a> |
 | `project.current()` | Mevcut projeyi al     | <a href={typesUrl}><code>Project</code></a>   |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // List all projects
@@ -262,13 +262,13 @@ const currentProject = await client.project.current()
 
 ### Path
 
-| Yöntem       | Açıklama       | Yanıt                                    |
+| Y枚ntem       | A莽谋klama       | Yan谋t                                    |
 | ------------ | -------------- | ---------------------------------------- |
 | `path.get()` | Mevcut yolu al | <a href={typesUrl}><code>Path</code></a> |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Get current path information
@@ -279,14 +279,14 @@ const pathInfo = await client.path.get()
 
 ### Config
 
-| Yöntem               | Açıklama                                      | Yanıt                                                                                                 |
+| Y枚ntem               | A莽谋klama                                      | Yan谋t                                                                                                 |
 | -------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `config.get()`       | Yapılandırma bilgisini al                     | <a href={typesUrl}><code>Config</code></a>                                                            |
-| `config.providers()` | Sağlayıcıları ve varsayılan modelleri listele | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
+| `config.get()`       | Yap谋land谋rma bilgisini al                     | <a href={typesUrl}><code>Config</code></a>                                                            |
+| `config.providers()` | Sa臒lay谋c谋lar谋 ve varsay谋lan modelleri listele | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 const config = await client.config.get()
@@ -298,31 +298,31 @@ const { providers, default: defaults } = await client.config.providers()
 
 ### Oturumlar
 
-| Yöntem                                                     | Açıklama                                    | Notlar                                                                                                                                                                                                                                        |
+| Y枚ntem                                                     | A莽谋klama                                    | Notlar                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session.list()`                                           | Oturumları listele                          | <a href={typesUrl}><code>Session[]</code></a> döndürür                                                                                                                                                                                        |
-| `session.get({ path })`                                    | Oturum al                                   | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.children({ path })`                               | Alt oturumları listele                      | <a href={typesUrl}><code>Session[]</code></a> döndürür                                                                                                                                                                                        |
-| `session.create({ body })`                                 | Oturum oluştur                              | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.delete({ path })`                                 | Oturum sil                                  | `boolean` döndürür                                                                                                                                                                                                                            |
-| `session.update({ path, body })`                           | Oturum özelliklerini güncelle               | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.init({ path, body })`                             | Uygulamayı analiz et ve `AGENTS.md` oluştur | `boolean` döndürür                                                                                                                                                                                                                            |
-| `session.abort({ path })`                                  | Çalışan bir oturumu iptal et                | `boolean` döndürür                                                                                                                                                                                                                            |
-| `session.share({ path })`                                  | Oturum paylaş                               | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.unshare({ path })`                                | Oturum paylaşımını kaldır                   | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.summarize({ path, body })`                        | Oturumu özetle                              | `boolean` döndürür                                                                                                                                                                                                                            |
-| `session.messages({ path })`                               | Oturumdaki mesajları listele                | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]` döndürür                                                                                                                      |
-| `session.message({ path })`                                | Mesaj ayrıntılarını al                      | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}` döndürür                                                                                                                        |
-| `session.prompt({ path, body })`                           | İstem mesajı gönder                         | `body.noReply: true` UserMessage (yalnızca bağlam) döndürür. Varsayılan olarak AI yanıtıyla <a href={typesUrl}><code>AssistantMessage</code></a> döndürür. [yapılandırılmış çıktı](#yapılandırılmış-çıktı) için `body.outputFormat` destekler |
-| `session.command({ path, body })`                          | Oturuma komut gönder                        | `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}` döndürür                                                                                                               |
-| `session.shell({ path, body })`                            | Bir kabuk komutu çalıştır                   | <a href={typesUrl}><code>AssistantMessage</code></a> döndürür                                                                                                                                                                                 |
-| `session.revert({ path, body })`                           | Bir mesajı geri al                          | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `session.unrevert({ path })`                               | Geri alınan mesajları geri yükle            | <a href={typesUrl}><code>Session</code></a> döndürür                                                                                                                                                                                          |
-| `postSessionByIdPermissionsByPermissionId({ path, body })` | Bir izin isteğine yanıt ver                 | `boolean` döndürür                                                                                                                                                                                                                            |
+| `session.list()`                                           | Oturumlar谋 listele                          | <a href={typesUrl}><code>Session[]</code></a> d枚nd眉r眉r                                                                                                                                                                                        |
+| `session.get({ path })`                                    | Oturum al                                   | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.children({ path })`                               | Alt oturumlar谋 listele                      | <a href={typesUrl}><code>Session[]</code></a> d枚nd眉r眉r                                                                                                                                                                                        |
+| `session.create({ body })`                                 | Oturum olu艧tur                              | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.delete({ path })`                                 | Oturum sil                                  | `boolean` d枚nd眉r眉r                                                                                                                                                                                                                            |
+| `session.update({ path, body })`                           | Oturum 枚zelliklerini g眉ncelle               | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.init({ path, body })`                             | Uygulamay谋 analiz et ve `AGENTS.md` olu艧tur | `boolean` d枚nd眉r眉r                                                                                                                                                                                                                            |
+| `session.abort({ path })`                                  | 脟al谋艧an bir oturumu iptal et                | `boolean` d枚nd眉r眉r                                                                                                                                                                                                                            |
+| `session.share({ path })`                                  | Oturum payla艧                               | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.unshare({ path })`                                | Oturum payla艧谋m谋n谋 kald谋r                   | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.summarize({ path, body })`                        | Oturumu 枚zetle                              | `boolean` d枚nd眉r眉r                                                                                                                                                                                                                            |
+| `session.messages({ path })`                               | Oturumdaki mesajlar谋 listele                | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]` d枚nd眉r眉r                                                                                                                      |
+| `session.message({ path })`                                | Mesaj ayr谋nt谋lar谋n谋 al                      | `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}` d枚nd眉r眉r                                                                                                                        |
+| `session.prompt({ path, body })`                           | 陌stem mesaj谋 g枚nder                         | `body.noReply: true` UserMessage (yaln谋zca ba臒lam) d枚nd眉r眉r. Varsay谋lan olarak AI yan谋t谋yla <a href={typesUrl}><code>AssistantMessage</code></a> d枚nd眉r眉r. [yap谋land谋r谋lm谋艧 莽谋kt谋](#yap谋land谋r谋lm谋艧-莽谋kt谋) i莽in `body.outputFormat` destekler |
+| `session.command({ path, body })`                          | Oturuma komut g枚nder                        | `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}` d枚nd眉r眉r                                                                                                               |
+| `session.shell({ path, body })`                            | Bir kabuk komutu 莽al谋艧t谋r                   | <a href={typesUrl}><code>AssistantMessage</code></a> d枚nd眉r眉r                                                                                                                                                                                 |
+| `session.revert({ path, body })`                           | Bir mesaj谋 geri al                          | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `session.unrevert({ path })`                               | Geri al谋nan mesajlar谋 geri y眉kle            | <a href={typesUrl}><code>Session</code></a> d枚nd眉r眉r                                                                                                                                                                                          |
+| `postSessionByIdPermissionsByPermissionId({ path, body })` | Bir izin iste臒ine yan谋t ver                 | `boolean` d枚nd眉r眉r                                                                                                                                                                                                                            |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Create and manage sessions
@@ -355,23 +355,23 @@ await client.session.prompt({
 
 ### Dosyalar
 
-| Yöntem                    | Açıklama                         | Yanıt                                                                                           |
+| Y枚ntem                    | A莽谋klama                         | Yan谋t                                                                                           |
 | ------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `find.text({ query })`    | Dosyalarda metin ara             | `path`, `lines`, `line_number`, `absolute_offset`, `submatches` içeren eşleşme nesneleri dizisi |
-| `find.files({ query })`   | Dosya ve dizinleri isme göre bul | `string[]` (yollar)                                                                             |
-| `find.symbols({ query })` | Çalışma alanı sembollerini bul   | <a href={typesUrl}><code>Symbol[]</code></a>                                                    |
-| `file.read({ query })`    | Bir dosyayı oku                  | `{ type: "raw" \| "patch", content: string }`                                                   |
-| `file.status({ query? })` | İzlenen dosyalar için durumu al  | <a href={typesUrl}><code>File[]</code></a>                                                      |
+| `find.text({ query })`    | Dosyalarda metin ara             | `path`, `lines`, `line_number`, `absolute_offset`, `submatches` i莽eren e艧le艧me nesneleri dizisi |
+| `find.files({ query })`   | Dosya ve dizinleri isme g枚re bul | `string[]` (yollar)                                                                             |
+| `find.symbols({ query })` | 脟al谋艧ma alan谋 sembollerini bul   | <a href={typesUrl}><code>Symbol[]</code></a>                                                    |
+| `file.read({ query })`    | Bir dosyay谋 oku                  | `{ type: "raw" \| "patch", content: string }`                                                   |
+| `file.status({ query? })` | 陌zlenen dosyalar i莽in durumu al  | <a href={typesUrl}><code>File[]</code></a>                                                      |
 
-`find.files` birkaç isteğe bağlı sorgu alanını destekler:
+`find.files` birka莽 iste臒e ba臒l谋 sorgu alan谋n谋 destekler:
 
 - `type`: `"file"` veya `"directory"`
-- `directory`: arama için proje kökünü geçersiz kılma
-- `limit`: maksimum sonuç (1-200)
+- `directory`: arama i莽in proje k枚k眉n眉 ge莽ersiz k谋lma
+- `limit`: maksimum sonu莽 (1-200)
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Search and read files
@@ -396,21 +396,21 @@ const content = await client.file.read({
 
 ### TUI
 
-| Yöntem                         | Açıklama                    | Yanıt     |
+| Y枚ntem                         | A莽谋klama                    | Yan谋t     |
 | ------------------------------ | --------------------------- | --------- |
-| `tui.appendPrompt({ body })`   | İsteme metin ekle           | `boolean` |
-| `tui.openHelp()`               | Yardım iletişim kutusunu aç | `boolean` |
-| `tui.openSessions()`           | Oturum seçiciyi aç          | `boolean` |
-| `tui.openThemes()`             | Tema seçiciyi aç            | `boolean` |
-| `tui.openModels()`             | Model seçiciyi aç           | `boolean` |
-| `tui.submitPrompt()`           | Mevcut istemi gönder        | `boolean` |
-| `tui.clearPrompt()`            | İstemi temizle              | `boolean` |
-| `tui.executeCommand({ body })` | Bir komut çalıştır          | `boolean` |
-| `tui.showToast({ body })`      | Toast bildirimi göster      | `boolean` |
+| `tui.appendPrompt({ body })`   | 陌steme metin ekle           | `boolean` |
+| `tui.openHelp()`               | Yard谋m ileti艧im kutusunu a莽 | `boolean` |
+| `tui.openSessions()`           | Oturum se莽iciyi a莽          | `boolean` |
+| `tui.openThemes()`             | Tema se莽iciyi a莽            | `boolean` |
+| `tui.openModels()`             | Model se莽iciyi a莽           | `boolean` |
+| `tui.submitPrompt()`           | Mevcut istemi g枚nder        | `boolean` |
+| `tui.clearPrompt()`            | 陌stemi temizle              | `boolean` |
+| `tui.executeCommand({ body })` | Bir komut 莽al谋艧t谋r          | `boolean` |
+| `tui.showToast({ body })`      | Toast bildirimi g枚ster      | `boolean` |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Control TUI interface
@@ -427,13 +427,13 @@ await client.tui.showToast({
 
 ### Auth
 
-| Yöntem              | Açıklama                  | Yanıt     |
+| Y枚ntem              | A莽谋klama                  | Yan谋t     |
 | ------------------- | ------------------------- | --------- |
 | `auth.set({ ... })` | Kimlik bilgilerini ayarla | `boolean` |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 await client.auth.set({
@@ -446,13 +446,13 @@ await client.auth.set({
 
 ### Olaylar
 
-| Yöntem              | Açıklama                                | Yanıt                                   |
+| Y枚ntem              | A莽谋klama                                | Yan谋t                                   |
 | ------------------- | --------------------------------------- | --------------------------------------- |
-| `event.subscribe()` | Sunucu tarafından gönderilen olay akışı | Sunucu tarafından gönderilen olay akışı |
+| `event.subscribe()` | Sunucu taraf谋ndan g枚nderilen olay ak谋艧谋 | Sunucu taraf谋ndan g枚nderilen olay ak谋艧谋 |
 
 ---
 
-#### Örnekler
+#### 脰rnekler
 
 ```javascript
 // Listen to real-time events

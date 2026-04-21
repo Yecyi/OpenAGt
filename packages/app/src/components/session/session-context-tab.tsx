@@ -1,16 +1,16 @@
 import { createMemo, createEffect, on, onCleanup, For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { useSync } from "@/context/sync"
-import { checksum } from "@opencode-ai/shared/util/encode"
-import { findLast } from "@opencode-ai/shared/util/array"
+import { checksum } from "@openagt/shared/util/encode"
+import { findLast } from "@openagt/shared/util/array"
 import { same } from "@/utils/same"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Accordion } from "@opencode-ai/ui/accordion"
-import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
-import { File } from "@opencode-ai/ui/file"
-import { Markdown } from "@opencode-ai/ui/markdown"
-import { ScrollView } from "@opencode-ai/ui/scroll-view"
-import type { Message, Part, UserMessage } from "@opencode-ai/sdk/v2/client"
+import { Icon } from "@openagt/ui/icon"
+import { Accordion } from "@openagt/ui/accordion"
+import { StickyAccordionHeader } from "@openagt/ui/sticky-accordion-header"
+import { File } from "@openagt/ui/file"
+import { Markdown } from "@openagt/ui/markdown"
+import { ScrollView } from "@openagt/ui/scroll-view"
+import type { Message, Part, UserMessage } from "@openagt/sdk/v2/client"
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
 import { useSessionLayout } from "@/pages/session/session-layout"
@@ -69,7 +69,7 @@ function RawMessage(props: {
         <Accordion.Trigger>
           <div class="flex items-center justify-between gap-2 w-full">
             <div class="min-w-0 truncate">
-              {props.message.role} <span class="text-text-base">• {props.message.id}</span>
+              {props.message.role} <span class="text-text-base">鈥?{props.message.id}</span>
             </div>
             <div class="flex items-center gap-3">
               <div class="shrink-0 text-12-regular text-text-weak">{props.time(props.message.time.created)}</div>
@@ -162,13 +162,13 @@ export function SessionContextTab() {
 
   const providerLabel = createMemo(() => {
     const c = ctx()
-    if (!c) return "—"
+    if (!c) return "鈥?
     return c.providerLabel
   })
 
   const modelLabel = createMemo(() => {
     const c = ctx()
-    if (!c) return "—"
+    if (!c) return "鈥?
     return c.modelLabel
   })
 
@@ -197,7 +197,7 @@ export function SessionContextTab() {
   }
 
   const stats = [
-    { label: "context.stats.session", value: () => info()?.title ?? params.id ?? "—" },
+    { label: "context.stats.session", value: () => info()?.title ?? params.id ?? "鈥? },
     { label: "context.stats.messages", value: () => counts().all.toLocaleString(language.intl()) },
     { label: "context.stats.provider", value: providerLabel },
     { label: "context.stats.model", value: modelLabel },

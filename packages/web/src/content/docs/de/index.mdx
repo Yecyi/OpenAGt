@@ -1,15 +1,15 @@
 ---
 title: Einführung
-description: Beginnen Sie mit OpenCode.
+description: Beginnen Sie mit OpenAGt.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components"
 import config from "../../../../config.mjs"
 export const console = config.console
 
-[**OpenCode**](/) ist ein Open-Source-Coding-Agent für AI. Es ist als terminalbasierte Schnittstelle, Desktop-App oder IDE-Erweiterung verfügbar.
+[**OpenAGt**](/) ist ein Open-Source-Coding-Agent für AI. Es ist als terminalbasierte Schnittstelle, Desktop-App oder IDE-Erweiterung verfügbar.
 
-![OpenCode TUI with the opencode theme](../../../assets/lander/screenshot.png)
+![OpenAGt TUI with the opencode theme](../../../assets/lander/screenshot.png)
 
 Fangen wir an.
 
@@ -17,7 +17,7 @@ Fangen wir an.
 
 #### Voraussetzungen
 
-Um OpenCode in Ihrem Terminal verwenden zu können, benötigen Sie:
+Um OpenAGt in Ihrem Terminal verwenden zu können, benötigen Sie:
 
 1. Ein moderner Terminal-Emulator, zum Beispiel:
    - [WezTerm](https://wezterm.org), cross-platform
@@ -31,10 +31,10 @@ Um OpenCode in Ihrem Terminal verwenden zu können, benötigen Sie:
 
 ## Installation
 
-Der einfachste Weg, OpenCode zu installieren, ist über das Installationsskript.
+Der einfachste Weg, OpenAGt zu installieren, ist über das Installationsskript.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://raw.githubusercontent.com/Yecyi/OpenAGt/dev/install | bash
 ```
 
 Sie können es auch mit den folgenden Befehlen installieren:
@@ -45,28 +45,28 @@ Sie können es auch mit den folgenden Befehlen installieren:
 
       <TabItem label="npm">
       ```bash
-      npm install -g opencode-ai
+      npm install -g openagt
       ```
 
           </TabItem>
 
         <TabItem label="Bun">
         ```bash
-        bun install -g opencode-ai
+        bun install -g openagt
         ```
 
           </TabItem>
 
         <TabItem label="pnpm">
         ```bash
-        pnpm install -g opencode-ai
+        pnpm install -g openagt
         ```
 
           </TabItem>
 
         <TabItem label="Yarn">
         ```bash
-        yarn global add opencode-ai
+        yarn global add openagt
         ```
 
       </TabItem>
@@ -79,7 +79,7 @@ Sie können es auch mit den folgenden Befehlen installieren:
   brew install anomalyco/tap/opencode
   ```
 
-  > Wir empfehlen die Verwendung des OpenCode-Taps für die aktuellsten Versionen. Die offizielle `brew install opencode`-Formel wird vom Homebrew-Team gepflegt und seltener aktualisiert.
+  > Wir empfehlen die Verwendung des OpenAGt-Taps für die aktuellsten Versionen. Die offizielle `brew install openagt`-Formel wird vom Homebrew-Team gepflegt und seltener aktualisiert.
 
 - **Verwendung von Paru unter Arch Linux**
 
@@ -91,31 +91,31 @@ Sie können es auch mit den folgenden Befehlen installieren:
 #### Windows
 
 :::tip[Empfohlen: Verwenden Sie WSL]
-Für das beste Erlebnis unter Windows empfehlen wir die Verwendung von [Windows Subsystem for Linux (WSL)](/docs/windows-wsl). Es bietet eine bessere Leistung und vollständige Kompatibilität mit den Funktionen von OpenCode.
+Für das beste Erlebnis unter Windows empfehlen wir die Verwendung von [Windows Subsystem for Linux (WSL)](/docs/windows-wsl). Es bietet eine bessere Leistung und vollständige Kompatibilität mit den Funktionen von OpenAGt.
 :::
 
 - **Verwendung von Chocolatey**
 
   ```bash
-  choco install opencode
+  choco install openagt
   ```
 
 - **Scoop verwenden**
 
   ```bash
-  scoop install opencode
+  scoop install openagt
   ```
 
 - **Mit NPM**
 
   ```bash
-  npm install -g opencode-ai
+  npm install -g openagt
   ```
 
 - **Mit Mise**
 
   ```bash
-  mise use -g github:anomalyco/opencode
+  mise use -g github:Yecyi/OpenAGt
   ```
 
 - **Verwendung von Docker**
@@ -124,20 +124,20 @@ Für das beste Erlebnis unter Windows empfehlen wir die Verwendung von [Windows 
   docker run -it --rm ghcr.io/anomalyco/opencode
   ```
 
-Die Unterstützung für die Installation von OpenCode unter Windows mit Bun ist derzeit in Arbeit.
+Die Unterstützung für die Installation von OpenAGt unter Windows mit Bun ist derzeit in Arbeit.
 
-Sie können die Binärdatei auch aus [Releases](https://github.com/anomalyco/opencode/releases) abrufen.
+Sie können die Binärdatei auch aus [Releases](https://github.com/Yecyi/OpenAGt/releases) abrufen.
 
 ---
 
 ## Konfiguration
 
-Mit OpenCode können Sie jeden LLM-Anbieter verwenden, indem Sie dessen API-Schlüssel konfigurieren.
+Mit OpenAGt können Sie jeden LLM-Anbieter verwenden, indem Sie dessen API-Schlüssel konfigurieren.
 
-Wenn Sie mit der Verwendung von LLM-Anbietern noch nicht vertraut sind, empfehlen wir die Verwendung von [OpenCode Zen](/docs/zen).
-Es handelt sich um eine kuratierte Liste von Modellen, die vom OpenCode Team getestet und verifiziert wurden.
+Wenn Sie mit der Verwendung von LLM-Anbietern noch nicht vertraut sind, empfehlen wir die Verwendung von [OpenAGt Zen](/docs/zen).
+Es handelt sich um eine kuratierte Liste von Modellen, die vom OpenAGt Team getestet und verifiziert wurden.
 
-1. Führen Sie den Befehl `/connect` in TUI aus, wählen Sie OpenCode aus und gehen Sie zu [opencode.ai/auth](https://opencode.ai/auth).
+1. Führen Sie den Befehl `/connect` in TUI aus, wählen Sie OpenAGt aus und gehen Sie zu [github.com/Yecyi/OpenAGt/auth](https://github.com/Yecyi/OpenAGt/auth).
 
    ```txt
    /connect
@@ -167,32 +167,32 @@ an dem Sie arbeiten möchten.
 cd /path/to/project
 ```
 
-Und führen Sie OpenCode aus.
+Und führen Sie OpenAGt aus.
 
 ```bash
 opencode
 ```
 
-Als nächstes initialisieren Sie OpenCode für das Projekt, indem Sie den folgenden Befehl ausführen.
+Als nächstes initialisieren Sie OpenAGt für das Projekt, indem Sie den folgenden Befehl ausführen.
 
 ```bash frame="none"
 /init
 ```
 
-Dadurch wird OpenCode dazu veranlasst, Ihr Projekt zu analysieren und eine `AGENTS.md`-Datei im Projektstammverzeichnis zu erstellen.
+Dadurch wird OpenAGt dazu veranlasst, Ihr Projekt zu analysieren und eine `AGENTS.md`-Datei im Projektstammverzeichnis zu erstellen.
 
 :::tip
 Sie sollten die `AGENTS.md`-Datei Ihres Projekts an Git übergeben.
 :::
 
-Dies hilft OpenCode, die Projektstruktur und die Codierungsmuster zu verstehen
+Dies hilft OpenAGt, die Projektstruktur und die Codierungsmuster zu verstehen
 die verwendet werden.
 
 ---
 
 ## Verwendung
 
-Sie können nun OpenCode verwenden, um an Ihrem Projekt zu arbeiten. Fragen Sie ruhig nach
+Sie können nun OpenAGt verwenden, um an Ihrem Projekt zu arbeiten. Fragen Sie ruhig nach
 allem!
 
 Wenn Sie mit der Verwendung eines AI-Codierungsagenten noch nicht vertraut sind, finden Sie hier einige Beispiele, die hilfreich sein könnten.
@@ -201,7 +201,7 @@ Wenn Sie mit der Verwendung eines AI-Codierungsagenten noch nicht vertraut sind,
 
 ### Fragen stellen
 
-Sie können OpenCode bitten, Ihnen die Codebasis zu erklären.
+Sie können OpenAGt bitten, Ihnen die Codebasis zu erklären.
 
 :::tip
 Verwenden Sie die Taste `@`, um eine Fuzzy-Suche nach Dateien im Projekt durchzuführen.
@@ -217,11 +217,11 @@ Dies ist hilfreich, wenn es einen Teil der Codebasis gibt, an dem Sie nicht gear
 
 ### Funktionen hinzufügen
 
-Sie können OpenCode bitten, Ihrem Projekt neue Funktionen hinzuzufügen. Wir empfehlen jedoch, es zunächst um die Erstellung eines Plans zu bitten.
+Sie können OpenAGt bitten, Ihrem Projekt neue Funktionen hinzuzufügen. Wir empfehlen jedoch, es zunächst um die Erstellung eines Plans zu bitten.
 
 1. **Erstellen Sie einen Plan**
 
-   OpenCode verfügt über einen _Plan Mode_, der seine Fähigkeit, Änderungen vorzunehmen, deaktiviert
+   OpenAGt verfügt über einen _Plan Mode_, der seine Fähigkeit, Änderungen vorzunehmen, deaktiviert
    Schlagen Sie stattdessen vor, wie die Funktion implementiert wird.
 
    Wechseln Sie mit der **Tabulatortaste** dorthin. In der unteren rechten Ecke sehen Sie einen Indikator dafür.
@@ -238,11 +238,11 @@ Sie können OpenCode bitten, Ihrem Projekt neue Funktionen hinzuzufügen. Wir em
    From this screen, the user can undelete a note or permanently delete it.
    ```
 
-   Sie möchten OpenCode genügend Details geben, um zu verstehen, was Sie wollen. Es hilft
+   Sie möchten OpenAGt genügend Details geben, um zu verstehen, was Sie wollen. Es hilft
    mit ihm zu sprechen, als ob Sie mit einem Junior-Entwickler in Ihrem Team sprechen würden.
 
    :::tip
-   Geben Sie OpenCode reichlich Kontext und Beispiele, damit es versteht, was Sie
+   Geben Sie OpenAGt reichlich Kontext und Beispiele, damit es versteht, was Sie
    wollen.
    :::
 
@@ -259,7 +259,7 @@ Sie können OpenCode bitten, Ihrem Projekt neue Funktionen hinzuzufügen. Wir em
    Ziehen Sie Bilder per Drag-and-Drop in das Terminal, um sie zur Eingabeaufforderung hinzuzufügen.
    :::
 
-   OpenCode kann alle von Ihnen bereitgestellten Bilder scannen und zur Eingabeaufforderung hinzufügen. Du kannst
+   OpenAGt kann alle von Ihnen bereitgestellten Bilder scannen und zur Eingabeaufforderung hinzufügen. Du kannst
    Ziehen Sie dazu ein Bild per Drag & Drop in das Terminal.
 
 3. **Funktion erstellen**
@@ -281,7 +281,7 @@ Sie können OpenCode bitten, Ihrem Projekt neue Funktionen hinzuzufügen. Wir em
 
 ### Änderungen vornehmen
 
-Für einfachere Änderungen können Sie OpenCode bitten, es direkt zu erstellen
+Für einfachere Änderungen können Sie OpenAGt bitten, es direkt zu erstellen
 ohne den Plan vorher überprüfen zu müssen.
 
 ```txt frame="none" "@packages/functions/src/settings.ts" "@packages/functions/src/notes.ts"
@@ -290,14 +290,14 @@ handled in the /notes route in @packages/functions/src/notes.ts and implement
 the same logic in @packages/functions/src/settings.ts
 ```
 
-Sie möchten sicherstellen, dass Sie viele Details bereitstellen, damit OpenCode die richtigen
+Sie möchten sicherstellen, dass Sie viele Details bereitstellen, damit OpenAGt die richtigen
 Änderungen vornimmt.
 
 ---
 
 ### Änderungen rückgängig machen
 
-Nehmen wir an, Sie bitten OpenCode, einige Änderungen vorzunehmen.
+Nehmen wir an, Sie bitten OpenAGt, einige Änderungen vorzunehmen.
 
 ```txt frame="none" "@packages/functions/src/api/index.ts"
 Can you refactor the function in @packages/functions/src/api/index.ts?
@@ -310,14 +310,14 @@ mit dem Befehl `/undo`.
 /undo
 ```
 
-OpenCode macht nun die von Ihnen vorgenommenen Änderungen rückgängig und zeigt Ihre ursprüngliche Nachricht
+OpenAGt macht nun die von Ihnen vorgenommenen Änderungen rückgängig und zeigt Ihre ursprüngliche Nachricht
 wieder an.
 
 ```txt frame="none" "@packages/functions/src/api/index.ts"
 Can you refactor the function in @packages/functions/src/api/index.ts?
 ```
 
-Von hier aus können Sie die Eingabeaufforderung anpassen und OpenCode bitten, es erneut zu versuchen.
+Von hier aus können Sie die Eingabeaufforderung anpassen und OpenAGt bitten, es erneut zu versuchen.
 
 :::tip
 Sie können `/undo` mehrmals ausführen, um mehrere Änderungen rückgängig zu machen.
@@ -333,7 +333,7 @@ Oder Sie **können** die Änderungen mit dem Befehl `/redo` wiederholen.
 
 ## Teilen
 
-Die Gespräche, die Sie mit OpenCode führen, können [mit Ihrem Team](/docs/share) geteilt werden.
+Die Gespräche, die Sie mit OpenAGt führen, können [mit Ihrem Team](/docs/share) geteilt werden.
 
 ```bash frame="none"
 /share
@@ -345,12 +345,12 @@ Dadurch wird ein Link zur aktuellen Konversation erstellt und in Ihre Zwischenab
 Gespräche werden standardmäßig nicht geteilt.
 :::
 
-Hier ist ein [Beispielgespräch](https://opencode.ai/s/4XP1fce5) mit OpenCode.
+Hier ist ein [Beispielgespräch](https://github.com/Yecyi/OpenAGt/s/4XP1fce5) mit OpenAGt.
 
 ---
 
 ## Anpassung
 
-Und das ist es! Sie sind jetzt ein Profi im Umgang mit OpenCode.
+Und das ist es! Sie sind jetzt ein Profi im Umgang mit OpenAGt.
 
-Um es zu Ihrem eigenen zu machen, empfehlen wir [ein Theme auszuwählen](/docs/themes), [Keybinds anzupassen](/docs/keybinds), [Code-Formatter zu konfigurieren](/docs/formatters), [eigene Commands zu erstellen](/docs/commands) oder mit der [OpenCode-Konfiguration](/docs/config) zu experimentieren.
+Um es zu Ihrem eigenen zu machen, empfehlen wir [ein Theme auszuwählen](/docs/themes), [Keybinds anzupassen](/docs/keybinds), [Code-Formatter zu konfigurieren](/docs/formatters), [eigene Commands zu erstellen](/docs/commands) oder mit der [OpenAGt-Konfiguration](/docs/config) zu experimentieren.

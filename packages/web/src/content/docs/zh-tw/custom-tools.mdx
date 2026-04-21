@@ -1,33 +1,33 @@
 ---
-title: 自訂工具
-description: 建立 LLM 可在 OpenCode 中呼叫的工具。
+title: 鑷▊宸ュ叿
+description: 寤虹珛 LLM 鍙湪 OpenAGt 涓懠鍙殑宸ュ叿銆?
 ---
 
-自訂工具是您建立的函式，LLM 可以在對話過程中呼叫它們。它們與 OpenCode 的[內建工具](/docs/tools)（如 `read`、`write` 和 `bash`）協同工作。
-
----
-
-## 建立工具
-
-工具以 **TypeScript** 或 **JavaScript** 檔案的形式定義。不過，工具定義可以呼叫**任何語言**編寫的指令碼——TypeScript 或 JavaScript 僅用於工具定義本身。
+鑷▊宸ュ叿鏄偍寤虹珛鐨勫嚱寮忥紝LLM 鍙互鍦ㄥ皪瑭遍亷绋嬩腑鍛煎彨瀹冨€戙€傚畠鍊戣垏 OpenAGt 鐨刐鍏у缓宸ュ叿](/docs/tools)锛堝 `read`銆乣write` 鍜?`bash`锛夊崝鍚屽伐浣溿€?
 
 ---
 
-### 位置
+## 寤虹珛宸ュ叿
 
-工具可以在以下位置定義：
-
-- 本地定義：將工具檔案放在專案的 `.opencode/tools/` 目錄中。
-- 全域定義：將工具檔案放在 `~/.config/opencode/tools/` 中。
+宸ュ叿浠?**TypeScript** 鎴?**JavaScript** 妾旀鐨勫舰寮忓畾缇┿€備笉閬庯紝宸ュ叿瀹氱京鍙互鍛煎彨**浠讳綍瑾炶█**绶ㄥ鐨勬寚浠ょ⒓鈥斺€擳ypeScript 鎴?JavaScript 鍍呯敤鏂煎伐鍏峰畾缇╂湰韬€?
 
 ---
 
-### 結構
+### 浣嶇疆
 
-建立工具最簡單的方式是使用 `tool()` 輔助函式，它提供型別安全和參數校驗。
+宸ュ叿鍙互鍦ㄤ互涓嬩綅缃畾缇╋細
+
+- 鏈湴瀹氱京锛氬皣宸ュ叿妾旀鏀惧湪灏堟鐨?`.opencode/tools/` 鐩寗涓€?
+- 鍏ㄥ煙瀹氱京锛氬皣宸ュ叿妾旀鏀惧湪 `~/.config/opencode/tools/` 涓€?
+
+---
+
+### 绲愭
+
+寤虹珛宸ュ叿鏈€绨″柈鐨勬柟寮忔槸浣跨敤 `tool()` 杓斿姪鍑藉紡锛屽畠鎻愪緵鍨嬪垾瀹夊叏鍜屽弮鏁告牎椹椼€?
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**檔案名稱**即為**工具名稱**。上面的範例建立了一個名為 `database` 的工具。
+**妾旀鍚嶇ū**鍗崇偤**宸ュ叿鍚嶇ū**銆備笂闈㈢殑绡勪緥寤虹珛浜嗕竴鍊嬪悕鐐?`database` 鐨勫伐鍏枫€?
 
 ---
 
-#### 單檔案多工具
+#### 鍠獢妗堝宸ュ叿
 
-您也可以從單個檔案中匯出多個工具。每個匯出都會成為**一個獨立的工具**，命名格式為 **`<filename>_<exportname>`**：
+鎮ㄤ篃鍙互寰炲柈鍊嬫獢妗堜腑鍖嚭澶氬€嬪伐鍏枫€傛瘡鍊嬪尟鍑洪兘鏈冩垚鐐?*涓€鍊嬬崹绔嬬殑宸ュ叿**锛屽懡鍚嶆牸寮忕偤 **`<filename>_<exportname>`**锛?
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-這會建立兩個工具：`math_add` 和 `math_multiply`。
+閫欐渻寤虹珛鍏╁€嬪伐鍏凤細`math_add` 鍜?`math_multiply`銆?
 
 ---
 
-#### 與內建工具名稱衝突
+#### 鑸囧収寤哄伐鍏峰悕绋辫绐?
 
-自訂工具以工具名稱作為鍵值。如果自訂工具使用與內建工具相同的名稱，則自訂工具具有優先權。
+鑷▊宸ュ叿浠ュ伐鍏峰悕绋变綔鐐洪嵉鍊笺€傚鏋滆嚜瑷傚伐鍏蜂娇鐢ㄨ垏鍏у缓宸ュ叿鐩稿悓鐨勫悕绋憋紝鍓囪嚜瑷傚伐鍏峰叿鏈夊劒鍏堟瑠銆?
 
-例如，此檔案將替換內建的 `bash` 工具：
+渚嬪锛屾妾旀灏囨浛鎻涘収寤虹殑 `bash` 宸ュ叿锛?
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-除非您有意替換內建工具，否則請使用唯一的名稱。如果您想停用內建工具但不覆寫它，請使用[權限](/docs/permissions)。
+闄ら潪鎮ㄦ湁鎰忔浛鎻涘収寤哄伐鍏凤紝鍚﹀墖璜嬩娇鐢ㄥ敮涓€鐨勫悕绋便€傚鏋滄偍鎯冲仠鐢ㄥ収寤哄伐鍏蜂絾涓嶈瀵畠锛岃珛浣跨敤[娆婇檺](/docs/permissions)銆?
 :::
 
 ---
 
-### 參數
+### 鍙冩暩
 
-您可以使用 `tool.schema`（即 [Zod](https://zod.dev)）來定義參數型別。
+鎮ㄥ彲浠ヤ娇鐢?`tool.schema`锛堝嵆 [Zod](https://zod.dev)锛変締瀹氱京鍙冩暩鍨嬪垾銆?
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-您也可以直接匯入 [Zod](https://zod.dev) 並回傳一個普通物件：
+鎮ㄤ篃鍙互鐩存帴鍖叆 [Zod](https://zod.dev) 涓﹀洖鍌充竴鍊嬫櫘閫氱墿浠讹細
 
 ```ts {6}
 import { z } from "zod"
@@ -134,12 +134,12 @@ export default {
 
 ---
 
-### 上下文
+### 涓婁笅鏂?
 
-工具會接收當前工作階段的上下文資訊：
+宸ュ叿鏈冩帴鏀剁暥鍓嶅伐浣滈殠娈电殑涓婁笅鏂囪硣瑷婏細
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -152,18 +152,18 @@ export default tool({
 })
 ```
 
-使用 `context.directory` 取得工作階段的工作目錄。
-使用 `context.worktree` 取得 git worktree 根目錄。
+浣跨敤 `context.directory` 鍙栧緱宸ヤ綔闅庢鐨勫伐浣滅洰閷勩€?
+浣跨敤 `context.worktree` 鍙栧緱 git worktree 鏍圭洰閷勩€?
 
 ---
 
-## 範例
+## 绡勪緥
 
-### 用 Python 編寫工具
+### 鐢?Python 绶ㄥ宸ュ叿
 
-您可以使用任何語言編寫工具。以下範例展示了如何用 Python 實作兩數相加。
+鎮ㄥ彲浠ヤ娇鐢ㄤ换浣曡獮瑷€绶ㄥ宸ュ叿銆備互涓嬬瘎渚嬪睍绀轰簡濡備綍鐢?Python 瀵︿綔鍏╂暩鐩稿姞銆?
 
-首先，建立一個 Python 指令碼作為工具：
+棣栧厛锛屽缓绔嬩竴鍊?Python 鎸囦护纰间綔鐐哄伐鍏凤細
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-然後建立呼叫該指令碼的工具定義：
+鐒跺緦寤虹珛鍛煎彨瑭叉寚浠ょ⒓鐨勫伐鍏峰畾缇╋細
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-這裡我們使用 [`Bun.$`](https://bun.com/docs/runtime/shell) 工具函式來執行 Python 指令碼。
+閫欒！鎴戝€戜娇鐢?[`Bun.$`](https://bun.com/docs/runtime/shell) 宸ュ叿鍑藉紡渚嗗煼琛?Python 鎸囦护纰笺€?

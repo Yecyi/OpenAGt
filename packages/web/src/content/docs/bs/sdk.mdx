@@ -18,7 +18,7 @@ Koristite ga za izradu integracija i programsko upravljanje opencode-om.
 Instalirajte SDK sa npm-a:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
@@ -28,7 +28,7 @@ npm install @opencode-ai/sdk
 Kreirajte instancu opencode:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
@@ -52,7 +52,7 @@ Ovo pokrece i server i klijent
 Mozete proslijediti konfiguracijski objekat za prilagodavanje ponasanja. Instanca i dalje ucitava `opencode.json`, ali konfiguraciju mozete nadjacati ili dodati inline:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -72,7 +72,7 @@ opencode.server.close()
 Ako vec imate pokrenutu opencode instancu, mozete napraviti klijentsku instancu i povezati se na nju:
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
@@ -96,14 +96,14 @@ const client = createOpencodeClient({
 SDK ukljucuje TypeScript definicije za sve API tipove. Uvezite ih direktno:
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
 Svi tipovi su generisani iz OpenAPI specifikacije servera i dostupni u <a href={typesUrl}>types datoteci</a>.
 
 ---
 
-## Greške
+## Gre拧ke
 
 SDK moze baciti greske koje mozete uhvatiti i obraditi:
 
@@ -119,7 +119,7 @@ try {
 
 ## Strukturirani izlaz
 
-Možete zatražiti strukturirani JSON izlaz od modela specificiranjem `format` sa JSON šemom. Model će koristiti `StructuredOutput` alat da vrati validirani JSON koji odgovara vašoj šemi.
+Mo啪ete zatra啪iti strukturirani JSON izlaz od modela specificiranjem `format` sa JSON 拧emom. Model 膰e koristiti `StructuredOutput` alat da vrati validirani JSON koji odgovara va拧oj 拧emi.
 
 ### Osnovna upotreba
 
@@ -157,21 +157,21 @@ console.log(result.data.info.structured_output)
 | Tip           | Opis                                                                |
 | ------------- | ------------------------------------------------------------------- |
 | `text`        | Default. Standardni tekstualni odgovor (nema strukturiranog izlaza) |
-| `json_schema` | Vraća validirani JSON koji odgovara pruženoj šemi                   |
+| `json_schema` | Vra膰a validirani JSON koji odgovara pru啪enoj 拧emi                   |
 
-### Format JSON šeme
+### Format JSON 拧eme
 
 Kada koristite `type: 'json_schema'`, navedite:
 
 | Polje        | Tip             | Opis                                                        |
 | ------------ | --------------- | ----------------------------------------------------------- |
-| `type`       | `'json_schema'` | Obavezno. Određuje JSON schema način rada                   |
+| `type`       | `'json_schema'` | Obavezno. Odre膽uje JSON schema na膷in rada                   |
 | `schema`     | `object`        | Obavezno. JSON Schema objekt koji definira strukturu izlaza |
-| `retryCount` | `number`        | Opcionalno. Broj ponovnih pokušaja validacije (default: 2)  |
+| `retryCount` | `number`        | Opcionalno. Broj ponovnih poku拧aja validacije (default: 2)  |
 
-### Rukovanje greškama
+### Rukovanje gre拧kama
 
-Ako model ne uspije proizvesti validan strukturirani izlaz nakon svih ponovnih pokušaja, odgovor će uključivati `StructuredOutputError`:
+Ako model ne uspije proizvesti validan strukturirani izlaz nakon svih ponovnih poku拧aja, odgovor 膰e uklju膷ivati `StructuredOutputError`:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -182,16 +182,16 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 
 ### Najbolje prakse
 
-1. **Navedite jasne opise** u svojstvima vaše šeme kako biste pomogli modelu da razumije koje podatke treba izdvojiti
+1. **Navedite jasne opise** u svojstvima va拧e 拧eme kako biste pomogli modelu da razumije koje podatke treba izdvojiti
 2. **Koristite `required`** da odredite koja polja moraju biti prisutna
-3. **Držite šeme fokusiranim** - složene ugniježđene šeme modelu mogu biti teže za ispravno popunjavanje
-4. **Postavite odgovarajući `retryCount`** - povećajte za složene šeme, smanjite za jednostavne
+3. **Dr啪ite 拧eme fokusiranim** - slo啪ene ugnije啪膽ene 拧eme modelu mogu biti te啪e za ispravno popunjavanje
+4. **Postavite odgovaraju膰i `retryCount`** - pove膰ajte za slo啪ene 拧eme, smanjite za jednostavne
 
 ---
 
 ## API-ji
 
-SDK izlaže sve server API-je kroz type-safe klijent.
+SDK izla啪e sve server API-je kroz type-safe klijent.
 
 ---
 
@@ -367,7 +367,7 @@ await client.session.prompt({
 
 - `type`: `"file"` or `"directory"`
 - `directory`: override the project root for the search
-- `limit`: max results (1–200)
+- `limit`: max results (1鈥?00)
 
 ---
 
@@ -444,7 +444,7 @@ await client.auth.set({
 
 ---
 
-### Događaji
+### Doga膽aji
 
 | Metoda              | Opis                      | Odgovor                   |
 | ------------------- | ------------------------- | ------------------------- |

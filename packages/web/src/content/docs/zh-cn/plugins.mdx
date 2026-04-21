@@ -1,78 +1,78 @@
 ---
-title: 插件
-description: 编写自己的插件来扩展 OpenCode。
+title: 鎻掍欢
+description: 缂栧啓鑷繁鐨勬彃浠舵潵鎵╁睍 OpenAGt銆?
 ---
 
-插件允许你通过挂钩各种事件和自定义行为来扩展 OpenCode。你可以创建插件来添加新功能、集成外部服务，或修改 OpenCode 的默认行为。
+鎻掍欢鍏佽浣犻€氳繃鎸傞挬鍚勭浜嬩欢鍜岃嚜瀹氫箟琛屼负鏉ユ墿灞?OpenAGt銆備綘鍙互鍒涘缓鎻掍欢鏉ユ坊鍔犳柊鍔熻兘銆侀泦鎴愬閮ㄦ湇鍔★紝鎴栦慨鏀?OpenAGt 鐨勯粯璁よ涓恒€?
 
-如需了解示例，请查看社区创建的[插件](/docs/ecosystem#plugins)。
-
----
-
-## 使用插件
-
-有两种方式加载插件。
+濡傞渶浜嗚В绀轰緥锛岃鏌ョ湅绀惧尯鍒涘缓鐨刐鎻掍欢](/docs/ecosystem#plugins)銆?
 
 ---
 
-### 从本地文件加载
+## 浣跨敤鎻掍欢
 
-将 JavaScript 或 TypeScript 文件放置在插件目录中。
-
-- `.opencode/plugins/` - 项目级插件
-- `~/.config/opencode/plugins/` - 全局插件
-
-这些目录中的文件会在启动时自动加载。
+鏈変袱绉嶆柟寮忓姞杞芥彃浠躲€?
 
 ---
 
-### 从 npm 加载
+### 浠庢湰鍦版枃浠跺姞杞?
 
-在配置文件中指定 npm 包。
+灏?JavaScript 鎴?TypeScript 鏂囦欢鏀剧疆鍦ㄦ彃浠剁洰褰曚腑銆?
+
+- `.opencode/plugins/` - 椤圭洰绾ф彃浠?
+- `~/.config/opencode/plugins/` - 鍏ㄥ眬鎻掍欢
+
+杩欎簺鐩綍涓殑鏂囦欢浼氬湪鍚姩鏃惰嚜鍔ㄥ姞杞姐€?
+
+---
+
+### 浠?npm 鍔犺浇
+
+鍦ㄩ厤缃枃浠朵腑鎸囧畾 npm 鍖呫€?
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-支持常规和带作用域的 npm 包。
+鏀寔甯歌鍜屽甫浣滅敤鍩熺殑 npm 鍖呫€?
 
-浏览[生态系统](/docs/ecosystem#plugins)中的可用插件。
-
----
-
-### 插件的安装方式
-
-**npm 插件**在启动时使用 Bun 自动安装。包及其依赖项会缓存在 `~/.cache/opencode/node_modules/` 中。
-
-**本地插件**直接从插件目录加载。如果需要使用外部包，你必须在配置目录中创建 `package.json`（参见[依赖项](#dependencies)），或者将插件发布到 npm 并[将其添加到配置中](/docs/config#plugins)。
+娴忚[鐢熸€佺郴缁焆(/docs/ecosystem#plugins)涓殑鍙敤鎻掍欢銆?
 
 ---
 
-### 加载顺序
+### 鎻掍欢鐨勫畨瑁呮柟寮?
 
-插件从所有来源加载，所有钩子按顺序执行。加载顺序为：
+**npm 鎻掍欢**鍦ㄥ惎鍔ㄦ椂浣跨敤 Bun 鑷姩瀹夎銆傚寘鍙婂叾渚濊禆椤逛細缂撳瓨鍦?`~/.cache/opencode/node_modules/` 涓€?
 
-1. 全局配置 (`~/.config/opencode/opencode.json`)
-2. 项目配置 (`opencode.json`)
-3. 全局插件目录 (`~/.config/opencode/plugins/`)
-4. 项目插件目录 (`.opencode/plugins/`)
-
-名称和版本相同的重复 npm 包只会加载一次。但本地插件和名称相似的 npm 插件会分别独立加载。
+**鏈湴鎻掍欢**鐩存帴浠庢彃浠剁洰褰曞姞杞姐€傚鏋滈渶瑕佷娇鐢ㄥ閮ㄥ寘锛屼綘蹇呴』鍦ㄩ厤缃洰褰曚腑鍒涘缓 `package.json`锛堝弬瑙乕渚濊禆椤筣(#dependencies)锛夛紝鎴栬€呭皢鎻掍欢鍙戝竷鍒?npm 骞禰灏嗗叾娣诲姞鍒伴厤缃腑](/docs/config#plugins)銆?
 
 ---
 
-## 创建插件
+### 鍔犺浇椤哄簭
 
-插件是一个 **JavaScript/TypeScript 模块**，它导出一个或多个插件函数。每个函数接收一个上下文对象，并返回一个钩子对象。
+鎻掍欢浠庢墍鏈夋潵婧愬姞杞斤紝鎵€鏈夐挬瀛愭寜椤哄簭鎵ц銆傚姞杞介『搴忎负锛?
+
+1. 鍏ㄥ眬閰嶇疆 (`~/.config/opencode/opencode.json`)
+2. 椤圭洰閰嶇疆 (`opencode.json`)
+3. 鍏ㄥ眬鎻掍欢鐩綍 (`~/.config/opencode/plugins/`)
+4. 椤圭洰鎻掍欢鐩綍 (`.opencode/plugins/`)
+
+鍚嶇О鍜岀増鏈浉鍚岀殑閲嶅 npm 鍖呭彧浼氬姞杞戒竴娆°€備絾鏈湴鎻掍欢鍜屽悕绉扮浉浼肩殑 npm 鎻掍欢浼氬垎鍒嫭绔嬪姞杞姐€?
 
 ---
 
-### 依赖项
+## 鍒涘缓鎻掍欢
 
-本地插件和自定义工具可以使用外部 npm 包。在配置目录中添加一个 `package.json`，列出所需的依赖项。
+鎻掍欢鏄竴涓?**JavaScript/TypeScript 妯″潡**锛屽畠瀵煎嚭涓€涓垨澶氫釜鎻掍欢鍑芥暟銆傛瘡涓嚱鏁版帴鏀朵竴涓笂涓嬫枃瀵硅薄锛屽苟杩斿洖涓€涓挬瀛愬璞°€?
+
+---
+
+### 渚濊禆椤?
+
+鏈湴鎻掍欢鍜岃嚜瀹氫箟宸ュ叿鍙互浣跨敤澶栭儴 npm 鍖呫€傚湪閰嶇疆鐩綍涓坊鍔犱竴涓?`package.json`锛屽垪鍑烘墍闇€鐨勪緷璧栭」銆?
 
 ```json title=".opencode/package.json"
 {
@@ -82,7 +82,7 @@ description: 编写自己的插件来扩展 OpenCode。
 }
 ```
 
-OpenCode 会在启动时运行 `bun install` 来安装这些依赖项。之后你的插件和工具就可以导入它们了。
+OpenAGt 浼氬湪鍚姩鏃惰繍琛?`bun install` 鏉ュ畨瑁呰繖浜涗緷璧栭」銆備箣鍚庝綘鐨勬彃浠跺拰宸ュ叿灏卞彲浠ュ鍏ュ畠浠簡銆?
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -100,7 +100,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### 基本结构
+### 鍩烘湰缁撴瀯
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -112,22 +112,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-插件函数接收以下参数：
+鎻掍欢鍑芥暟鎺ユ敹浠ヤ笅鍙傛暟锛?
 
-- `project`：当前项目信息。
-- `directory`：当前工作目录。
-- `worktree`：git 工作树路径。
-- `client`：用于与 AI 交互的 OpenCode SDK 客户端。
-- `$`：Bun 的 [Shell API](https://bun.com/docs/runtime/shell)，用于执行命令。
+- `project`锛氬綋鍓嶉」鐩俊鎭€?
+- `directory`锛氬綋鍓嶅伐浣滅洰褰曘€?
+- `worktree`锛歡it 宸ヤ綔鏍戣矾寰勩€?
+- `client`锛氱敤浜庝笌 AI 浜や簰鐨?OpenAGt SDK 瀹㈡埛绔€?
+- `$`锛欱un 鐨?[Shell API](https://bun.com/docs/runtime/shell)锛岀敤浜庢墽琛屽懡浠ゃ€?
 
 ---
 
-### TypeScript 支持
+### TypeScript 鏀寔
 
-对于 TypeScript 插件，你可以从插件包中导入类型：
+瀵逛簬 TypeScript 鎻掍欢锛屼綘鍙互浠庢彃浠跺寘涓鍏ョ被鍨嬶細
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -138,45 +138,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### 事件
+### 浜嬩欢
 
-插件可以订阅事件，如下方示例部分所示。以下是所有可用事件的列表。
+鎻掍欢鍙互璁㈤槄浜嬩欢锛屽涓嬫柟绀轰緥閮ㄥ垎鎵€绀恒€備互涓嬫槸鎵€鏈夊彲鐢ㄤ簨浠剁殑鍒楄〃銆?
 
-#### 命令事件
+#### 鍛戒护浜嬩欢
 
 - `command.executed`
 
-#### 文件事件
+#### 鏂囦欢浜嬩欢
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### 安装事件
+#### 瀹夎浜嬩欢
 
 - `installation.updated`
 
-#### LSP 事件
+#### LSP 浜嬩欢
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### 消息事件
+#### 娑堟伅浜嬩欢
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### 权限事件
+#### 鏉冮檺浜嬩欢
 
 - `permission.asked`
 - `permission.replied`
 
-#### 服务器事件
+#### 鏈嶅姟鍣ㄤ簨浠?
 
 - `server.connected`
 
-#### 会话事件
+#### 浼氳瘽浜嬩欢
 
 - `session.created`
 - `session.compacted`
@@ -187,20 +187,20 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 - `session.status`
 - `session.updated`
 
-#### 待办事项事件
+#### 寰呭姙浜嬮」浜嬩欢
 
 - `todo.updated`
 
-#### Shell 事件
+#### Shell 浜嬩欢
 
 - `shell.env`
 
-#### 工具事件
+#### 宸ュ叿浜嬩欢
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUI 事件
+#### TUI 浜嬩欢
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -208,15 +208,15 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-## 示例
+## 绀轰緥
 
-以下是一些可用于扩展 OpenCode 的插件示例。
+浠ヤ笅鏄竴浜涘彲鐢ㄤ簬鎵╁睍 OpenAGt 鐨勬彃浠剁ず渚嬨€?
 
 ---
 
-### 发送通知
+### 鍙戦€侀€氱煡
 
-在特定事件发生时发送通知：
+鍦ㄧ壒瀹氫簨浠跺彂鐢熸椂鍙戦€侀€氱煡锛?
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -231,17 +231,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-这里使用 `osascript` 在 macOS 上运行 AppleScript 来发送通知。
+杩欓噷浣跨敤 `osascript` 鍦?macOS 涓婅繍琛?AppleScript 鏉ュ彂閫侀€氱煡銆?
 
 :::note
-如果你使用 OpenCode 桌面应用，它可以在响应就绪或会话出错时自动发送系统通知。
+濡傛灉浣犱娇鐢?OpenAGt 妗岄潰搴旂敤锛屽畠鍙互鍦ㄥ搷搴斿氨缁垨浼氳瘽鍑洪敊鏃惰嚜鍔ㄥ彂閫佺郴缁熼€氱煡銆?
 :::
 
 ---
 
-### .env 保护
+### .env 淇濇姢
 
-阻止 OpenCode 读取 `.env` 文件：
+闃绘 OpenAGt 璇诲彇 `.env` 鏂囦欢锛?
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -257,9 +257,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### 注入环境变量
+### 娉ㄥ叆鐜鍙橀噺
 
-将环境变量注入所有 Shell 执行（AI 工具和用户终端）：
+灏嗙幆澧冨彉閲忔敞鍏ユ墍鏈?Shell 鎵ц锛圓I 宸ュ叿鍜岀敤鎴风粓绔級锛?
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -274,12 +274,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### 自定义工具
+### 鑷畾涔夊伐鍏?
 
-插件还可以为 OpenCode 添加自定义工具：
+鎻掍欢杩樺彲浠ヤ负 OpenAGt 娣诲姞鑷畾涔夊伐鍏凤細
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -299,23 +299,23 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-`tool` 辅助函数用于创建 OpenCode 可调用的自定义工具。它接受一个 Zod schema 函数，并返回一个工具定义，包含：
+`tool` 杈呭姪鍑芥暟鐢ㄤ簬鍒涘缓 OpenAGt 鍙皟鐢ㄧ殑鑷畾涔夊伐鍏枫€傚畠鎺ュ彈涓€涓?Zod schema 鍑芥暟锛屽苟杩斿洖涓€涓伐鍏峰畾涔夛紝鍖呭惈锛?
 
-- `description`：工具的功能描述
-- `args`：工具参数的 Zod schema
-- `execute`：工具被调用时执行的函数
+- `description`锛氬伐鍏风殑鍔熻兘鎻忚堪
+- `args`锛氬伐鍏峰弬鏁扮殑 Zod schema
+- `execute`锛氬伐鍏疯璋冪敤鏃舵墽琛岀殑鍑芥暟
 
-你的自定义工具将与内置工具一起在 OpenCode 中可用。
+浣犵殑鑷畾涔夊伐鍏峰皢涓庡唴缃伐鍏蜂竴璧峰湪 OpenAGt 涓彲鐢ㄣ€?
 
 :::note
-如果插件工具与内置工具使用相同的名称，则优先使用插件工具。
+濡傛灉鎻掍欢宸ュ叿涓庡唴缃伐鍏蜂娇鐢ㄧ浉鍚岀殑鍚嶇О锛屽垯浼樺厛浣跨敤鎻掍欢宸ュ叿銆?
 :::
 
 ---
 
-### 日志记录
+### 鏃ュ織璁板綍
 
-使用 `client.app.log()` 代替 `console.log` 进行结构化日志记录：
+浣跨敤 `client.app.log()` 浠ｆ浛 `console.log` 杩涜缁撴瀯鍖栨棩蹇楄褰曪細
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -330,16 +330,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-日志级别：`debug`、`info`、`warn`、`error`。详情请参阅 [SDK 文档](https://opencode.ai/docs/sdk)。
+鏃ュ織绾у埆锛歚debug`銆乣info`銆乣warn`銆乣error`銆傝鎯呰鍙傞槄 [SDK 鏂囨。](https://github.com/Yecyi/OpenAGt/docs/sdk)銆?
 
 ---
 
-### 压缩钩子
+### 鍘嬬缉閽╁瓙
 
-自定义会话压缩时包含的上下文：
+鑷畾涔変細璇濆帇缂╂椂鍖呭惈鐨勪笂涓嬫枃锛?
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -358,12 +358,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` 钩子在 LLM 生成续接摘要之前触发。使用它来注入默认压缩提示词可能遗漏的领域特定上下文。
+`experimental.session.compacting` 閽╁瓙鍦?LLM 鐢熸垚缁帴鎽樿涔嬪墠瑙﹀彂銆備娇鐢ㄥ畠鏉ユ敞鍏ラ粯璁ゅ帇缂╂彁绀鸿瘝鍙兘閬楁紡鐨勯鍩熺壒瀹氫笂涓嬫枃銆?
 
-你还可以通过设置 `output.prompt` 来完全替换压缩提示词：
+浣犺繕鍙互閫氳繃璁剧疆 `output.prompt` 鏉ュ畬鍏ㄦ浛鎹㈠帇缂╂彁绀鸿瘝锛?
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -385,4 +385,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-当设置了 `output.prompt` 时，它会完全替换默认的压缩提示词。在这种情况下，`output.context` 数组将被忽略。
+褰撹缃簡 `output.prompt` 鏃讹紝瀹冧細瀹屽叏鏇挎崲榛樿鐨勫帇缂╂彁绀鸿瘝銆傚湪杩欑鎯呭喌涓嬶紝`output.context` 鏁扮粍灏嗚蹇界暐銆?

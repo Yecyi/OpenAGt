@@ -4,14 +4,14 @@ description: Ulike moduser for forskjellige brukstilfeller.
 ---
 
 :::caution
-Moduser konfigureres nå gjennom alternativet `agent` i OpenCode-konfigurasjonen.
+Moduser konfigureres nå gjennom alternativet `agent` i OpenAGt-konfigurasjonen.
 Alternativet `mode` er nå utdatert. [Finn ut mer](/docs/agents).
 :::
 
-Moduser i OpenCode lar deg tilpasse oppførselen, verktøyene og prompter for ulike brukstilfeller.
+Moduser i OpenAGt lar deg tilpasse oppførselen, verktøyene og prompter for ulike brukstilfeller.
 
 Den kommer med to innebygde moduser: **bygg** og **plan**. Du kan tilpasse
-disse eller konfigurer din egen gjennom OpenCode-konfigurasjonen.
+disse eller konfigurer din egen gjennom OpenAGt-konfigurasjonen.
 
 Du kan bytte mellom moduser under en økt eller konfigurere dem i konfigurasjonsfilen din.
 
@@ -19,7 +19,7 @@ Du kan bytte mellom moduser under en økt eller konfigurere dem i konfigurasjons
 
 ## Innebygd
 
-OpenCode kommer med to innebygde moduser.
+OpenAGt kommer med to innebygde moduser.
 
 ---
 
@@ -60,7 +60,7 @@ Konfigurer moduser i din `opencode.json` konfigurasjonsfil:
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "mode": {
     "build": {
       "model": "anthropic/claude-sonnet-4-20250514",
@@ -173,7 +173,7 @@ Temperaturverdier varierer vanligvis fra 0,0 til 1,0:
 }
 ```
 
-Hvis ingen temperatur er spesifisert, bruker OpenCode modellspesifikke standardinnstillinger (vanligvis 0 for de fleste modeller, 0,55 for Qwen-modeller).
+Hvis ingen temperatur er spesifisert, bruker OpenAGt modellspesifikke standardinnstillinger (vanligvis 0 for de fleste modeller, 0,55 for Qwen-modeller).
 
 ---
 
@@ -191,7 +191,7 @@ Angi en tilpasset systemprompt-fil for denne modusen med `prompt`-konfigurasjone
 }
 ```
 
-Denne banen er relativ til der konfigurasjonsfilen er plassert. Så dette fungerer for både den globale OpenCode-konfigurasjonen og den prosjektspesifikke konfigurasjonen.
+Denne banen er relativ til der konfigurasjonsfilen er plassert. Så dette fungerer for både den globale OpenAGt-konfigurasjonen og den prosjektspesifikke konfigurasjonen.
 
 ---
 
@@ -246,7 +246,7 @@ Du kan opprette dine egne tilpassede moduser ved å legge dem til i konfigurasjo
 
 ```json title="opencode.json" {4-14}
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "mode": {
     "docs": {
       "prompt": "{file:./prompts/documentation.txt}",

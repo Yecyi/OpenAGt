@@ -1,8 +1,8 @@
 import { Component, For, Show } from "solid-js"
-import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { getDirectory, getFilename, getFilenameTruncated } from "@opencode-ai/shared/util/path"
+import { FileIcon } from "@openagt/ui/file-icon"
+import { IconButton } from "@openagt/ui/icon-button"
+import { Tooltip } from "@openagt/ui/tooltip"
+import { getDirectory, getFilename, getFilenameTruncated } from "@openagt/shared/util/path"
 import type { ContextItem } from "@/context/prompt"
 
 type PromptContextItem = ContextItem & { key: string }

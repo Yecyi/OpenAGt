@@ -1,43 +1,43 @@
 ---
 title: SDK
-description: Типобезопасный JS-клиент для сервера opencode.
+description: 孝懈锌芯斜械蟹芯锌邪褋薪褘泄 JS-泻谢懈械薪褌 写谢褟 褋械褉胁械褉邪 opencode.
 ---
 
 import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
-SDK JS/TS с открытым кодом предоставляет типобезопасный клиент для взаимодействия с сервером.
-Используйте его для создания интеграции и программного управления открытым кодом.
+SDK JS/TS 褋 芯褌泻褉褘褌褘屑 泻芯写芯屑 锌褉械写芯褋褌邪胁谢褟械褌 褌懈锌芯斜械蟹芯锌邪褋薪褘泄 泻谢懈械薪褌 写谢褟 胁蟹邪懈屑芯写械泄褋褌胁懈褟 褋 褋械褉胁械褉芯屑.
+袠褋锌芯谢褜蟹褍泄褌械 械谐芯 写谢褟 褋芯蟹写邪薪懈褟 懈薪褌械谐褉邪褑懈懈 懈 锌褉芯谐褉邪屑屑薪芯谐芯 褍锌褉邪胁谢械薪懈褟 芯褌泻褉褘褌褘屑 泻芯写芯屑.
 
-[Узнайте больше](/docs/server) о том, как работает сервер. Примеры можно найти в [projects](/docs/ecosystem#projects), созданном сообществом.
+[校蟹薪邪泄褌械 斜芯谢褜褕械](/docs/server) 芯 褌芯屑, 泻邪泻 褉邪斜芯褌邪械褌 褋械褉胁械褉. 袩褉懈屑械褉褘 屑芯卸薪芯 薪邪泄褌懈 胁 [projects](/docs/ecosystem#projects), 褋芯蟹写邪薪薪芯屑 褋芯芯斜褖械褋褌胁芯屑.
 
 ---
 
-## Установить
+## 校褋褌邪薪芯胁懈褌褜
 
-Установите SDK из npm:
+校褋褌邪薪芯胁懈褌械 SDK 懈蟹 npm:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
 
-## Создать клиента
+## 小芯蟹写邪褌褜 泻谢懈械薪褌邪
 
-Создайте экземпляр opencode:
+小芯蟹写邪泄褌械 褝泻蟹械屑锌谢褟褉 opencode:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
 
-Это запускает и сервер, и клиент.
+协褌芯 蟹邪锌褍褋泻邪械褌 懈 褋械褉胁械褉, 懈 泻谢懈械薪褌.
 
-#### Параметры
+#### 袩邪褉邪屑械褌褉褘
 
-| Вариант    | Тип           | Описание                       | По умолчанию |
+| 袙邪褉懈邪薪褌    | 孝懈锌           | 袨锌懈褋邪薪懈械                       | 袩芯 褍屑芯谢褔邪薪懈褞 |
 | ---------- | ------------- | ------------------------------ | ------------ |
 | `hostname` | `string`      | Server hostname                | `127.0.0.1`  |
 | `port`     | `number`      | Server port                    | `4096`       |
@@ -47,12 +47,12 @@ const { client } = await createOpencode()
 
 ---
 
-## Конфигурация
+## 袣芯薪褎懈谐褍褉邪褑懈褟
 
-Вы можете передать объект конфигурации для настройки поведения. Экземпляр по-прежнему получает ваш `opencode.json`, но вы можете переопределить или добавить встроенную конфигурацию:
+袙褘 屑芯卸械褌械 锌械褉械写邪褌褜 芯斜褗械泻褌 泻芯薪褎懈谐褍褉邪褑懈懈 写谢褟 薪邪褋褌褉芯泄泻懈 锌芯胁械写械薪懈褟. 协泻蟹械屑锌谢褟褉 锌芯-锌褉械卸薪械屑褍 锌芯谢褍褔邪械褌 胁邪褕 `opencode.json`, 薪芯 胁褘 屑芯卸械褌械 锌械褉械芯锌褉械写械谢懈褌褜 懈谢懈 写芯斜邪胁懈褌褜 胁褋褌褉芯械薪薪褍褞 泻芯薪褎懈谐褍褉邪褑懈褞:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -67,21 +67,21 @@ console.log(`Server running at ${opencode.server.url}`)
 opencode.server.close()
 ```
 
-## Только клиент
+## 孝芯谢褜泻芯 泻谢懈械薪褌
 
-Если у вас уже есть работающий экземпляр opencode, вы можете создать экземпляр клиента для подключения к нему:
+袝褋谢懈 褍 胁邪褋 褍卸械 械褋褌褜 褉邪斜芯褌邪褞褖懈泄 褝泻蟹械屑锌谢褟褉 opencode, 胁褘 屑芯卸械褌械 褋芯蟹写邪褌褜 褝泻蟹械屑锌谢褟褉 泻谢懈械薪褌邪 写谢褟 锌芯写泻谢褞褔械薪懈褟 泻 薪械屑褍:
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
 })
 ```
 
-#### Параметры
+#### 袩邪褉邪屑械褌褉褘
 
-| Вариант         | Тип        | Описание                         | По умолчанию            |
+| 袙邪褉懈邪薪褌         | 孝懈锌        | 袨锌懈褋邪薪懈械                         | 袩芯 褍屑芯谢褔邪薪懈褞            |
 | --------------- | ---------- | -------------------------------- | ----------------------- |
 | `baseUrl`       | `string`   | URL of the server                | `http://localhost:4096` |
 | `fetch`         | `function` | Custom fetch implementation      | `globalThis.fetch`      |
@@ -91,21 +91,21 @@ const client = createOpencodeClient({
 
 ---
 
-## Типы
+## 孝懈锌褘
 
-SDK включает определения TypeScript для всех типов API. Импортируйте их напрямую:
+SDK 胁泻谢褞褔邪械褌 芯锌褉械写械谢械薪懈褟 TypeScript 写谢褟 胁褋械褏 褌懈锌芯胁 API. 袠屑锌芯褉褌懈褉褍泄褌械 懈褏 薪邪锌褉褟屑褍褞:
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-Все типы генерируются на основе спецификации OpenAPI сервера и доступны в файле <a href={typesUrl}>types</a>.
+袙褋械 褌懈锌褘 谐械薪械褉懈褉褍褞褌褋褟 薪邪 芯褋薪芯胁械 褋锌械褑懈褎懈泻邪褑懈懈 OpenAPI 褋械褉胁械褉邪 懈 写芯褋褌褍锌薪褘 胁 褎邪泄谢械 <a href={typesUrl}>types</a>.
 
 ---
 
-## Ошибки
+## 袨褕懈斜泻懈
 
-SDK может выдавать ошибки, которые вы можете отловить и обработать:
+SDK 屑芯卸械褌 胁褘写邪胁邪褌褜 芯褕懈斜泻懈, 泻芯褌芯褉褘械 胁褘 屑芯卸械褌械 芯褌谢芯胁懈褌褜 懈 芯斜褉邪斜芯褌邪褌褜:
 
 ```typescript
 try {
@@ -117,11 +117,11 @@ try {
 
 ---
 
-## Структурированный вывод
+## 小褌褉褍泻褌褍褉懈褉芯胁邪薪薪褘泄 胁褘胁芯写
 
-Вы можете запросить структурированный вывод JSON от модели, указав `format` со схемой JSON. Модель будет использовать инструмент `StructuredOutput` для возврата проверенного JSON, соответствующего вашей схеме.
+袙褘 屑芯卸械褌械 蟹邪锌褉芯褋懈褌褜 褋褌褉褍泻褌褍褉懈褉芯胁邪薪薪褘泄 胁褘胁芯写 JSON 芯褌 屑芯写械谢懈, 褍泻邪蟹邪胁 `format` 褋芯 褋褏械屑芯泄 JSON. 袦芯写械谢褜 斜褍写械褌 懈褋锌芯谢褜蟹芯胁邪褌褜 懈薪褋褌褉褍屑械薪褌 `StructuredOutput` 写谢褟 胁芯蟹胁褉邪褌邪 锌褉芯胁械褉械薪薪芯谐芯 JSON, 褋芯芯褌胁械褌褋褌胁褍褞褖械谐芯 胁邪褕械泄 褋褏械屑械.
 
-### Основное использование
+### 袨褋薪芯胁薪芯械 懈褋锌芯谢褜蟹芯胁邪薪懈械
 
 ```typescript
 const result = await client.session.prompt({
@@ -152,26 +152,26 @@ console.log(result.data.info.structured_output)
 // { company: "Anthropic", founded: 2021, products: ["Claude", "Claude API"] }
 ```
 
-### Типы форматов вывода
+### 孝懈锌褘 褎芯褉屑邪褌芯胁 胁褘胁芯写邪
 
-| Тип           | Описание                                                                  |
+| 孝懈锌           | 袨锌懈褋邪薪懈械                                                                  |
 | ------------- | ------------------------------------------------------------------------- |
-| `text`        | По умолчанию. Стандартный текстовый ответ (без структурированного вывода) |
-| `json_schema` | Возвращает проверенный JSON, соответствующий предоставленной схеме        |
+| `text`        | 袩芯 褍屑芯谢褔邪薪懈褞. 小褌邪薪写邪褉褌薪褘泄 褌械泻褋褌芯胁褘泄 芯褌胁械褌 (斜械蟹 褋褌褉褍泻褌褍褉懈褉芯胁邪薪薪芯谐芯 胁褘胁芯写邪) |
+| `json_schema` | 袙芯蟹胁褉邪褖邪械褌 锌褉芯胁械褉械薪薪褘泄 JSON, 褋芯芯褌胁械褌褋褌胁褍褞褖懈泄 锌褉械写芯褋褌邪胁谢械薪薪芯泄 褋褏械屑械        |
 
-### Формат схемы JSON
+### 肖芯褉屑邪褌 褋褏械屑褘 JSON
 
-При использовании `type: 'json_schema'`, укажите:
+袩褉懈 懈褋锌芯谢褜蟹芯胁邪薪懈懈 `type: 'json_schema'`, 褍泻邪卸懈褌械:
 
-| Поле         | Тип             | Описание                                                               |
+| 袩芯谢械         | 孝懈锌             | 袨锌懈褋邪薪懈械                                                               |
 | ------------ | --------------- | ---------------------------------------------------------------------- |
-| `type`       | `'json_schema'` | Обязательно. Указывает режим схемы JSON                                |
-| `schema`     | `object`        | Обязательно. Объект JSON Schema, определяющий структуру вывода         |
-| `retryCount` | `number`        | Необязательно. Количество повторных попыток проверки (по умолчанию: 2) |
+| `type`       | `'json_schema'` | 袨斜褟蟹邪褌械谢褜薪芯. 校泻邪蟹褘胁邪械褌 褉械卸懈屑 褋褏械屑褘 JSON                                |
+| `schema`     | `object`        | 袨斜褟蟹邪褌械谢褜薪芯. 袨斜褗械泻褌 JSON Schema, 芯锌褉械写械谢褟褞褖懈泄 褋褌褉褍泻褌褍褉褍 胁褘胁芯写邪         |
+| `retryCount` | `number`        | 袧械芯斜褟蟹邪褌械谢褜薪芯. 袣芯谢懈褔械褋褌胁芯 锌芯胁褌芯褉薪褘褏 锌芯锌褘褌芯泻 锌褉芯胁械褉泻懈 (锌芯 褍屑芯谢褔邪薪懈褞: 2) |
 
-### Обработка ошибок
+### 袨斜褉邪斜芯褌泻邪 芯褕懈斜芯泻
 
-Если модель не может выдать действительный структурированный вывод после всех повторных попыток, ответ будет включать `StructuredOutputError`:
+袝褋谢懈 屑芯写械谢褜 薪械 屑芯卸械褌 胁褘写邪褌褜 写械泄褋褌胁懈褌械谢褜薪褘泄 褋褌褉褍泻褌褍褉懈褉芯胁邪薪薪褘泄 胁褘胁芯写 锌芯褋谢械 胁褋械褏 锌芯胁褌芯褉薪褘褏 锌芯锌褘褌芯泻, 芯褌胁械褌 斜褍写械褌 胁泻谢褞褔邪褌褜 `StructuredOutputError`:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -180,30 +180,30 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 }
 ```
 
-### Лучшие практики
+### 袥褍褔褕懈械 锌褉邪泻褌懈泻懈
 
-1. **Предоставляйте четкие описания** в свойствах вашей схемы, чтобы помочь модели понять, какие данные извлекать
-2. **Используйте `required`**, чтобы указать, какие поля должны присутствовать
-3. **Делайте схемы сфокусированными** — сложные вложенные схемы могут быть труднее для правильного заполнения моделью
-4. **Устанавливайте соответствующий `retryCount`** — увеличивайте для сложных схем, уменьшайте для простых
+1. **袩褉械写芯褋褌邪胁谢褟泄褌械 褔械褌泻懈械 芯锌懈褋邪薪懈褟** 胁 褋胁芯泄褋褌胁邪褏 胁邪褕械泄 褋褏械屑褘, 褔褌芯斜褘 锌芯屑芯褔褜 屑芯写械谢懈 锌芯薪褟褌褜, 泻邪泻懈械 写邪薪薪褘械 懈蟹胁谢械泻邪褌褜
+2. **袠褋锌芯谢褜蟹褍泄褌械 `required`**, 褔褌芯斜褘 褍泻邪蟹邪褌褜, 泻邪泻懈械 锌芯谢褟 写芯谢卸薪褘 锌褉懈褋褍褌褋褌胁芯胁邪褌褜
+3. **袛械谢邪泄褌械 褋褏械屑褘 褋褎芯泻褍褋懈褉芯胁邪薪薪褘屑懈** 鈥?褋谢芯卸薪褘械 胁谢芯卸械薪薪褘械 褋褏械屑褘 屑芯谐褍褌 斜褘褌褜 褌褉褍写薪械械 写谢褟 锌褉邪胁懈谢褜薪芯谐芯 蟹邪锌芯谢薪械薪懈褟 屑芯写械谢褜褞
+4. **校褋褌邪薪邪胁谢懈胁邪泄褌械 褋芯芯褌胁械褌褋褌胁褍褞褖懈泄 `retryCount`** 鈥?褍胁械谢懈褔懈胁邪泄褌械 写谢褟 褋谢芯卸薪褘褏 褋褏械屑, 褍屑械薪褜褕邪泄褌械 写谢褟 锌褉芯褋褌褘褏
 
 ---
 
 ## API
 
-SDK предоставляет все серверные API через типобезопасный клиент.
+SDK 锌褉械写芯褋褌邪胁谢褟械褌 胁褋械 褋械褉胁械褉薪褘械 API 褔械褉械蟹 褌懈锌芯斜械蟹芯锌邪褋薪褘泄 泻谢懈械薪褌.
 
 ---
 
-### Глобальный
+### 袚谢芯斜邪谢褜薪褘泄
 
-| Метод             | Описание                        | Ответ                                |
+| 袦械褌芯写             | 袨锌懈褋邪薪懈械                        | 袨褌胁械褌                                |
 | ----------------- | ------------------------------- | ------------------------------------ |
 | `global.health()` | Check server health and version | `{ healthy: true, version: string }` |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 const health = await client.global.health()
@@ -212,16 +212,16 @@ console.log(health.data.version)
 
 ---
 
-### Приложение
+### 袩褉懈谢芯卸械薪懈械
 
-| Метод          | Описание                  | Ответ                                       |
+| 袦械褌芯写          | 袨锌懈褋邪薪懈械                  | 袨褌胁械褌                                       |
 | -------------- | ------------------------- | ------------------------------------------- |
 | `app.log()`    | Write a log entry         | `boolean`                                   |
 | `app.agents()` | List all available agents | <a href={typesUrl}><code>Agent[]</code></a> |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Write a log entry
@@ -239,16 +239,16 @@ const agents = await client.app.agents()
 
 ---
 
-### Проект
+### 袩褉芯械泻褌
 
-| Метод               | Описание            | Ответ                                         |
+| 袦械褌芯写               | 袨锌懈褋邪薪懈械            | 袨褌胁械褌                                         |
 | ------------------- | ------------------- | --------------------------------------------- |
 | `project.list()`    | List all projects   | <a href={typesUrl}><code>Project[]</code></a> |
 | `project.current()` | Get current project | <a href={typesUrl}><code>Project</code></a>   |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // List all projects
@@ -260,15 +260,15 @@ const currentProject = await client.project.current()
 
 ---
 
-### Путь
+### 袩褍褌褜
 
-| Метод        | Описание         | Ответ                                    |
+| 袦械褌芯写        | 袨锌懈褋邪薪懈械         | 袨褌胁械褌                                    |
 | ------------ | ---------------- | ---------------------------------------- |
 | `path.get()` | Get current path | <a href={typesUrl}><code>Path</code></a> |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Get current path information
@@ -277,16 +277,16 @@ const pathInfo = await client.path.get()
 
 ---
 
-### Конфигурация
+### 袣芯薪褎懈谐褍褉邪褑懈褟
 
-| Метод                | Описание                          | Ответ                                                                                                 |
+| 袦械褌芯写                | 袨锌懈褋邪薪懈械                          | 袨褌胁械褌                                                                                                 |
 | -------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `config.get()`       | Get config info                   | <a href={typesUrl}><code>Config</code></a>                                                            |
 | `config.providers()` | List providers and default models | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 const config = await client.config.get()
@@ -296,9 +296,9 @@ const { providers, default: defaults } = await client.config.providers()
 
 ---
 
-### Сессии
+### 小械褋褋懈懈
 
-| Метод                                                      | Описание                           | Примечания                                                                                                                                                                                                                                           |
+| 袦械褌芯写                                                      | 袨锌懈褋邪薪懈械                           | 袩褉懈屑械褔邪薪懈褟                                                                                                                                                                                                                                           |
 | ---------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `session.list()`                                           | List sessions                      | Returns <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                                |
 | `session.get({ path })`                                    | Get session                        | Returns <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                                  |
@@ -313,7 +313,7 @@ const { providers, default: defaults } = await client.config.providers()
 | `session.summarize({ path, body })`                        | Summarize session                  | Returns `boolean`                                                                                                                                                                                                                                    |
 | `session.messages({ path })`                               | List messages in a session         | Returns `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                                              |
 | `session.message({ path })`                                | Get message details                | Returns `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                                |
-| `session.prompt({ path, body })`                           | Send prompt message                | `body.noReply: true` возвращает UserMessage (только контекст). По умолчанию возвращает <a href={typesUrl}><code>AssistantMessage</code></a> с ответом ИИ. Поддерживает `body.outputFormat` для [структурированного вывода](#структурированный-вывод) |
+| `session.prompt({ path, body })`                           | Send prompt message                | `body.noReply: true` 胁芯蟹胁褉邪褖邪械褌 UserMessage (褌芯谢褜泻芯 泻芯薪褌械泻褋褌). 袩芯 褍屑芯谢褔邪薪懈褞 胁芯蟹胁褉邪褖邪械褌 <a href={typesUrl}><code>AssistantMessage</code></a> 褋 芯褌胁械褌芯屑 袠袠. 袩芯写写械褉卸懈胁邪械褌 `body.outputFormat` 写谢褟 [褋褌褉褍泻褌褍褉懈褉芯胁邪薪薪芯谐芯 胁褘胁芯写邪](#褋褌褉褍泻褌褍褉懈褉芯胁邪薪薪褘泄-胁褘胁芯写) |
 | `session.command({ path, body })`                          | Send command to session            | Returns `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                       |
 | `session.shell({ path, body })`                            | Run a shell command                | Returns <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                                         |
 | `session.revert({ path, body })`                           | Revert a message                   | Returns <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                                  |
@@ -322,7 +322,7 @@ const { providers, default: defaults } = await client.config.providers()
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Create and manage sessions
@@ -353,9 +353,9 @@ await client.session.prompt({
 
 ---
 
-### Файлы
+### 肖邪泄谢褘
 
-| Метод                     | Описание                           | Ответ                                                                                       |
+| 袦械褌芯写                     | 袨锌懈褋邪薪懈械                           | 袨褌胁械褌                                                                                       |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------- |
 | `find.text({ query })`    | Search for text in files           | Array of match objects with `path`, `lines`, `line_number`, `absolute_offset`, `submatches` |
 | `find.files({ query })`   | Find files and directories by name | `string[]` (paths)                                                                          |
@@ -363,15 +363,15 @@ await client.session.prompt({
 | `file.read({ query })`    | Read a file                        | `{ type: "raw" \| "patch", content: string }`                                               |
 | `file.status({ query? })` | Get status for tracked files       | <a href={typesUrl}><code>File[]</code></a>                                                  |
 
-`find.files` поддерживает несколько дополнительных полей запроса:
+`find.files` 锌芯写写械褉卸懈胁邪械褌 薪械褋泻芯谢褜泻芯 写芯锌芯谢薪懈褌械谢褜薪褘褏 锌芯谢械泄 蟹邪锌褉芯褋邪:
 
-- `type`: `"file"` или `"directory"`
-- `directory`: переопределить корень проекта для поиска.
-- `limit`: максимальное количество результатов (1–200)
+- `type`: `"file"` 懈谢懈 `"directory"`
+- `directory`: 锌械褉械芯锌褉械写械谢懈褌褜 泻芯褉械薪褜 锌褉芯械泻褌邪 写谢褟 锌芯懈褋泻邪.
+- `limit`: 屑邪泻褋懈屑邪谢褜薪芯械 泻芯谢懈褔械褋褌胁芯 褉械蟹褍谢褜褌邪褌芯胁 (1鈥?00)
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Search and read files
@@ -396,7 +396,7 @@ const content = await client.file.read({
 
 ### TUI
 
-| Метод                          | Описание                  | Ответ     |
+| 袦械褌芯写                          | 袨锌懈褋邪薪懈械                  | 袨褌胁械褌     |
 | ------------------------------ | ------------------------- | --------- |
 | `tui.appendPrompt({ body })`   | Append text to the prompt | `boolean` |
 | `tui.openHelp()`               | Open the help dialog      | `boolean` |
@@ -410,7 +410,7 @@ const content = await client.file.read({
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Control TUI interface
@@ -425,15 +425,15 @@ await client.tui.showToast({
 
 ---
 
-### Аутентификация
+### 袗褍褌械薪褌懈褎懈泻邪褑懈褟
 
-| Метод               | Описание                       | Ответ     |
+| 袦械褌芯写               | 袨锌懈褋邪薪懈械                       | 袨褌胁械褌     |
 | ------------------- | ------------------------------ | --------- |
 | `auth.set({ ... })` | Set authentication credentials | `boolean` |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 await client.auth.set({
@@ -444,15 +444,15 @@ await client.auth.set({
 
 ---
 
-### События
+### 小芯斜褘褌懈褟
 
-| Метод               | Описание                  | Ответ                     |
+| 袦械褌芯写               | 袨锌懈褋邪薪懈械                  | 袨褌胁械褌                     |
 | ------------------- | ------------------------- | ------------------------- |
 | `event.subscribe()` | Server-sent events stream | Server-sent events stream |
 
 ---
 
-#### Примеры
+#### 袩褉懈屑械褉褘
 
 ```javascript
 // Listen to real-time events

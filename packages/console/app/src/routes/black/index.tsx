@@ -4,7 +4,7 @@ import { createMemo, createSignal, For, Match, onMount, Show, Switch } from "sol
 import { PlanIcon, plans } from "./common"
 import { useI18n } from "~/context/i18n"
 import { useLanguage } from "~/context/language"
-import { Resource } from "@opencode-ai/console-resource"
+import { Resource } from "@openagt/console-resource"
 
 const getPaused = query(async () => {
   "use server"
@@ -115,7 +115,7 @@ export default function Black() {
         </Show>
         <Show when={!paused()}>
           <p data-slot="fine-print" style={{ "view-transition-name": "fine-print" }}>
-            {i18n.t("black.finePrint.beforeTerms")} ·{" "}
+            {i18n.t("black.finePrint.beforeTerms")} 路{" "}
             <A href={language.route("/legal/terms-of-service")}>{i18n.t("black.finePrint.terms")}</A>
           </p>
         </Show>

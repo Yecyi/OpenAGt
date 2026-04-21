@@ -1,5 +1,5 @@
-import { createSimpleContext } from "@opencode-ai/ui/context"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { createSimpleContext } from "@openagt/ui/context"
+import { useDialog } from "@openagt/ui/context/dialog"
 import { type Accessor, createEffect, createMemo, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
@@ -177,17 +177,17 @@ export function formatKeybind(config: string, t?: (key: KeyLabel) => string): st
   const kb = keybinds[0]
   const parts: string[] = []
 
-  if (kb.ctrl) parts.push(IS_MAC ? "⌃" : keyText("common.key.ctrl", t))
-  if (kb.alt) parts.push(IS_MAC ? "⌥" : keyText("common.key.alt", t))
-  if (kb.shift) parts.push(IS_MAC ? "⇧" : keyText("common.key.shift", t))
-  if (kb.meta) parts.push(IS_MAC ? "⌘" : keyText("common.key.meta", t))
+  if (kb.ctrl) parts.push(IS_MAC ? "鈱? : keyText("common.key.ctrl", t))
+  if (kb.alt) parts.push(IS_MAC ? "鈱? : keyText("common.key.alt", t))
+  if (kb.shift) parts.push(IS_MAC ? "鈬? : keyText("common.key.shift", t))
+  if (kb.meta) parts.push(IS_MAC ? "鈱? : keyText("common.key.meta", t))
 
   if (kb.key) {
     const keys: Record<string, string> = {
-      arrowup: "↑",
-      arrowdown: "↓",
-      arrowleft: "←",
-      arrowright: "→",
+      arrowup: "鈫?,
+      arrowdown: "鈫?,
+      arrowleft: "鈫?,
+      arrowright: "鈫?,
       comma: ",",
       plus: "+",
     }

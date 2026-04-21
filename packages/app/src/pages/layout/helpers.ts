@@ -1,5 +1,5 @@
-import { getFilename } from "@opencode-ai/shared/util/path"
-import { type Session } from "@opencode-ai/sdk/v2/client"
+import { getFilename } from "@openagt/shared/util/path"
+import { type Session } from "@openagt/sdk/v2/client"
 
 type SessionStore = {
   session?: Session[]

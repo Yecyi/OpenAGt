@@ -31,7 +31,7 @@ export default defineConfig({
     configSchema(),
     solidJs(),
     starlight({
-      title: "OpenCode",
+      title: "OpenAGt",
       defaultLocale: "root",
       locales: {
         root: {
@@ -157,7 +157,6 @@ export default defineConfig({
       expressiveCode: { themes: ["github-light", "github-dark"] },
       social: [
         { icon: "github", label: "GitHub", href: config.github },
-        { icon: "discord", label: "Discord", href: config.discord },
       ],
       editLink: {
         baseUrl: `${config.github}/edit/dev/packages/web/`,
@@ -176,7 +175,6 @@ export default defineConfig({
         "config",
         "providers",
         "network",
-        "enterprise",
         "troubleshooting",
         {
           label: "Windows",
@@ -224,7 +222,7 @@ export default defineConfig({
             "zh-CN": "使用",
             "zh-TW": "使用",
           },
-          items: ["go", "tui", "cli", "web", "ide", "zen", "share", "github", "gitlab"],
+          items: ["tui", "cli", "ide", "github", "gitlab"],
         },
 
         {
@@ -314,7 +312,7 @@ function configSchema() {
     hooks: {
       "astro:build:done": async () => {
         console.log("generating config schema")
-        spawnSync("../opencode/script/schema.ts", ["./dist/config.json", "./dist/tui.json"])
+        spawnSync("../openagt/script/schema.ts", ["./dist/config.json", "./dist/tui.json"])
       },
     },
   }

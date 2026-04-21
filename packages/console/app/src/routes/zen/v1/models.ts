@@ -1,9 +1,9 @@
 import type { APIEvent } from "@solidjs/start/server"
-import { and, Database, eq, isNull } from "@opencode-ai/console-core/drizzle/index.js"
-import { KeyTable } from "@opencode-ai/console-core/schema/key.sql.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
-import { ModelTable } from "@opencode-ai/console-core/schema/model.sql.js"
-import { ZenData } from "@opencode-ai/console-core/model.js"
+import { and, Database, eq, isNull } from "@openagt/console-core/drizzle/index.js"
+import { KeyTable } from "@openagt/console-core/schema/key.sql.js"
+import { WorkspaceTable } from "@openagt/console-core/schema/workspace.sql.js"
+import { ModelTable } from "@openagt/console-core/schema/model.sql.js"
+import { ZenData } from "@openagt/console-core/model.js"
 
 export async function OPTIONS(_input: APIEvent) {
   return new Response(null, {

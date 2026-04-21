@@ -3,6 +3,8 @@ export * from "./server.js"
 
 import { createOpencodeClient } from "./client.js"
 import { createOpencodeServer } from "./server.js"
+import { createOpenagtClient } from "./client.js"
+import { createOpenagtServer } from "./server.js"
 import type { ServerOptions } from "./server.js"
 
 export async function createOpencode(options?: ServerOptions) {
@@ -11,6 +13,21 @@ export async function createOpencode(options?: ServerOptions) {
   })
 
   const client = createOpencodeClient({
+    baseUrl: server.url,
+  })
+
+  return {
+    client,
+    server,
+  }
+}
+
+export async function createOpenagt(options?: ServerOptions) {
+  const server = await createOpenagtServer({
+    ...options,
+  })
+
+  const client = createOpenagtClient({
     baseUrl: server.url,
   })
 

@@ -4,12 +4,12 @@ import { fileURLToPath } from "url"
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
-import { $ } from "bun"
 import path from "path"
+import { $ } from "bun"
 
 import { createClient } from "@hey-api/openapi-ts"
 
-await $`bun dev generate > ${dir}/openapi.json`.cwd(path.resolve(dir, "../../opencode"))
+await $`cp ../openapi.json ./openapi.json`.cwd(dir)
 
 await createClient({
   input: "./openapi.json",
@@ -25,7 +25,7 @@ await createClient({
     },
     {
       name: "@hey-api/sdk",
-      instance: "OpencodeClient",
+      instance: "OpenagtClient",
       exportFromIndex: false,
       auth: false,
       paramsStructure: "flat",

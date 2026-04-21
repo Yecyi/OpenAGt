@@ -1,33 +1,33 @@
 ---
-title: Narzędzia specjalistyczne
-description: Twórz narzędzi, które LLM mogą być uruchamiane w otwartym kodzie.
+title: Narz臋dzia specjalistyczne
+description: Tw贸rz narz臋dzi, kt贸re LLM mog膮 by膰 uruchamiane w otwartym kodzie.
 ---
 
-Narzędzia specjalistyczne to funkcje, które tworzysz i które LLM może wywoływać podczas rozmów. Współpracują one z [wbudowanymi narzędziami](/docs/tools) opencode, takimi jak `read`, `write` i `bash`.
+Narz臋dzia specjalistyczne to funkcje, kt贸re tworzysz i kt贸re LLM mo偶e wywo艂ywa膰 podczas rozm贸w. Wsp贸艂pracuj膮 one z [wbudowanymi narz臋dziami](/docs/tools) opencode, takimi jak `read`, `write` i `bash`.
 
 ---
 
-## Tworzenie narzędzia
+## Tworzenie narz臋dzia
 
-Narzędzia tworzą pliki **TypeScript** lub **JavaScript**. Definicja narzędzia może być odwoływana do skryptów napisanych w **dowolnym języku** — TypeScript lub JavaScript są używane tylko w tym samym narzędziu.
+Narz臋dzia tworz膮 pliki **TypeScript** lub **JavaScript**. Definicja narz臋dzia mo偶e by膰 odwo艂ywana do skrypt贸w napisanych w **dowolnym j臋zyku** 鈥?TypeScript lub JavaScript s膮 u偶ywane tylko w tym samym narz臋dziu.
 
 ---
 
 ### Lokalizacja
 
-Można je uruchomić:
+Mo偶na je uruchomi膰:
 
-- Lokalnie, umieszczając je w katalogu `.opencode/tools/` swojego projektu.
-- Lub globalnie, umieszczając je w `~/.config/opencode/tools/`.
+- Lokalnie, umieszczaj膮c je w katalogu `.opencode/tools/` swojego projektu.
+- Lub globalnie, umieszczaj膮c je w `~/.config/opencode/tools/`.
 
 ---
 
 ### Struktura
 
-Najłatwiejszym sposobem tworzenia narzędzia jest pomocnika `tool()`, który zapewnia bezpieczeństwo i sprawdzanie poprawności.
+Naj艂atwiejszym sposobem tworzenia narz臋dzia jest pomocnika `tool()`, kt贸ry zapewnia bezpiecze艅stwo i sprawdzanie poprawno艣ci.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**Nazwa pliku** staje się **nazwą narzędzia**. Pierwotne narzędzie `database`.
+**Nazwa pliku** staje si臋 **nazw膮 narz臋dzia**. Pierwotne narz臋dzie `database`.
 
 ---
 
-#### Wiele narzędzi na plik
+#### Wiele narz臋dzi na plik
 
-Można także eksportować wiele narzędzi z jednego pliku. Każdy eksport staje się **oddzielnym językiem** o nazwie **`<filename>_<exportname>`**:
+Mo偶na tak偶e eksportowa膰 wiele narz臋dzi z jednego pliku. Ka偶dy eksport staje si臋 **oddzielnym j臋zykiem** o nazwie **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-Tworzy to dwa narzędzia: `math_add` i `math_multiply`.
+Tworzy to dwa narz臋dzia: `math_add` i `math_multiply`.
 
 ---
 
-#### Kolizje nazw z wbudowanymi narzędziami
+#### Kolizje nazw z wbudowanymi narz臋dziami
 
-Niestandardowe narzędzia są identyfikowane według nazwy narzędzia. Jeśli niestandardowe narzędzie używa tej samej nazwy co wbudowane narzędzie, niestandardowe narzędzie ma pierwszeństwo.
+Niestandardowe narz臋dzia s膮 identyfikowane wed艂ug nazwy narz臋dzia. Je艣li niestandardowe narz臋dzie u偶ywa tej samej nazwy co wbudowane narz臋dzie, niestandardowe narz臋dzie ma pierwsze艅stwo.
 
-Na przykład ten plik zastępuje wbudowane narzędzie `bash`:
+Na przyk艂ad ten plik zast臋puje wbudowane narz臋dzie `bash`:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-Preferuj unikalne nazwy, chyba że celowo chcesz zastąpić wbudowane narzędzie. Jeśli chcesz wyłączyć wbudowane narzędzie, ale go nie nadpisywać, użyj [uprawnień](/docs/permissions).
+Preferuj unikalne nazwy, chyba 偶e celowo chcesz zast膮pi膰 wbudowane narz臋dzie. Je艣li chcesz wy艂膮czy膰 wbudowane narz臋dzie, ale go nie nadpisywa膰, u偶yj [uprawnie艅](/docs/permissions).
 :::
 
 ---
 
 ### Argumenty
 
-Do zdefiniowania argumentów można zastosować `tool.schema`, czyli po prostu [Zod](https://zod.dev).
+Do zdefiniowania argument贸w mo偶na zastosowa膰 `tool.schema`, czyli po prostu [Zod](https://zod.dev).
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-Można także bezpośrednio zaimportować [Zod](https://zod.dev) i zwyczajowo zwykły obiekt:
+Mo偶na tak偶e bezpo艣rednio zaimportowa膰 [Zod](https://zod.dev) i zwyczajowo zwyk艂y obiekt:
 
 ```ts {6}
 import { z } from "zod"
@@ -136,10 +136,10 @@ export default {
 
 ### Kontekst
 
-Narzędzia kontekstowe charakterystycznej sesji:
+Narz臋dzia kontekstowe charakterystycznej sesji:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -153,17 +153,17 @@ export default tool({
 ```
 
 `context.directory` jako katalogowy pracodawczy.
-`context.worktree` dla katalogu głównego zwalczającego git.
+`context.worktree` dla katalogu g艂贸wnego zwalczaj膮cego git.
 
 ---
 
-## Przykład
+## Przyk艂ad
 
-### Napisz narzędzie w Pythonie
+### Napisz narz臋dzie w Pythonie
 
-Możesz pisać swoje narzędzia w dowolnym języku. Oto przykład dodania dwóch liczb przy użyciu języka Python.
+Mo偶esz pisa膰 swoje narz臋dzia w dowolnym j臋zyku. Oto przyk艂ad dodania dw贸ch liczb przy u偶yciu j臋zyka Python.
 
-Najpierw utwórz narzędzie jako skrypt w języku Python:
+Najpierw utw贸rz narz臋dzie jako skrypt w j臋zyku Python:
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-Następnie utwórz definicję narzędzia, która go wywołuje:
+Nast臋pnie utw贸rz definicj臋 narz臋dzia, kt贸ra go wywo艂uje:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-Tutaj używamy narzędzia [`Bun.$`](https://bun.com/docs/runtime/shell) do uruchomienia skryptu w języku Python.
+Tutaj u偶ywamy narz臋dzia [`Bun.$`](https://bun.com/docs/runtime/shell) do uruchomienia skryptu w j臋zyku Python.

@@ -1,8 +1,8 @@
 import { Title } from "@solidjs/meta"
 import { createAsync, query, useParams } from "@solidjs/router"
 import { createSignal, For, Show } from "solid-js"
-import { Database, eq } from "@opencode-ai/console-core/drizzle/index.js"
-import { BenchmarkTable } from "@opencode-ai/console-core/schema/benchmark.sql.js"
+import { Database, eq } from "@openagt/console-core/drizzle/index.js"
+import { BenchmarkTable } from "@openagt/console-core/schema/benchmark.sql.js"
 import { useI18n } from "~/context/i18n"
 
 interface TaskSource {
@@ -260,7 +260,7 @@ export default function BenchDetail() {
                                       "margin-right": "0.25rem",
                                     }}
                                   >
-                                    {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                    {judge.score === 1 ? "鉁? : judge.score === 0 ? "鉁? : judge.score}
                                   </span>
                                 )}
                               </For>
@@ -294,7 +294,7 @@ export default function BenchDetail() {
                                     "margin-right": "0.25rem",
                                   }}
                                 >
-                                  {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                  {judge.score === 1 ? "鉁? : judge.score === 0 ? "鉁? : judge.score}
                                 </span>
                               )}
                             </For>
@@ -309,13 +309,13 @@ export default function BenchDetail() {
                                       style={{ "font-size": "0.875rem", cursor: "pointer" }}
                                       onClick={() => setExpanded(!expanded())}
                                     >
-                                      <span style={{ "margin-right": "0.5rem" }}>{expanded() ? "▼" : "▶"}</span>
+                                      <span style={{ "margin-right": "0.5rem" }}>{expanded() ? "鈻? : "鈻?}</span>
                                       <span
                                         style={{
                                           color: judge.score === 1 ? "green" : judge.score === 0 ? "red" : "inherit",
                                         }}
                                       >
-                                        {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                        {judge.score === 1 ? "鉁? : judge.score === 0 ? "鉁? : judge.score}
                                       </span>{" "}
                                       {judge.judge}
                                     </div>
@@ -359,7 +359,7 @@ export default function BenchDetail() {
                   }}
                   onClick={() => setJsonExpanded(!jsonExpanded())}
                 >
-                  <span style={{ "margin-right": "0.5rem" }}>{jsonExpanded() ? "▼" : "▶"}</span>
+                  <span style={{ "margin-right": "0.5rem" }}>{jsonExpanded() ? "鈻? : "鈻?}</span>
                   {i18n.t("bench.detail.rawJson")}
                 </button>
                 <Show when={jsonExpanded()}>

@@ -1,78 +1,78 @@
 ---
-title: 생태계
-description: OpenCode로 구축된 프로젝트와 통합.
+title: 靸濏儨瓿?
+description: OpenAGt搿?甑稌霅?頂勲鞝濏姼鞕€ 韱淀暕.
 ---
 
-OpenCode를 기반으로 만들어진 커뮤니티 프로젝트 모음입니다.
+OpenAGt毳?旮半皹鞙茧 毵岆摛鞏挫 旎る雼堩嫲 頂勲鞝濏姼 氇潓鞛呺媹雼?
 
 :::note
-이 목록에 OpenCode 관련 프로젝트를 추가하고 싶다면 PR을 제출하세요.
+鞚?氇╇鞐?OpenAGt 甏€霠?頂勲鞝濏姼毳?於旉皜頃橁碃 鞁峨嫟氅?PR鞚?鞝滌稖頃橃劯鞖?
 :::
 
-[awesome-opencode](https://github.com/awesome-opencode/awesome-opencode)와 [opencode.cafe](https://opencode.cafe)도 함께 확인해 보세요. ecosystem과 community 정보를 한곳에 모아볼 수 있습니다.
+[awesome-opencode](https://github.com/awesome-opencode/awesome-opencode)鞕€ [opencode.cafe](https://opencode.cafe)霃?頃粯 頇曥澑頃?氤挫劯鞖? ecosystem瓿?community 鞝曤炒毳?頃滉吵鞐?氇晞氤?靾?鞛堨姷雼堧嫟.
 
 ---
 
-## 플러그인
+## 頂岆煬攴胳澑
 
-| 이름                                                                                               | 설명                                                                                            |
+| 鞚措                                                                                               | 靹る獏                                                                                            |
 | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [opencode-daytona](https://github.com/daytonaio/daytona/tree/main/libs/opencode-plugin)            | git sync와 live preview를 지원하는 격리된 Daytona sandbox에서 OpenCode 세션을 자동 실행합니다.  |
-| [opencode-helicone-session](https://github.com/H2Shami/opencode-helicone-session)                  | 요청을 그룹화할 수 있도록 Helicone session header를 자동으로 주입합니다.                        |
-| [opencode-type-inject](https://github.com/nick-vi/opencode-type-inject)                            | 조회 tool과 함께 TypeScript/Svelte 타입 정보를 파일 읽기에 자동 주입합니다.                     |
-| [opencode-openai-codex-auth](https://github.com/numman-ali/opencode-openai-codex-auth)             | API 크레딧 대신 ChatGPT Plus/Pro 구독을 사용할 수 있습니다.                                     |
-| [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth)                            | API 과금 대신 기존 Gemini 플랜을 사용할 수 있습니다.                                            |
-| [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)                | API 과금 대신 Antigravity의 무료 model을 사용할 수 있습니다.                                    |
-| [opencode-devcontainers](https://github.com/athal7/opencode-devcontainers)                         | shallow clone과 자동 포트 할당을 기반으로 multi-branch devcontainer 격리를 제공합니다.          |
-| [opencode-google-antigravity-auth](https://github.com/shekohex/opencode-google-antigravity-auth)   | Google Search 지원과 견고한 API 처리를 제공하는 Google Antigravity OAuth Plugin입니다.          |
-| [opencode-dynamic-context-pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)  | 오래된 tool output을 정리해 token 사용량을 최적화합니다.                                        |
-| [opencode-vibeguard](https://github.com/inkdust2021/opencode-vibeguard)                            | LLM 호출 전에 secrets/PII를 VibeGuard 스타일 placeholder로 가리고, 로컬에서 복원합니다.         |
-| [opencode-websearch-cited](https://github.com/ghoulr/opencode-websearch-cited.git)                 | 지원 provider에서 Google grounded 스타일의 네이티브 websearch를 추가합니다.                     |
-| [opencode-pty](https://github.com/shekohex/opencode-pty.git)                                       | AI agent가 PTY에서 백그라운드 프로세스를 실행하고 대화형 입력을 보낼 수 있게 합니다.            |
-| [opencode-shell-strategy](https://github.com/JRedeker/opencode-shell-strategy)                     | 비대화형 shell 명령 실행 지침을 제공해 TTY 의존 작업으로 인한 멈춤을 방지합니다.                |
-| [opencode-wakatime](https://github.com/angristan/opencode-wakatime)                                | Wakatime으로 OpenCode 사용량을 추적합니다.                                                      |
-| [opencode-md-table-formatter](https://github.com/franlol/opencode-md-table-formatter/tree/main)    | LLM이 생성한 markdown 표를 정리합니다.                                                          |
-| [opencode-morph-plugin](https://github.com/morphllm/opencode-morph-plugin)                         | Morph를 통한 Fast Apply 편집, WarpGrep 코드베이스 검색 및 컨텍스트 압축                         |
-| [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode)                                   | background agent, 사전 구성된 LSP/AST/MCP tool, curated agent, Claude Code 호환성을 제공합니다. |
-| [opencode-notificator](https://github.com/panta82/opencode-notificator)                            | OpenCode 세션에 데스크톱 알림과 사운드 알림을 제공합니다.                                       |
-| [opencode-notifier](https://github.com/mohak34/opencode-notifier)                                  | permission, 완료, 오류 이벤트에 대한 데스크톱 알림과 사운드 알림을 제공합니다.                  |
-| [opencode-zellij-namer](https://github.com/24601/opencode-zellij-namer)                            | OpenCode 맥락을 기반으로 Zellij session 이름을 AI로 자동 지정합니다.                            |
-| [opencode-skillful](https://github.com/zenobi-us/opencode-skillful)                                | skill 탐색과 주입을 통해 OpenCode agent가 필요 시 prompt를 lazy load하도록 합니다.              |
-| [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory)                      | Supermemory를 사용해 세션 간 persistent memory를 제공합니다.                                    |
-| [@plannotator/opencode](https://github.com/backnotprop/plannotator/tree/main/apps/opencode-plugin) | 시각 주석과 private/offline 공유를 포함한 인터랙티브 계획 리뷰를 제공합니다.                    |
-| [@openspoon/subtask2](https://github.com/spoons-and-mirrors/subtask2)                              | 세밀한 flow control로 opencode /commands를 강력한 orchestration 시스템으로 확장합니다.          |
-| [opencode-scheduler](https://github.com/different-ai/opencode-scheduler)                           | cron 문법을 사용해 launchd(Mac) 또는 systemd(Linux) 기반 반복 작업을 예약합니다.                |
-| [micode](https://github.com/vtemian/micode)                                                        | Structured Brainstorm → Plan → Implement 워크플로를 session continuity와 함께 제공합니다.       |
-| [octto](https://github.com/vtemian/octto)                                                          | 다중 질문 폼 기반의 AI 브레인스토밍용 인터랙티브 브라우저 UI를 제공합니다.                      |
-| [opencode-background-agents](https://github.com/kdcokenny/opencode-background-agents)              | Claude Code 스타일의 background agent를 async delegation과 context persistence로 제공합니다.    |
-| [opencode-notify](https://github.com/kdcokenny/opencode-notify)                                    | OpenCode 작업 완료 시점을 native OS 알림으로 알려줍니다.                                        |
-| [opencode-workspace](https://github.com/kdcokenny/opencode-workspace)                              | 16개 구성요소를 한 번에 설치하는 bundled multi-agent orchestration harness를 제공합니다.        |
-| [opencode-worktree](https://github.com/kdcokenny/opencode-worktree)                                | OpenCode용 git worktree를 손쉽게 사용할 수 있도록 돕습니다.                                     |
-| [opencode-sentry-monitor](https://github.com/stolinski/opencode-sentry-monitor)                    | Sentry AI 모니터링으로 AI 에이전트를 추적하고 디버그합니다.                                     |
+| [opencode-daytona](https://github.com/daytonaio/daytona/tree/main/libs/opencode-plugin)            | git sync鞕€ live preview毳?歆€鞗愴晿電?瓴╇Μ霅?Daytona sandbox鞐愳劀 OpenAGt 靹胳厴鞚?鞛愲彊 鞁ろ枆頃╇媹雼?  |
+| [opencode-helicone-session](https://github.com/H2Shami/opencode-helicone-session)                  | 鞖旍箔鞚?攴鸽９頇旐暊 靾?鞛堧弰搿?Helicone session header毳?鞛愲彊鞙茧 欤检瀰頃╇媹雼?                        |
+| [opencode-type-inject](https://github.com/nick-vi/opencode-type-inject)                            | 臁绊殞 tool瓿?頃粯 TypeScript/Svelte 韮€鞛?鞝曤炒毳?韺岇澕 鞚疥赴鞐?鞛愲彊 欤检瀰頃╇媹雼?                     |
+| [opencode-openai-codex-auth](https://github.com/numman-ali/opencode-openai-codex-auth)             | API 韥爤霐?雽€鞁?ChatGPT Plus/Pro 甑弲鞚?靷毄頃?靾?鞛堨姷雼堧嫟.                                     |
+| [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth)                            | API 瓿缄笀 雽€鞁?旮办〈 Gemini 頂岆灉鞚?靷毄頃?靾?鞛堨姷雼堧嫟.                                            |
+| [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)                | API 瓿缄笀 雽€鞁?Antigravity鞚?氍措 model鞚?靷毄頃?靾?鞛堨姷雼堧嫟.                                    |
+| [opencode-devcontainers](https://github.com/athal7/opencode-devcontainers)                         | shallow clone瓿?鞛愲彊 韽姼 頃犽嫻鞚?旮半皹鞙茧 multi-branch devcontainer 瓴╇Μ毳?鞝滉车頃╇媹雼?          |
+| [opencode-google-antigravity-auth](https://github.com/shekohex/opencode-google-antigravity-auth)   | Google Search 歆€鞗愱臣 瓴碃頃?API 觳橂Μ毳?鞝滉车頃橂姅 Google Antigravity OAuth Plugin鞛呺媹雼?          |
+| [opencode-dynamic-context-pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)  | 鞓る灅霅?tool output鞚?鞝曤Μ頃?token 靷毄霟夓潉 斓滌爜頇旐暕雼堧嫟.                                        |
+| [opencode-vibeguard](https://github.com/inkdust2021/opencode-vibeguard)                            | LLM 順胳稖 鞝勳棎 secrets/PII毳?VibeGuard 鞀ろ儉鞚?placeholder搿?臧€毽碃, 搿滌滑鞐愳劀 氤奠洂頃╇媹雼?         |
+| [opencode-websearch-cited](https://github.com/ghoulr/opencode-websearch-cited.git)                 | 歆€鞗?provider鞐愳劀 Google grounded 鞀ろ儉鞚检潣 雱れ澊韹半笇 websearch毳?於旉皜頃╇媹雼?                     |
+| [opencode-pty](https://github.com/shekohex/opencode-pty.git)                                       | AI agent臧€ PTY鞐愳劀 氚标犯霛检毚霌?頂勲靹胳姢毳?鞁ろ枆頃橁碃 雽€頇旐槙 鞛呺牓鞚?氤措偧 靾?鞛堦矊 頃╇媹雼?            |
+| [opencode-shell-strategy](https://github.com/JRedeker/opencode-shell-strategy)                     | 牍勲寑頇旐槙 shell 氇呺牴 鞁ろ枆 歆€旃潉 鞝滉车頃?TTY 鞚橃〈 鞛戩梾鞙茧 鞚疙暅 氅堨钉鞚?氚╈頃╇媹雼?                |
+| [opencode-wakatime](https://github.com/angristan/opencode-wakatime)                                | Wakatime鞙茧 OpenAGt 靷毄霟夓潉 於旍爜頃╇媹雼?                                                      |
+| [opencode-md-table-formatter](https://github.com/franlol/opencode-md-table-formatter/tree/main)    | LLM鞚?靸濎劚頃?markdown 響滊ゼ 鞝曤Μ頃╇媹雼?                                                          |
+| [opencode-morph-plugin](https://github.com/morphllm/opencode-morph-plugin)                         | Morph毳?韱淀暅 Fast Apply 韼胳, WarpGrep 旖旊摐氩犾澊鞀?瓴€靸?氚?旎厤鞀ろ姼 鞎曥稌                         |
+| [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode)                                   | background agent, 靷爠 甑劚霅?LSP/AST/MCP tool, curated agent, Claude Code 順疙櫂靹膘潉 鞝滉车頃╇媹雼? |
+| [opencode-notificator](https://github.com/panta82/opencode-notificator)                            | OpenAGt 靹胳厴鞐?雿办姢韥啽 鞎岆瓿?靷毚霌?鞎岆鞚?鞝滉车頃╇媹雼?                                       |
+| [opencode-notifier](https://github.com/mohak34/opencode-notifier)                                  | permission, 鞕勲, 鞓る 鞚措菠韸胳棎 雽€頃?雿办姢韥啽 鞎岆瓿?靷毚霌?鞎岆鞚?鞝滉车頃╇媹雼?                  |
+| [opencode-zellij-namer](https://github.com/24601/opencode-zellij-namer)                            | OpenAGt 毵ル澖鞚?旮半皹鞙茧 Zellij session 鞚措鞚?AI搿?鞛愲彊 歆€鞝曧暕雼堧嫟.                            |
+| [opencode-skillful](https://github.com/zenobi-us/opencode-skillful)                                | skill 韮愳儔瓿?欤检瀰鞚?韱淀暣 OpenAGt agent臧€ 頃勳殧 鞁?prompt毳?lazy load頃橂弰搿?頃╇媹雼?              |
+| [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory)                      | Supermemory毳?靷毄頃?靹胳厴 臧?persistent memory毳?鞝滉车頃╇媹雼?                                    |
+| [@plannotator/opencode](https://github.com/backnotprop/plannotator/tree/main/apps/opencode-plugin) | 鞁滉皝 欤检劃瓿?private/offline 瓿奠湢毳?韽暔頃?鞚疙劙霝欗嫲敫?瓿勴殟 毽钒毳?鞝滉车頃╇媹雼?                    |
+| [@openspoon/subtask2](https://github.com/spoons-and-mirrors/subtask2)                              | 靹鸽皜頃?flow control搿?opencode /commands毳?臧曤牓頃?orchestration 鞁滌姢韰滌溂搿?頇曥灔頃╇媹雼?          |
+| [opencode-scheduler](https://github.com/different-ai/opencode-scheduler)                           | cron 氍鸽矔鞚?靷毄頃?launchd(Mac) 霕愲姅 systemd(Linux) 旮半皹 氚橂车 鞛戩梾鞚?鞓堨暯頃╇媹雼?                |
+| [micode](https://github.com/vtemian/micode)                                                        | Structured Brainstorm 鈫?Plan 鈫?Implement 鞗岉伂頂岆毳?session continuity鞕€ 頃粯 鞝滉车頃╇媹雼?       |
+| [octto](https://github.com/vtemian/octto)                                                          | 雼れ 歆堧 韽?旮半皹鞚?AI 敫岆爤鞚胳姢韱犽皪鞖?鞚疙劙霝欗嫲敫?敫岆澕鞖办爛 UI毳?鞝滉车頃╇媹雼?                      |
+| [opencode-background-agents](https://github.com/kdcokenny/opencode-background-agents)              | Claude Code 鞀ろ儉鞚检潣 background agent毳?async delegation瓿?context persistence搿?鞝滉车頃╇媹雼?    |
+| [opencode-notify](https://github.com/kdcokenny/opencode-notify)                                    | OpenAGt 鞛戩梾 鞕勲 鞁滌爯鞚?native OS 鞎岆鞙茧 鞎岆牑欷嶋媹雼?                                        |
+| [opencode-workspace](https://github.com/kdcokenny/opencode-workspace)                              | 16臧?甑劚鞖旍唽毳?頃?氩堨棎 靹れ箻頃橂姅 bundled multi-agent orchestration harness毳?鞝滉车頃╇媹雼?        |
+| [opencode-worktree](https://github.com/kdcokenny/opencode-worktree)                                | OpenAGt鞖?git worktree毳?靻愳壗瓴?靷毄頃?靾?鞛堧弰搿?霃曥姷雼堧嫟.                                     |
+| [opencode-sentry-monitor](https://github.com/stolinski/opencode-sentry-monitor)                    | Sentry AI 氇媹韯半鞙茧 AI 鞐愳澊鞝勴姼毳?於旍爜頃橁碃 霐旊矂攴疙暕雼堧嫟.                                     |
 
 ---
 
-## 프로젝트
+## 頂勲鞝濏姼
 
-| 이름                                                                                       | 설명                                                                   |
+| 鞚措                                                                                       | 靹る獏                                                                   |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| [kimaki](https://github.com/remorses/kimaki)                                               | SDK 기반으로 OpenCode 세션을 제어하는 Discord bot입니다.               |
-| [opencode.nvim](https://github.com/NickvanDyke/opencode.nvim)                              | API 기반 editor-aware prompt를 제공하는 Neovim plugin입니다.           |
-| [portal](https://github.com/hosenur/portal)                                                | Tailscale/VPN 환경에서 OpenCode를 쓰기 위한 mobile-first 웹 UI입니다.  |
-| [opencode plugin template](https://github.com/zenobi-us/opencode-plugin-template/)         | OpenCode plugin 개발을 위한 템플릿입니다.                              |
-| [opencode.nvim](https://github.com/sudo-tee/opencode.nvim)                                 | terminal 기반 AI 코딩 agent인 opencode용 Neovim frontend입니다.        |
-| [ai-sdk-provider-opencode-sdk](https://github.com/ben-vargas/ai-sdk-provider-opencode-sdk) | `@opencode-ai/sdk`로 OpenCode를 사용하는 Vercel AI SDK provider입니다. |
-| [OpenChamber](https://github.com/btriapitsyn/openchamber)                                  | OpenCode용 Web/Desktop App 및 VS Code Extension입니다.                 |
-| [OpenCode-Obsidian](https://github.com/mtymek/opencode-obsidian)                           | Obsidian UI에 OpenCode를 내장하는 Obsidian plugin입니다.               |
-| [OpenWork](https://github.com/different-ai/openwork)                                       | OpenCode 기반의 Claude Cowork 대체 오픈소스 프로젝트입니다.            |
-| [ocx](https://github.com/kdcokenny/ocx)                                                    | 휴대형 격리 프로필을 지원하는 OpenCode extension manager입니다.        |
-| [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad)                                   | OpenCode용 Desktop/Web/Mobile/Remote client app입니다.                 |
+| [kimaki](https://github.com/remorses/kimaki)                                               | SDK 旮半皹鞙茧 OpenAGt 靹胳厴鞚?鞝滌柎頃橂姅 Discord bot鞛呺媹雼?               |
+| [opencode.nvim](https://github.com/NickvanDyke/opencode.nvim)                              | API 旮半皹 editor-aware prompt毳?鞝滉车頃橂姅 Neovim plugin鞛呺媹雼?           |
+| [portal](https://github.com/hosenur/portal)                                                | Tailscale/VPN 頇橁步鞐愳劀 OpenAGt毳?鞊瓣赴 鞙勴暅 mobile-first 鞗?UI鞛呺媹雼?  |
+| [opencode plugin template](https://github.com/zenobi-us/opencode-plugin-template/)         | OpenAGt plugin 臧滊皽鞚?鞙勴暅 韰滍攲毽快瀰雼堧嫟.                              |
+| [opencode.nvim](https://github.com/sudo-tee/opencode.nvim)                                 | terminal 旮半皹 AI 旖旊敥 agent鞚?opencode鞖?Neovim frontend鞛呺媹雼?        |
+| [ai-sdk-provider-opencode-sdk](https://github.com/ben-vargas/ai-sdk-provider-opencode-sdk) | `@openagt/sdk`搿?OpenAGt毳?靷毄頃橂姅 Vercel AI SDK provider鞛呺媹雼? |
+| [OpenChamber](https://github.com/btriapitsyn/openchamber)                                  | OpenAGt鞖?Web/Desktop App 氚?VS Code Extension鞛呺媹雼?                 |
+| [OpenAGt-Obsidian](https://github.com/mtymek/opencode-obsidian)                           | Obsidian UI鞐?OpenAGt毳?雮挫灔頃橂姅 Obsidian plugin鞛呺媹雼?               |
+| [OpenWork](https://github.com/different-ai/openwork)                                       | OpenAGt 旮半皹鞚?Claude Cowork 雽€觳?鞓ろ攬靻岇姢 頂勲鞝濏姼鞛呺媹雼?            |
+| [ocx](https://github.com/kdcokenny/ocx)                                                    | 頊措寑順?瓴╇Μ 頂勲頃勳潉 歆€鞗愴晿電?OpenAGt extension manager鞛呺媹雼?        |
+| [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad)                                   | OpenAGt鞖?Desktop/Web/Mobile/Remote client app鞛呺媹雼?                 |
 
 ---
 
-## 에이전트
+## 鞐愳澊鞝勴姼
 
-| 이름                                                              | 설명                                                             |
+| 鞚措                                                              | 靹る獏                                                             |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [Agentic](https://github.com/Cluster444/agentic)                  | 구조화된 개발을 위한 모듈형 AI agent와 command를 제공합니다.     |
-| [opencode-agents](https://github.com/darrenhinde/opencode-agents) | 향상된 워크플로를 위한 config, prompt, agent, plugin 모음입니다. |
+| [Agentic](https://github.com/Cluster444/agentic)                  | 甑“頇旊悳 臧滊皽鞚?鞙勴暅 氇搱順?AI agent鞕€ command毳?鞝滉车頃╇媹雼?     |
+| [opencode-agents](https://github.com/darrenhinde/opencode-agents) | 頄レ儊霅?鞗岉伂頂岆毳?鞙勴暅 config, prompt, agent, plugin 氇潓鞛呺媹雼? |

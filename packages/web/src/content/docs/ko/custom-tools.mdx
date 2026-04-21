@@ -1,33 +1,33 @@
 ---
 title: Custom Tools
-description: Create tools the LLM can call in OpenCode.
+description: Create tools the LLM can call in OpenAGt.
 ---
 
-custom tool은 대화 중 LLM이 호출할 수 있도록 사용자가 직접 만든 함수입니다. `read`, `write`, `bash` 같은 OpenCode의 [built-in tools](/docs/tools)와 함께 동작합니다.
-
----
-
-## 도구 만들기
-
-tool은 **TypeScript** 또는 **JavaScript** 파일로 정의합니다. 다만 tool 정의에서 호출하는 스크립트는 **어떤 언어든** 사용할 수 있습니다. 즉, TypeScript/JavaScript는 tool 정의 자체에만 필요합니다.
+custom tool鞚€ 雽€頇?欷?LLM鞚?順胳稖頃?靾?鞛堧弰搿?靷毄鞛愱皜 歆侅爲 毵岆摖 頃垬鞛呺媹雼? `read`, `write`, `bash` 臧欖潃 OpenAGt鞚?[built-in tools](/docs/tools)鞕€ 頃粯 霃欖瀾頃╇媹雼?
 
 ---
 
-### 위치
+## 霃勱惮 毵岆摛旮?
 
-tool은 다음 위치에 둘 수 있습니다.
-
-- 프로젝트의 `.opencode/tools/` 디렉토리(로컬)
-- `~/.config/opencode/tools/` 디렉토리(전역)
+tool鞚€ **TypeScript** 霕愲姅 **JavaScript** 韺岇澕搿?鞝曥潣頃╇媹雼? 雼る tool 鞝曥潣鞐愳劀 順胳稖頃橂姅 鞀ろ伂毽巾姼電?**鞏措枻 鞏胳柎霌?* 靷毄頃?靾?鞛堨姷雼堧嫟. 歃? TypeScript/JavaScript電?tool 鞝曥潣 鞛愳泊鞐愲 頃勳殧頃╇媹雼?
 
 ---
 
-### 구조
+### 鞙勳箻
 
-tool을 가장 쉽게 만드는 방법은 타입 안정성과 validation을 제공하는 `tool()` helper를 사용하는 것입니다.
+tool鞚€ 雼れ潓 鞙勳箻鞐?霊?靾?鞛堨姷雼堧嫟.
+
+- 頂勲鞝濏姼鞚?`.opencode/tools/` 霐旊爥韱犽Μ(搿滌滑)
+- `~/.config/opencode/tools/` 霐旊爥韱犽Μ(鞝勳棴)
+
+---
+
+### 甑“
+
+tool鞚?臧€鞛?靿疥矊 毵岆摐電?氚╇矔鞚€ 韮€鞛?鞎堨爼靹标臣 validation鞚?鞝滉车頃橂姅 `tool()` helper毳?靷毄頃橂姅 瓴冹瀰雼堧嫟.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**파일 이름**이 **tool 이름**이 됩니다. 위 예시는 `database` tool을 생성합니다.
+**韺岇澕 鞚措**鞚?**tool 鞚措**鞚?霅╇媹雼? 鞙?鞓堨嫓電?`database` tool鞚?靸濎劚頃╇媹雼?
 
 ---
 
-#### 파일 하나에 여러 tool 정의
+#### 韺岇澕 頃橂倶鞐?鞐煬 tool 鞝曥潣
 
-하나의 파일에서 여러 tool을 export할 수도 있습니다. 각 export는 **별도의 tool**이 되며 이름은 **`<filename>_<exportname>`** 형식을 사용합니다.
+頃橂倶鞚?韺岇澕鞐愳劀 鞐煬 tool鞚?export頃?靾橂弰 鞛堨姷雼堧嫟. 臧?export電?**氤勲弰鞚?tool**鞚?霅橂┌ 鞚措鞚€ **`<filename>_<exportname>`** 順曥嫕鞚?靷毄頃╇媹雼?
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-이 경우 `math_add`, `math_multiply` 두 tool이 생성됩니다.
+鞚?瓴届毎 `math_add`, `math_multiply` 霊?tool鞚?靸濎劚霅╇媹雼?
 
 ---
 
-#### 기본 도구와 이름 충돌
+#### 旮半掣 霃勱惮鞕€ 鞚措 於╇弻
 
-커스텀 도구는 도구 이름으로 식별됩니다. 커스텀 도구가 기본 도구와 같은 이름을 사용하면 커스텀 도구가 우선순위를 갖습니다.
+旎れ姢韰€ 霃勱惮電?霃勱惮 鞚措鞙茧 鞁濍硠霅╇媹雼? 旎れ姢韰€ 霃勱惮臧€ 旮半掣 霃勱惮鞕€ 臧欖潃 鞚措鞚?靷毄頃橂┐ 旎れ姢韰€ 霃勱惮臧€ 鞖办劆靾滌渼毳?臧栰姷雼堧嫟.
 
-예를 들어, 이 파일은 기본 `bash` 도구를 대체합니다:
+鞓堧ゼ 霌れ柎, 鞚?韺岇澕鞚€ 旮半掣 `bash` 霃勱惮毳?雽€觳错暕雼堧嫟:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-의도적으로 기본 도구를 대체하려는 경우가 아니라면 고유한 이름을 사용하는 것이 좋습니다. 도구를 오버라이드하지 않고 비활성화만 하려면 [permissions](/docs/permissions)를 사용하세요.
+鞚橂弰鞝侅溂搿?旮半掣 霃勱惮毳?雽€觳错晿霠る姅 瓴届毎臧€ 鞎勲媹霛茧┐ 瓿犾湢頃?鞚措鞚?靷毄頃橂姅 瓴冹澊 膦嬱姷雼堧嫟. 霃勱惮毳?鞓る矂霛检澊霌滍晿歆€ 鞎婈碃 牍勴櫆靹表檾毵?頃橂牑氅?[permissions](/docs/permissions)毳?靷毄頃橃劯鞖?
 :::
 
 ---
 
-### 인자
+### 鞚胳瀽
 
-인자 타입은 `tool.schema`로 정의할 수 있습니다. `tool.schema`는 [Zod](https://zod.dev) 기반입니다.
+鞚胳瀽 韮€鞛呾潃 `tool.schema`搿?鞝曥潣頃?靾?鞛堨姷雼堧嫟. `tool.schema`電?[Zod](https://zod.dev) 旮半皹鞛呺媹雼?
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-[Zod](https://zod.dev)를 직접 import해서 일반 객체를 반환하는 방식도 사용할 수 있습니다.
+[Zod](https://zod.dev)毳?歆侅爲 import頃挫劀 鞚茧皹 臧濎泊毳?氚橅櫂頃橂姅 氚╈嫕霃?靷毄頃?靾?鞛堨姷雼堧嫟.
 
 ```ts {6}
 import { z } from "zod"
@@ -136,10 +136,10 @@ export default {
 
 ### Context
 
-tool은 현재 세션의 context 정보를 전달받습니다.
+tool鞚€ 順勳灛 靹胳厴鞚?context 鞝曤炒毳?鞝勲嫭氚涭姷雼堧嫟.
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -152,18 +152,18 @@ export default tool({
 })
 ```
 
-세션 작업 디렉토리는 `context.directory`를 사용하세요.
-git worktree 루트는 `context.worktree`를 사용하세요.
+靹胳厴 鞛戩梾 霐旊爥韱犽Μ電?`context.directory`毳?靷毄頃橃劯鞖?
+git worktree 耄姼電?`context.worktree`毳?靷毄頃橃劯鞖?
 
 ---
 
-## 예시
+## 鞓堨嫓
 
-### Python으로 tool 작성
+### Python鞙茧 tool 鞛戩劚
 
-tool은 원하는 언어로 작성할 수 있습니다. 아래는 Python으로 두 숫자를 더하는 예시입니다.
+tool鞚€ 鞗愴晿電?鞏胳柎搿?鞛戩劚頃?靾?鞛堨姷雼堧嫟. 鞎勲灅電?Python鞙茧 霊?靾瀽毳?雿旐晿電?鞓堨嫓鞛呺媹雼?
 
-먼저 Python 스크립트로 tool을 만듭니다.
+毹检爛 Python 鞀ろ伂毽巾姼搿?tool鞚?毵岆摥雼堧嫟.
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-그다음 이 스크립트를 호출하는 tool 정의를 만듭니다.
+攴鸽嫟鞚?鞚?鞀ろ伂毽巾姼毳?順胳稖頃橂姅 tool 鞝曥潣毳?毵岆摥雼堧嫟.
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-여기서는 Python 스크립트를 실행하기 위해 [`Bun.$`](https://bun.com/docs/runtime/shell) 유틸리티를 사용합니다.
+鞐赴靹滊姅 Python 鞀ろ伂毽巾姼毳?鞁ろ枆頃橁赴 鞙勴暣 [`Bun.$`](https://bun.com/docs/runtime/shell) 鞙犿嫺毽嫲毳?靷毄頃╇媹雼?

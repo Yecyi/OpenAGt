@@ -17,14 +17,14 @@ ts-dist
 /result
 refs
 Session.vim
-/opencode.json
+/openagt.json
 a.out
 target
 .scripts
 .direnv/
 
 # Local dev files
-opencode-dev
+openagt-dev
 UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
@@ -39,4 +39,4 @@ Code Reference/codex/
 Code Reference/hermes-agent/
 
 # Transient binary/temp artifacts
-packages/opencode/.*.tmp/
+packages/openagt/.*.tmp/

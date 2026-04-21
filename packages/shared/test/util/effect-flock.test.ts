@@ -5,10 +5,10 @@ import path from "path"
 import os from "os"
 import { Cause, Effect, Exit, Layer } from "effect"
 import { testEffect } from "../lib/effect"
-import { AppFileSystem } from "@opencode-ai/shared/filesystem"
-import { EffectFlock } from "@opencode-ai/shared/util/effect-flock"
-import { Global } from "@opencode-ai/shared/global"
-import { Hash } from "@opencode-ai/shared/util/hash"
+import { AppFileSystem } from "@openagt/shared/filesystem"
+import { EffectFlock } from "@openagt/shared/util/effect-flock"
+import { Global } from "@openagt/shared/global"
+import { Hash } from "@openagt/shared/util/hash"
 
 function lock(dir: string, key: string) {
   return path.join(dir, Hash.fast(key) + ".lock")

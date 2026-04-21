@@ -1,11 +1,11 @@
-import { TextField } from "@opencode-ai/ui/text-field"
-import { Logo } from "@opencode-ai/ui/logo"
-import { Button } from "@opencode-ai/ui/button"
+import { TextField } from "@openagt/ui/text-field"
+import { Logo } from "@openagt/ui/logo"
+import { Button } from "@openagt/ui/button"
 import { Component, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
-import { Icon } from "@opencode-ai/ui/icon"
+import { Icon } from "@openagt/ui/icon"
 
 export type InitError = {
   name: string
@@ -13,7 +13,7 @@ export type InitError = {
 }
 
 type Translator = ReturnType<typeof useLanguage>["t"]
-const CHAIN_SEPARATOR = "\n" + "─".repeat(40) + "\n"
+const CHAIN_SEPARATOR = "\n" + "鈹€".repeat(40) + "\n"
 
 function isIssue(value: unknown): value is { message: string; path: string[] } {
   if (!value || typeof value !== "object") return false
@@ -124,7 +124,7 @@ function formatInitError(error: InitError, t: Translator): string {
     }
     case "ConfigInvalidError": {
       const issues = Array.isArray(data.issues)
-        ? data.issues.filter(isIssue).map((issue) => "↳ " + issue.message + " " + issue.path.join("."))
+        ? data.issues.filter(isIssue).map((issue) => "鈫?" + issue.message + " " + issue.path.join("."))
         : []
       const message = typeof data.message === "string" ? data.message : ""
       const path = typeof data.path === "string" ? data.path : json(data.path)

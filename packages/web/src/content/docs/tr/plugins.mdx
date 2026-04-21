@@ -1,78 +1,78 @@
 ---
 title: Eklentiler
-description: OpenCode'u genişletmek için kendi eklentilerinizi yazın.
+description: OpenAGt'u geni艧letmek i莽in kendi eklentilerinizi yaz谋n.
 ---
 
-Eklentiler, çeşitli olaylara bağlanarak ve davranışı özelleştirerek OpenCode'u genişletmenize olanak tanır. Yeni özellikler eklemek, harici hizmetlerle entegrasyon sağlamak veya OpenCode'un varsayılan davranışını değiştirmek için eklentiler oluşturabilirsiniz.
+Eklentiler, 莽e艧itli olaylara ba臒lanarak ve davran谋艧谋 枚zelle艧tirerek OpenAGt'u geni艧letmenize olanak tan谋r. Yeni 枚zellikler eklemek, harici hizmetlerle entegrasyon sa臒lamak veya OpenAGt'un varsay谋lan davran谋艧谋n谋 de臒i艧tirmek i莽in eklentiler olu艧turabilirsiniz.
 
-Örnekler için topluluk tarafından oluşturulan [eklentilere](/docs/ecosystem#plugins) göz atın.
+脰rnekler i莽in topluluk taraf谋ndan olu艧turulan [eklentilere](/docs/ecosystem#plugins) g枚z at谋n.
 
 ---
 
-## Eklenti kullanımı
+## Eklenti kullan谋m谋
 
-Eklentileri yüklemenin iki yolu vardır.
+Eklentileri y眉klemenin iki yolu vard谋r.
 
 ---
 
 ### Yerel dosyalardan
 
-JavaScript veya TypeScript dosyalarını eklenti dizinine yerleştirin.
+JavaScript veya TypeScript dosyalar谋n谋 eklenti dizinine yerle艧tirin.
 
-- `.opencode/plugins/` - Proje düzeyinde eklentiler
+- `.opencode/plugins/` - Proje d眉zeyinde eklentiler
 - `~/.config/opencode/plugins/` - Genel eklentiler
 
-Bu dizinlerdeki dosyalar başlangıçta otomatik olarak yüklenir.
+Bu dizinlerdeki dosyalar ba艧lang谋莽ta otomatik olarak y眉klenir.
 
 ---
 
 ### npm'den
 
-Yapılandırma dosyanızda npm paketlerini belirtin.
+Yap谋land谋rma dosyan谋zda npm paketlerini belirtin.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-Hem normal hem de kapsamlı npm paketleri desteklenir.
+Hem normal hem de kapsaml谋 npm paketleri desteklenir.
 
-[Ekosistem](/docs/ecosystem#plugins)'deki mevcut eklentilere göz atın.
-
----
-
-### Eklentiler nasıl kurulur?
-
-**npm eklentileri** başlangıçta Bun kullanılarak otomatik olarak yüklenir. Paketler ve bağımlılıkları `~/.cache/opencode/node_modules/`'da önbelleğe alınır.
-
-**Yerel eklentiler** doğrudan eklenti dizininden yüklenir. Harici paketleri kullanmak için, sisteminizin dizininde bir `package.json` oluşturmanız (bkz. [Bağımlılıklar](#dependencies)) veya eklentiyi npm ve [yapılandırmanıza eklemeniz](/docs/config#plugins) gerekir.
+[Ekosistem](/docs/ecosystem#plugins)'deki mevcut eklentilere g枚z at谋n.
 
 ---
 
-### Yükleme sırası
+### Eklentiler nas谋l kurulur?
 
-Eklentiler tüm kaynaklardan yüklenir ve tüm kancalar sırayla çalışır. Yükleme sırası şöyledir:
+**npm eklentileri** ba艧lang谋莽ta Bun kullan谋larak otomatik olarak y眉klenir. Paketler ve ba臒谋ml谋l谋klar谋 `~/.cache/opencode/node_modules/`'da 枚nbelle臒e al谋n谋r.
+
+**Yerel eklentiler** do臒rudan eklenti dizininden y眉klenir. Harici paketleri kullanmak i莽in, sisteminizin dizininde bir `package.json` olu艧turman谋z (bkz. [Ba臒谋ml谋l谋klar](#dependencies)) veya eklentiyi npm ve [yap谋land谋rman谋za eklemeniz](/docs/config#plugins) gerekir.
+
+---
+
+### Y眉kleme s谋ras谋
+
+Eklentiler t眉m kaynaklardan y眉klenir ve t眉m kancalar s谋rayla 莽al谋艧谋r. Y眉kleme s谋ras谋 艧枚yledir:
 
 1. Global config (`~/.config/opencode/opencode.json`)
 2. Project config (`opencode.json`)
 3. Global eklenti dizini (`~/.config/opencode/plugins/`)
 4. Proje eklenti dizini (`.opencode/plugins/`)
 
-Aynı ad ve sürüme sahip yinelenen npm paketleri bir kez yüklenir. Ancak benzer adlara sahip bir yerel eklenti ve bir npm eklentisinin her ikisi de ayrı ayrı yüklenir.
+Ayn谋 ad ve s眉r眉me sahip yinelenen npm paketleri bir kez y眉klenir. Ancak benzer adlara sahip bir yerel eklenti ve bir npm eklentisinin her ikisi de ayr谋 ayr谋 y眉klenir.
 
 ---
 
-## Eklenti oluşturma
+## Eklenti olu艧turma
 
-Eklenti, bir veya daha fazla eklenti işlevini dışa aktaran bir **JavaScript/TypeScript modülüdür**. Her işlev bir bağlam nesnesi alır ve bir kanca nesnesi döndürür.
+Eklenti, bir veya daha fazla eklenti i艧levini d谋艧a aktaran bir **JavaScript/TypeScript mod眉l眉d眉r**. Her i艧lev bir ba臒lam nesnesi al谋r ve bir kanca nesnesi d枚nd眉r眉r.
 
 ---
 
-### Bağımlılıklar
+### Ba臒谋ml谋l谋klar
 
-Yerel eklentiler ve özel araçlar harici npm paketlerini kullanabilir. İhtiyacınız olan bağımlılıkları içeren config dizininize bir `package.json` ekleyin.
+Yerel eklentiler ve 枚zel ara莽lar harici npm paketlerini kullanabilir. 陌htiyac谋n谋z olan ba臒谋ml谋l谋klar谋 i莽eren config dizininize bir `package.json` ekleyin.
 
 ```json title=".opencode/package.json"
 {
@@ -82,7 +82,7 @@ Yerel eklentiler ve özel araçlar harici npm paketlerini kullanabilir. İhtiyac
 }
 ```
 
-OpenCode bunları yüklemek için başlangıçta `bun install` komutunu çalıştırır. Eklentileriniz ve araçlarınız daha sonra bunları içe aktarabilir.
+OpenAGt bunlar谋 y眉klemek i莽in ba艧lang谋莽ta `bun install` komutunu 莽al谋艧t谋r谋r. Eklentileriniz ve ara莽lar谋n谋z daha sonra bunlar谋 i莽e aktarabilir.
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -100,7 +100,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### Temel yapı
+### Temel yap谋
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -112,22 +112,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-Eklenti işlevi şunları alır:
+Eklenti i艧levi 艧unlar谋 al谋r:
 
 - `project`: Mevcut proje bilgisi.
-- `directory`: Güncel çalışma dizini.
-- `worktree`: Git çalışma ağacı yolu.
-- `client`: Yapay zeka ile etkileşim kurmak için bir OpenCode SDK istemcisi.
-- `$`: Bun'un komutları yürütmek için kullandığı [shell API](https://bun.com/docs/runtime/shell).
+- `directory`: G眉ncel 莽al谋艧ma dizini.
+- `worktree`: Git 莽al谋艧ma a臒ac谋 yolu.
+- `client`: Yapay zeka ile etkile艧im kurmak i莽in bir OpenAGt SDK istemcisi.
+- `$`: Bun'un komutlar谋 y眉r眉tmek i莽in kulland谋臒谋 [shell API](https://bun.com/docs/runtime/shell).
 
 ---
 
-### TypeScript desteği
+### TypeScript deste臒i
 
-TypeScript eklentileri için türleri eklenti paketinden içe aktarabilirsiniz:
+TypeScript eklentileri i莽in t眉rleri eklenti paketinden i莽e aktarabilirsiniz:
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -140,43 +140,43 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ### Olaylar
 
-Eklentiler aşağıdaki Örnekler bölümünde görüldüğü gibi etkinliklere abone olabilirler. Burada mevcut farklı etkinliklerin bir listesi bulunmaktadır.
+Eklentiler a艧a臒谋daki 脰rnekler b枚l眉m眉nde g枚r眉ld眉臒眉 gibi etkinliklere abone olabilirler. Burada mevcut farkl谋 etkinliklerin bir listesi bulunmaktad谋r.
 
-#### Komut Olayları
+#### Komut Olaylar谋
 
 - `command.executed`
 
-#### Dosya Olayları
+#### Dosya Olaylar谋
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### Kurulum Olayları
+#### Kurulum Olaylar谋
 
 - `installation.updated`
 
-#### LSP Olayları
+#### LSP Olaylar谋
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### Mesaj Olayları
+#### Mesaj Olaylar谋
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### İzin Olayları
+#### 陌zin Olaylar谋
 
 - `permission.asked`
 - `permission.replied`
 
-#### Sunucu Olayları
+#### Sunucu Olaylar谋
 
 - `server.connected`
 
-#### Oturum Olayları
+#### Oturum Olaylar谋
 
 - `session.created`
 - `session.compacted`
@@ -187,20 +187,20 @@ Eklentiler aşağıdaki Örnekler bölümünde görüldüğü gibi etkinliklere 
 - `session.status`
 - `session.updated`
 
-#### Yapılacaklar Olayları
+#### Yap谋lacaklar Olaylar谋
 
 - `todo.updated`
 
-#### Kabuk Olayları
+#### Kabuk Olaylar谋
 
 - `shell.env`
 
-#### Araç Olayları
+#### Ara莽 Olaylar谋
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUI Olayları
+#### TUI Olaylar谋
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -208,15 +208,15 @@ Eklentiler aşağıdaki Örnekler bölümünde görüldüğü gibi etkinliklere 
 
 ---
 
-## Örnekler
+## 脰rnekler
 
-OpenCode'u genişletmek için kullanabileceğiniz bazı eklenti örneklerini burada bulabilirsiniz.
+OpenAGt'u geni艧letmek i莽in kullanabilece臒iniz baz谋 eklenti 枚rneklerini burada bulabilirsiniz.
 
 ---
 
-### Bildirim Gönderme
+### Bildirim G枚nderme
 
-Belirli olaylar meydana geldiğinde bildirim gönderin:
+Belirli olaylar meydana geldi臒inde bildirim g枚nderin:
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -231,17 +231,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-macOS'ta AppleScript'i çalıştırmak için `osascript` kullanıyoruz. Burada bildirim göndermek için kullanıyoruz.
+macOS'ta AppleScript'i 莽al谋艧t谋rmak i莽in `osascript` kullan谋yoruz. Burada bildirim g枚ndermek i莽in kullan谋yoruz.
 
 :::note
-OpenCode masaüstü uygulamasını kullanıyorsanız yanıt hazır olduğunda veya oturum hataları oluştuğunda otomatik olarak sistem bildirimleri gönderebilir.
+OpenAGt masa眉st眉 uygulamas谋n谋 kullan谋yorsan谋z yan谋t haz谋r oldu臒unda veya oturum hatalar谋 olu艧tu臒unda otomatik olarak sistem bildirimleri g枚nderebilir.
 :::
 
 ---
 
-### .env Koruması
+### .env Korumas谋
 
-OpenCode'un `.env` dosyalarını okumasını önleyin:
+OpenAGt'un `.env` dosyalar谋n谋 okumas谋n谋 枚nleyin:
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -257,9 +257,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### Ortam değişkenlerini enjekte etme
+### Ortam de臒i艧kenlerini enjekte etme
 
-Ortam değişkenlerini tüm kabuk yürütmeye (AI araçları ve kullanıcı terminalleri) enjekte edin:
+Ortam de臒i艧kenlerini t眉m kabuk y眉r眉tmeye (AI ara莽lar谋 ve kullan谋c谋 terminalleri) enjekte edin:
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -274,12 +274,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### Özel araçlar
+### 脰zel ara莽lar
 
-Eklentiler ayrıca OpenCode'a özel araçlar da ekleyebilir:
+Eklentiler ayr谋ca OpenAGt'a 枚zel ara莽lar da ekleyebilir:
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -299,23 +299,23 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-`tool` yardımcısı, OpenCode'un çağırabileceği özel bir araç oluşturur. Bir Zod şeması işlevini alır ve aşağıdakileri içeren bir araç tanımı döndürür:
+`tool` yard谋mc谋s谋, OpenAGt'un 莽a臒谋rabilece臒i 枚zel bir ara莽 olu艧turur. Bir Zod 艧emas谋 i艧levini al谋r ve a艧a臒谋dakileri i莽eren bir ara莽 tan谋m谋 d枚nd眉r眉r:
 
-- `description`: Araç ne yapar?
-- `args`: Aracın argümanları için Zod şeması
-- `execute`: Araç çağrıldığında çalışan fonksiyon
+- `description`: Ara莽 ne yapar?
+- `args`: Arac谋n arg眉manlar谋 i莽in Zod 艧emas谋
+- `execute`: Ara莽 莽a臒r谋ld谋臒谋nda 莽al谋艧an fonksiyon
 
-Özel araçlarınız, yerleşik araçların yanı sıra OpenCode'a da hazır olacaktır.
+脰zel ara莽lar谋n谋z, yerle艧ik ara莽lar谋n yan谋 s谋ra OpenAGt'a da haz谋r olacakt谋r.
 
 :::note
-Eğer bir eklenti aracı yerleşik bir araçla aynı adı kullanırsa, eklenti aracı öncelik kazanır.
+E臒er bir eklenti arac谋 yerle艧ik bir ara莽la ayn谋 ad谋 kullan谋rsa, eklenti arac谋 枚ncelik kazan谋r.
 :::
 
 ---
 
-### Günlüğe kaydetme
+### G眉nl眉臒e kaydetme
 
-Yapılandırılmış günlük kaydı için `console.log` yerine `client.app.log()` kullanın:
+Yap谋land谋r谋lm谋艧 g眉nl眉k kayd谋 i莽in `console.log` yerine `client.app.log()` kullan谋n:
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -330,16 +330,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-Seviyeler: `debug`, `info`, `warn`, `error`. Ayrıntılar için [SDK belgelerine](https://opencode.ai/docs/sdk) bakın.
+Seviyeler: `debug`, `info`, `warn`, `error`. Ayr谋nt谋lar i莽in [SDK belgelerine](https://github.com/Yecyi/OpenAGt/docs/sdk) bak谋n.
 
 ---
 
-### Sıkıştırma kancaları
+### S谋k谋艧t谋rma kancalar谋
 
-Bir oturum sıkıştırıldığında içerilen bağlamı özelleştirin:
+Bir oturum s谋k谋艧t谋r谋ld谋臒谋nda i莽erilen ba臒lam谋 枚zelle艧tirin:
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -358,12 +358,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` kancası, LLM bir devam özeti oluşturmadan önce tetiklenir. Varsayılan sıkıştırma isteminin kaçıracağı etki alanına özgü bağlamı enjekte etmek için bunu kullanın.
+`experimental.session.compacting` kancas谋, LLM bir devam 枚zeti olu艧turmadan 枚nce tetiklenir. Varsay谋lan s谋k谋艧t谋rma isteminin ka莽谋raca臒谋 etki alan谋na 枚zg眉 ba臒lam谋 enjekte etmek i莽in bunu kullan谋n.
 
-Ayrıca `output.prompt` ayarını yaparak sıkıştırma istemini tamamen değiştirebilirsiniz:
+Ayr谋ca `output.prompt` ayar谋n谋 yaparak s谋k谋艧t谋rma istemini tamamen de臒i艧tirebilirsiniz:
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -385,4 +385,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-`output.prompt` ayarlandığında, varsayılan sıkıştırma isteminin tamamen yerini alır. Bu durumda `output.context` dizisi dikkate alınmaz.
+`output.prompt` ayarland谋臒谋nda, varsay谋lan s谋k谋艧t谋rma isteminin tamamen yerini al谋r. Bu durumda `output.context` dizisi dikkate al谋nmaz.

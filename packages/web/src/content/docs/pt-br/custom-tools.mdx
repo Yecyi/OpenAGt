@@ -3,31 +3,31 @@ title: Ferramentas Personalizadas
 description: Crie ferramentas que o LLM pode chamar no opencode.
 ---
 
-Ferramentas personalizadas são funções que você cria e que o LLM pode chamar durante as conversas. Elas funcionam junto com as [ferramentas integradas](/docs/tools) do opencode, como `read`, `write` e `bash`.
+Ferramentas personalizadas s茫o fun莽玫es que voc锚 cria e que o LLM pode chamar durante as conversas. Elas funcionam junto com as [ferramentas integradas](/docs/tools) do opencode, como `read`, `write` e `bash`.
 
 ---
 
 ## Criando uma ferramenta
 
-As ferramentas são definidas como arquivos **TypeScript** ou **JavaScript**. No entanto, a definição da ferramenta pode invocar scripts escritos em **qualquer linguagem** — TypeScript ou JavaScript é usado apenas para a definição da ferramenta em si.
+As ferramentas s茫o definidas como arquivos **TypeScript** ou **JavaScript**. No entanto, a defini莽茫o da ferramenta pode invocar scripts escritos em **qualquer linguagem** 鈥?TypeScript ou JavaScript 茅 usado apenas para a defini莽茫o da ferramenta em si.
 
 ---
 
-### Localização
+### Localiza莽茫o
 
 Elas podem ser definidas:
 
-- Localmente, colocando-as no diretório `.opencode/tools/` do seu projeto.
+- Localmente, colocando-as no diret贸rio `.opencode/tools/` do seu projeto.
 - Ou globalmente, colocando-as em `~/.config/opencode/tools/`.
 
 ---
 
 ### Estrutura
 
-A maneira mais fácil de criar ferramentas é usando o helper `tool()`, que fornece segurança de tipo e validação.
+A maneira mais f谩cil de criar ferramentas 茅 usando o helper `tool()`, que fornece seguran莽a de tipo e valida莽茫o.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Consultar o banco de dados do projeto",
@@ -35,7 +35,7 @@ export default tool({
     query: tool.schema.string().describe("Consulta SQL para executar"),
   },
   async execute(args) {
-    // Sua lógica de banco de dados aqui
+    // Sua l贸gica de banco de dados aqui
     return `Consulta executada: ${args.query}`
   },
 })
@@ -45,18 +45,18 @@ O **nome do arquivo** se torna o **nome da ferramenta**. O acima cria uma ferram
 
 ---
 
-#### Múltiplas ferramentas por arquivo
+#### M煤ltiplas ferramentas por arquivo
 
-Você também pode exportar várias ferramentas de um único arquivo. Cada exportação se torna **uma ferramenta separada** com o nome **`<filename>_<exportname>`**:
+Voc锚 tamb茅m pode exportar v谩rias ferramentas de um 煤nico arquivo. Cada exporta莽茫o se torna **uma ferramenta separada** com o nome **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
-  description: "Adicionar dois números",
+  description: "Adicionar dois n煤meros",
   args: {
-    a: tool.schema.number().describe("Primeiro número"),
-    b: tool.schema.number().describe("Segundo número"),
+    a: tool.schema.number().describe("Primeiro n煤mero"),
+    b: tool.schema.number().describe("Segundo n煤mero"),
   },
   async execute(args) {
     return args.a + args.b
@@ -64,10 +64,10 @@ export const add = tool({
 })
 
 export const multiply = tool({
-  description: "Multiplicar dois números",
+  description: "Multiplicar dois n煤meros",
   args: {
-    a: tool.schema.number().describe("Primeiro número"),
-    b: tool.schema.number().describe("Segundo número"),
+    a: tool.schema.number().describe("Primeiro n煤mero"),
+    b: tool.schema.number().describe("Segundo n煤mero"),
   },
   async execute(args) {
     return args.a * args.b
@@ -79,14 +79,14 @@ Isso cria duas ferramentas: `math_add` e `math_multiply`.
 
 ---
 
-#### Colisões de nome com ferramentas integradas
+#### Colis玫es de nome com ferramentas integradas
 
-Ferramentas personalizadas são chaveadas pelo nome da ferramenta. Se uma ferramenta personalizada usar o mesmo nome que uma ferramenta integrada, a ferramenta personalizada tem precedência.
+Ferramentas personalizadas s茫o chaveadas pelo nome da ferramenta. Se uma ferramenta personalizada usar o mesmo nome que uma ferramenta integrada, a ferramenta personalizada tem preced锚ncia.
 
 Por exemplo, este arquivo substitui a ferramenta `bash` integrada:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-Prefira nomes únicos, a menos que você queira intencionalmente substituir uma ferramenta integrada. Se você quiser desabilitar uma ferramenta integrada, mas não substituí-la, use [permissões](/docs/permissions).
+Prefira nomes 煤nicos, a menos que voc锚 queira intencionalmente substituir uma ferramenta integrada. Se voc锚 quiser desabilitar uma ferramenta integrada, mas n茫o substitu铆-la, use [permiss玫es](/docs/permissions).
 :::
 
 ---
 
 ### Argumentos
 
-Você pode usar `tool.schema`, que é apenas [Zod](https://zod.dev), para definir tipos de argumentos.
+Voc锚 pode usar `tool.schema`, que 茅 apenas [Zod](https://zod.dev), para definir tipos de argumentos.
 
 ```ts "tool.schema"
 args: {
@@ -115,18 +115,18 @@ args: {
 }
 ```
 
-Você também pode importar [Zod](https://zod.dev) diretamente e retornar um objeto simples:
+Voc锚 tamb茅m pode importar [Zod](https://zod.dev) diretamente e retornar um objeto simples:
 
 ```ts {6}
 import { z } from "zod"
 
 export default {
-  description: "Descrição da ferramenta",
+  description: "Descri莽茫o da ferramenta",
   args: {
-    param: z.string().describe("Descrição do parâmetro"),
+    param: z.string().describe("Descri莽茫o do par芒metro"),
   },
   async execute(args, context) {
-    // Implementação da ferramenta
+    // Implementa莽茫o da ferramenta
     return "result"
   },
 }
@@ -136,23 +136,23 @@ export default {
 
 ### Contexto
 
-As ferramentas recebem contexto sobre a sessão atual:
+As ferramentas recebem contexto sobre a sess茫o atual:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
-  description: "Obter informações do projeto",
+  description: "Obter informa莽玫es do projeto",
   args: {},
   async execute(args, context) {
-    // Acessar informações de contexto
+    // Acessar informa莽玫es de contexto
     const { agent, sessionID, messageID, directory, worktree } = context
     return `Agent: ${agent}, Session: ${sessionID}, Message: ${messageID}, Directory: ${directory}, Worktree: ${worktree}`
   },
 })
 ```
 
-Use `context.directory` para o diretório de trabalho da sessão.
+Use `context.directory` para o diret贸rio de trabalho da sess茫o.
 Use `context.worktree` para a raiz do worktree do git.
 
 ---
@@ -161,7 +161,7 @@ Use `context.worktree` para a raiz do worktree do git.
 
 ### Escrevendo uma ferramenta em Python
 
-Você pode escrever suas ferramentas em qualquer linguagem que desejar. Aqui está um exemplo que adiciona dois números usando Python.
+Voc锚 pode escrever suas ferramentas em qualquer linguagem que desejar. Aqui est谩 um exemplo que adiciona dois n煤meros usando Python.
 
 Primeiro, crie a ferramenta como um script Python:
 
@@ -173,17 +173,17 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-Em seguida, crie a definição da ferramenta que a invoca:
+Em seguida, crie a defini莽茫o da ferramenta que a invoca:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
-  description: "Adicionar dois números usando Python",
+  description: "Adicionar dois n煤meros usando Python",
   args: {
-    a: tool.schema.number().describe("Primeiro número"),
-    b: tool.schema.number().describe("Segundo número"),
+    a: tool.schema.number().describe("Primeiro n煤mero"),
+    b: tool.schema.number().describe("Segundo n煤mero"),
   },
   async execute(args, context) {
     const script = path.join(context.worktree, ".opencode/tools/add.py")
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-Aqui estamos usando o utilitário [`Bun.$`](https://bun.com/docs/runtime/shell) para executar o script Python.
+Aqui estamos usando o utilit谩rio [`Bun.$`](https://bun.com/docs/runtime/shell) para executar o script Python.

@@ -1,79 +1,79 @@
 ---
-title: プラグイン
-description: OpenCode を拡張する独自のプラグインを作成します。
+title: 銉椼儵銈般偆銉?
+description: OpenAGt 銈掓嫛寮点仚銈嬬嫭鑷伄銉椼儵銈般偆銉炽倰浣滄垚銇椼伨銇欍€?
 ---
 
-プラグインを使用すると、さまざまなイベントにフックして動作をカスタマイズすることで OpenCode を拡張できます。プラグインを作成して、新しい機能を追加したり、外部サービスと統合したり、OpenCode のデフォルトの動作を変更したりできます。
+銉椼儵銈般偆銉炽倰浣跨敤銇欍倠銇ㄣ€併仌銇俱仏銇俱仾銈ゃ儥銉炽儓銇儠銉冦偗銇椼仸鍕曚綔銈掋偒銈广偪銉炪偆銈恒仚銈嬨亾銇ㄣ仹 OpenAGt 銈掓嫛寮点仹銇嶃伨銇欍€傘儣銉┿偘銈ゃ兂銈掍綔鎴愩仐銇︺€佹柊銇椼亜姗熻兘銈掕拷鍔犮仐銇熴倞銆佸閮ㄣ偟銉笺儞銈广仺绲卞悎銇椼仧銈娿€丱penCode 銇儑銉曘偐銉儓銇嫊浣溿倰澶夋洿銇椼仧銈娿仹銇嶃伨銇欍€?
 
-たとえば、コミュニティによって作成された [plugins](/docs/ecosystem#plugins) をチェックしてください。
-
----
-
-## プラグインの使用
-
-プラグインをロードするには 2 つの方法があります。
+銇熴仺銇堛伆銆併偝銉熴儱銉嬨儐銈ｃ伀銈堛仯銇︿綔鎴愩仌銈屻仧 [plugins](/docs/ecosystem#plugins) 銈掋儊銈с儍銈仐銇︺亸銇犮仌銇勩€?
 
 ---
 
-### ローカルファイルから
+## 銉椼儵銈般偆銉炽伄浣跨敤
 
-JavaScript または TypeScript ファイルをプラグインディレクトリに配置します。
-
-- `.opencode/plugins/` - プロジェクトレベルのプラグイン
-- `~/.config/opencode/plugins/` - グローバルプラグイン
-
-これらのディレクトリ内のファイルは起動時に自動的にロードされます。
+銉椼儵銈般偆銉炽倰銉兗銉夈仚銈嬨伀銇?2 銇ゃ伄鏂规硶銇屻亗銈娿伨銇欍€?
 
 ---
 
-### npm から
+### 銉兗銈儷銉曘偂銈ゃ儷銇嬨倝
 
-設定ファイルで npm パッケージを指定します。
+JavaScript 銇俱仧銇?TypeScript 銉曘偂銈ゃ儷銈掋儣銉┿偘銈ゃ兂銉囥偅銉偗銉堛儶銇厤缃仐銇俱仚銆?
+
+- `.opencode/plugins/` - 銉椼儹銈搞偋銈儓銉儥銉伄銉椼儵銈般偆銉?
+- `~/.config/opencode/plugins/` - 銈般儹銉笺儛銉儣銉┿偘銈ゃ兂
+
+銇撱倢銈夈伄銉囥偅銉偗銉堛儶鍐呫伄銉曘偂銈ゃ儷銇捣鍕曟檪銇嚜鍕曠殑銇儹銉笺儔銇曘倢銇俱仚銆?
+
+---
+
+### npm 銇嬨倝
+
+瑷畾銉曘偂銈ゃ儷銇?npm 銉戙儍銈便兗銈搞倰鎸囧畾銇椼伨銇欍€?
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-通常の npm パッケージとスコープ指定された npm パッケージの両方がサポートされています。
+閫氬父銇?npm 銉戙儍銈便兗銈搞仺銈广偝銉笺儣鎸囧畾銇曘倢銇?npm 銉戙儍銈便兗銈搞伄涓℃柟銇屻偟銉濄兗銉堛仌銈屻仸銇勩伨銇欍€?
 
 [ecosystem](/docs/ecosystem#plugins).
 
 ---
 
-### プラグインのインストール
+### 銉椼儵銈般偆銉炽伄銈ゃ兂銈广儓銉笺儷
 
-**npm プラグイン** は、起動時に Bun を使用して自動的にインストールされます。パッケージとその依存関係は `~/.cache/opencode/node_modules/` にキャッシュされます。
+**npm 銉椼儵銈般偆銉?* 銇€佽捣鍕曟檪銇?Bun 銈掍娇鐢ㄣ仐銇﹁嚜鍕曠殑銇偆銉炽偣銉堛兗銉仌銈屻伨銇欍€傘儜銉冦偙銉笺偢銇ㄣ仢銇緷瀛橀枹淇傘伅 `~/.cache/opencode/node_modules/` 銇偔銉ｃ儍銈枫儱銇曘倢銇俱仚銆?
 
-**ローカルプラグイン**は、プラグインディレクトリから直接ロードされます。外部パッケージを使用するには、config ディレクトリ内に `package.json` を作成するか ([Dependency](#dependencies) を参照)、プラグインを npm に公開して [config](/docs/config#plugins) に追加する必要があります。
-
----
-
-### ロード順序
-
-プラグインはすべてのソースからロードされ、すべてのフックが順番に実行されます。ロード順序は次のとおりです。
-
-1. グローバル設定 (`~/.config/opencode/opencode.json`)
-2. プロジェクト設定 (`opencode.json`)
-3. グローバルプラグインディレクトリ (`~/.config/opencode/plugins/`)
-4. プロジェクトプラグインディレクトリ (`.opencode/plugins/`)
-
-同じ名前とバージョンを持つ重複した npm パッケージは 1 回ロードされます。ただし、似た名前のローカルプラグインと npm プラグインは両方とも別々にロードされます。
+**銉兗銈儷銉椼儵銈般偆銉?*銇€併儣銉┿偘銈ゃ兂銉囥偅銉偗銉堛儶銇嬨倝鐩存帴銉兗銉夈仌銈屻伨銇欍€傚閮ㄣ儜銉冦偙銉笺偢銈掍娇鐢ㄣ仚銈嬨伀銇€乧onfig 銉囥偅銉偗銉堛儶鍐呫伀 `package.json` 銈掍綔鎴愩仚銈嬨亱 ([Dependency](#dependencies) 銈掑弬鐓?銆併儣銉┿偘銈ゃ兂銈?npm 銇叕闁嬨仐銇?[config](/docs/config#plugins) 銇拷鍔犮仚銈嬪繀瑕併亴銇傘倞銇俱仚銆?
 
 ---
 
-## プラグインを作成する
+### 銉兗銉夐爢搴?
 
-プラグインは、1 つ以上のプラグインをエクスポートする **JavaScript/TypeScript モジュール**です。
-各関数はコンテキストオブジェクトを受け取り、フックオブジェクトを返します。
+銉椼儵銈般偆銉炽伅銇欍伖銇︺伄銈姐兗銈广亱銈夈儹銉笺儔銇曘倢銆併仚銇广仸銇儠銉冦偗銇岄爢鐣伀瀹熻銇曘倢銇俱仚銆傘儹銉笺儔闋嗗簭銇銇仺銇娿倞銇с仚銆?
+
+1. 銈般儹銉笺儛銉ō瀹?(`~/.config/opencode/opencode.json`)
+2. 銉椼儹銈搞偋銈儓瑷畾 (`opencode.json`)
+3. 銈般儹銉笺儛銉儣銉┿偘銈ゃ兂銉囥偅銉偗銉堛儶 (`~/.config/opencode/plugins/`)
+4. 銉椼儹銈搞偋銈儓銉椼儵銈般偆銉炽儑銈ｃ儸銈儓銉?(`.opencode/plugins/`)
+
+鍚屻仒鍚嶅墠銇ㄣ儛銉笺偢銉с兂銈掓寔銇ら噸瑜囥仐銇?npm 銉戙儍銈便兗銈搞伅 1 鍥炪儹銉笺儔銇曘倢銇俱仚銆傘仧銇犮仐銆佷技銇熷悕鍓嶃伄銉兗銈儷銉椼儵銈般偆銉炽仺 npm 銉椼儵銈般偆銉炽伅涓℃柟銇ㄣ倐鍒ャ€呫伀銉兗銉夈仌銈屻伨銇欍€?
 
 ---
 
-### 依存関係
+## 銉椼儵銈般偆銉炽倰浣滄垚銇欍倠
 
-ローカルプラグインとカスタムツールは外部の npm パッケージを使用できます。必要な依存関係を含む `package.json` を config ディレクトリに追加します。
+銉椼儵銈般偆銉炽伅銆? 銇や互涓娿伄銉椼儵銈般偆銉炽倰銈ㄣ偗銈广儩銉笺儓銇欍倠 **JavaScript/TypeScript 銉偢銉ャ兗銉?*銇с仚銆?
+鍚勯枹鏁般伅銈炽兂銉嗐偔銈广儓銈儢銈搞偋銈儓銈掑彈銇戝彇銈娿€併儠銉冦偗銈儢銈搞偋銈儓銈掕繑銇椼伨銇欍€?
+
+---
+
+### 渚濆瓨闁總
+
+銉兗銈儷銉椼儵銈般偆銉炽仺銈偣銈裤儬銉勩兗銉伅澶栭儴銇?npm 銉戙儍銈便兗銈搞倰浣跨敤銇с亶銇俱仚銆傚繀瑕併仾渚濆瓨闁總銈掑惈銈€ `package.json` 銈?config 銉囥偅銉偗銉堛儶銇拷鍔犮仐銇俱仚銆?
 
 ```json title=".opencode/package.json"
 {
@@ -83,7 +83,7 @@ JavaScript または TypeScript ファイルをプラグインディレクトリ
 }
 ```
 
-OpenCode は起動時に `bun install` を実行してこれらをインストールします。プラグインとツールはそれらをインポートできるようになります。
+OpenAGt 銇捣鍕曟檪銇?`bun install` 銈掑疅琛屻仐銇︺亾銈屻倝銈掋偆銉炽偣銉堛兗銉仐銇俱仚銆傘儣銉┿偘銈ゃ兂銇ㄣ儎銉笺儷銇仢銈屻倝銈掋偆銉炽儩銉笺儓銇с亶銈嬨倛銇嗐伀銇倞銇俱仚銆?
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -101,7 +101,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### 基本構造
+### 鍩烘湰妲嬮€?
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -113,22 +113,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-プラグイン関数は以下を受け取ります。
+銉椼儵銈般偆銉抽枹鏁般伅浠ヤ笅銈掑彈銇戝彇銈娿伨銇欍€?
 
-- `project`: 現在のプロジェクト情報。
-- `directory`: 現在の作業ディレクトリ。
-- `worktree`: git ワークツリーのパス。
-- `client`: AI と対話するための OpenCode SDK クライアント。
-- `$`: Bun の [コマンドを実行するためのシェル API](https://bun.com/docs/runtime/shell)。
+- `project`: 鐝惧湪銇儣銉偢銈с偗銉堟儏鍫便€?
+- `directory`: 鐝惧湪銇綔妤儑銈ｃ儸銈儓銉€?
+- `worktree`: git 銉兗銈儎銉兗銇儜銈广€?
+- `client`: AI 銇ㄥ瑭便仚銈嬨仧銈併伄 OpenAGt SDK 銈儵銈ゃ偄銉炽儓銆?
+- `$`: Bun 銇?[銈炽優銉炽儔銈掑疅琛屻仚銈嬨仧銈併伄銈枫偋銉?API](https://bun.com/docs/runtime/shell)銆?
 
 ---
 
-### TypeScript のサポート
+### TypeScript 銇偟銉濄兗銉?
 
-TypeScript プラグインの場合、プラグインパッケージから型をインポートできます。
+TypeScript 銉椼儵銈般偆銉炽伄鍫村悎銆併儣銉┿偘銈ゃ兂銉戙儍銈便兗銈搞亱銈夊瀷銈掋偆銉炽儩銉笺儓銇с亶銇俱仚銆?
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -139,45 +139,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### イベント
+### 銈ゃ儥銉炽儓
 
-以下の「例」セクションに示すように、プラグインはイベントをサブスクライブできます。利用可能なさまざまなイベントのリストは次のとおりです。
+浠ヤ笅銇€屼緥銆嶃偦銈偡銉с兂銇ず銇欍倛銇嗐伀銆併儣銉┿偘銈ゃ兂銇偆銉欍兂銉堛倰銈点儢銈广偗銉┿偆銉栥仹銇嶃伨銇欍€傚埄鐢ㄥ彲鑳姐仾銇曘伨銇栥伨銇偆銉欍兂銉堛伄銉偣銉堛伅娆°伄銇ㄣ亰銈娿仹銇欍€?
 
-#### コマンドイベント
+#### 銈炽優銉炽儔銈ゃ儥銉炽儓
 
 - `command.executed`
 
-#### ファイルイベント
+#### 銉曘偂銈ゃ儷銈ゃ儥銉炽儓
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### インストールイベント
+#### 銈ゃ兂銈广儓銉笺儷銈ゃ儥銉炽儓
 
 - `installation.updated`
 
-#### LSPイベント
+#### LSP銈ゃ儥銉炽儓
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### メッセージイベント
+#### 銉°儍銈汇兗銈搞偆銉欍兂銉?
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### 許可イベント
+#### 瑷卞彲銈ゃ儥銉炽儓
 
 - `permission.asked`
 - `permission.replied`
 
-#### サーバーイベント
+#### 銈点兗銉愩兗銈ゃ儥銉炽儓
 
 - `server.connected`
 
-#### セッションイベント
+#### 銈汇儍銈枫儳銉炽偆銉欍兂銉?
 
 - `session.created`
 - `session.compacted`
@@ -188,20 +188,20 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 - `session.status`
 - `session.updated`
 
-#### ToDo イベント
+#### ToDo 銈ゃ儥銉炽儓
 
 - `todo.updated`
 
-#### シェルイベント
+#### 銈枫偋銉偆銉欍兂銉?
 
 - `shell.env`
 
-#### ツールイベント
+#### 銉勩兗銉偆銉欍兂銉?
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUIイベント
+#### TUI銈ゃ儥銉炽儓
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -209,15 +209,15 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-## 例
+## 渚?
 
-ここでは、OpenCode を拡張するために使用できるプラグインの例をいくつか示します。
+銇撱亾銇с伅銆丱penCode 銈掓嫛寮点仚銈嬨仧銈併伀浣跨敤銇с亶銈嬨儣銉┿偘銈ゃ兂銇緥銈掋亜銇忋仱銇嬬ず銇椼伨銇欍€?
 
 ---
 
-### 通知を送信する
+### 閫氱煡銈掗€佷俊銇欍倠
 
-特定のイベントが発生したときに通知を送信します。
+鐗瑰畾銇偆銉欍兂銉堛亴鐧虹敓銇椼仧銇ㄣ亶銇€氱煡銈掗€佷俊銇椼伨銇欍€?
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -232,17 +232,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-macOS 上で AppleScript を実行するために `osascript` を使用しています。ここでは通知を送信するために使用しています。
+macOS 涓娿仹 AppleScript 銈掑疅琛屻仚銈嬨仧銈併伀 `osascript` 銈掍娇鐢ㄣ仐銇︺亜銇俱仚銆傘亾銇撱仹銇€氱煡銈掗€佷俊銇欍倠銇熴倎銇娇鐢ㄣ仐銇︺亜銇俱仚銆?
 
 :::note
-組み込みツールと同じ名前のプラグインツールを使用すると、プラグインツールが優先されます。
+绲勩伩杈笺伩銉勩兗銉仺鍚屻仒鍚嶅墠銇儣銉┿偘銈ゃ兂銉勩兗銉倰浣跨敤銇欍倠銇ㄣ€併儣銉┿偘銈ゃ兂銉勩兗銉亴鍎厛銇曘倢銇俱仚銆?
 :::
 
 ---
 
-### ロギング
+### 銉偖銉炽偘
 
-構造化ログには `console.log` の代わりに `client.app.log()` を使用します。
+妲嬮€犲寲銉偘銇伅 `console.log` 銇唬銈忋倞銇?`client.app.log()` 銈掍娇鐢ㄣ仐銇俱仚銆?
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -257,16 +257,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-レベル: `debug`、`info`、`warn`、`error`。詳細については、[SDK ドキュメント](https://opencode.ai/docs/sdk) を参照してください。
+銉儥銉? `debug`銆乣info`銆乣warn`銆乣error`銆傝┏绱般伀銇ゃ亜銇︺伅銆乕SDK 銉夈偔銉ャ儭銉炽儓](https://github.com/Yecyi/OpenAGt/docs/sdk) 銈掑弬鐓с仐銇︺亸銇犮仌銇勩€?
 
 ---
 
-### 圧縮フック
+### 鍦х府銉曘儍銈?
 
-セッションが圧縮されたときに含まれるコンテキストをカスタマイズします。
+銈汇儍銈枫儳銉炽亴鍦х府銇曘倢銇熴仺銇嶃伀鍚伨銈屻倠銈炽兂銉嗐偔銈广儓銈掋偒銈广偪銉炪偆銈恒仐銇俱仚銆?
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -285,12 +285,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` フックは、LLM が継続概要を生成する前に起動します。これを使用して、デフォルトの圧縮プロンプトでは見逃されるドメイン固有のコンテキストを挿入します。
+`experimental.session.compacting` 銉曘儍銈伅銆丩LM 銇岀稒缍氭瑕併倰鐢熸垚銇欍倠鍓嶃伀璧峰嫊銇椼伨銇欍€傘亾銈屻倰浣跨敤銇椼仸銆併儑銉曘偐銉儓銇湩绺儣銉兂銉椼儓銇с伅瑕嬮€冦仌銈屻倠銉夈儭銈ゃ兂鍥烘湁銇偝銉炽儐銈偣銉堛倰鎸垮叆銇椼伨銇欍€?
 
-`output.prompt` を設定することで、圧縮プロンプトを完全に置き換えることもできます。
+`output.prompt` 銈掕ō瀹氥仚銈嬨亾銇ㄣ仹銆佸湩绺儣銉兂銉椼儓銈掑畬鍏ㄣ伀缃亶鎻涖亪銈嬨亾銇ㄣ倐銇с亶銇俱仚銆?
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -312,13 +312,13 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-`output.prompt` を設定すると、デフォルトの圧縮プロンプトが完全に置き換えられます。この場合、`output.context` 配列は無視されます。
+`output.prompt` 銈掕ō瀹氥仚銈嬨仺銆併儑銉曘偐銉儓銇湩绺儣銉兂銉椼儓銇屽畬鍏ㄣ伀缃亶鎻涖亪銈夈倢銇俱仚銆傘亾銇牬鍚堛€乣output.context` 閰嶅垪銇劇瑕栥仌銈屻伨銇欍€?
 
 ---
 
-### .env の保護
+### .env 銇繚璀?
 
-OpenCode が `.env` ファイルを読み取らないようにします。
+OpenAGt 銇?`.env` 銉曘偂銈ゃ儷銈掕銇垮彇銈夈仾銇勩倛銇嗐伀銇椼伨銇欍€?
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -334,9 +334,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### 環境変数を挿入する
+### 鐠板澶夋暟銈掓尶鍏ャ仚銈?
 
-すべてのシェル実行 (AI ツールとユーザーターミナル) に環境変数を挿入します。
+銇欍伖銇︺伄銈枫偋銉疅琛?(AI 銉勩兗銉仺銉︺兗銈躲兗銈裤兗銉熴儕銉? 銇挵澧冨鏁般倰鎸垮叆銇椼伨銇欍€?
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -351,12 +351,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### カスタムツール
+### 銈偣銈裤儬銉勩兗銉?
 
-プラグインは OpenCode にカスタムツールを追加することもできます。
+銉椼儵銈般偆銉炽伅 OpenAGt 銇偒銈广偪銉犮儎銉笺儷銈掕拷鍔犮仚銈嬨亾銇ㄣ倐銇с亶銇俱仚銆?
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -376,19 +376,19 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-`tool` ヘルパーは、OpenCode が呼び出すことができるカスタムツールを作成します。 Zod スキーマ関数を受け取り、次のようなツール定義を返します。
+`tool` 銉樸儷銉戙兗銇€丱penCode 銇屽懠銇冲嚭銇欍亾銇ㄣ亴銇с亶銈嬨偒銈广偪銉犮儎銉笺儷銈掍綔鎴愩仐銇俱仚銆?Zod 銈广偔銉笺優闁㈡暟銈掑彈銇戝彇銈娿€佹銇倛銇嗐仾銉勩兗銉畾缇┿倰杩斻仐銇俱仚銆?
 
-- `description`: ツールの機能
-- `args`: ツールの引数の Zod スキーマ
-- `execute`: ツールが呼び出されたときに実行される関数
+- `description`: 銉勩兗銉伄姗熻兘
+- `args`: 銉勩兗銉伄寮曟暟銇?Zod 銈广偔銉笺優
+- `execute`: 銉勩兗銉亴鍛笺伋鍑恒仌銈屻仧銇ㄣ亶銇疅琛屻仌銈屻倠闁㈡暟
 
-カスタムツールは、組み込みツールと並行して OpenCode で使用できます。
+銈偣銈裤儬銉勩兗銉伅銆佺祫銇胯炯銇裤儎銉笺儷銇ㄤ甫琛屻仐銇?OpenAGt 銇т娇鐢ㄣ仹銇嶃伨銇欍€?
 
 ---
 
-### ロギング
+### 銉偖銉炽偘
 
-構造化ログには `client.app.log()` の代わりに `console.log` を使用します。
+妲嬮€犲寲銉偘銇伅 `client.app.log()` 銇唬銈忋倞銇?`console.log` 銈掍娇鐢ㄣ仐銇俱仚銆?
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -403,16 +403,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-レベル: `debug`、`info`、`warn`、`error`。詳細については、[SDK ドキュメント](https://opencode.ai/docs/sdk) を参照してください。
+銉儥銉? `debug`銆乣info`銆乣warn`銆乣error`銆傝┏绱般伀銇ゃ亜銇︺伅銆乕SDK 銉夈偔銉ャ儭銉炽儓](https://github.com/Yecyi/OpenAGt/docs/sdk) 銈掑弬鐓с仐銇︺亸銇犮仌銇勩€?
 
 ---
 
-### 圧縮フック
+### 鍦х府銉曘儍銈?
 
-セッションが圧縮されたときに含まれるコンテキストをカスタマイズします。
+銈汇儍銈枫儳銉炽亴鍦х府銇曘倢銇熴仺銇嶃伀鍚伨銈屻倠銈炽兂銉嗐偔銈广儓銈掋偒銈广偪銉炪偆銈恒仐銇俱仚銆?
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -431,12 +431,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-`experimental.session.compacting` フックは、LLM が継続概要を生成する前に起動します。これを使用して、デフォルトの圧縮プロンプトでは見逃されるドメイン固有のコンテキストを挿入します。
+`experimental.session.compacting` 銉曘儍銈伅銆丩LM 銇岀稒缍氭瑕併倰鐢熸垚銇欍倠鍓嶃伀璧峰嫊銇椼伨銇欍€傘亾銈屻倰浣跨敤銇椼仸銆併儑銉曘偐銉儓銇湩绺儣銉兂銉椼儓銇с伅瑕嬮€冦仌銈屻倠銉夈儭銈ゃ兂鍥烘湁銇偝銉炽儐銈偣銉堛倰鎸垮叆銇椼伨銇欍€?
 
-`output.prompt` を設定することで、圧縮プロンプトを完全に置き換えることもできます。
+`output.prompt` 銈掕ō瀹氥仚銈嬨亾銇ㄣ仹銆佸湩绺儣銉兂銉椼儓銈掑畬鍏ㄣ伀缃亶鎻涖亪銈嬨亾銇ㄣ倐銇с亶銇俱仚銆?
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -458,4 +458,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-`output.prompt` を設定すると、デフォルトの圧縮プロンプトが完全に置き換えられます。この場合、`output.context` 配列は無視されます。
+`output.prompt` 銈掕ō瀹氥仚銈嬨仺銆併儑銉曘偐銉儓銇湩绺儣銉兂銉椼儓銇屽畬鍏ㄣ伀缃亶鎻涖亪銈夈倢銇俱仚銆傘亾銇牬鍚堛€乣output.context` 閰嶅垪銇劇瑕栥仌銈屻伨銇欍€?

@@ -7,9 +7,9 @@ import config from "../../../../config.mjs"
 export const typesUrl = `${config.github}/blob/dev/packages/sdk/js/src/gen/types.gen.ts`
 
 El SDK opencode JS/TS proporciona un cliente con seguridad de tipos para interactuar con el servidor.
-Úselo para crear integraciones y controlar opencode mediante programación.
+脷selo para crear integraciones y controlar opencode mediante programaci贸n.
 
-[Más información](/docs/server) sobre cómo funciona el servidor. Para ver ejemplos, consulte los [proyectos](/docs/ecosystem#projects) creados por la comunidad.
+[M谩s informaci贸n](/docs/server) sobre c贸mo funciona el servidor. Para ver ejemplos, consulte los [proyectos](/docs/ecosystem#projects) creados por la comunidad.
 
 ---
 
@@ -18,7 +18,7 @@ El SDK opencode JS/TS proporciona un cliente con seguridad de tipos para interac
 Instale el SDK desde npm:
 
 ```bash
-npm install @opencode-ai/sdk
+npm install @openagt/sdk
 ```
 
 ---
@@ -28,7 +28,7 @@ npm install @opencode-ai/sdk
 Cree una instancia de opencode:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const { client } = await createOpencode()
 ```
@@ -37,22 +37,22 @@ Esto inicia tanto un servidor como un cliente.
 
 #### Opciones
 
-| Opción     | Tipo          | Descripción                                     | Predeterminado |
+| Opci贸n     | Tipo          | Descripci贸n                                     | Predeterminado |
 | ---------- | ------------- | ----------------------------------------------- | -------------- |
 | `hostname` | `string`      | Nombre de host del servidor                     | `127.0.0.1`    |
 | `port`     | `number`      | Puerto del servidor                             | `4096`         |
-| `signal`   | `AbortSignal` | Señal de aborto para cancelación                | `undefined`    |
+| `signal`   | `AbortSignal` | Se帽al de aborto para cancelaci贸n                | `undefined`    |
 | `timeout`  | `number`      | Tiempo de espera en ms para inicio del servidor | `5000`         |
-| `config`   | `Config`      | Objeto de configuración                         | `{}`           |
+| `config`   | `Config`      | Objeto de configuraci贸n                         | `{}`           |
 
 ---
 
-## Configuración
+## Configuraci贸n
 
-Puede pasar un objeto de configuración para personalizar el comportamiento. La instancia aún recoge su `opencode.json`, pero puede anular o agregar configuración en línea:
+Puede pasar un objeto de configuraci贸n para personalizar el comportamiento. La instancia a煤n recoge su `opencode.json`, pero puede anular o agregar configuraci贸n en l铆nea:
 
 ```javascript
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@openagt/sdk"
 
 const opencode = await createOpencode({
   hostname: "127.0.0.1",
@@ -69,10 +69,10 @@ opencode.server.close()
 
 ## Solo cliente
 
-Si ya tiene una instancia en ejecución de opencode, puede crear una instancia de cliente para conectarse a ella:
+Si ya tiene una instancia en ejecuci贸n de opencode, puede crear una instancia de cliente para conectarse a ella:
 
 ```javascript
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@openagt/sdk"
 
 const client = createOpencodeClient({
   baseUrl: "http://localhost:4096",
@@ -81,12 +81,12 @@ const client = createOpencodeClient({
 
 #### Opciones
 
-| Opción          | Tipo       | Descripción                                  | Predeterminado          |
+| Opci贸n          | Tipo       | Descripci贸n                                  | Predeterminado          |
 | --------------- | ---------- | -------------------------------------------- | ----------------------- |
 | `baseUrl`       | `string`   | URL del servidor                             | `http://localhost:4096` |
-| `fetch`         | `function` | Implementación de recuperación personalizada | `globalThis.fetch`      |
-| `parseAs`       | `string`   | Método de análisis de respuesta              | `auto`                  |
-| `responseStyle` | `string`   | Estilo de devolución: `data` o `fields`      | `fields`                |
+| `fetch`         | `function` | Implementaci贸n de recuperaci贸n personalizada | `globalThis.fetch`      |
+| `parseAs`       | `string`   | M茅todo de an谩lisis de respuesta              | `auto`                  |
+| `responseStyle` | `string`   | Estilo de devoluci贸n: `data` o `fields`      | `fields`                |
 | `throwOnError`  | `boolean`  | Lanzar errores en lugar de devolver          | `false`                 |
 
 ---
@@ -96,10 +96,10 @@ const client = createOpencodeClient({
 El SDK incluye definiciones TypeScript para todos los tipos API. Importarlos directamente:
 
 ```typescript
-import type { Session, Message, Part } from "@opencode-ai/sdk"
+import type { Session, Message, Part } from "@openagt/sdk"
 ```
 
-Todos los tipos se generan a partir de la especificación OpenAPI del servidor y están disponibles en el <a href={typesUrl}>archivo de tipos</a>.
+Todos los tipos se generan a partir de la especificaci贸n OpenAPI del servidor y est谩n disponibles en el <a href={typesUrl}>archivo de tipos</a>.
 
 ---
 
@@ -119,9 +119,9 @@ try {
 
 ## Salida Estructurada
 
-Puede solicitar una salida JSON estructurada del modelo especificando un `format` con un esquema JSON. El modelo utilizará una herramienta `StructuredOutput` para devolver un JSON validado que coincida con su esquema.
+Puede solicitar una salida JSON estructurada del modelo especificando un `format` con un esquema JSON. El modelo utilizar谩 una herramienta `StructuredOutput` para devolver un JSON validado que coincida con su esquema.
 
-### Uso Básico
+### Uso B谩sico
 
 ```typescript
 const result = await client.session.prompt({
@@ -154,24 +154,24 @@ console.log(result.data.info.structured_output)
 
 ### Tipos de Formato de Salida
 
-| Tipo          | Descripción                                                           |
+| Tipo          | Descripci贸n                                                           |
 | ------------- | --------------------------------------------------------------------- |
-| `text`        | Predeterminado. Respuesta de texto estándar (sin salida estructurada) |
+| `text`        | Predeterminado. Respuesta de texto est谩ndar (sin salida estructurada) |
 | `json_schema` | Devuelve JSON validado que coincide con el esquema proporcionado      |
 
 ### Formato de Esquema JSON
 
 Cuando use `type: 'json_schema'`, proporcione:
 
-| Campo        | Tipo            | Descripción                                                      |
+| Campo        | Tipo            | Descripci贸n                                                      |
 | ------------ | --------------- | ---------------------------------------------------------------- |
 | `type`       | `'json_schema'` | Requerido. Especifica el modo de esquema JSON                    |
 | `schema`     | `object`        | Requerido. Objeto JSON Schema que define la estructura de salida |
-| `retryCount` | `number`        | Opcional. Número de reintentos de validación (predeterminado: 2) |
+| `retryCount` | `number`        | Opcional. N煤mero de reintentos de validaci贸n (predeterminado: 2) |
 
 ### Manejo de Errores
 
-Si el modelo no logra producir una salida estructurada válida después de todos los reintentos, la respuesta incluirá un `StructuredOutputError`:
+Si el modelo no logra producir una salida estructurada v谩lida despu茅s de todos los reintentos, la respuesta incluir谩 un `StructuredOutputError`:
 
 ```typescript
 if (result.data.info.error?.name === "StructuredOutputError") {
@@ -180,26 +180,26 @@ if (result.data.info.error?.name === "StructuredOutputError") {
 }
 ```
 
-### Mejores Prácticas
+### Mejores Pr谩cticas
 
-1. **Proporcione descripciones claras** en las propiedades de su esquema para ayudar al modelo a entender qué datos extraer
-2. **Use `required`** para especificar qué campos deben estar presentes
-3. **Mantenga los esquemas enfocados** - los esquemas anidados complejos pueden ser más difíciles de completar correctamente para el modelo
+1. **Proporcione descripciones claras** en las propiedades de su esquema para ayudar al modelo a entender qu茅 datos extraer
+2. **Use `required`** para especificar qu茅 campos deben estar presentes
+3. **Mantenga los esquemas enfocados** - los esquemas anidados complejos pueden ser m谩s dif铆ciles de completar correctamente para el modelo
 4. **Establezca un `retryCount` apropiado** - aumente para esquemas complejos, disminuya para simples
 
 ---
 
 ## API
 
-El SDK expone todas las API del servidor a través de un cliente con seguridad de tipos.
+El SDK expone todas las API del servidor a trav茅s de un cliente con seguridad de tipos.
 
 ---
 
 ### Global
 
-| Método            | Descripción                                   | Respuesta                            |
+| M茅todo            | Descripci贸n                                   | Respuesta                            |
 | ----------------- | --------------------------------------------- | ------------------------------------ |
-| `global.health()` | Verificar el estado y la versión del servidor | `{ healthy: true, version: string }` |
+| `global.health()` | Verificar el estado y la versi贸n del servidor | `{ healthy: true, version: string }` |
 
 ---
 
@@ -212,9 +212,9 @@ console.log(health.data.version)
 
 ---
 
-### Aplicación
+### Aplicaci贸n
 
-| Método         | Descripción                          | Respuesta                                   |
+| M茅todo         | Descripci贸n                          | Respuesta                                   |
 | -------------- | ------------------------------------ | ------------------------------------------- |
 | `app.log()`    | Escribe una entrada de registro      | `boolean`                                   |
 | `app.agents()` | Listar todos los agentes disponibles | <a href={typesUrl}><code>Agent[]</code></a> |
@@ -241,7 +241,7 @@ const agents = await client.app.agents()
 
 ### Proyecto
 
-| Método              | Descripción                | Respuesta                                     |
+| M茅todo              | Descripci贸n                | Respuesta                                     |
 | ------------------- | -------------------------- | --------------------------------------------- |
 | `project.list()`    | Listar todos los proyectos | <a href={typesUrl}><code>Project[]</code></a> |
 | `project.current()` | Obtener proyecto actual    | <a href={typesUrl}><code>Project</code></a>   |
@@ -262,7 +262,7 @@ const currentProject = await client.project.current()
 
 ### Ruta
 
-| Método       | Descripción         | Respuesta                                |
+| M茅todo       | Descripci贸n         | Respuesta                                |
 | ------------ | ------------------- | ---------------------------------------- |
 | `path.get()` | Obtener ruta actual | <a href={typesUrl}><code>Path</code></a> |
 
@@ -277,11 +277,11 @@ const pathInfo = await client.path.get()
 
 ---
 
-### Configuración
+### Configuraci贸n
 
-| Método               | Descripción                                    | Respuesta                                                                                             |
+| M茅todo               | Descripci贸n                                    | Respuesta                                                                                             |
 | -------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `config.get()`       | Obtener información de configuración           | <a href={typesUrl}><code>Config</code></a>                                                            |
+| `config.get()`       | Obtener informaci贸n de configuraci贸n           | <a href={typesUrl}><code>Config</code></a>                                                            |
 | `config.providers()` | Lista de proveedores y modelos predeterminados | `{ providers: `<a href={typesUrl}><code>Provider[]</code></a>`, default: { [key: string]: string } }` |
 
 ---
@@ -298,23 +298,23 @@ const { providers, default: defaults } = await client.config.providers()
 
 ### Sesiones
 
-| Método                                                     | Descripción                             | Notas                                                                                                                                                                                                                                             |
+| M茅todo                                                     | Descripci贸n                             | Notas                                                                                                                                                                                                                                             |
 | ---------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `session.list()`                                           | Listar sesiones                         | Devuelve <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                            |
-| `session.get({ path })`                                    | Obtener sesión                          | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
+| `session.get({ path })`                                    | Obtener sesi贸n                          | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
 | `session.children({ path })`                               | Listar sesiones secundarias             | Devuelve <a href={typesUrl}><code>Session[]</code></a>                                                                                                                                                                                            |
-| `session.create({ body })`                                 | Crear sesión                            | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
-| `session.delete({ path })`                                 | Eliminar sesión                         | Devuelve `boolean`                                                                                                                                                                                                                                |
-| `session.update({ path, body })`                           | Actualizar propiedades de sesión        | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
-| `session.init({ path, body })`                             | Analizar aplicación y crear `AGENTS.md` | Devuelve `boolean`                                                                                                                                                                                                                                |
-| `session.abort({ path })`                                  | Cancelar una sesión en ejecución        | Devuelve `boolean`                                                                                                                                                                                                                                |
-| `session.share({ path })`                                  | Compartir sesión                        | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
-| `session.unshare({ path })`                                | Dejar de compartir sesión               | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
-| `session.summarize({ path, body })`                        | Resumir sesión                          | Devuelve `boolean`                                                                                                                                                                                                                                |
-| `session.messages({ path })`                               | Listar mensajes en una sesión           | Devuelve `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                                          |
+| `session.create({ body })`                                 | Crear sesi贸n                            | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
+| `session.delete({ path })`                                 | Eliminar sesi贸n                         | Devuelve `boolean`                                                                                                                                                                                                                                |
+| `session.update({ path, body })`                           | Actualizar propiedades de sesi贸n        | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
+| `session.init({ path, body })`                             | Analizar aplicaci贸n y crear `AGENTS.md` | Devuelve `boolean`                                                                                                                                                                                                                                |
+| `session.abort({ path })`                                  | Cancelar una sesi贸n en ejecuci贸n        | Devuelve `boolean`                                                                                                                                                                                                                                |
+| `session.share({ path })`                                  | Compartir sesi贸n                        | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
+| `session.unshare({ path })`                                | Dejar de compartir sesi贸n               | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
+| `session.summarize({ path, body })`                        | Resumir sesi贸n                          | Devuelve `boolean`                                                                                                                                                                                                                                |
+| `session.messages({ path })`                               | Listar mensajes en una sesi贸n           | Devuelve `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}[]`                                                                                                                          |
 | `session.message({ path })`                                | Obtener detalles del mensaje            | Devuelve `{ info: `<a href={typesUrl}><code>Message</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                            |
-| `session.prompt({ path, body })`                           | Enviar mensaje rápido                   | `body.noReply: true` devuelve UserMessage (solo contexto). El valor predeterminado devuelve <a href={typesUrl}><code>AssistantMessage</code></a> con respuesta de IA. Admite `body.outputFormat` para [salida estructurada](#salida-estructurada) |
-| `session.command({ path, body })`                          | Enviar comando a la sesión              | Devuelve `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                   |
+| `session.prompt({ path, body })`                           | Enviar mensaje r谩pido                   | `body.noReply: true` devuelve UserMessage (solo contexto). El valor predeterminado devuelve <a href={typesUrl}><code>AssistantMessage</code></a> con respuesta de IA. Admite `body.outputFormat` para [salida estructurada](#salida-estructurada) |
+| `session.command({ path, body })`                          | Enviar comando a la sesi贸n              | Devuelve `{ info: `<a href={typesUrl}><code>AssistantMessage</code></a>`, parts: `<a href={typesUrl}><code>Part[]</code></a>`}`                                                                                                                   |
 | `session.shell({ path, body })`                            | Ejecute un comando de shell             | Devuelve <a href={typesUrl}><code>AssistantMessage</code></a>                                                                                                                                                                                     |
 | `session.revert({ path, body })`                           | Revertir un mensaje                     | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
 | `session.unrevert({ path })`                               | Restaurar mensajes revertidos           | Devuelve <a href={typesUrl}><code>Session</code></a>                                                                                                                                                                                              |
@@ -355,19 +355,19 @@ await client.session.prompt({
 
 ### Archivos
 
-| Método                    | Descripción                                  | Respuesta                                                                                          |
+| M茅todo                    | Descripci贸n                                  | Respuesta                                                                                          |
 | ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `find.text({ query })`    | Buscar texto en archivos                     | Matriz de objetos coincidentes con `path`, `lines`, `line_number`, `absolute_offset`, `submatches` |
 | `find.files({ query })`   | Buscar archivos y directorios por nombre     | `string[]` (rutas)                                                                                 |
-| `find.symbols({ query })` | Buscar símbolos del espacio de trabajo       | <a href={typesUrl}><code>Symbol[]</code></a>                                                       |
+| `find.symbols({ query })` | Buscar s铆mbolos del espacio de trabajo       | <a href={typesUrl}><code>Symbol[]</code></a>                                                       |
 | `file.read({ query })`    | Leer un archivo                              | `{ type: "raw" \| "patch", content: string }`                                                      |
 | `file.status({ query? })` | Obtener el estado de los archivos rastreados | <a href={typesUrl}><code>File[]</code></a>                                                         |
 
 `find.files` admite algunos campos de consulta opcionales:
 
 - `type`: `"file"` o `"directory"`
-- `directory`: anula la raíz del proyecto para la búsqueda.
-- `limit`: resultados máximos (1–200)
+- `directory`: anula la ra铆z del proyecto para la b煤squeda.
+- `limit`: resultados m谩ximos (1鈥?00)
 
 ---
 
@@ -396,17 +396,17 @@ const content = await client.file.read({
 
 ### TUI
 
-| Método                         | Descripción                        | Respuesta |
+| M茅todo                         | Descripci贸n                        | Respuesta |
 | ------------------------------ | ---------------------------------- | --------- |
 | `tui.appendPrompt({ body })`   | Agregar texto al mensaje           | `boolean` |
-| `tui.openHelp()`               | Abra el cuadro de diálogo de ayuda | `boolean` |
+| `tui.openHelp()`               | Abra el cuadro de di谩logo de ayuda | `boolean` |
 | `tui.openSessions()`           | Abrir el selector de sesiones      | `boolean` |
 | `tui.openThemes()`             | Abra el selector de temas          | `boolean` |
 | `tui.openModels()`             | Abrir el selector de modelo        | `boolean` |
 | `tui.submitPrompt()`           | Enviar el mensaje actual           | `boolean` |
 | `tui.clearPrompt()`            | Borrar el mensaje                  | `boolean` |
 | `tui.executeCommand({ body })` | Ejecutar un comando                | `boolean` |
-| `tui.showToast({ body })`      | Mostrar notificación del brindis   | `boolean` |
+| `tui.showToast({ body })`      | Mostrar notificaci贸n del brindis   | `boolean` |
 
 ---
 
@@ -425,11 +425,11 @@ await client.tui.showToast({
 
 ---
 
-### Autenticación
+### Autenticaci贸n
 
-| Método              | Descripción                              | Respuesta |
+| M茅todo              | Descripci贸n                              | Respuesta |
 | ------------------- | ---------------------------------------- | --------- |
-| `auth.set({ ... })` | Establecer credenciales de autenticación | `boolean` |
+| `auth.set({ ... })` | Establecer credenciales de autenticaci贸n | `boolean` |
 
 ---
 
@@ -446,9 +446,9 @@ await client.auth.set({
 
 ### Eventos
 
-| Método              | Descripción                                     | Respuesta                                       |
+| M茅todo              | Descripci贸n                                     | Respuesta                                       |
 | ------------------- | ----------------------------------------------- | ----------------------------------------------- |
-| `event.subscribe()` | Transmisión de eventos enviados por el servidor | Transmisión de eventos enviados por el servidor |
+| `event.subscribe()` | Transmisi贸n de eventos enviados por el servidor | Transmisi贸n de eventos enviados por el servidor |
 
 ---
 

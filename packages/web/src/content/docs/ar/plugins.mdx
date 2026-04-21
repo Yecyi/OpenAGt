@@ -1,79 +1,79 @@
 ---
-title: الإضافات
-description: اكتب إضافاتك الخاصة لتوسيع OpenCode.
+title: 丕賱廿囟丕賮丕鬲
+description: 丕賰鬲亘 廿囟丕賮丕鬲賰 丕賱禺丕氐丞 賱鬲賵爻賷毓 OpenAGt.
 ---
 
-تتيح لك الإضافات توسيع OpenCode عبر ربطها بأحداث مختلفة وتخصيص السلوك. يمكنك إنشاء إضافات لإضافة ميزات جديدة، أو التكامل مع خدمات خارجية، أو تعديل السلوك الافتراضي لـ OpenCode.
+鬲鬲賷丨 賱賰 丕賱廿囟丕賮丕鬲 鬲賵爻賷毓 OpenAGt 毓亘乇 乇亘胤賴丕 亘兀丨丿丕孬 賲禺鬲賱賮丞 賵鬲禺氐賷氐 丕賱爻賱賵賰. 賷賲賰賳賰 廿賳卮丕亍 廿囟丕賮丕鬲 賱廿囟丕賮丞 賲賷夭丕鬲 噩丿賷丿丞貙 兀賵 丕賱鬲賰丕賲賱 賲毓 禺丿賲丕鬲 禺丕乇噩賷丞貙 兀賵 鬲毓丿賷賱 丕賱爻賱賵賰 丕賱丕賮鬲乇丕囟賷 賱賭 OpenAGt.
 
-للاطلاع على أمثلة، راجع [الإضافات](/docs/ecosystem#plugins) التي أنشأها المجتمع.
-
----
-
-## استخدام إضافة
-
-هناك طريقتان لتحميل الإضافات.
+賱賱丕胤賱丕毓 毓賱賶 兀賲孬賱丞貙 乇丕噩毓 [丕賱廿囟丕賮丕鬲](/docs/ecosystem#plugins) 丕賱鬲賷 兀賳卮兀賴丕 丕賱賲噩鬲賲毓.
 
 ---
 
-### من ملفات محلية
+## 丕爻鬲禺丿丕賲 廿囟丕賮丞
 
-ضع ملفات JavaScript أو TypeScript في دليل الإضافات.
-
-- `.opencode/plugins/` - إضافات على مستوى المشروع
-- `~/.config/opencode/plugins/` - إضافات عامة
-
-تُحمَّل الملفات في هذه الأدلة تلقائيا عند بدء التشغيل.
+賴賳丕賰 胤乇賷賯鬲丕賳 賱鬲丨賲賷賱 丕賱廿囟丕賮丕鬲.
 
 ---
 
-### من npm
+### 賲賳 賲賱賮丕鬲 賲丨賱賷丞
 
-حدّد حزم npm في ملف الإعدادات.
+囟毓 賲賱賮丕鬲 JavaScript 兀賵 TypeScript 賮賷 丿賱賷賱 丕賱廿囟丕賮丕鬲.
+
+- `.opencode/plugins/` - 廿囟丕賮丕鬲 毓賱賶 賲爻鬲賵賶 丕賱賲卮乇賵毓
+- `~/.config/opencode/plugins/` - 廿囟丕賮丕鬲 毓丕賲丞
+
+鬲購丨賲賾賻賱 丕賱賲賱賮丕鬲 賮賷 賴匕賴 丕賱兀丿賱丞 鬲賱賯丕卅賷丕 毓賳丿 亘丿亍 丕賱鬲卮睾賷賱.
+
+---
+
+### 賲賳 npm
+
+丨丿賾丿 丨夭賲 npm 賮賷 賲賱賮 丕賱廿毓丿丕丿丕鬲.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-يتم دعم حزم npm العادية والحزم ذات النطاق (scoped).
+賷鬲賲 丿毓賲 丨夭賲 npm 丕賱毓丕丿賷丞 賵丕賱丨夭賲 匕丕鬲 丕賱賳胤丕賯 (scoped).
 
-تصفّح الإضافات المتاحة في [النظام البيئي](/docs/ecosystem#plugins).
-
----
-
-### كيفية تثبيت الإضافات
-
-**إضافات npm** تُثبَّت تلقائيا باستخدام Bun عند بدء التشغيل. تُخزَّن الحزم واعتمادياتها مؤقتا في `~/.cache/opencode/node_modules/`.
-
-**الإضافات المحلية** تُحمَّل مباشرة من دليل الإضافات. لاستخدام حزم خارجية، يجب إنشاء `package.json` داخل دليل الإعدادات لديك (راجع [الاعتماديات](#dependencies))، أو نشر الإضافة على npm ثم [إضافتها إلى إعداداتك](/docs/config#plugins).
+鬲氐賮賾丨 丕賱廿囟丕賮丕鬲 丕賱賲鬲丕丨丞 賮賷 [丕賱賳馗丕賲 丕賱亘賷卅賷](/docs/ecosystem#plugins).
 
 ---
 
-### ترتيب التحميل
+### 賰賷賮賷丞 鬲孬亘賷鬲 丕賱廿囟丕賮丕鬲
 
-تُحمَّل الإضافات من جميع المصادر وتعمل جميع الخطافات بالتتابع. ترتيب التحميل هو:
+**廿囟丕賮丕鬲 npm** 鬲購孬亘賾賻鬲 鬲賱賯丕卅賷丕 亘丕爻鬲禺丿丕賲 Bun 毓賳丿 亘丿亍 丕賱鬲卮睾賷賱. 鬲購禺夭賾賻賳 丕賱丨夭賲 賵丕毓鬲賲丕丿賷丕鬲賴丕 賲丐賯鬲丕 賮賷 `~/.cache/opencode/node_modules/`.
 
-1. إعدادات عامة (`~/.config/opencode/opencode.json`)
-2. إعدادات المشروع (`opencode.json`)
-3. دليل الإضافات العام (`~/.config/opencode/plugins/`)
-4. دليل إضافات المشروع (`.opencode/plugins/`)
-
-تُحمَّل حزم npm المكررة ذات الاسم والإصدار نفسيهما مرة واحدة. ومع ذلك، تُحمَّل الإضافة المحلية وإضافة npm ذات الاسم المشابه كلتاهما بشكل مستقل.
+**丕賱廿囟丕賮丕鬲 丕賱賲丨賱賷丞** 鬲購丨賲賾賻賱 賲亘丕卮乇丞 賲賳 丿賱賷賱 丕賱廿囟丕賮丕鬲. 賱丕爻鬲禺丿丕賲 丨夭賲 禺丕乇噩賷丞貙 賷噩亘 廿賳卮丕亍 `package.json` 丿丕禺賱 丿賱賷賱 丕賱廿毓丿丕丿丕鬲 賱丿賷賰 (乇丕噩毓 [丕賱丕毓鬲賲丕丿賷丕鬲](#dependencies))貙 兀賵 賳卮乇 丕賱廿囟丕賮丞 毓賱賶 npm 孬賲 [廿囟丕賮鬲賴丕 廿賱賶 廿毓丿丕丿丕鬲賰](/docs/config#plugins).
 
 ---
 
-## إنشاء إضافة
+### 鬲乇鬲賷亘 丕賱鬲丨賲賷賱
 
-الإضافة هي **وحدة JavaScript/TypeScript** تصدّر دالة إضافة واحدة أو أكثر.
-تستقبل كل دالة كائنا للسياق وتعيد كائنا للخطافات.
+鬲購丨賲賾賻賱 丕賱廿囟丕賮丕鬲 賲賳 噩賲賷毓 丕賱賲氐丕丿乇 賵鬲毓賲賱 噩賲賷毓 丕賱禺胤丕賮丕鬲 亘丕賱鬲鬲丕亘毓. 鬲乇鬲賷亘 丕賱鬲丨賲賷賱 賴賵:
+
+1. 廿毓丿丕丿丕鬲 毓丕賲丞 (`~/.config/opencode/opencode.json`)
+2. 廿毓丿丕丿丕鬲 丕賱賲卮乇賵毓 (`opencode.json`)
+3. 丿賱賷賱 丕賱廿囟丕賮丕鬲 丕賱毓丕賲 (`~/.config/opencode/plugins/`)
+4. 丿賱賷賱 廿囟丕賮丕鬲 丕賱賲卮乇賵毓 (`.opencode/plugins/`)
+
+鬲購丨賲賾賻賱 丨夭賲 npm 丕賱賲賰乇乇丞 匕丕鬲 丕賱丕爻賲 賵丕賱廿氐丿丕乇 賳賮爻賷賴賲丕 賲乇丞 賵丕丨丿丞. 賵賲毓 匕賱賰貙 鬲購丨賲賾賻賱 丕賱廿囟丕賮丞 丕賱賲丨賱賷丞 賵廿囟丕賮丞 npm 匕丕鬲 丕賱丕爻賲 丕賱賲卮丕亘賴 賰賱鬲丕賴賲丕 亘卮賰賱 賲爻鬲賯賱.
 
 ---
 
-### الاعتماديات
+## 廿賳卮丕亍 廿囟丕賮丞
 
-يمكن للإضافات المحلية والأدوات المخصصة استخدام حزم npm خارجية. أضف `package.json` إلى دليل الإعدادات لديك متضمنا الاعتماديات التي تحتاجها.
+丕賱廿囟丕賮丞 賴賷 **賵丨丿丞 JavaScript/TypeScript** 鬲氐丿賾乇 丿丕賱丞 廿囟丕賮丞 賵丕丨丿丞 兀賵 兀賰孬乇.
+鬲爻鬲賯亘賱 賰賱 丿丕賱丞 賰丕卅賳丕 賱賱爻賷丕賯 賵鬲毓賷丿 賰丕卅賳丕 賱賱禺胤丕賮丕鬲.
+
+---
+
+### 丕賱丕毓鬲賲丕丿賷丕鬲
+
+賷賲賰賳 賱賱廿囟丕賮丕鬲 丕賱賲丨賱賷丞 賵丕賱兀丿賵丕鬲 丕賱賲禺氐氐丞 丕爻鬲禺丿丕賲 丨夭賲 npm 禺丕乇噩賷丞. 兀囟賮 `package.json` 廿賱賶 丿賱賷賱 丕賱廿毓丿丕丿丕鬲 賱丿賷賰 賲鬲囟賲賳丕 丕賱丕毓鬲賲丕丿賷丕鬲 丕賱鬲賷 鬲丨鬲丕噩賴丕.
 
 ```json title=".opencode/package.json"
 {
@@ -83,7 +83,7 @@ description: اكتب إضافاتك الخاصة لتوسيع OpenCode.
 }
 ```
 
-يشغّل OpenCode الأمر `bun install` عند بدء التشغيل لتثبيتها. بعد ذلك يمكن لإضافاتك وأدواتك استيرادها.
+賷卮睾賾賱 OpenAGt 丕賱兀賲乇 `bun install` 毓賳丿 亘丿亍 丕賱鬲卮睾賷賱 賱鬲孬亘賷鬲賴丕. 亘毓丿 匕賱賰 賷賲賰賳 賱廿囟丕賮丕鬲賰 賵兀丿賵丕鬲賰 丕爻鬲賷乇丕丿賴丕.
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -101,7 +101,7 @@ export const MyPlugin = async (ctx) => {
 
 ---
 
-### البنية الأساسية
+### 丕賱亘賳賷丞 丕賱兀爻丕爻賷丞
 
 ```js title=".opencode/plugins/example.js"
 export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -113,22 +113,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-تستقبل دالة الإضافة ما يلي:
+鬲爻鬲賯亘賱 丿丕賱丞 丕賱廿囟丕賮丞 賲丕 賷賱賷:
 
-- `project`: معلومات المشروع الحالي.
-- `directory`: دليل العمل الحالي.
-- `worktree`: مسار git worktree.
-- `client`: عميل SDK لـ opencode للتفاعل مع الذكاء الاصطناعي.
-- `$`: واجهة [shell API](https://bun.com/docs/runtime/shell) الخاصة بـ Bun لتنفيذ الأوامر.
+- `project`: 賲毓賱賵賲丕鬲 丕賱賲卮乇賵毓 丕賱丨丕賱賷.
+- `directory`: 丿賱賷賱 丕賱毓賲賱 丕賱丨丕賱賷.
+- `worktree`: 賲爻丕乇 git worktree.
+- `client`: 毓賲賷賱 SDK 賱賭 opencode 賱賱鬲賮丕毓賱 賲毓 丕賱匕賰丕亍 丕賱丕氐胤賳丕毓賷.
+- `$`: 賵丕噩賴丞 [shell API](https://bun.com/docs/runtime/shell) 丕賱禺丕氐丞 亘賭 Bun 賱鬲賳賮賷匕 丕賱兀賵丕賲乇.
 
 ---
 
-### دعم TypeScript
+### 丿毓賲 TypeScript
 
-بالنسبة لإضافات TypeScript، يمكنك استيراد الأنواع من حزمة الإضافة:
+亘丕賱賳爻亘丞 賱廿囟丕賮丕鬲 TypeScript貙 賷賲賰賳賰 丕爻鬲賷乇丕丿 丕賱兀賳賵丕毓 賲賳 丨夭賲丞 丕賱廿囟丕賮丞:
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -139,45 +139,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### الأحداث
+### 丕賱兀丨丿丕孬
 
-يمكن للإضافات الاشتراك في الأحداث كما هو موضح أدناه في قسم الأمثلة. فيما يلي قائمة بالأحداث المتاحة.
+賷賲賰賳 賱賱廿囟丕賮丕鬲 丕賱丕卮鬲乇丕賰 賮賷 丕賱兀丨丿丕孬 賰賲丕 賴賵 賲賵囟丨 兀丿賳丕賴 賮賷 賯爻賲 丕賱兀賲孬賱丞. 賮賷賲丕 賷賱賷 賯丕卅賲丞 亘丕賱兀丨丿丕孬 丕賱賲鬲丕丨丞.
 
-#### أحداث الأوامر
+#### 兀丨丿丕孬 丕賱兀賵丕賲乇
 
 - `command.executed`
 
-#### أحداث الملفات
+#### 兀丨丿丕孬 丕賱賲賱賮丕鬲
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### أحداث التثبيت
+#### 兀丨丿丕孬 丕賱鬲孬亘賷鬲
 
 - `installation.updated`
 
-#### أحداث LSP
+#### 兀丨丿丕孬 LSP
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### أحداث الرسائل
+#### 兀丨丿丕孬 丕賱乇爻丕卅賱
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### أحداث الأذونات
+#### 兀丨丿丕孬 丕賱兀匕賵賳丕鬲
 
 - `permission.asked`
 - `permission.replied`
 
-#### أحداث الخادم
+#### 兀丨丿丕孬 丕賱禺丕丿賲
 
 - `server.connected`
 
-#### أحداث الجلسة
+#### 兀丨丿丕孬 丕賱噩賱爻丞
 
 - `session.created`
 - `session.compacted`
@@ -188,20 +188,20 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 - `session.status`
 - `session.updated`
 
-#### أحداث Todo
+#### 兀丨丿丕孬 Todo
 
 - `todo.updated`
 
-#### أحداث shell
+#### 兀丨丿丕孬 shell
 
 - `shell.env`
 
-#### أحداث الأدوات
+#### 兀丨丿丕孬 丕賱兀丿賵丕鬲
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### أحداث واجهة TUI
+#### 兀丨丿丕孬 賵丕噩賴丞 TUI
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -209,15 +209,15 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-## أمثلة
+## 兀賲孬賱丞
 
-فيما يلي بعض أمثلة الإضافات التي يمكنك استخدامها لتوسيع opencode.
+賮賷賲丕 賷賱賷 亘毓囟 兀賲孬賱丞 丕賱廿囟丕賮丕鬲 丕賱鬲賷 賷賲賰賳賰 丕爻鬲禺丿丕賲賴丕 賱鬲賵爻賷毓 opencode.
 
 ---
 
-### إرسال إشعارات
+### 廿乇爻丕賱 廿卮毓丕乇丕鬲
 
-أرسل إشعارات عند وقوع أحداث معينة:
+兀乇爻賱 廿卮毓丕乇丕鬲 毓賳丿 賵賯賵毓 兀丨丿丕孬 賲毓賷賳丞:
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -232,17 +232,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-نستخدم `osascript` لتشغيل AppleScript على macOS. هنا نستخدمه لإرسال إشعارات.
+賳爻鬲禺丿賲 `osascript` 賱鬲卮睾賷賱 AppleScript 毓賱賶 macOS. 賴賳丕 賳爻鬲禺丿賲賴 賱廿乇爻丕賱 廿卮毓丕乇丕鬲.
 
 :::note
-إذا كنت تستخدم تطبيق OpenCode لسطح المكتب، فيمكنه إرسال إشعارات النظام تلقائيا عند جاهزية الرد أو عند حدوث خطأ في جلسة.
+廿匕丕 賰賳鬲 鬲爻鬲禺丿賲 鬲胤亘賷賯 OpenAGt 賱爻胤丨 丕賱賲賰鬲亘貙 賮賷賲賰賳賴 廿乇爻丕賱 廿卮毓丕乇丕鬲 丕賱賳馗丕賲 鬲賱賯丕卅賷丕 毓賳丿 噩丕賴夭賷丞 丕賱乇丿 兀賵 毓賳丿 丨丿賵孬 禺胤兀 賮賷 噩賱爻丞.
 :::
 
 ---
 
-### حماية .env
+### 丨賲丕賷丞 .env
 
-امنع opencode من قراءة ملفات `.env`:
+丕賲賳毓 opencode 賲賳 賯乇丕亍丞 賲賱賮丕鬲 `.env`:
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -258,9 +258,9 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ---
 
-### حقن متغيرات البيئة
+### 丨賯賳 賲鬲睾賷乇丕鬲 丕賱亘賷卅丞
 
-احقن متغيرات البيئة في جميع عمليات تنفيذ shell (أدوات الذكاء الاصطناعي وterminal المستخدم):
+丕丨賯賳 賲鬲睾賷乇丕鬲 丕賱亘賷卅丞 賮賷 噩賲賷毓 毓賲賱賷丕鬲 鬲賳賮賷匕 shell (兀丿賵丕鬲 丕賱匕賰丕亍 丕賱丕氐胤賳丕毓賷 賵terminal 丕賱賲爻鬲禺丿賲):
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -275,12 +275,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### أدوات مخصصة
+### 兀丿賵丕鬲 賲禺氐氐丞
 
-يمكن للإضافات أيضا إضافة أدوات مخصصة إلى opencode:
+賷賲賰賳 賱賱廿囟丕賮丕鬲 兀賷囟丕 廿囟丕賮丞 兀丿賵丕鬲 賲禺氐氐丞 廿賱賶 opencode:
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -300,19 +300,19 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-تقوم الدالة المساعدة `tool` بإنشاء أداة مخصصة يمكن لـ opencode استدعاؤها. تأخذ دالة مخطط Zod وتعيد تعريف أداة يتضمن:
+鬲賯賵賲 丕賱丿丕賱丞 丕賱賲爻丕毓丿丞 `tool` 亘廿賳卮丕亍 兀丿丕丞 賲禺氐氐丞 賷賲賰賳 賱賭 opencode 丕爻鬲丿毓丕丐賴丕. 鬲兀禺匕 丿丕賱丞 賲禺胤胤 Zod 賵鬲毓賷丿 鬲毓乇賷賮 兀丿丕丞 賷鬲囟賲賳:
 
-- `description`: ما الذي تفعله الأداة
-- `args`: مخطط Zod لوسائط الأداة
-- `execute`: الدالة التي تُشغَّل عند استدعاء الأداة
+- `description`: 賲丕 丕賱匕賷 鬲賮毓賱賴 丕賱兀丿丕丞
+- `args`: 賲禺胤胤 Zod 賱賵爻丕卅胤 丕賱兀丿丕丞
+- `execute`: 丕賱丿丕賱丞 丕賱鬲賷 鬲購卮睾賾賻賱 毓賳丿 丕爻鬲丿毓丕亍 丕賱兀丿丕丞
 
-ستكون أدواتك المخصصة متاحة لـ opencode إلى جانب الأدوات المضمنة.
+爻鬲賰賵賳 兀丿賵丕鬲賰 丕賱賲禺氐氐丞 賲鬲丕丨丞 賱賭 opencode 廿賱賶 噩丕賳亘 丕賱兀丿賵丕鬲 丕賱賲囟賲賳丞.
 
 ---
 
-### التسجيل
+### 丕賱鬲爻噩賷賱
 
-استخدم `client.app.log()` بدلا من `console.log` للتسجيل البنيوي:
+丕爻鬲禺丿賲 `client.app.log()` 亘丿賱丕 賲賳 `console.log` 賱賱鬲爻噩賷賱 丕賱亘賳賷賵賷:
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -327,16 +327,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-المستويات: `debug`, `info`, `warn`, `error`. راجع [توثيق SDK](https://opencode.ai/docs/sdk) للتفاصيل.
+丕賱賲爻鬲賵賷丕鬲: `debug`, `info`, `warn`, `error`. 乇丕噩毓 [鬲賵孬賷賯 SDK](https://github.com/Yecyi/OpenAGt/docs/sdk) 賱賱鬲賮丕氐賷賱.
 
 ---
 
-### خطافات الضغط
+### 禺胤丕賮丕鬲 丕賱囟睾胤
 
-خصّص السياق الذي يتم تضمينه عند ضغط جلسة:
+禺氐賾氐 丕賱爻賷丕賯 丕賱匕賷 賷鬲賲 鬲囟賲賷賳賴 毓賳丿 囟睾胤 噩賱爻丞:
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -355,12 +355,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-يعمل الخطاف `experimental.session.compacting` قبل أن ينشئ نموذج اللغة الكبير (LLM) ملخص المتابعة. استخدمه لحقن سياق خاص بالمجال قد يفوته موجّه الضغط الافتراضي.
+賷毓賲賱 丕賱禺胤丕賮 `experimental.session.compacting` 賯亘賱 兀賳 賷賳卮卅 賳賲賵匕噩 丕賱賱睾丞 丕賱賰亘賷乇 (LLM) 賲賱禺氐 丕賱賲鬲丕亘毓丞. 丕爻鬲禺丿賲賴 賱丨賯賳 爻賷丕賯 禺丕氐 亘丕賱賲噩丕賱 賯丿 賷賮賵鬲賴 賲賵噩賾賴 丕賱囟睾胤 丕賱丕賮鬲乇丕囟賷.
 
-يمكنك أيضا استبدال موجّه الضغط بالكامل عبر ضبط `output.prompt`:
+賷賲賰賳賰 兀賷囟丕 丕爻鬲亘丿丕賱 賲賵噩賾賴 丕賱囟睾胤 亘丕賱賰丕賲賱 毓亘乇 囟亘胤 `output.prompt`:
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -382,4 +382,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-عند ضبط `output.prompt` فإنه يستبدل موجّه الضغط الافتراضي بالكامل. يتم تجاهل المصفوفة `output.context` في هذه الحالة.
+毓賳丿 囟亘胤 `output.prompt` 賮廿賳賴 賷爻鬲亘丿賱 賲賵噩賾賴 丕賱囟睾胤 丕賱丕賮鬲乇丕囟賷 亘丕賱賰丕賲賱. 賷鬲賲 鬲噩丕賴賱 丕賱賲氐賮賵賮丞 `output.context` 賮賷 賴匕賴 丕賱丨丕賱丞.

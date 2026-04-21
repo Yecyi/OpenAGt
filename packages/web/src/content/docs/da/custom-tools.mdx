@@ -1,15 +1,15 @@
 ---
-title: Brugerdefinerede værktøjer
-description: Opret værktøjer, som LLM kan kalde opencode ind.
+title: Brugerdefinerede v忙rkt酶jer
+description: Opret v忙rkt酶jer, som LLM kan kalde opencode ind.
 ---
 
-Brugerdefinerede værktøjer er funktioner, du opretter, som LLM kan kalde under samtaler. De arbejder sammen med opencodes [built-in tools](/docs/tools) som `read`, `write` og `bash`.
+Brugerdefinerede v忙rkt酶jer er funktioner, du opretter, som LLM kan kalde under samtaler. De arbejder sammen med opencodes [built-in tools](/docs/tools) som `read`, `write` og `bash`.
 
 ---
 
-## Oprettelse af et værktøj
+## Oprettelse af et v忙rkt酶j
 
-Værktøjer er defineret som **TypeScript**- eller **JavaScript**-filer. Værktøjsdefinitionen kan dog kalde scripts skrevet på **alle sprog** - TypeScript eller JavaScript bruges kun til selve værktøjsdefinitionen.
+V忙rkt酶jer er defineret som **TypeScript**- eller **JavaScript**-filer. V忙rkt酶jsdefinitionen kan dog kalde scripts skrevet p氓 **alle sprog** - TypeScript eller JavaScript bruges kun til selve v忙rkt酶jsdefinitionen.
 
 ---
 
@@ -24,10 +24,10 @@ De kan definere:
 
 ### Struktur
 
-Den nemmeste måde at oprette værktøjer på er at bruge `tool()`-hjælperen, som giver typesikkerhed og validering.
+Den nemmeste m氓de at oprette v忙rkt酶jer p氓 er at bruge `tool()`-hj忙lperen, som giver typesikkerhed og validering.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**filnavnet** bliver **værktøjsnavnet**. Ovenstående opretter et `database` værktøj.
+**filnavnet** bliver **v忙rkt酶jsnavnet**. Ovenst氓ende opretter et `database` v忙rkt酶j.
 
 ---
 
-#### Flere værktøjer pr. fil
+#### Flere v忙rkt酶jer pr. fil
 
-Du kan også eksportere flere værktøjer fra en enkelt fil. Hver eksport bliver **et separat værktøj** med navnet **`<filename>_<exportname>`**:
+Du kan ogs氓 eksportere flere v忙rkt酶jer fra en enkelt fil. Hver eksport bliver **et separat v忙rkt酶j** med navnet **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-Dette skaber værktøjer: `math_add` og `math_multiply`.
+Dette skaber v忙rkt酶jer: `math_add` og `math_multiply`.
 
 ---
 
-#### Navnekollisioner med indbyggede værktøjer
+#### Navnekollisioner med indbyggede v忙rkt酶jer
 
-Brugerdefinerede værktøjer er identificeret ved værktøjsnavn. Hvis et brugerdefineret værktøj bruger samme navn som et indbygget værktøj, har det brugerdefinerede værktøj forrang.
+Brugerdefinerede v忙rkt酶jer er identificeret ved v忙rkt酶jsnavn. Hvis et brugerdefineret v忙rkt酶j bruger samme navn som et indbygget v忙rkt酶j, har det brugerdefinerede v忙rkt酶j forrang.
 
-For eksempel erstatter denne fil det indbyggede `bash` værktøj:
+For eksempel erstatter denne fil det indbyggede `bash` v忙rkt酶j:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,7 +100,7 @@ export default tool({
 ```
 
 :::note
-Foretræk unikke navne, medmindre du bevidst ønsker at erstatte et indbygget værktøj. Hvis du vil deaktivere et indbygget værktøj, men ikke overskrive det, skal du bruge [tilladelser](/docs/permissions).
+Foretr忙k unikke navne, medmindre du bevidst 酶nsker at erstatte et indbygget v忙rkt酶j. Hvis du vil deaktivere et indbygget v忙rkt酶j, men ikke overskrive det, skal du bruge [tilladelser](/docs/permissions).
 :::
 
 ---
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-Du kan også importere [Zod](https://zod.dev) direkte og returnere et almindeligt objekt:
+Du kan ogs氓 importere [Zod](https://zod.dev) direkte og returnere et almindeligt objekt:
 
 ```ts {6}
 import { z } from "zod"
@@ -136,10 +136,10 @@ export default {
 
 ### Kontekst
 
-Værktøjer modtager kontekst om den aktuelle session:
+V忙rkt酶jer modtager kontekst om den aktuelle session:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -153,17 +153,17 @@ export default tool({
 ```
 
 Brug `context.directory` til sessionens arbejdsmappe.
-Brug `context.worktree` til git-arbejdstræets rod.
+Brug `context.worktree` til git-arbejdstr忙ets rod.
 
 ---
 
 ## Eksempler
 
-### Skriv et værktøj i Python
+### Skriv et v忙rkt酶j i Python
 
-Du kan skrive dine værktøjer på et hvilket som helst sprog, du ønsker. Her er et eksempel, der tilføjer til tal ved hjælp af Python.
+Du kan skrive dine v忙rkt酶jer p氓 et hvilket som helst sprog, du 酶nsker. Her er et eksempel, der tilf酶jer til tal ved hj忙lp af Python.
 
-Først skal du oprette værktøjet som et Python-script:
+F酶rst skal du oprette v忙rkt酶jet som et Python-script:
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-Opret derefter værktøjsdefinitionen, der kalder den:
+Opret derefter v忙rkt酶jsdefinitionen, der kalder den:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-Her bruger vi [`Bun.$`](https://bun.com/docs/runtime/shell)-værktøjet til at køre Python-scriptet.
+Her bruger vi [`Bun.$`](https://bun.com/docs/runtime/shell)-v忙rkt酶jet til at k酶re Python-scriptet.

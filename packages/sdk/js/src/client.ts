@@ -3,7 +3,9 @@ export * from "./gen/types.gen.js"
 import { createClient } from "./gen/client/client.gen.js"
 import { type Config } from "./gen/client/types.gen.js"
 import { OpencodeClient } from "./gen/sdk.gen.js"
+export class OpenagtClient extends OpencodeClient {}
 export { type Config as OpencodeClientConfig, OpencodeClient }
+export { type Config as OpenagtClientConfig }
 
 function pick(value: string | null, fallback?: string) {
   if (!value) return
@@ -16,7 +18,7 @@ function pick(value: string | null, fallback?: string) {
 function rewrite(request: Request, directory?: string) {
   if (request.method !== "GET" && request.method !== "HEAD") return request
 
-  const value = pick(request.headers.get("x-opencode-directory"), directory)
+  const value = pick(request.headers.get("x-openagt-directory") ?? request.headers.get("x-opencode-directory"), directory)
   if (!value) return request
 
   const url = new URL(request.url)
@@ -25,6 +27,7 @@ function rewrite(request: Request, directory?: string) {
   }
 
   const next = new Request(url, request)
+  next.headers.delete("x-openagt-directory")
   next.headers.delete("x-opencode-directory")
   return next
 }
@@ -45,6 +48,7 @@ export function createOpencodeClient(config?: Config & { directory?: string }) {
   if (config?.directory) {
     config.headers = {
       ...config.headers,
+      "x-openagt-directory": encodeURIComponent(config.directory),
       "x-opencode-directory": encodeURIComponent(config.directory),
     }
   }
@@ -52,4 +56,30 @@ export function createOpencodeClient(config?: Config & { directory?: string }) {
   const client = createClient(config)
   client.interceptors.request.use((request) => rewrite(request, config?.directory))
   return new OpencodeClient({ client })
+}
+
+export function createOpenagtClient(config?: Config & { directory?: string }) {
+  if (!config?.fetch) {
+    const customFetch: any = (req: any) => {
+      // @ts-ignore
+      req.timeout = false
+      return fetch(req)
+    }
+    config = {
+      ...config,
+      fetch: customFetch,
+    }
+  }
+
+  if (config?.directory) {
+    config.headers = {
+      ...config.headers,
+      "x-openagt-directory": encodeURIComponent(config.directory),
+      "x-opencode-directory": encodeURIComponent(config.directory),
+    }
+  }
+
+  const client = createClient(config)
+  client.interceptors.request.use((request) => rewrite(request, config?.directory))
+  return new OpenagtClient({ client })
 }

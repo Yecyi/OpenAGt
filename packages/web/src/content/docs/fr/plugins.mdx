@@ -1,78 +1,78 @@
 ---
 title: Plugins
-description: Écrivez vos propres plugins pour étendre OpenCode.
+description: 脡crivez vos propres plugins pour 茅tendre OpenAGt.
 ---
 
-Les plugins vous permettent d'étendre OpenCode en vous connectant à divers événements et en personnalisant le comportement. Vous pouvez créer des plugins pour ajouter de nouvelles fonctionnalités, intégrer des services externes ou modifier le comportement par défaut de OpenCode.
+Les plugins vous permettent d'茅tendre OpenAGt en vous connectant 脿 divers 茅v茅nements et en personnalisant le comportement. Vous pouvez cr茅er des plugins pour ajouter de nouvelles fonctionnalit茅s, int茅grer des services externes ou modifier le comportement par d茅faut de OpenAGt.
 
-Pour des exemples, consultez les [plugins](/docs/ecosystem#plugins) créés par la communauté.
+Pour des exemples, consultez les [plugins](/docs/ecosystem#plugins) cr茅茅s par la communaut茅.
 
 ---
 
 ## Utiliser un plugin
 
-Il existe deux manières de charger des plugins.
+Il existe deux mani猫res de charger des plugins.
 
 ---
 
-### À partir de fichiers locaux
+### 脌 partir de fichiers locaux
 
-Placez les fichiers JavaScript ou TypeScript dans le répertoire du plugin.
+Placez les fichiers JavaScript ou TypeScript dans le r茅pertoire du plugin.
 
 - `.opencode/plugins/` - Plugins au niveau du projet
 - `~/.config/opencode/plugins/` - Plugins globaux
 
-Les fichiers de ces répertoires sont automatiquement chargés au démarrage.
+Les fichiers de ces r茅pertoires sont automatiquement charg茅s au d茅marrage.
 
 ---
 
 ### Depuis npm
 
-Spécifiez les packages npm dans votre fichier de configuration.
+Sp茅cifiez les packages npm dans votre fichier de configuration.
 
 ```json title="opencode.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",
   "plugin": ["opencode-helicone-session", "opencode-wakatime", "@my-org/custom-plugin"]
 }
 ```
 
-Les packages npm scopés et standards sont pris en charge.
+Les packages npm scop茅s et standards sont pris en charge.
 
 Parcourez les plugins disponibles dans le [ecosystem](/docs/ecosystem#plugins).
 
 ---
 
-### Comment les plugins sont installés
+### Comment les plugins sont install茅s
 
-Les **plugins npm** sont installés automatiquement à l'aide de Bun au démarrage. Les packages et leurs dépendances sont mis en cache dans `~/.cache/opencode/node_modules/`.
+Les **plugins npm** sont install茅s automatiquement 脿 l'aide de Bun au d茅marrage. Les packages et leurs d茅pendances sont mis en cache dans `~/.cache/opencode/node_modules/`.
 
-Les **plugins locaux** sont chargés directement depuis le répertoire des plugins. Pour utiliser des packages externes, vous devez créer un `package.json` dans votre répertoire de configuration (voir [Dépendances](#dependencies)), ou publier le plugin sur npm et [l'ajouter à votre config](/docs/config#plugins).
+Les **plugins locaux** sont charg茅s directement depuis le r茅pertoire des plugins. Pour utiliser des packages externes, vous devez cr茅er un `package.json` dans votre r茅pertoire de configuration (voir [D茅pendances](#dependencies)), ou publier le plugin sur npm et [l'ajouter 脿 votre config](/docs/config#plugins).
 
 ---
 
 ### Ordre de chargement
 
-Les plugins sont chargés à partir de toutes les sources et tous les hooks s'exécutent dans l'ordre. L'ordre de chargement est le suivant :
+Les plugins sont charg茅s 脿 partir de toutes les sources et tous les hooks s'ex茅cutent dans l'ordre. L'ordre de chargement est le suivant :
 
 1. Configuration globale (`~/.config/opencode/opencode.json`)
 2. Configuration du projet (`opencode.json`)
-3. Répertoire global des plugins (`~/.config/opencode/plugins/`)
-4. Répertoire des plugins du projet (`.opencode/plugins/`)
+3. R茅pertoire global des plugins (`~/.config/opencode/plugins/`)
+4. R茅pertoire des plugins du projet (`.opencode/plugins/`)
 
-Les packages npm en double avec le même nom et la même version sont chargés une fois. Cependant, un plugin local et un plugin npm portant des noms similaires sont tous deux chargés séparément.
-
----
-
-## Créer un plugin
-
-Un plugin est un **module JavaScript/TypeScript** qui exporte une ou plusieurs fonctions de plugin. Chaque fonction reçoit un objet contextuel et renvoie un objet hooks.
+Les packages npm en double avec le m锚me nom et la m锚me version sont charg茅s une fois. Cependant, un plugin local et un plugin npm portant des noms similaires sont tous deux charg茅s s茅par茅ment.
 
 ---
 
-### Dépendances
+## Cr茅er un plugin
 
-Les plugins locaux et les outils personnalisés peuvent utiliser des packages npm externes. Ajoutez un `package.json` à votre répertoire de configuration avec les dépendances dont vous avez besoin.
+Un plugin est un **module JavaScript/TypeScript** qui exporte une ou plusieurs fonctions de plugin. Chaque fonction re莽oit un objet contextuel et renvoie un objet hooks.
+
+---
+
+### D茅pendances
+
+Les plugins locaux et les outils personnalis茅s peuvent utiliser des packages npm externes. Ajoutez un `package.json` 脿 votre r茅pertoire de configuration avec les d茅pendances dont vous avez besoin.
 
 ```json title=".opencode/package.json"
 {
@@ -82,7 +82,7 @@ Les plugins locaux et les outils personnalisés peuvent utiliser des packages np
 }
 ```
 
-OpenCode exécute `bun install` au démarrage pour les installer. Vos plugins et outils peuvent ensuite les importer.
+OpenAGt ex茅cute `bun install` au d茅marrage pour les installer. Vos plugins et outils peuvent ensuite les importer.
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 import { escape } from "shescape"
@@ -112,22 +112,22 @@ export const MyPlugin = async ({ project, client, $, directory, worktree }) => {
 }
 ```
 
-La fonction plugin reçoit :
+La fonction plugin re莽oit :
 
 - `project` : informations sur le projet actuel.
-- `directory` : le répertoire de travail actuel.
+- `directory` : le r茅pertoire de travail actuel.
 - `worktree` : le chemin de l'arbre de travail git.
 - `client` : un client SDK opencode pour interagir avec l'IA.
-- `$` : [shell API](https://bun.com/docs/runtime/shell) de Bun pour l'exécution de commandes.
+- `$` : [shell API](https://bun.com/docs/runtime/shell) de Bun pour l'ex茅cution de commandes.
 
 ---
 
 ### Prise en charge de TypeScript
 
-Pour les plugins TypeScript, vous pouvez importer des types à partir du package du plugin :
+Pour les plugins TypeScript, vous pouvez importer des types 脿 partir du package du plugin :
 
 ```ts title="my-plugin.ts" {1}
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree }) => {
   return {
@@ -138,45 +138,45 @@ export const MyPlugin: Plugin = async ({ project, client, $, directory, worktree
 
 ---
 
-### Événements
+### 脡v茅nements
 
-Les plugins peuvent s'abonner à des événements comme indiqué ci-dessous dans la section Exemples. Voici une liste des différents événements disponibles.
+Les plugins peuvent s'abonner 脿 des 茅v茅nements comme indiqu茅 ci-dessous dans la section Exemples. Voici une liste des diff茅rents 茅v茅nements disponibles.
 
-#### Événements de commande
+#### 脡v茅nements de commande
 
 - `command.executed`
 
-#### Événements de fichier
+#### 脡v茅nements de fichier
 
 - `file.edited`
 - `file.watcher.updated`
 
-#### Événements d'installation
+#### 脡v茅nements d'installation
 
 - `installation.updated`
 
-#### LSP Événements
+#### LSP 脡v茅nements
 
 - `lsp.client.diagnostics`
 - `lsp.updated`
 
-#### Événements de messages
+#### 脡v茅nements de messages
 
 - `message.part.removed`
 - `message.part.updated`
 - `message.removed`
 - `message.updated`
 
-#### Événements d'autorisation
+#### 脡v茅nements d'autorisation
 
 - `permission.asked`
 - `permission.replied`
 
-#### Événements du serveur
+#### 脡v茅nements du serveur
 
 - `server.connected`
 
-#### Événements de session
+#### 脡v茅nements de session
 
 - `session.created`
 - `session.compacted`
@@ -187,20 +187,20 @@ Les plugins peuvent s'abonner à des événements comme indiqué ci-dessous dans
 - `session.status`
 - `session.updated`
 
-#### Événements à faire
+#### 脡v茅nements 脿 faire
 
 - `todo.updated`
 
-#### Événements Shell
+#### 脡v茅nements Shell
 
 - `shell.env`
 
-#### Événements d'outils
+#### 脡v茅nements d'outils
 
 - `tool.execute.after`
 - `tool.execute.before`
 
-#### TUI Événements
+#### TUI 脡v茅nements
 
 - `tui.prompt.append`
 - `tui.command.execute`
@@ -210,13 +210,13 @@ Les plugins peuvent s'abonner à des événements comme indiqué ci-dessous dans
 
 ## Exemples
 
-Voici quelques exemples de plugins que vous pouvez utiliser pour étendre opencode.
+Voici quelques exemples de plugins que vous pouvez utiliser pour 茅tendre opencode.
 
 ---
 
 ### Envoyer des notifications
 
-Envoyez des notifications lorsque certains événements se produisent :
+Envoyez des notifications lorsque certains 茅v茅nements se produisent :
 
 ```js title=".opencode/plugins/notification.js"
 export const NotificationPlugin = async ({ project, client, $, directory, worktree }) => {
@@ -231,17 +231,17 @@ export const NotificationPlugin = async ({ project, client, $, directory, worktr
 }
 ```
 
-Nous utilisons `osascript` pour exécuter AppleScript sur macOS. Ici, nous l'utilisons pour envoyer des notifications.
+Nous utilisons `osascript` pour ex茅cuter AppleScript sur macOS. Ici, nous l'utilisons pour envoyer des notifications.
 
 :::note
-Si vous utilisez l'application de bureau OpenCode, elle peut envoyer automatiquement des notifications système lorsqu'une réponse est prête ou en cas d'erreur de session.
+Si vous utilisez l'application de bureau OpenAGt, elle peut envoyer automatiquement des notifications syst猫me lorsqu'une r茅ponse est pr锚te ou en cas d'erreur de session.
 :::
 
 ---
 
 ### Protection .env
 
-Empêchez opencode de lire les fichiers `.env` :
+Emp锚chez opencode de lire les fichiers `.env` :
 
 ```javascript title=".opencode/plugins/env-protection.js"
 export const EnvProtection = async ({ project, client, $, directory, worktree }) => {
@@ -259,7 +259,7 @@ export const EnvProtection = async ({ project, client, $, directory, worktree })
 
 ### Injecter des variables d'environnement
 
-Injectez des variables d'environnement dans toutes les exécutions du shell (outils d'IA et terminal utilisateur) :
+Injectez des variables d'environnement dans toutes les ex茅cutions du shell (outils d'IA et terminal utilisateur) :
 
 ```javascript title=".opencode/plugins/inject-env.js"
 export const InjectEnvPlugin = async () => {
@@ -274,12 +274,12 @@ export const InjectEnvPlugin = async () => {
 
 ---
 
-### Outils personnalisés
+### Outils personnalis茅s
 
-Les plugins peuvent également ajouter des outils personnalisés à opencode :
+Les plugins peuvent 茅galement ajouter des outils personnalis茅s 脿 opencode :
 
 ```ts title=".opencode/plugins/custom-tools.ts"
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, tool } from "@openagt/plugin"
 
 export const CustomToolsPlugin: Plugin = async (ctx) => {
   return {
@@ -299,19 +299,19 @@ export const CustomToolsPlugin: Plugin = async (ctx) => {
 }
 ```
 
-L'assistant `tool` crée un outil personnalisé que opencode peut appeler. Il prend une fonction de schéma Zod et renvoie une définition d'outil avec :
+L'assistant `tool` cr茅e un outil personnalis茅 que opencode peut appeler. Il prend une fonction de sch茅ma Zod et renvoie une d茅finition d'outil avec :
 
 - `description` : ce que fait l'outil
-- `args` : schéma Zod pour les arguments de l'outil
-- `execute` : Fonction qui s'exécute lorsque l'outil est appelé
+- `args` : sch茅ma Zod pour les arguments de l'outil
+- `execute` : Fonction qui s'ex茅cute lorsque l'outil est appel茅
 
-Vos outils personnalisés seront disponibles pour opencode aux côtés des outils intégrés.
+Vos outils personnalis茅s seront disponibles pour opencode aux c么t茅s des outils int茅gr茅s.
 
 ---
 
 ### Journalisation
 
-Utilisez `client.app.log()` au lieu de `console.log` pour la journalisation structurée :
+Utilisez `client.app.log()` au lieu de `console.log` pour la journalisation structur茅e :
 
 ```ts title=".opencode/plugins/my-plugin.ts"
 export const MyPlugin = async ({ client }) => {
@@ -326,16 +326,16 @@ export const MyPlugin = async ({ client }) => {
 }
 ```
 
-Niveaux : `debug`, `info`, `warn`, `error`. Voir la [documentation du SDK](https://opencode.ai/docs/sdk) pour plus de détails.
+Niveaux : `debug`, `info`, `warn`, `error`. Voir la [documentation du SDK](https://github.com/Yecyi/OpenAGt/docs/sdk) pour plus de d茅tails.
 
 ---
 
 ### Hooks de compactage
 
-Personnalisez le contexte inclus lorsqu'une session est compactée :
+Personnalisez le contexte inclus lorsqu'une session est compact茅e :
 
 ```ts title=".opencode/plugins/compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -354,12 +354,12 @@ Include any state that should persist across compaction:
 }
 ```
 
-Le hook `experimental.session.compacting` se déclenche avant que le LLM ne génère un résumé de continuation. Utilisez-le pour injecter un contexte spécifique au domaine que le prompt de compactage par défaut manquerait.
+Le hook `experimental.session.compacting` se d茅clenche avant que le LLM ne g茅n猫re un r茅sum茅 de continuation. Utilisez-le pour injecter un contexte sp茅cifique au domaine que le prompt de compactage par d茅faut manquerait.
 
-Vous pouvez également remplacer entièrement le prompt de compactage en définissant `output.prompt` :
+Vous pouvez 茅galement remplacer enti猫rement le prompt de compactage en d茅finissant `output.prompt` :
 
 ```ts title=".opencode/plugins/custom-compaction.ts"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { Plugin } from "@openagt/plugin"
 
 export const CustomCompactionPlugin: Plugin = async (ctx) => {
   return {
@@ -381,4 +381,4 @@ Format as a structured prompt that a new agent can use to resume work.
 }
 ```
 
-Lorsque `output.prompt` est défini, il remplace complètement le prompt de compactage par défaut. Le tableau `output.context` est ignoré dans ce cas.
+Lorsque `output.prompt` est d茅fini, il remplace compl猫tement le prompt de compactage par d茅faut. Le tableau `output.context` est ignor茅 dans ce cas.

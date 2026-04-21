@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+
+process.env.OPENAGT_LEGACY_COMMAND = "1"
+require("./launcher")

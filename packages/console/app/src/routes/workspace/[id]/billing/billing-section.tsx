@@ -1,7 +1,7 @@
 import { action, useParams, useAction, createAsync, useSubmission, json } from "@solidjs/router"
 import { createMemo, Match, Show, Switch, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Billing } from "@opencode-ai/console-core/billing.js"
+import { Billing } from "@openagt/console-core/billing.js"
 import { withActor } from "~/context/auth.withActor"
 import { IconAlipay, IconCreditCard, IconStripe, IconUpi, IconWechat } from "~/component/icon"
 import styles from "./billing-section.module.css"
@@ -220,7 +220,7 @@ export function BillingSection() {
                   <Switch>
                     <Match when={billingInfo()?.paymentMethodType === "card"}>
                       <Show when={billingInfo()?.paymentMethodLast4} fallback={<span data-slot="number">----</span>}>
-                        <span data-slot="secret">••••</span>
+                        <span data-slot="secret">鈥⑩€⑩€⑩€?/span>
                         <span data-slot="number">{billingInfo()?.paymentMethodLast4}</span>
                       </Show>
                     </Match>

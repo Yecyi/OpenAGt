@@ -1,15 +1,15 @@
 ---
-title: Egendefinerte verktøy
-description: Lag verktøy som LLM kan kalle inn OpenCode.
+title: Egendefinerte verkt酶y
+description: Lag verkt酶y som LLM kan kalle inn OpenAGt.
 ---
 
-Egendefinerte verktøy er funksjoner du oppretter som LLM kan kalle under samtaler. De fungerer sammen med OpenCode sine [innebygde verktøy](/docs/tools) som `read`, `write` og `bash`.
+Egendefinerte verkt酶y er funksjoner du oppretter som LLM kan kalle under samtaler. De fungerer sammen med OpenAGt sine [innebygde verkt酶y](/docs/tools) som `read`, `write` og `bash`.
 
 ---
 
-## Opprette et verktøy
+## Opprette et verkt酶y
 
-Verktøy er definert som **TypeScript**- eller **JavaScript**-filer. Verktøydefinisjonen kan imidlertid påkalle skript skrevet på **alle språk** - TypeScript eller JavaScript brukes bare for selve verktøydefinisjonen.
+Verkt酶y er definert som **TypeScript**- eller **JavaScript**-filer. Verkt酶ydefinisjonen kan imidlertid p氓kalle skript skrevet p氓 **alle spr氓k** - TypeScript eller JavaScript brukes bare for selve verkt酶ydefinisjonen.
 
 ---
 
@@ -17,17 +17,17 @@ Verktøy er definert som **TypeScript**- eller **JavaScript**-filer. Verktøydef
 
 De kan defineres:
 
-- Lokalt ved å plassere dem i `.opencode/tools/`-katalogen til prosjektet ditt.
-- Eller globalt, ved å plassere dem i `~/.config/opencode/tools/`.
+- Lokalt ved 氓 plassere dem i `.opencode/tools/`-katalogen til prosjektet ditt.
+- Eller globalt, ved 氓 plassere dem i `~/.config/opencode/tools/`.
 
 ---
 
 ### Struktur
 
-Den enkleste måten å lage verktøy på er å bruke `tool()`-hjelperen som gir typesikkerhet og validering.
+Den enkleste m氓ten 氓 lage verkt酶y p氓 er 氓 bruke `tool()`-hjelperen som gir typesikkerhet og validering.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**filnavnet** blir **verktøynavnet**. Ovennevnte oppretter et `database`-verktøy.
+**filnavnet** blir **verkt酶ynavnet**. Ovennevnte oppretter et `database`-verkt酶y.
 
 ---
 
-#### Flere verktøy per fil
+#### Flere verkt酶y per fil
 
-Du kan også eksportere flere verktøy fra en enkelt fil. Hver eksport blir **et separat verktøy** med navnet **`<filename>_<exportname>`**:
+Du kan ogs氓 eksportere flere verkt酶y fra en enkelt fil. Hver eksport blir **et separat verkt酶y** med navnet **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-Dette lager to verktøy: `math_add` og `math_multiply`.
+Dette lager to verkt酶y: `math_add` og `math_multiply`.
 
 ---
 
-#### Navnekollisjoner med innebygde verktøy
+#### Navnekollisjoner med innebygde verkt酶y
 
-Egendefinerte verktøy er nøklet etter verktøynavn. Hvis et egendefinert verktøy bruker samme navn som et innebygd verktøy, vil det egendefinerte verktøyet ha forrang.
+Egendefinerte verkt酶y er n酶klet etter verkt酶ynavn. Hvis et egendefinert verkt酶y bruker samme navn som et innebygd verkt酶y, vil det egendefinerte verkt酶yet ha forrang.
 
-For eksempel erstatter denne filen det innebygde `bash`-verktøyet:
+For eksempel erstatter denne filen det innebygde `bash`-verkt酶yet:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-Foretrekk unike navn med mindre du med vilje ønsker å erstatte et innebygd verktøy. Hvis du vil deaktivere et innebygd verktøy, men ikke overstyre det, bruk [tillatelser](/docs/permissions).
+Foretrekk unike navn med mindre du med vilje 酶nsker 氓 erstatte et innebygd verkt酶y. Hvis du vil deaktivere et innebygd verkt酶y, men ikke overstyre det, bruk [tillatelser](/docs/permissions).
 :::
 
 ---
 
 ### Argumenter
 
-Du kan bruke `tool.schema`, som bare er [Zod](https://zod.dev), for å definere argumenttyper.
+Du kan bruke `tool.schema`, som bare er [Zod](https://zod.dev), for 氓 definere argumenttyper.
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-Du kan også importere [Zod](https://zod.dev) direkte og returnere et vanlig objekt:
+Du kan ogs氓 importere [Zod](https://zod.dev) direkte og returnere et vanlig objekt:
 
 ```ts {6}
 import { z } from "zod"
@@ -136,10 +136,10 @@ export default {
 
 ### Kontekst
 
-Verktøy mottar kontekst om gjeldende økt:
+Verkt酶y mottar kontekst om gjeldende 酶kt:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -152,18 +152,18 @@ export default tool({
 })
 ```
 
-Bruk `context.directory` for øktens arbeidskatalog.
+Bruk `context.directory` for 酶ktens arbeidskatalog.
 Bruk `context.worktree` for git-arbeidstreet.
 
 ---
 
 ## Eksempler
 
-### Skrive et verktøy i Python
+### Skrive et verkt酶y i Python
 
-Du kan skrive verktøyene dine på hvilket som helst språk du vil. Her er et eksempel som legger til to tall ved hjelp av Python.
+Du kan skrive verkt酶yene dine p氓 hvilket som helst spr氓k du vil. Her er et eksempel som legger til to tall ved hjelp av Python.
 
-Først lager du verktøyet som et Python-skript:
+F酶rst lager du verkt酶yet som et Python-skript:
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-Lag deretter verktøydefinisjonen som påkaller den:
+Lag deretter verkt酶ydefinisjonen som p氓kaller den:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-Her bruker vi [`Bun.$`](https://bun.com/docs/runtime/shell)-verktøyet for å kjøre Python-skriptet.
+Her bruker vi [`Bun.$`](https://bun.com/docs/runtime/shell)-verkt酶yet for 氓 kj酶re Python-skriptet.

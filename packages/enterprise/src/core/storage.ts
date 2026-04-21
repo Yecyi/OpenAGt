@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch"
-import { lazy } from "@opencode-ai/shared/util/lazy"
+import { lazy } from "@openagt/shared/util/lazy"
 
 export namespace Storage {
   export interface Adapter {

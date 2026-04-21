@@ -1,33 +1,33 @@
 ---
-title: Özel Araçlar
-description: LLM'un opencode'da çağırabileceği araçları birleştirebilir.
+title: 脰zel Ara莽lar
+description: LLM'un opencode'da 莽a臒谋rabilece臒i ara莽lar谋 birle艧tirebilir.
 ---
 
-Özel araçlar, LLM'un konuşmalar sırasında arayabileceği, oluşturduğunuz işlevlerdir. opencode'un [built-in tools](/docs/tools) ile birlikte `read`, `write` ve `bash` gibi çalışırlar.
+脰zel ara莽lar, LLM'un konu艧malar s谋ras谋nda arayabilece臒i, olu艧turdu臒unuz i艧levlerdir. opencode'un [built-in tools](/docs/tools) ile birlikte `read`, `write` ve `bash` gibi 莽al谋艧谋rlar.
 
 ---
 
-## Araç oluşturma
+## Ara莽 olu艧turma
 
-Araçlar **TypeScript** veya **JavaScript** dosyaları olarak tanımlanır. Ancak araç tanımı **herhangi bir dilde** yazılmış komut dosyalarını çağırabilir; TypeScript veya JavaScript yalnızca araç tanımının kendisi için kullanılır.
+Ara莽lar **TypeScript** veya **JavaScript** dosyalar谋 olarak tan谋mlan谋r. Ancak ara莽 tan谋m谋 **herhangi bir dilde** yaz谋lm谋艧 komut dosyalar谋n谋 莽a臒谋rabilir; TypeScript veya JavaScript yaln谋zca ara莽 tan谋m谋n谋n kendisi i莽in kullan谋l谋r.
 
 ---
 
 ### Konum
 
-Bunlar tanımlanabilir:
+Bunlar tan谋mlanabilir:
 
-- Yerel olarak bunları projenizin `.opencode/tools/` dizinine yerleştirerek.
-- Veya küresel olarak bunları `~/.config/opencode/tools/` içine yerleştirerek.
+- Yerel olarak bunlar谋 projenizin `.opencode/tools/` dizinine yerle艧tirerek.
+- Veya k眉resel olarak bunlar谋 `~/.config/opencode/tools/` i莽ine yerle艧tirerek.
 
 ---
 
-### Yapı
+### Yap谋
 
-Araç oluşturmanın en kolay yolu, tür güvenliği ve doğrulama sağlayan `tool()` yardımcısını kullanmaktır.
+Ara莽 olu艧turman谋n en kolay yolu, t眉r g眉venli臒i ve do臒rulama sa臒layan `tool()` yard谋mc谋s谋n谋 kullanmakt谋r.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -41,16 +41,16 @@ export default tool({
 })
 ```
 
-**dosya adı**, **araç adı** olur. Yukarıdakiler bir `database` aracı oluşturur.
+**dosya ad谋**, **ara莽 ad谋** olur. Yukar谋dakiler bir `database` arac谋 olu艧turur.
 
 ---
 
-#### Dosya başına birden fazla araç
+#### Dosya ba艧谋na birden fazla ara莽
 
-Ayrıca tek bir dosyadan birden fazla aracı dışa aktarabilirsiniz. Her dışa aktarma, **`<filename>_<exportname>`** adıyla **ayrı bir araç** haline gelir:
+Ayr谋ca tek bir dosyadan birden fazla arac谋 d谋艧a aktarabilirsiniz. Her d谋艧a aktarma, **`<filename>_<exportname>`** ad谋yla **ayr谋 bir ara莽** haline gelir:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -75,18 +75,18 @@ export const multiply = tool({
 })
 ```
 
-Bu iki araç oluşturur: `math_add` ve `math_multiply`.
+Bu iki ara莽 olu艧turur: `math_add` ve `math_multiply`.
 
 ---
 
-#### Yerleşik araçlarla ad çakışmaları
+#### Yerle艧ik ara莽larla ad 莽ak谋艧malar谋
 
-Özel araçlar, araç adına göre anahtarlanır. Özel bir araç yerleşik bir araçla aynı adı kullanıyorsa, özel araç önceliklidir.
+脰zel ara莽lar, ara莽 ad谋na g枚re anahtarlan谋r. 脰zel bir ara莽 yerle艧ik bir ara莽la ayn谋 ad谋 kullan谋yorsa, 枚zel ara莽 枚nceliklidir.
 
-Örneğin, bu dosya yerleşik `bash` aracının yerini alır:
+脰rne臒in, bu dosya yerle艧ik `bash` arac谋n谋n yerini al谋r:
 
 ```ts title=".opencode/tools/bash.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Restricted bash wrapper",
@@ -100,14 +100,14 @@ export default tool({
 ```
 
 :::note
-Kasıtlı olarak yerleşik bir aracı değiştirmek istemiyorsanız benzersiz adları tercih edin. Yerleşik bir aracı devre dışı bırakmak ancak geçersiz kılmak istemiyorsanız [izinleri](/docs/permissions) kullanın.
+Kas谋tl谋 olarak yerle艧ik bir arac谋 de臒i艧tirmek istemiyorsan谋z benzersiz adlar谋 tercih edin. Yerle艧ik bir arac谋 devre d谋艧谋 b谋rakmak ancak ge莽ersiz k谋lmak istemiyorsan谋z [izinleri](/docs/permissions) kullan谋n.
 :::
 
 ---
 
-### Argümanlar
+### Arg眉manlar
 
-Bağımsız değişken türlerini tanımlamak için yalnızca [Zod](https://zod.dev) olan `tool.schema` öğesini kullanabilirsiniz.
+Ba臒谋ms谋z de臒i艧ken t眉rlerini tan谋mlamak i莽in yaln谋zca [Zod](https://zod.dev) olan `tool.schema` 枚臒esini kullanabilirsiniz.
 
 ```ts "tool.schema"
 args: {
@@ -115,7 +115,7 @@ args: {
 }
 ```
 
-Ayrıca [Zod](https://zod.dev) öğesini doğrudan içe aktarabilir ve düz bir nesne döndürebilirsiniz:
+Ayr谋ca [Zod](https://zod.dev) 枚臒esini do臒rudan i莽e aktarabilir ve d眉z bir nesne d枚nd眉rebilirsiniz:
 
 ```ts {6}
 import { z } from "zod"
@@ -134,12 +134,12 @@ export default {
 
 ---
 
-### Bağlam
+### Ba臒lam
 
-Araçlar geçerli oturumla ilgili bağlamı alır:
+Ara莽lar ge莽erli oturumla ilgili ba臒lam谋 al谋r:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -152,18 +152,18 @@ export default tool({
 })
 ```
 
-Oturum çalışma dizisi için `context.directory` kullanın.
-Git çalışma ağacı kökü için `context.worktree` kullanın.
+Oturum 莽al谋艧ma dizisi i莽in `context.directory` kullan谋n.
+Git 莽al谋艧ma a臒ac谋 k枚k眉 i莽in `context.worktree` kullan谋n.
 
 ---
 
-## Örnekler
+## 脰rnekler
 
-### Python ile araç yazma
+### Python ile ara莽 yazma
 
-Araçlarınızı dilediğiniz dilde yazabilirsiniz. İşte Python kullanarak iki sayıyı toplayan bir örnek.
+Ara莽lar谋n谋z谋 diledi臒iniz dilde yazabilirsiniz. 陌艧te Python kullanarak iki say谋y谋 toplayan bir 枚rnek.
 
-Öncelikle aracı bir Python betiği olarak oluşturun:
+脰ncelikle arac谋 bir Python beti臒i olarak olu艧turun:
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -173,10 +173,10 @@ b = int(sys.argv[2])
 print(a + b)
 ```
 
-Ardından onu çağıran araç tanımını oluşturun:
+Ard谋ndan onu 莽a臒谋ran ara莽 tan谋m谋n谋 olu艧turun:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -193,4 +193,4 @@ export default tool({
 })
 ```
 
-Burada Python betiğini çalıştırmak için [`Bun.$`](https://bun.com/docs/runtime/shell) yardımcı programını kullanıyoruz.
+Burada Python beti臒ini 莽al谋艧t谋rmak i莽in [`Bun.$`](https://bun.com/docs/runtime/shell) yard谋mc谋 program谋n谋 kullan谋yoruz.

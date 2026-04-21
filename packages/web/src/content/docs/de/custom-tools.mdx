@@ -1,21 +1,21 @@
 ---
 title: Benutzerdefinierte Tools
-description: Erstellen Sie Tools, die der LLM in OpenCode aufrufen kann.
+description: Erstellen Sie Tools, die der LLM in OpenAGt aufrufen kann.
 ---
 
-Benutzerdefinierte Tools sind von Ihnen erstellte Funktionen, die der LLM während Gesprächen aufrufen kann. Sie arbeiten neben [built-in tools](/docs/tools) von OpenCode wie `read`, `write` und `bash`.
+Benutzerdefinierte Tools sind von Ihnen erstellte Funktionen, die der LLM w盲hrend Gespr盲chen aufrufen kann. Sie arbeiten neben [built-in tools](/docs/tools) von OpenAGt wie `read`, `write` und `bash`.
 
 ---
 
 ## Ein Tool erstellen
 
-Tools werden als **TypeScript**- oder **JavaScript**-Dateien definiert. Die Tooldefinition kann jedoch Skripte aufrufen, die in **jeder Sprache** geschrieben sind – TypeScript oder JavaScript wird nur für die Tooldefinition selbst verwendet.
+Tools werden als **TypeScript**- oder **JavaScript**-Dateien definiert. Die Tooldefinition kann jedoch Skripte aufrufen, die in **jeder Sprache** geschrieben sind 鈥?TypeScript oder JavaScript wird nur f眉r die Tooldefinition selbst verwendet.
 
 ---
 
 ### Speicherort
 
-Sie können wie folgt definiert werden:
+Sie k枚nnen wie folgt definiert werden:
 
 - Lokal, indem Sie sie im Verzeichnis `.opencode/tools/` Ihres Projekts platzieren.
 - Oder global, indem Sie sie in `~/.config/opencode/tools/` platzieren.
@@ -27,7 +27,7 @@ Sie können wie folgt definiert werden:
 Der einfachste Weg, Tools zu erstellen, ist die Verwendung des `tool()`-Helfers, der Typsicherheit und Validierung bietet.
 
 ```ts title=".opencode/tools/database.ts" {1}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Query the project database",
@@ -47,10 +47,10 @@ Der **Dateiname** wird zum **Toolnamen**. Das Obige erstellt ein `database`-Tool
 
 #### Mehrere Werkzeuge pro Datei
 
-Sie können auch mehrere Tools aus einer einzigen Datei exportieren. Jeder Export wird zu **einem separaten Tool** mit dem Namen **`<filename>_<exportname>`**:
+Sie k枚nnen auch mehrere Tools aus einer einzigen Datei exportieren. Jeder Export wird zu **einem separaten Tool** mit dem Namen **`<filename>_<exportname>`**:
 
 ```ts title=".opencode/tools/math.ts"
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export const add = tool({
   description: "Add two numbers",
@@ -81,7 +81,7 @@ Dadurch werden zwei Tools erstellt: `math_add` und `math_multiply`.
 
 ### Argumente
 
-Sie können `tool.schema` verwenden, was nur [Zod](https://zod.dev) ist, um Argumenttypen zu definieren.
+Sie k枚nnen `tool.schema` verwenden, was nur [Zod](https://zod.dev) ist, um Argumenttypen zu definieren.
 
 ```ts "tool.schema"
 args: {
@@ -89,7 +89,7 @@ args: {
 }
 ```
 
-Sie können [Zod](https://zod.dev) auch direkt importieren und ein ähnliches Objekt zurückgeben:
+Sie k枚nnen [Zod](https://zod.dev) auch direkt importieren und ein 盲hnliches Objekt zur眉ckgeben:
 
 ```ts {6}
 import { z } from "zod"
@@ -113,7 +113,7 @@ export default {
 Tools erhalten Kontext zur aktuellen Sitzung:
 
 ```ts title=".opencode/tools/project.ts" {8}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 
 export default tool({
   description: "Get project information",
@@ -126,8 +126,8 @@ export default tool({
 })
 ```
 
-Verwenden Sie `context.directory` für das Sitzungsarbeitsverzeichnis.
-Verwenden Sie `context.worktree` für das Stammverzeichnis des Git-Arbeitsbaums.
+Verwenden Sie `context.directory` f眉r das Sitzungsarbeitsverzeichnis.
+Verwenden Sie `context.worktree` f眉r das Stammverzeichnis des Git-Arbeitsbaums.
 
 ---
 
@@ -135,9 +135,9 @@ Verwenden Sie `context.worktree` für das Stammverzeichnis des Git-Arbeitsbaums.
 
 ### Ein Tool in Python schreiben
 
-Sie können Ihre Tools in jeder gewünschten Sprache schreiben. Hier ist ein Beispiel, das mit Python zwei Zahlen addiert.
+Sie k枚nnen Ihre Tools in jeder gew眉nschten Sprache schreiben. Hier ist ein Beispiel, das mit Python zwei Zahlen addiert.
 
-Erstellen Sie zunächst das Tool als Python-Skript:
+Erstellen Sie zun盲chst das Tool als Python-Skript:
 
 ```python title=".opencode/tools/add.py"
 import sys
@@ -150,7 +150,7 @@ print(a + b)
 Erstellen Sie dann die Werkzeugdefinition, die es aufruft:
 
 ```ts title=".opencode/tools/python-add.ts" {10}
-import { tool } from "@opencode-ai/plugin"
+import { tool } from "@openagt/plugin"
 import path from "path"
 
 export default tool({
@@ -167,4 +167,4 @@ export default tool({
 })
 ```
 
-Hier verwenden wir das Dienstprogramm [`Bun.$`](https://bun.com/docs/runtime/shell), um das Python-Skript auszuführen.
+Hier verwenden wir das Dienstprogramm [`Bun.$`](https://bun.com/docs/runtime/shell), um das Python-Skript auszuf眉hren.

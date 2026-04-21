@@ -6,18 +6,18 @@ import { Elements, PaymentElement, useStripe, useElements, AddressElement } from
 import { PlanID, plans } from "../common"
 import { getActor, useAuthSession } from "~/context/auth"
 import { withActor } from "~/context/auth.withActor"
-import { Actor } from "@opencode-ai/console-core/actor.js"
-import { and, Database, eq, isNull } from "@opencode-ai/console-core/drizzle/index.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
-import { UserTable } from "@opencode-ai/console-core/schema/user.sql.js"
+import { Actor } from "@openagt/console-core/actor.js"
+import { and, Database, eq, isNull } from "@openagt/console-core/drizzle/index.js"
+import { WorkspaceTable } from "@openagt/console-core/schema/workspace.sql.js"
+import { UserTable } from "@openagt/console-core/schema/user.sql.js"
 import { createList } from "solid-list"
 import { Modal } from "~/component/modal"
-import { BillingTable } from "@opencode-ai/console-core/schema/billing.sql.js"
-import { Billing } from "@opencode-ai/console-core/billing.js"
+import { BillingTable } from "@openagt/console-core/schema/billing.sql.js"
+import { Billing } from "@openagt/console-core/billing.js"
 import { useI18n } from "~/context/i18n"
 import { useLanguage } from "~/context/language"
 import { formError } from "~/lib/form-error"
-import { Resource } from "@opencode-ai/console-resource"
+import { Resource } from "@openagt/console-resource"
 
 const getEnabled = query(async () => {
   "use server"
@@ -475,7 +475,7 @@ export default function BlackSubscribe() {
           </div>
         </Modal>
         <p data-slot="fine-print">
-          {i18n.t("black.finePrint.beforeTerms")} ·{" "}
+          {i18n.t("black.finePrint.beforeTerms")} 路{" "}
           <A href={language.route("/legal/terms-of-service")}>{i18n.t("black.finePrint.terms")}</A>
         </p>
       </section>

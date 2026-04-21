@@ -57,7 +57,7 @@ The output of the command is added to the conversation as a tool result.
 
 ## Commands
 
-When using the OpenCode TUI, you can type `/` followed by a command name to quickly execute actions. For example:
+When using the OpenAGt TUI, you can type `/` followed by a command name to quickly execute actions. For example:
 
 ```bash frame="none"
 /help
@@ -71,7 +71,7 @@ Here are all available slash commands:
 
 ### connect
 
-Add a provider to OpenCode. Allows you to select from available providers and add their API keys.
+Add a provider to OpenAGt. Allows you to select from available providers and add their API keys.
 
 ```bash frame="none"
 /connect
@@ -117,7 +117,7 @@ Open external editor for composing messages. Uses the editor set in your `EDITOR
 
 ### exit
 
-Exit OpenCode. _Aliases_: `/quit`, `/q`
+Exit OpenAGt. _Aliases_: `/quit`, `/q`
 
 ```bash frame="none"
 /exit
@@ -359,7 +359,7 @@ You can customize TUI behavior through `tui.json` (or `tui.jsonc`).
 
 ```json title="tui.json"
 {
-  "$schema": "https://opencode.ai/tui.json",
+  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/tui.json",
   "theme": "opencode",
   "keybinds": {
     "leader": "ctrl+x"

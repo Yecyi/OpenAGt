@@ -8,7 +8,7 @@ import type {
   TuiPluginMeta,
   TuiPluginModule,
   TuiSlotPlugin,
-} from "@opencode-ai/plugin/tui"
+} from "@openagt/plugin/tui"
 
 const tabs = ["overview", "counter", "help"]
 const bind = {
@@ -193,7 +193,7 @@ const host = (api: TuiPluginApi, input: Cfg, skin: Skin) => {
         <b>{input.label} host overlay</b>
       </text>
       <text fg={skin.muted}>Using api.ui.dialog stack with built-in backdrop</text>
-      <text fg={skin.muted}>esc closes · depth {api.ui.dialog.depth}</text>
+      <text fg={skin.muted}>esc closes 路 depth {api.ui.dialog.depth}</text>
       <box flexDirection="row" gap={1}>
         <Btn txt="close" run={() => api.ui.dialog.clear()} skin={skin} on />
       </box>
@@ -461,8 +461,8 @@ const Screen = (props: {
               <text fg={skin.text}>Route: {props.route.screen}</text>
               <text fg={skin.muted}>plugin state: {props.meta.state}</text>
               <text fg={skin.muted}>
-                first: {props.meta.state === "first" ? "yes" : "no"} · updated:{" "}
-                {props.meta.state === "updated" ? "yes" : "no"} · loads: {props.meta.load_count}
+                first: {props.meta.state === "first" ? "yes" : "no"} 路 updated:{" "}
+                {props.meta.state === "updated" ? "yes" : "no"} 路 loads: {props.meta.load_count}
               </text>
               <text fg={skin.muted}>plugin source: {props.meta.source}</text>
               <text fg={skin.muted}>source: {value.source}</text>
@@ -492,7 +492,7 @@ const Screen = (props: {
                 {props.keys.print("local")} local stack | {props.keys.print("host")} host stack
               </text>
               <text fg={skin.muted}>
-                local open: {props.keys.print("local_push")} push nested · esc or {props.keys.print("local_close")}{" "}
+                local open: {props.keys.print("local_push")} push nested 路 esc or {props.keys.print("local_close")}{" "}
                 close
               </text>
               <text fg={skin.muted}>{props.keys.print("home")} returns home</text>
@@ -548,7 +548,7 @@ const Screen = (props: {
           </text>
           <text fg={skin.muted}>Plugin-owned stack depth: {value.local}</text>
           <text fg={skin.muted}>
-            {props.keys.print("local_push")} push nested · {props.keys.print("local_close")} pop/close
+            {props.keys.print("local_push")} push nested 路 {props.keys.print("local_close")} pop/close
           </text>
           <box flexDirection="row" gap={1}>
             <Btn txt="push" run={push} skin={skin} on />
@@ -598,7 +598,7 @@ const Modal = (props: {
           <text fg={skin.muted}>{props.keys.print("modal")} modal command</text>
           <text fg={skin.muted}>{props.keys.print("screen")} screen command</text>
           <text fg={skin.muted}>
-            {props.keys.print("modal_accept")} opens screen · {props.keys.print("modal_close")} closes
+            {props.keys.print("modal_accept")} opens screen 路 {props.keys.print("modal_close")} closes
           </text>
           <box flexDirection="row" gap={1}>
             <Btn
@@ -679,7 +679,7 @@ const home = (api: TuiPluginApi, input: Cfg) => ({
       const hint = (
         <box flexShrink={0} flexDirection="row" gap={1}>
           <text fg={skin.muted}>
-            <span style={{ fg: skin.accent }}>•</span> smoke home prompt
+            <span style={{ fg: skin.accent }}>鈥?/span> smoke home prompt
           </text>
         </box>
       )
@@ -774,7 +774,7 @@ const block = (input: Cfg, order: number, title: string, text: string): TuiSlotP
           </text>
           <text fg={skin.text}>{text}</text>
           <text fg={skin.muted}>
-            {input.label} order {order} · session {value.session_id.slice(0, 8)}
+            {input.label} order {order} 路 session {value.session_id.slice(0, 8)}
           </text>
         </box>
       )

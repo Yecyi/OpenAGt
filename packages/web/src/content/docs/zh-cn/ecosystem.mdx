@@ -1,78 +1,78 @@
 ---
-title: 生态系统
-description: 基于 OpenCode 构建的项目与集成。
+title: 鐢熸€佺郴缁?
+description: 鍩轰簬 OpenAGt 鏋勫缓鐨勯」鐩笌闆嗘垚銆?
 ---
 
-基于 OpenCode 构建的社区项目合集。
+鍩轰簬 OpenAGt 鏋勫缓鐨勭ぞ鍖洪」鐩悎闆嗐€?
 
 :::note
-想将您的 OpenCode 相关项目添加到此列表中？欢迎提交 PR。
+鎯冲皢鎮ㄧ殑 OpenAGt 鐩稿叧椤圭洰娣诲姞鍒版鍒楄〃涓紵娆㈣繋鎻愪氦 PR銆?
 :::
 
-您还可以查看 [awesome-opencode](https://github.com/awesome-opencode/awesome-opencode) 和 [opencode.cafe](https://opencode.cafe)，这是一个聚合生态系统与社区资源的社区。
+鎮ㄨ繕鍙互鏌ョ湅 [awesome-opencode](https://github.com/awesome-opencode/awesome-opencode) 鍜?[opencode.cafe](https://opencode.cafe)锛岃繖鏄竴涓仛鍚堢敓鎬佺郴缁熶笌绀惧尯璧勬簮鐨勭ぞ鍖恒€?
 
 ---
 
-## 插件
+## 鎻掍欢
 
-| 名称                                                                                               | 描述                                                                   |
+| 鍚嶇О                                                                                               | 鎻忚堪                                                                   |
 | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [opencode-daytona](https://github.com/daytonaio/daytona/tree/main/libs/opencode-plugin)            | 在隔离的 Daytona 沙箱中自动运行 OpenCode 会话，支持 git 同步和实时预览 |
-| [opencode-helicone-session](https://github.com/H2Shami/opencode-helicone-session)                  | 自动注入 Helicone 会话头信息，用于请求分组                             |
-| [opencode-type-inject](https://github.com/nick-vi/opencode-type-inject)                            | 通过查找工具自动将 TypeScript/Svelte 类型注入到文件读取中              |
-| [opencode-openai-codex-auth](https://github.com/numman-ali/opencode-openai-codex-auth)             | 使用您的 ChatGPT Plus/Pro 订阅替代 API 额度                            |
-| [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth)                            | 使用您现有的 Gemini 套餐替代 API 计费                                  |
-| [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)                | 使用 Antigravity 的免费模型替代 API 计费                               |
-| [opencode-devcontainers](https://github.com/athal7/opencode-devcontainers)                         | 多分支开发容器隔离，支持浅克隆和自动分配端口                           |
-| [opencode-google-antigravity-auth](https://github.com/shekohex/opencode-google-antigravity-auth)   | Google Antigravity OAuth 插件，支持 Google 搜索及更强健的 API 处理     |
-| [opencode-dynamic-context-pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)  | 通过修剪过时的工具输出来优化 Token 使用                                |
-| [opencode-vibeguard](https://github.com/inkdust2021/opencode-vibeguard)                            | 在调用 LLM 之前将机密/PII 替换为 VibeGuard 风格的占位符；并在本地恢复  |
-| [opencode-websearch-cited](https://github.com/ghoulr/opencode-websearch-cited.git)                 | 为受支持的提供商添加原生网页搜索支持，采用 Google grounded 风格        |
-| [opencode-pty](https://github.com/shekohex/opencode-pty.git)                                       | 使 AI 代理能够在 PTY 中运行后台进程，并向其发送交互式输入              |
-| [opencode-shell-strategy](https://github.com/JRedeker/opencode-shell-strategy)                     | 非交互式 shell 命令指令——防止依赖 TTY 的操作导致挂起                   |
-| [opencode-wakatime](https://github.com/angristan/opencode-wakatime)                                | 使用 Wakatime 追踪 OpenCode 的使用情况                                 |
-| [opencode-md-table-formatter](https://github.com/franlol/opencode-md-table-formatter/tree/main)    | 清理 LLM 生成的 Markdown 表格                                          |
-| [opencode-morph-plugin](https://github.com/morphllm/opencode-morph-plugin)                         | 通过 Morph 提供 Fast Apply 编辑、WarpGrep 代码搜索和上下文压缩         |
-| [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode)                                   | 后台代理、预构建的 LSP/AST/MCP 工具、精选代理，兼容 Claude Code        |
-| [opencode-notificator](https://github.com/panta82/opencode-notificator)                            | OpenCode 会话的桌面通知和声音提醒                                      |
-| [opencode-notifier](https://github.com/mohak34/opencode-notifier)                                  | 针对权限请求、任务完成和错误事件的桌面通知与声音提醒                   |
-| [opencode-zellij-namer](https://github.com/24601/opencode-zellij-namer)                            | 基于 OpenCode 上下文的 AI 驱动自动 Zellij 会话命名                     |
-| [opencode-skillful](https://github.com/zenobi-us/opencode-skillful)                                | 允许 OpenCode 代理通过技能发现和注入按需延迟加载提示词                 |
-| [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory)                      | 使用 Supermemory 实现跨会话的持久记忆                                  |
-| [@plannotator/opencode](https://github.com/backnotprop/plannotator/tree/main/apps/opencode-plugin) | 支持可视化标注和私有/离线分享的交互式计划审查                          |
-| [@openspoon/subtask2](https://github.com/spoons-and-mirrors/subtask2)                              | 将 OpenCode /commands 扩展为具有精细流程控制的强大编排系统             |
-| [opencode-scheduler](https://github.com/different-ai/opencode-scheduler)                           | 使用 cron 语法通过 launchd (Mac) 或 systemd (Linux) 调度周期性任务     |
-| [micode](https://github.com/vtemian/micode)                                                        | 结构化的头脑风暴 → 计划 → 实现工作流，支持会话连续性                   |
-| [octto](https://github.com/vtemian/octto)                                                          | 用于 AI 头脑风暴的交互式浏览器 UI，支持多问题表单                      |
-| [opencode-background-agents](https://github.com/kdcokenny/opencode-background-agents)              | Claude Code 风格的后台代理，支持异步委托和上下文持久化                 |
-| [opencode-notify](https://github.com/kdcokenny/opencode-notify)                                    | OpenCode 的原生操作系统通知——随时了解任务完成情况                      |
-| [opencode-workspace](https://github.com/kdcokenny/opencode-workspace)                              | 捆绑式多代理编排套件——16 个组件，一次安装                              |
-| [opencode-worktree](https://github.com/kdcokenny/opencode-worktree)                                | OpenCode 的零摩擦 git worktree 管理                                    |
-| [opencode-sentry-monitor](https://github.com/stolinski/opencode-sentry-monitor)                    | 使用 Sentry AI Monitoring 追踪和调试您的 AI 代理                       |
+| [opencode-daytona](https://github.com/daytonaio/daytona/tree/main/libs/opencode-plugin)            | 鍦ㄩ殧绂荤殑 Daytona 娌欑涓嚜鍔ㄨ繍琛?OpenAGt 浼氳瘽锛屾敮鎸?git 鍚屾鍜屽疄鏃堕瑙?|
+| [opencode-helicone-session](https://github.com/H2Shami/opencode-helicone-session)                  | 鑷姩娉ㄥ叆 Helicone 浼氳瘽澶翠俊鎭紝鐢ㄤ簬璇锋眰鍒嗙粍                             |
+| [opencode-type-inject](https://github.com/nick-vi/opencode-type-inject)                            | 閫氳繃鏌ユ壘宸ュ叿鑷姩灏?TypeScript/Svelte 绫诲瀷娉ㄥ叆鍒版枃浠惰鍙栦腑              |
+| [opencode-openai-codex-auth](https://github.com/numman-ali/opencode-openai-codex-auth)             | 浣跨敤鎮ㄧ殑 ChatGPT Plus/Pro 璁㈤槄鏇夸唬 API 棰濆害                            |
+| [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth)                            | 浣跨敤鎮ㄧ幇鏈夌殑 Gemini 濂楅鏇夸唬 API 璁¤垂                                  |
+| [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)                | 浣跨敤 Antigravity 鐨勫厤璐规ā鍨嬫浛浠?API 璁¤垂                               |
+| [opencode-devcontainers](https://github.com/athal7/opencode-devcontainers)                         | 澶氬垎鏀紑鍙戝鍣ㄩ殧绂伙紝鏀寔娴呭厠闅嗗拰鑷姩鍒嗛厤绔彛                           |
+| [opencode-google-antigravity-auth](https://github.com/shekohex/opencode-google-antigravity-auth)   | Google Antigravity OAuth 鎻掍欢锛屾敮鎸?Google 鎼滅储鍙婃洿寮哄仴鐨?API 澶勭悊     |
+| [opencode-dynamic-context-pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)  | 閫氳繃淇壀杩囨椂鐨勫伐鍏疯緭鍑烘潵浼樺寲 Token 浣跨敤                                |
+| [opencode-vibeguard](https://github.com/inkdust2021/opencode-vibeguard)                            | 鍦ㄨ皟鐢?LLM 涔嬪墠灏嗘満瀵?PII 鏇挎崲涓?VibeGuard 椋庢牸鐨勫崰浣嶇锛涘苟鍦ㄦ湰鍦版仮澶? |
+| [opencode-websearch-cited](https://github.com/ghoulr/opencode-websearch-cited.git)                 | 涓哄彈鏀寔鐨勬彁渚涘晢娣诲姞鍘熺敓缃戦〉鎼滅储鏀寔锛岄噰鐢?Google grounded 椋庢牸        |
+| [opencode-pty](https://github.com/shekohex/opencode-pty.git)                                       | 浣?AI 浠ｇ悊鑳藉鍦?PTY 涓繍琛屽悗鍙拌繘绋嬶紝骞跺悜鍏跺彂閫佷氦浜掑紡杈撳叆              |
+| [opencode-shell-strategy](https://github.com/JRedeker/opencode-shell-strategy)                     | 闈炰氦浜掑紡 shell 鍛戒护鎸囦护鈥斺€旈槻姝緷璧?TTY 鐨勬搷浣滃鑷存寕璧?                  |
+| [opencode-wakatime](https://github.com/angristan/opencode-wakatime)                                | 浣跨敤 Wakatime 杩借釜 OpenAGt 鐨勪娇鐢ㄦ儏鍐?                                |
+| [opencode-md-table-formatter](https://github.com/franlol/opencode-md-table-formatter/tree/main)    | 娓呯悊 LLM 鐢熸垚鐨?Markdown 琛ㄦ牸                                          |
+| [opencode-morph-plugin](https://github.com/morphllm/opencode-morph-plugin)                         | 閫氳繃 Morph 鎻愪緵 Fast Apply 缂栬緫銆乄arpGrep 浠ｇ爜鎼滅储鍜屼笂涓嬫枃鍘嬬缉         |
+| [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode)                                   | 鍚庡彴浠ｇ悊銆侀鏋勫缓鐨?LSP/AST/MCP 宸ュ叿銆佺簿閫変唬鐞嗭紝鍏煎 Claude Code        |
+| [opencode-notificator](https://github.com/panta82/opencode-notificator)                            | OpenAGt 浼氳瘽鐨勬闈㈤€氱煡鍜屽０闊虫彁閱?                                     |
+| [opencode-notifier](https://github.com/mohak34/opencode-notifier)                                  | 閽堝鏉冮檺璇锋眰銆佷换鍔″畬鎴愬拰閿欒浜嬩欢鐨勬闈㈤€氱煡涓庡０闊虫彁閱?                  |
+| [opencode-zellij-namer](https://github.com/24601/opencode-zellij-namer)                            | 鍩轰簬 OpenAGt 涓婁笅鏂囩殑 AI 椹卞姩鑷姩 Zellij 浼氳瘽鍛藉悕                     |
+| [opencode-skillful](https://github.com/zenobi-us/opencode-skillful)                                | 鍏佽 OpenAGt 浠ｇ悊閫氳繃鎶€鑳藉彂鐜板拰娉ㄥ叆鎸夐渶寤惰繜鍔犺浇鎻愮ず璇?                |
+| [opencode-supermemory](https://github.com/supermemoryai/opencode-supermemory)                      | 浣跨敤 Supermemory 瀹炵幇璺ㄤ細璇濈殑鎸佷箙璁板繂                                  |
+| [@plannotator/opencode](https://github.com/backnotprop/plannotator/tree/main/apps/opencode-plugin) | 鏀寔鍙鍖栨爣娉ㄥ拰绉佹湁/绂荤嚎鍒嗕韩鐨勪氦浜掑紡璁″垝瀹℃煡                          |
+| [@openspoon/subtask2](https://github.com/spoons-and-mirrors/subtask2)                              | 灏?OpenAGt /commands 鎵╁睍涓哄叿鏈夌簿缁嗘祦绋嬫帶鍒剁殑寮哄ぇ缂栨帓绯荤粺             |
+| [opencode-scheduler](https://github.com/different-ai/opencode-scheduler)                           | 浣跨敤 cron 璇硶閫氳繃 launchd (Mac) 鎴?systemd (Linux) 璋冨害鍛ㄦ湡鎬т换鍔?    |
+| [micode](https://github.com/vtemian/micode)                                                        | 缁撴瀯鍖栫殑澶磋剳椋庢毚 鈫?璁″垝 鈫?瀹炵幇宸ヤ綔娴侊紝鏀寔浼氳瘽杩炵画鎬?                  |
+| [octto](https://github.com/vtemian/octto)                                                          | 鐢ㄤ簬 AI 澶磋剳椋庢毚鐨勪氦浜掑紡娴忚鍣?UI锛屾敮鎸佸闂琛ㄥ崟                      |
+| [opencode-background-agents](https://github.com/kdcokenny/opencode-background-agents)              | Claude Code 椋庢牸鐨勫悗鍙颁唬鐞嗭紝鏀寔寮傛濮旀墭鍜屼笂涓嬫枃鎸佷箙鍖?                |
+| [opencode-notify](https://github.com/kdcokenny/opencode-notify)                                    | OpenAGt 鐨勫師鐢熸搷浣滅郴缁熼€氱煡鈥斺€旈殢鏃朵簡瑙ｄ换鍔″畬鎴愭儏鍐?                     |
+| [opencode-workspace](https://github.com/kdcokenny/opencode-workspace)                              | 鎹嗙粦寮忓浠ｇ悊缂栨帓濂椾欢鈥斺€?6 涓粍浠讹紝涓€娆″畨瑁?                             |
+| [opencode-worktree](https://github.com/kdcokenny/opencode-worktree)                                | OpenAGt 鐨勯浂鎽╂摝 git worktree 绠＄悊                                    |
+| [opencode-sentry-monitor](https://github.com/stolinski/opencode-sentry-monitor)                    | 浣跨敤 Sentry AI Monitoring 杩借釜鍜岃皟璇曟偍鐨?AI 浠ｇ悊                       |
 
 ---
 
-## 项目
+## 椤圭洰
 
-| 名称                                                                                       | 描述                                                          |
+| 鍚嶇О                                                                                       | 鎻忚堪                                                          |
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| [kimaki](https://github.com/remorses/kimaki)                                               | 用于控制 OpenCode 会话的 Discord 机器人，基于 SDK 构建        |
-| [opencode.nvim](https://github.com/NickvanDyke/opencode.nvim)                              | Neovim 插件，提供编辑器感知的提示词，基于 API 构建            |
-| [portal](https://github.com/hosenur/portal)                                                | 通过 Tailscale/VPN 使用的移动优先 OpenCode Web UI             |
-| [opencode plugin template](https://github.com/zenobi-us/opencode-plugin-template/)         | 用于构建 OpenCode 插件的模板                                  |
-| [opencode.nvim](https://github.com/sudo-tee/opencode.nvim)                                 | OpenCode 的 Neovim 前端——基于终端的 AI 编码代理               |
-| [ai-sdk-provider-opencode-sdk](https://github.com/ben-vargas/ai-sdk-provider-opencode-sdk) | Vercel AI SDK 提供商，用于通过 @opencode-ai/sdk 使用 OpenCode |
-| [OpenChamber](https://github.com/btriapitsyn/openchamber)                                  | OpenCode 的 Web / 桌面应用和 VS Code 扩展                     |
-| [OpenCode-Obsidian](https://github.com/mtymek/opencode-obsidian)                           | 将 OpenCode 嵌入 Obsidian UI 的 Obsidian 插件                 |
-| [OpenWork](https://github.com/different-ai/openwork)                                       | Claude Cowork 的开源替代方案，由 OpenCode 驱动                |
-| [ocx](https://github.com/kdcokenny/ocx)                                                    | OpenCode 扩展管理器，支持可移植的隔离配置                     |
-| [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad)                                   | OpenCode 的桌面、Web、移动和远程客户端应用                    |
+| [kimaki](https://github.com/remorses/kimaki)                                               | 鐢ㄤ簬鎺у埗 OpenAGt 浼氳瘽鐨?Discord 鏈哄櫒浜猴紝鍩轰簬 SDK 鏋勫缓        |
+| [opencode.nvim](https://github.com/NickvanDyke/opencode.nvim)                              | Neovim 鎻掍欢锛屾彁渚涚紪杈戝櫒鎰熺煡鐨勬彁绀鸿瘝锛屽熀浜?API 鏋勫缓            |
+| [portal](https://github.com/hosenur/portal)                                                | 閫氳繃 Tailscale/VPN 浣跨敤鐨勭Щ鍔ㄤ紭鍏?OpenAGt Web UI             |
+| [opencode plugin template](https://github.com/zenobi-us/opencode-plugin-template/)         | 鐢ㄤ簬鏋勫缓 OpenAGt 鎻掍欢鐨勬ā鏉?                                 |
+| [opencode.nvim](https://github.com/sudo-tee/opencode.nvim)                                 | OpenAGt 鐨?Neovim 鍓嶇鈥斺€斿熀浜庣粓绔殑 AI 缂栫爜浠ｇ悊               |
+| [ai-sdk-provider-opencode-sdk](https://github.com/ben-vargas/ai-sdk-provider-opencode-sdk) | Vercel AI SDK 鎻愪緵鍟嗭紝鐢ㄤ簬閫氳繃 @openagt/sdk 浣跨敤 OpenAGt |
+| [OpenChamber](https://github.com/btriapitsyn/openchamber)                                  | OpenAGt 鐨?Web / 妗岄潰搴旂敤鍜?VS Code 鎵╁睍                     |
+| [OpenAGt-Obsidian](https://github.com/mtymek/opencode-obsidian)                           | 灏?OpenAGt 宓屽叆 Obsidian UI 鐨?Obsidian 鎻掍欢                 |
+| [OpenWork](https://github.com/different-ai/openwork)                                       | Claude Cowork 鐨勫紑婧愭浛浠ｆ柟妗堬紝鐢?OpenAGt 椹卞姩                |
+| [ocx](https://github.com/kdcokenny/ocx)                                                    | OpenAGt 鎵╁睍绠＄悊鍣紝鏀寔鍙Щ妞嶇殑闅旂閰嶇疆                     |
+| [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad)                                   | OpenAGt 鐨勬闈€乄eb銆佺Щ鍔ㄥ拰杩滅▼瀹㈡埛绔簲鐢?                   |
 
 ---
 
-## 代理
+## 浠ｇ悊
 
-| 名称                                                              | 描述                                     |
+| 鍚嶇О                                                              | 鎻忚堪                                     |
 | ----------------------------------------------------------------- | ---------------------------------------- |
-| [Agentic](https://github.com/Cluster444/agentic)                  | 用于结构化开发的模块化 AI 代理和命令     |
-| [opencode-agents](https://github.com/darrenhinde/opencode-agents) | 用于增强工作流的配置、提示词、代理和插件 |
+| [Agentic](https://github.com/Cluster444/agentic)                  | 鐢ㄤ簬缁撴瀯鍖栧紑鍙戠殑妯″潡鍖?AI 浠ｇ悊鍜屽懡浠?    |
+| [opencode-agents](https://github.com/darrenhinde/opencode-agents) | 鐢ㄤ簬澧炲己宸ヤ綔娴佺殑閰嶇疆銆佹彁绀鸿瘝銆佷唬鐞嗗拰鎻掍欢 |

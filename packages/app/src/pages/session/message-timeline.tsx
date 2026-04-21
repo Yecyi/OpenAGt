@@ -2,25 +2,25 @@ import { For, createEffect, createMemo, on, onCleanup, Show, Index, type JSX, cr
 import { createStore, produce } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
 import { useMutation } from "@tanstack/solid-query"
-import { Button } from "@opencode-ai/ui/button"
-import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { Icon } from "@opencode-ai/ui/icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { InlineInput } from "@opencode-ai/ui/inline-input"
-import { Spinner } from "@opencode-ai/ui/spinner"
-import { SessionTurn } from "@opencode-ai/ui/session-turn"
-import { ScrollView } from "@opencode-ai/ui/scroll-view"
-import { TextField } from "@opencode-ai/ui/text-field"
-import type { AssistantMessage, Message as MessageType, Part, TextPart, UserMessage } from "@opencode-ai/sdk/v2"
-import { showToast } from "@opencode-ai/ui/toast"
-import { Binary } from "@opencode-ai/shared/util/binary"
-import { getFilename } from "@opencode-ai/shared/util/path"
+import { Button } from "@openagt/ui/button"
+import { FileIcon } from "@openagt/ui/file-icon"
+import { Icon } from "@openagt/ui/icon"
+import { IconButton } from "@openagt/ui/icon-button"
+import { DropdownMenu } from "@openagt/ui/dropdown-menu"
+import { Dialog } from "@openagt/ui/dialog"
+import { InlineInput } from "@openagt/ui/inline-input"
+import { Spinner } from "@openagt/ui/spinner"
+import { SessionTurn } from "@openagt/ui/session-turn"
+import { ScrollView } from "@openagt/ui/scroll-view"
+import { TextField } from "@openagt/ui/text-field"
+import type { AssistantMessage, Message as MessageType, Part, TextPart, UserMessage } from "@openagt/sdk/v2"
+import { showToast } from "@openagt/ui/toast"
+import { Binary } from "@openagt/shared/util/binary"
+import { getFilename } from "@openagt/shared/util/path"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
 import { SessionContextUsage } from "@/components/session-context-usage"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useDialog } from "@openagt/ui/context/dialog"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useLanguage } from "@/context/language"
 import { useSessionKey } from "@/pages/session/session-layout"
@@ -126,7 +126,7 @@ type TimelineStageInput = {
  * Defer-mounts small timeline windows so revealing older turns does not
  * block first paint with a large DOM mount.
  *
- * Once staging completes for a session it never re-stages — backfill and
+ * Once staging completes for a session it never re-stages 鈥?backfill and
  * new messages render immediately.
  */
 function createTimelineStaging(input: TimelineStageInput) {
