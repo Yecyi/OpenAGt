@@ -15,19 +15,35 @@ export function define<Type extends string, Properties extends ZodType>(type: Ty
 }
 
 export function payloads() {
-  return registry
-    .entries()
-    .map(([type, def]) => {
-      return z
-        .object({
-          type: z.literal(type),
-          properties: def.properties,
-        })
-        .meta({
-          ref: `Event.${def.type}`,
-        })
-    })
-    .toArray()
+  return Array.from(registry.entries()).map(([type, def]) => {
+    return z
+      .object({
+        type: z.literal(type),
+        properties: def.properties,
+      })
+      .meta({
+        ref: `Event.${def.type}`,
+      })
+  })
 }
+
+/**
+ * Provider Fallback Events for observability
+ */
+export const FallbackHopEvent = define(
+  "provider.fallback.hop",
+  z.object({
+    from: z.object({
+      provider: z.string(),
+      model: z.string(),
+    }),
+    to: z.object({
+      provider: z.string(),
+      model: z.string(),
+    }),
+    attempt: z.number(),
+    reason: z.string().optional(),
+  }),
+)
 
 export * as BusEvent from "./bus-event"

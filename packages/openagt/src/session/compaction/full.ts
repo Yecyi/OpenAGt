@@ -27,10 +27,16 @@ export interface FullCompactConfig {
 }
 
 export const DEFAULT_FULL_COMPACT_CONFIG: FullCompactConfig = {
-  summaryTemplate: `Provide a detailed prompt for continuing our conversation above.
+  summaryTemplate: `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
+
+- Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.
+- You already have all the context you need in the conversation above.
+- Tool calls will be REJECTED and will waste your only turn — you will fail the task.
+- Your entire response must be plain text: follow the summary template below.
+
+Provide a detailed prompt for continuing our conversation above.
 Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.
 The summary that you construct will be used so that another agent can read it and continue the work.
-Do not call any tools. Respond only with the summary text.
 Respond in the same language as the user's messages in the conversation.
 
 When constructing the summary, try to stick to this template:

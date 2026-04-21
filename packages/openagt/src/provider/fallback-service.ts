@@ -3,6 +3,8 @@ import { Provider } from "@/provider"
 import { Config } from "@/config"
 import { Log } from "@/util"
 import { ModelID, ProviderID } from "./schema"
+import { Bus } from "@/bus"
+import z from "zod"
 
 const log = Log.create({ service: "provider.fallback" })
 
@@ -22,10 +24,35 @@ export interface FallbackState {
   retryOnServerError: boolean
 }
 
+/**
+ * Fallback event for observability
+ */
+export interface FallbackHopEvent {
+  from: { provider: string; model: string }
+  to: { provider: string; model: string }
+  attempt: number
+  reason?: string
+}
+
 export interface Interface {
   readonly createState: (providerID: string, modelID: string) => Effect.Effect<FallbackState | undefined>
   readonly next: (state: FallbackState) => Effect.Effect<{ model: Provider.Model; state: FallbackState } | undefined>
   readonly shouldFallback: (error: unknown, state: FallbackState) => Effect.Effect<boolean>
+  /** Get fallback metrics for observability */
+  readonly getMetrics: () => FallbackMetrics
+}
+
+export interface FallbackMetrics {
+  totalFallbacks: number
+  fallbackByReason: Record<string, number>
+  fallbackByProvider: Record<string, number>
+  lastFallback?: FallbackHopEvent
+}
+
+let metrics: FallbackMetrics = {
+  totalFallbacks: 0,
+  fallbackByReason: {},
+  fallbackByProvider: {},
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProviderFallback") {}
@@ -33,13 +60,32 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Pr
 type ParsedError = {
   statusCode?: number
   message: string
+  reason?: string
 }
 
-export const layer: Layer.Layer<Service, never, Config.Service | Provider.Service> = Layer.effect(
+// Define FallbackHopEvent locally to avoid module initialization order issues
+const FallbackHopEvent = {
+  type: "provider.fallback.hop" as const,
+  properties: z.object({
+    from: z.object({
+      provider: z.string(),
+      model: z.string(),
+    }),
+    to: z.object({
+      provider: z.string(),
+      model: z.string(),
+    }),
+    attempt: z.number(),
+    reason: z.string().optional(),
+  }),
+}
+
+export const layer: Layer.Layer<Service, never, Config.Service | Provider.Service | Bus.Service> = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
     const provider = yield* Provider.Service
+    const bus = yield* Bus.Service
 
     const createState: Interface["createState"] = Effect.fn("ProviderFallback.createState")(function* (
       providerID: string,
@@ -87,11 +133,29 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
         attempts += 1
         if (Option.isSome(fallbackModel)) {
           const nextState: FallbackState = { ...state, index, attempts }
-          log.info("using fallback", {
+          const hopEvent: FallbackHopEvent = {
+            from: { provider: state.baseProviderID, model: state.baseModelID },
+            to: { provider: entry.provider, model: entry.model },
+            attempt: nextState.attempts,
+          }
+
+          // Update metrics
+          metrics.totalFallbacks++
+          metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] =
+            (metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] ?? 0) + 1
+          metrics.lastFallback = hopEvent
+
+          // Emit fallback hop event to Bus for observability
+          yield* bus.publish(FallbackHopEvent, hopEvent)
+
+          log.info("provider.fallback.hop", {
             from: `${state.baseProviderID}/${state.baseModelID}`,
             to: `${entry.provider}/${entry.model}`,
-            attempts: nextState.attempts,
+            attempt: nextState.attempts,
+            totalAttempts: nextState.attempts,
+            chainLength: state.chain.length,
           })
+
           return { model: fallbackModel.value, state: nextState }
         }
         log.warn("fallback model unavailable", { provider: entry.provider, model: entry.model })
@@ -107,18 +171,47 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       const parsed = parseError(error)
       if (!parsed) return false
 
-      if (parsed.statusCode === 429) return state.retryOnRateLimit
-      if (parsed.statusCode !== undefined && parsed.statusCode >= 500 && parsed.statusCode < 600) {
-        return state.retryOnServerError
+      let shouldRetry = false
+      if (parsed.statusCode === 429) {
+        shouldRetry = state.retryOnRateLimit
+        if (shouldRetry) {
+          metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+        }
+      } else if (parsed.statusCode !== undefined && parsed.statusCode >= 500 && parsed.statusCode < 600) {
+        shouldRetry = state.retryOnServerError
+        if (shouldRetry) {
+          metrics.fallbackByReason[`server_error_${parsed.statusCode}`] =
+            (metrics.fallbackByReason[`server_error_${parsed.statusCode}`] ?? 0) + 1
+        }
       }
 
-      if (parsed.message.includes("rate limit")) return state.retryOnRateLimit
-      if (parsed.message.includes("too many requests")) return state.retryOnRateLimit
-      if (parsed.message.includes("overloaded")) return state.retryOnServerError
-      return false
+      if (!shouldRetry) {
+        if (parsed.message.includes("rate limit")) {
+          shouldRetry = state.retryOnRateLimit
+          if (shouldRetry) {
+            metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+          }
+        }
+        if (parsed.message.includes("too many requests")) {
+          shouldRetry = state.retryOnRateLimit
+          if (shouldRetry) {
+            metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+          }
+        }
+        if (parsed.message.includes("overloaded")) {
+          shouldRetry = state.retryOnServerError
+          if (shouldRetry) {
+            metrics.fallbackByReason["overloaded"] = (metrics.fallbackByReason["overloaded"] ?? 0) + 1
+          }
+        }
+      }
+
+      return shouldRetry
     })
 
-    return Service.of({ createState, next, shouldFallback })
+    const getMetrics: Interface["getMetrics"] = () => metrics
+
+    return Service.of({ createState, next, shouldFallback, getMetrics })
   }),
 )
 
@@ -141,7 +234,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export const defaultLayer = Layer.suspend(() =>
-  layer.pipe(Layer.provide(Config.defaultLayer), Layer.provide(Provider.defaultLayer)),
+  layer.pipe(Layer.provide(Config.defaultLayer), Layer.provide(Provider.defaultLayer), Layer.provide(Bus.layer)),
 )
 
 export * as ProviderFallback from "./fallback-service"
