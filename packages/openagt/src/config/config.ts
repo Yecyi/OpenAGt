@@ -326,6 +326,7 @@ export interface Interface {
   readonly update: (config: Info) => Effect.Effect<void>
   readonly updateGlobal: (config: Info) => Effect.Effect<Info>
   readonly invalidate: (wait?: boolean) => Effect.Effect<void>
+  readonly invalidateDirectory: (dir: string) => Effect.Effect<void>
   readonly directories: () => Effect.Effect<string[]>
   readonly waitForDependencies: () => Effect.Effect<void>
 }
@@ -775,7 +776,7 @@ export const layer = Layer.effect(
       yield* fs
         .writeFileString(file, JSON.stringify(mergeDeep(writable(existing), writable(config)), null, 2))
         .pipe(Effect.orDie)
-      yield* Effect.promise(() => Instance.dispose())
+      yield* invalidate()
     })
 
     const invalidate = Effect.fn("Config.invalidate")(function* (wait?: boolean) {
@@ -793,6 +794,10 @@ export const layer = Layer.effect(
         )
       if (wait) yield* Effect.promise(() => task)
       else void task
+    })
+
+    const invalidateDirectory = Effect.fn("Config.invalidateDirectory")(function* (dir: string) {
+      log.info("config directory invalidation requested", { directory: dir })
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
@@ -822,6 +827,7 @@ export const layer = Layer.effect(
       update,
       updateGlobal,
       invalidate,
+      invalidateDirectory,
       directories,
       waitForDependencies,
     })

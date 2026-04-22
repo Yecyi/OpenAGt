@@ -42,6 +42,7 @@ class EventBuffer {
   private events: Array<{ timestamp: number; payload: unknown }> = []
   private maxCapacity: number
   private bufferPath: string | null = null
+  private _droppedCount: number = 0
 
   constructor(maxCapacity: number = DEFAULT_EVENT_BUFFER_SIZE) {
     this.maxCapacity = maxCapacity
@@ -58,11 +59,37 @@ class EventBuffer {
     }
   }
 
-  push(event: { timestamp: number; payload: unknown }): void {
+  push(event: { timestamp: number; payload: unknown }): boolean {
+    const eventType = (event.payload as any)?.type ?? ""
+    const isCritical = CRITICAL_EVENT_TYPES.includes(eventType)
+
+    // Backpressure: at 90% capacity, drop non-critical events
+    if (this.events.length >= this.maxCapacity * 0.9 && !isCritical) {
+      this._droppedCount++
+      return false
+    }
+
     this.events.push(event)
     if (this.events.length > this.maxCapacity) {
       this.events = this.events.slice(-this.maxCapacity)
     }
+    return true
+  }
+
+  getDroppedCount(): number {
+    return this._droppedCount
+  }
+
+  resetDroppedCount(): void {
+    this._droppedCount = 0
+  }
+
+  getSize(): number {
+    return this.events.length
+  }
+
+  getCapacity(): number {
+    return this.maxCapacity
   }
 
   async persist(): Promise<void> {
@@ -190,9 +217,12 @@ export const layer = Layer.effect(
         const payload: Payload = { type: def.type, properties }
         log.info("publishing", { type: def.type })
 
-        // Persist critical events to buffer
+        // Persist critical events to buffer; log if dropped due to backpressure
         if (CRITICAL_EVENT_TYPES.includes(def.type)) {
-          eventBuffer.push({ timestamp: Date.now(), payload })
+          const pushed = eventBuffer.push({ timestamp: Date.now(), payload })
+          if (!pushed) {
+            log.warn("event dropped due to backpressure", { type: def.type })
+          }
         }
 
         const ps = s.typed.get(def.type)

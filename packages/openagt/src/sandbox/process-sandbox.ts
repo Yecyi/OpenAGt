@@ -22,6 +22,8 @@ export interface ResourceLimits {
   maxMemory?: number
   maxFileSize?: number
   maxStack?: number
+  /** Maximum total bytes for stdout + stderr combined. Defaults to maxFileSize * 2 if maxFileSize is set. */
+  maxOutputBytes?: number
 }
 
 export interface ProcessSandboxOptions {
@@ -30,6 +32,8 @@ export interface ProcessSandboxOptions {
   cwd?: string
   env?: Record<string, string>
   shell?: string
+  /** Grace period (ms) before SIGKILL after SIGTERM. Default 2000ms. */
+  killGraceMs?: number
 }
 
 export interface ProcessSandboxResult {
@@ -39,12 +43,15 @@ export interface ProcessSandboxResult {
   timedOut: boolean
   killed: boolean
   outputTruncated?: boolean
+  /** Whether output was truncated due to maxOutputBytes limit */
+  outputBytesTruncated?: boolean
 }
 
 export interface ProcessSandboxStats {
   totalSpawned: number
   totalKilled: number
   totalTimeouts: number
+  totalKilledByResourceLimit: number
   currentRunning: number
 }
 
@@ -57,6 +64,7 @@ const stats: ProcessSandboxStats = {
   totalSpawned: 0,
   totalKilled: 0,
   totalTimeouts: 0,
+  totalKilledByResourceLimit: 0,
   currentRunning: 0,
 }
 
@@ -68,6 +76,7 @@ export function resetSandboxStats(): void {
   stats.totalSpawned = 0
   stats.totalKilled = 0
   stats.totalTimeouts = 0
+  stats.totalKilledByResourceLimit = 0
   stats.currentRunning = 0
 }
 
@@ -153,17 +162,27 @@ async function collectStream(stream: ReadableStream<Uint8Array> | null, maxSize?
   }
 }
 
-async function killProcessTree(pid: number | undefined) {
+async function killProcessTree(pid: number | undefined, graceMs = 2000) {
   if (!pid) return
 
   if (process.platform === "win32") {
     await new Promise<void>((resolve) => {
-      const killer = nodeSpawn("taskkill", ["/pid", String(pid), "/f", "/t"], {
+      // SIGTERM via taskkill without /f gives processes a chance to clean up
+      const killer = nodeSpawn("taskkill", ["/pid", String(pid), "/t"], {
         stdio: "ignore",
         windowsHide: true,
       })
       killer.once("exit", () => resolve())
       killer.once("error", () => resolve())
+      // Force kill after grace period
+      setTimeout(() => {
+        const forced = nodeSpawn("taskkill", ["/pid", String(pid), "/f", "/t"], {
+          stdio: "ignore",
+          windowsHide: true,
+        })
+        forced.once("exit", () => resolve())
+        forced.once("error", () => resolve())
+      }, graceMs)
     })
     return
   }
@@ -175,13 +194,30 @@ async function killProcessTree(pid: number | undefined) {
       process.kill(pid, "SIGTERM")
     } catch {}
   }
+  // Force kill after grace period
+  setTimeout(() => {
+    try {
+      process.kill(-pid, "SIGKILL")
+    } catch {
+      try {
+        process.kill(pid, "SIGKILL")
+      } catch {}
+    }
+  }, graceMs)
 }
 
 export async function spawnWithSandbox(
   command: string,
   options: ProcessSandboxOptions = {},
 ): Promise<ProcessSandboxResult> {
-  const { timeoutMs = 30000, cwd = process.cwd(), env = process.env as Record<string, string>, limits, shell } = options
+  const {
+    timeoutMs = 30000,
+    cwd = process.cwd(),
+    env = process.env as Record<string, string>,
+    limits,
+    shell,
+    killGraceMs = 2000,
+  } = options
 
   stats.totalSpawned++
   stats.currentRunning++
@@ -191,6 +227,10 @@ export async function spawnWithSandbox(
 
   let timedOut = false
   let killed = false
+  let outputBytesTruncated = false
+
+  // Combined output byte limit (stdout + stderr)
+  const maxOutputBytes = limits?.maxOutputBytes ?? (limits?.maxFileSize ? limits.maxFileSize * 2 : undefined)
 
   return new Promise<ProcessSandboxResult>((resolve) => {
     const child = spawn({
@@ -205,6 +245,9 @@ export async function spawnWithSandbox(
     const stdoutPromise = collectStream(child.stdout, limits?.maxFileSize)
     const stderrPromise = collectStream(child.stderr, limits?.maxFileSize)
 
+    // Track total bytes emitted across both streams for combined limit
+    let totalOutputBytes = 0
+
     const timer =
       timeoutMs > 0
         ? setTimeout(() => {
@@ -212,7 +255,7 @@ export async function spawnWithSandbox(
             killed = true
             stats.totalTimeouts++
             stats.totalKilled++
-            void killProcessTree(child.pid).finally(() => child.kill())
+            void killProcessTree(child.pid, killGraceMs)
           }, timeoutMs)
         : undefined
 
@@ -229,6 +272,7 @@ export async function spawnWithSandbox(
           timedOut,
           killed,
           outputTruncated: stdout.truncated || stderr.truncated,
+          outputBytesTruncated,
         })
       })
       .catch(async (error) => {
@@ -243,6 +287,7 @@ export async function spawnWithSandbox(
           timedOut,
           killed,
           outputTruncated: stdout.truncated || stderr.truncated,
+          outputBytesTruncated,
         })
       })
   })
@@ -289,6 +334,7 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
     timedOut,
     killed: timedOut,
     outputTruncated: stdout.truncated || stderr.truncated,
+    outputBytesTruncated: false,
   }
 }
 

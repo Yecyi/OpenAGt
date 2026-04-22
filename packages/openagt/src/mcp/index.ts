@@ -130,12 +130,37 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
 
 const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
 
+const MAX_TOOL_NAME_LENGTH = 128
+const ALLOWED_TOOL_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,127}$/
+
+function validateToolName(name: string): { valid: boolean; reason?: string } {
+  if (!name || name.length === 0) {
+    return { valid: false, reason: "Empty tool name" }
+  }
+  if (name.length > MAX_TOOL_NAME_LENGTH) {
+    return { valid: false, reason: `Tool name exceeds ${MAX_TOOL_NAME_LENGTH} chars` }
+  }
+  if (!ALLOWED_TOOL_NAME_PATTERN.test(name)) {
+    return { valid: false, reason: "Tool name contains invalid characters" }
+  }
+  if (/\.\.|\/|\$/.test(name)) {
+    return { valid: false, reason: "Tool name contains path traversal or injection patterns" }
+  }
+  return { valid: true }
+}
+
 // Convert MCP tool definition to AI SDK Tool type
-function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool {
+function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool | null {
+  const validation = validateToolName(mcpTool.name)
+  if (!validation.valid) {
+    log.warn("skipping tool with invalid name", { name: mcpTool.name, reason: validation.reason })
+    return null
+  }
+
   const inputSchema = mcpTool.inputSchema as JSONSchema7 | undefined
   const schema: JSONSchema7 =
     inputSchema && typeof inputSchema === "object"
-      ? { ...inputSchema }
+      ? structuredClone(inputSchema) as JSONSchema7
       : {
           type: "object",
           properties: {},
@@ -264,6 +289,25 @@ export const layer = Layer.effect(
 
     type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
 
+    // MCP layer-level circuit breaker
+    const mcpCircuitBreaker: Record<string, { failures: number; lastFailure: number }> = {}
+    const MCP_CB_THRESHOLD = 5
+    const MCP_CB_RESET_MS = 60_000
+    const MCP_RETRY_ATTEMPTS = 3
+    const MCP_RETRY_BASE_DELAY_MS = 1000
+    const MCP_RETRY_MAX_DELAY_MS = 30_000
+    const MCP_RETRY_JITTER = 0.3
+
+    function computeBackoff(attempt: number): number {
+      const exponential = Math.min(MCP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt), MCP_RETRY_MAX_DELAY_MS)
+      const jitter = Math.abs((Math.random() * 2 - 1) * MCP_RETRY_JITTER * exponential)
+      return Math.max(MCP_RETRY_BASE_DELAY_MS, Math.round(exponential + jitter))
+    }
+
+    async function sleep(ms: number): Promise<void> {
+      return new Promise((resolve) => setTimeout(resolve, ms))
+    }
+
     /**
      * Connect a client via the given transport with resource safety:
      * on failure the transport is closed; on success the caller owns it.
@@ -332,57 +376,101 @@ export const layer = Layer.effect(
       let lastStatus: Status | undefined
 
       for (const { name, transport } of transports) {
-        const result = yield* connectTransport(transport, connectTimeout).pipe(
-          Effect.map((client) => ({ client, transportName: name })),
-          Effect.catch((error) => {
-            const lastError = error instanceof Error ? error : new Error(String(error))
-            const isAuthError =
-              error instanceof UnauthorizedError || (authProvider && lastError.message.includes("OAuth"))
-
-            if (isAuthError) {
-              log.info("mcp server requires authentication", { key, transport: name })
-
-              if (lastError.message.includes("registration") || lastError.message.includes("client_id")) {
-                lastStatus = {
-                  status: "needs_client_registration" as const,
-                  error: "Server does not support dynamic client registration. Please provide clientId in config.",
-                }
-                return bus
-                  .publish(TuiEvent.ToastShow, {
-                    title: "MCP Authentication Required",
-                    message: `Server "${key}" requires a pre-registered client ID. Add clientId to your config.`,
-                    variant: "warning",
-                    duration: 8000,
-                  })
-                  .pipe(Effect.ignore, Effect.as(undefined))
-              } else {
-                pendingOAuthTransports.set(key, transport)
-                lastStatus = { status: "needs_auth" as const }
-                return bus
-                  .publish(TuiEvent.ToastShow, {
-                    title: "MCP Authentication Required",
-                    message: `Server "${key}" requires authentication. Run: opencode mcp auth ${key}`,
-                    variant: "warning",
-                    duration: 8000,
-                  })
-                  .pipe(Effect.ignore, Effect.as(undefined))
-              }
-            }
-
-            log.debug("transport connection failed", {
-              key,
-              transport: name,
-              url: mcp.url,
-              error: lastError.message,
-            })
-            lastStatus = { status: "failed" as const, error: lastError.message }
-            return Effect.succeed(undefined)
-          }),
-        )
-        if (result) {
-          log.info("connected", { key, transport: result.transportName })
-          return { client: result.client as MCPClient | undefined, status: { status: "connected" } as Status }
+        // Check circuit breaker before attempting
+        const now = Date.now()
+        const cb = mcpCircuitBreaker[key]
+        if (cb && cb.failures >= MCP_CB_THRESHOLD && now - cb.lastFailure < MCP_CB_RESET_MS) {
+          log.info("mcp circuit breaker open, skipping server", { key, failures: cb.failures })
+          lastStatus = { status: "failed" as const, error: "Circuit breaker open" }
+          break
         }
+
+        let attempt = 0
+        let lastError: Error | undefined
+
+        while (attempt < MCP_RETRY_ATTEMPTS) {
+          const result = yield* connectTransport(transport, connectTimeout).pipe(
+            Effect.map((client) => ({ client, transportName: name })),
+            Effect.catch((error) => {
+              const err = error instanceof Error ? error : new Error(String(error))
+              const isAuthError =
+                error instanceof UnauthorizedError || (authProvider && err.message.includes("OAuth"))
+
+              if (isAuthError) {
+                log.info("mcp server requires authentication", { key, transport: name })
+
+                if (err.message.includes("registration") || err.message.includes("client_id")) {
+                  lastStatus = {
+                    status: "needs_client_registration" as const,
+                    error: "Server does not support dynamic client registration. Please provide clientId in config.",
+                  }
+                  return bus
+                    .publish(TuiEvent.ToastShow, {
+                      title: "MCP Authentication Required",
+                      message: `Server "${key}" requires a pre-registered client ID. Add clientId to your config.`,
+                      variant: "warning",
+                      duration: 8000,
+                    })
+                    .pipe(Effect.ignore, Effect.as(undefined))
+                } else {
+                  pendingOAuthTransports.set(key, transport)
+                  lastStatus = { status: "needs_auth" as const }
+                  return bus
+                    .publish(TuiEvent.ToastShow, {
+                      title: "MCP Authentication Required",
+                      message: `Server "${key}" requires authentication. Run: opencode mcp auth ${key}`,
+                      variant: "warning",
+                      duration: 8000,
+                    })
+                    .pipe(Effect.ignore, Effect.as(undefined))
+                }
+              }
+
+              lastError = err
+              log.debug("transport connection failed", {
+                key,
+                transport: name,
+                url: mcp.url,
+                error: err.message,
+                attempt,
+              })
+              return Effect.succeed(undefined)
+            }),
+          )
+
+          if (result) {
+            // Reset circuit breaker on success
+            if (mcpCircuitBreaker[key]) {
+              delete mcpCircuitBreaker[key]
+            }
+            log.info("connected", { key, transport: result.transportName })
+            return { client: result.client as MCPClient | undefined, status: { status: "connected" as const } }
+          }
+
+          // If auth error or last attempt, don't retry
+          if (lastStatus?.status === "needs_auth" || lastStatus?.status === "needs_client_registration") {
+            break
+          }
+
+          attempt++
+          if (attempt < MCP_RETRY_ATTEMPTS) {
+            const delay = computeBackoff(attempt - 1)
+            log.info("mcp connection retrying", { key, transport: name, attempt, delayMs: delay })
+            yield* Effect.promise(() => sleep(delay))
+          }
+        }
+
+        // Record circuit breaker failure
+        if (lastError) {
+          const ts = Date.now()
+          if (!mcpCircuitBreaker[key]) {
+            mcpCircuitBreaker[key] = { failures: 0, lastFailure: ts }
+          }
+          mcpCircuitBreaker[key].failures++
+          mcpCircuitBreaker[key].lastFailure = ts
+          lastStatus = { status: "failed" as const, error: lastError.message }
+        }
+
         // If this was an auth error, stop trying other transports
         if (lastStatus?.status === "needs_auth" || lastStatus?.status === "needs_client_registration") break
       }
@@ -665,7 +753,10 @@ export const layer = Layer.effect(
 
             const timeout = entry?.timeout ?? defaultTimeout
             for (const mcpTool of listed) {
-              result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = convertMcpTool(mcpTool, client, timeout)
+              const tool = convertMcpTool(mcpTool, client, timeout)
+              if (tool) {
+                result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = tool
+              }
             }
           }),
         { concurrency: "unbounded" },

@@ -3,6 +3,10 @@ import z from "zod"
 import { Global } from "../global"
 import { Effect, Layer, Context } from "effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
+import { Log } from "@/util"
+import * as crypto from "crypto"
+
+const log = Log.create({ service: "mcp-auth" })
 
 export const Tokens = z.object({
   accessToken: z.string(),
@@ -31,6 +35,72 @@ export type Entry = z.infer<typeof Entry>
 
 const filepath = path.join(Global.Path.data, "mcp-auth.json")
 
+const ENCRYPTION_KEY_ENV = "OPENCODE_MCP_KEY"
+const ENCRYPTION_ALGORITHM = "aes-256-gcm"
+const IV_LENGTH = 12
+const AUTH_TAG_LENGTH = 16
+
+function getEncryptionKey(): Buffer | null {
+  const keyHex = process.env[ENCRYPTION_KEY_ENV]
+  if (!keyHex) return null
+  const key = Buffer.from(keyHex, "hex")
+  if (key.length !== 32) {
+    log.warn("OPENCODE_MCP_KEY must be 32 bytes (64 hex chars), encryption disabled", {
+      keyLength: key.length,
+    })
+    return null
+  }
+  return key
+}
+
+function encryptTokens(tokens: Tokens): string | null {
+  const key = getEncryptionKey()
+  if (!key) return null
+  try {
+    const iv = crypto.randomBytes(IV_LENGTH)
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv)
+    const plaintext = Buffer.from(JSON.stringify(tokens), "utf8")
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()])
+    const authTag = cipher.getAuthTag()
+    return Buffer.concat([iv, authTag, encrypted]).toString("base64")
+  } catch (err) {
+    log.warn("failed to encrypt tokens, storing plaintext", { error: String(err) })
+    return null
+  }
+}
+
+function decryptTokens(encrypted: string): Tokens | null {
+  const key = getEncryptionKey()
+  if (!key) return null
+  try {
+    const raw = Buffer.from(encrypted, "base64")
+    if (raw.length < IV_LENGTH + AUTH_TAG_LENGTH) return null
+    const iv = raw.subarray(0, IV_LENGTH)
+    const authTag = raw.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
+    const data = raw.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv)
+    decipher.setAuthTag(authTag)
+    const decrypted = Buffer.concat([decipher.update(data), decipher.final()])
+    return JSON.parse(decrypted.toString("utf8")) as Tokens
+  } catch (err) {
+    log.warn("failed to decrypt tokens", { error: String(err) })
+    return null
+  }
+}
+
+type StoredEntry = Entry & { _encryptedTokens?: string }
+
+function decryptEntryTokens(entry: StoredEntry): Entry {
+  if (entry.tokens) return entry as Entry
+  if (entry._encryptedTokens) {
+    const tokens = decryptTokens(entry._encryptedTokens)
+    if (tokens) {
+      return { ...entry, tokens } as Entry
+    }
+  }
+  return entry as Entry
+}
+
 export interface Interface {
   readonly all: () => Effect.Effect<Record<string, Entry>>
   readonly get: (mcpName: string) => Effect.Effect<Entry | undefined>
@@ -56,7 +126,14 @@ export const layer = Layer.effect(
 
     const all = Effect.fn("McpAuth.all")(function* () {
       return yield* fs.readJson(filepath).pipe(
-        Effect.map((data) => data as Record<string, Entry>),
+        Effect.map((data) => {
+          const raw = data as Record<string, StoredEntry>
+          const result: Record<string, Entry> = {}
+          for (const [name, entry] of Object.entries(raw)) {
+            result[name] = decryptEntryTokens(entry)
+          }
+          return result
+        }),
         Effect.catch(() => Effect.succeed({} as Record<string, Entry>)),
       )
     })
@@ -77,7 +154,15 @@ export const layer = Layer.effect(
     const set = Effect.fn("McpAuth.set")(function* (mcpName: string, entry: Entry, serverUrl?: string) {
       const data = yield* all()
       if (serverUrl) entry.serverUrl = serverUrl
-      yield* fs.writeJson(filepath, { ...data, [mcpName]: entry }, 0o600).pipe(Effect.orDie)
+      const storedEntry: StoredEntry = { ...entry }
+      if (entry.tokens) {
+        const encrypted = encryptTokens(entry.tokens)
+        if (encrypted) {
+          delete storedEntry.tokens
+          storedEntry._encryptedTokens = encrypted
+        }
+      }
+      yield* fs.writeJson(filepath, { ...data, [mcpName]: storedEntry }, 0o600).pipe(Effect.orDie)
     })
 
     const remove = Effect.fn("McpAuth.remove")(function* (mcpName: string) {
