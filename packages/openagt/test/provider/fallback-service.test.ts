@@ -4,6 +4,8 @@ import { Config } from "../../src/config"
 import { Provider } from "../../src/provider"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { ProviderFallback } from "../../src/provider/fallback-service"
+import { Bus } from "../../src/bus"
+import { BusEvent } from "../../src/bus/bus-event"
 
 function createConfigLayer(config: unknown) {
   return Layer.succeed(
@@ -41,6 +43,22 @@ function createProviderLayer(models: Provider.Model[]) {
   )
 }
 
+function createBusLayer(events: Array<{ type: string; properties: unknown }> = []) {
+  return Layer.succeed(
+    Bus.Service,
+    Bus.Service.of({
+      publish: (def, properties) =>
+        Effect.sync(() => {
+          events.push({ type: def.type, properties })
+        }),
+      subscribe: () => Effect.fail(new Error("unused")) as any,
+      subscribeAll: () => Effect.fail(new Error("unused")) as any,
+      subscribeCallback: () => Effect.fail(new Error("unused")) as any,
+      subscribeAllCallback: () => Effect.fail(new Error("unused")) as any,
+    }),
+  )
+}
+
 function model(providerID: string, id: string): Provider.Model {
   return {
     id: ModelID.make(id),
@@ -69,6 +87,7 @@ async function run<A, E>(config: unknown, models: Provider.Model[], effect: Effe
   return Effect.runPromise(
     effect.pipe(
       Effect.provide(ProviderFallback.layer),
+      Effect.provide(createBusLayer()),
       Effect.provide(createProviderLayer(models)),
       Effect.provide(createConfigLayer(config)),
     ),
@@ -192,5 +211,41 @@ describe("provider.fallback-service", () => {
 
     expect(verdict.rate).toBe(false)
     expect(verdict.server).toBe(true)
+  })
+
+  test("publishes the shared fallback bus event and returns a safe metrics snapshot", async () => {
+    const events: Array<{ type: string; properties: unknown }> = []
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fallback = yield* ProviderFallback.Service
+        const state = yield* fallback.createState("primary", "main")
+        if (!state) throw new Error("missing fallback state")
+        yield* fallback.next(state)
+        fallback.recordAttempt("primary", false)
+        const metrics = fallback.getMetrics()
+        metrics.providerErrors.primary = 999
+        return fallback.getMetrics()
+      }).pipe(
+        Effect.provide(ProviderFallback.layer),
+        Effect.provide(createBusLayer(events)),
+        Effect.provide(createProviderLayer([model("backup", "model-a")])),
+        Effect.provide(
+          createConfigLayer({
+            provider: {
+              primary: {
+                fallback: {
+                  enabled: true,
+                  provider: "backup",
+                  model: "model-a",
+                },
+              },
+            },
+          }),
+        ),
+      ),
+    )
+
+    expect(events.some((event) => event.type === BusEvent.FallbackHopEvent.type)).toBe(true)
+    expect(result.providerErrors.primary).toBe(1)
   })
 })

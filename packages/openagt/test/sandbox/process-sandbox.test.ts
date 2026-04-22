@@ -6,6 +6,7 @@ import {
   killAllProcesses,
   getResourceUsage,
   spawnWithSandbox,
+  spawnWithSandboxSync,
 } from "../../src/sandbox/process-sandbox"
 
 const isWindows = process.platform === "win32"
@@ -48,6 +49,54 @@ describe("getSandboxStats", () => {
     expect(stats.totalSpawned).toBe(0)
     expect(stats.totalKilled).toBe(0)
     expect(stats.currentRunning).toBe(0)
+  })
+})
+
+describe("spawnWithSandbox", () => {
+  test("returns stdout for successful commands", async () => {
+    const command = isWindows ? "echo sandbox-output" : "printf 'sandbox-output'"
+    const result = await spawnWithSandbox(command, { timeoutMs: 5000, shell: isWindows ? "cmd.exe" : "/bin/sh" })
+    expect(result.stdout).toContain("sandbox-output")
+    expect(result.timedOut).toBe(false)
+  })
+
+  test("marks timed out commands", async () => {
+    const command = isWindows ? "ping 127.0.0.1 -n 6 > nul" : "sleep 5"
+    const result = await spawnWithSandbox(command, { timeoutMs: 50, shell: isWindows ? "cmd.exe" : "/bin/sh" })
+    expect(result.timedOut).toBe(true)
+    expect(result.killed).toBe(true)
+  })
+
+  test("truncates large output", async () => {
+    const command = isWindows ? "echo 1234567890" : "printf '1234567890'"
+    const result = await spawnWithSandbox(command, {
+      timeoutMs: 5000,
+      shell: isWindows ? "cmd.exe" : "/bin/sh",
+      limits: { maxFileSize: 4 },
+    })
+    expect(result.outputTruncated).toBe(true)
+    expect(result.stdout.length).toBeLessThanOrEqual(4)
+  })
+
+  test("supports powershell shell on windows", async () => {
+    if (!isWindows) return
+    const result = await spawnWithSandbox("Write-Output sandbox-ps", {
+      timeoutMs: 5000,
+      shell: "powershell.exe",
+    })
+    expect(result.stdout).toContain("sandbox-ps")
+  })
+})
+
+describe("spawnWithSandboxSync", () => {
+  test("applies output truncation", () => {
+    const command = isWindows ? "echo 1234567890" : "printf '1234567890'"
+    const result = spawnWithSandboxSync(command, {
+      shell: isWindows ? "cmd.exe" : "/bin/sh",
+      limits: { maxFileSize: 4 },
+    })
+    expect(result.outputTruncated).toBe(true)
+    expect(result.stdout.length).toBeLessThanOrEqual(4)
   })
 })
 

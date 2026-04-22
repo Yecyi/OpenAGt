@@ -1,12 +1,7 @@
 /**
  * Dangerous Command Detector
  *
- * Unified security detection entry point that integrates:
- * - Bash/Danger patterns from dangers.ts
- * - PowerShell cmdlet detection from powershell.ts
- * - Shell classification and risk assessment from shell-security.ts
- *
- * Provides a single interface for command security analysis.
+ * Unified security detection entry point for posix shells, cmd, and PowerShell.
  */
 
 import { Effect, Layer, Context } from "effect"
@@ -14,10 +9,6 @@ import { Shell } from "@/shell/shell"
 import {
   COMMAND_SUBSTITUTION_PATTERNS,
   BINARY_HIJACK_VARS,
-  SAFE_ENV_VARS,
-  BARE_SHELL_PREFIXES,
-  ZSH_DANGEROUS_COMMANDS,
-  DANGEROUS_BASH_PATTERNS,
   OBFUSCATED_FLAG_PATTERNS,
   hasBareShellPrefix,
   hasControlCharacters,
@@ -25,34 +16,10 @@ import {
   hasNewlines,
   containsDangerousPatterns,
   hasZshDangerousCommand,
-  CONTROL_CHAR_RE,
-  UNICODE_WHITESPACE_RE,
   type DangerSeverity,
 } from "./dangers"
-import {
-  DANGEROUS_CMDLETS,
-  HIGH_SEVERITY_CMDLETS,
-  ENCODED_COMMAND_PATTERNS,
-  REMOTE_EXECUTION_PATTERNS,
-  containsDangerousCmdlets,
-  containsHighSeverityCmdlets,
-  validatePowerShellCommand,
-  getDangerousCmdletSummary,
-} from "./powershell"
+import { ENCODED_COMMAND_PATTERNS, REMOTE_EXECUTION_PATTERNS, validatePowerShellCommand } from "./powershell"
 import { parsePowerShellAst } from "./powershell-ast"
-
-interface DangerCheck {
-  cmdlet: string
-  matched: boolean
-  severity: DangerSeverity
-  message?: string
-}
-import { commandClassifier } from "./command-classifier"
-import { WrapperStripper } from "./wrapper-stripper"
-
-// ============================================================
-// Types
-// ============================================================
 
 export type ShellFamily = "powershell" | "posix" | "cmd" | "unknown"
 
@@ -67,13 +34,19 @@ export interface DangerResult {
 
 export interface DangerDetectorOptions {
   strictMode?: boolean
-  allowNetwork?: boolean
-  allowPrivilegeEscalation?: boolean
 }
 
-// ============================================================
-// Shell Family Detection
-// ============================================================
+interface DetectionResult {
+  severity: DangerSeverity
+  reasons: string[]
+  patterns: string[]
+}
+
+const SEVERITY_ORDER: Record<DangerSeverity, number> = { safe: 0, low: 1, medium: 2, high: 3 }
+
+function mergeSeverity(current: DangerSeverity, next: DangerSeverity) {
+  return SEVERITY_ORDER[next] > SEVERITY_ORDER[current] ? next : current
+}
 
 function detectShellFamily(shell?: string): ShellFamily {
   if (!shell) return "unknown"
@@ -84,67 +57,49 @@ function detectShellFamily(shell?: string): ShellFamily {
   return "unknown"
 }
 
-// ============================================================
-// Bash/Danger Pattern Detection
-// ============================================================
-
-interface BashDetectionResult {
-  severity: DangerSeverity
-  reasons: string[]
-  patterns: string[]
-}
-
-function detectBashDanger(command: string): BashDetectionResult {
+function detectBashDanger(command: string): DetectionResult {
   const reasons: string[] = []
   const patterns: string[] = []
   let severity: DangerSeverity = "safe"
 
-  // Check for bare shell prefixes (medium risk)
   if (hasBareShellPrefix(command)) {
     reasons.push("Command starts with shell interpreter")
     patterns.push("bare_shell_prefix")
-    if (severity === "safe") severity = "medium"
+    severity = mergeSeverity(severity, "medium")
   }
 
-  // Check for command substitution patterns
   for (const { pattern, message } of COMMAND_SUBSTITUTION_PATTERNS) {
-    if (pattern.test(command)) {
-      reasons.push(message)
-      patterns.push(`cmd_subst:${message}`)
-      severity = "medium"
-    }
+    if (!pattern.test(command)) continue
+    reasons.push(message)
+    patterns.push(`cmd_subst:${message}`)
+    severity = mergeSeverity(severity, "medium")
   }
 
-  // Check for dangerous bash patterns
   if (containsDangerousPatterns(command)) {
     reasons.push("Contains code execution or package manager")
     patterns.push("dangerous_pattern")
     severity = "high"
   }
 
-  // Check for control characters
   if (hasControlCharacters(command)) {
     reasons.push("Contains control characters (possible obfuscation)")
     patterns.push("control_chars")
     severity = "high"
   }
 
-  // Check for unicode whitespace
   if (hasUnicodeWhitespace(command)) {
     reasons.push("Contains unicode whitespace (possible obfuscation)")
     patterns.push("unicode_whitespace")
     severity = "high"
   }
 
-  // Check for newlines
   if (hasNewlines(command)) {
     reasons.push("Contains newline characters")
     patterns.push("newlines")
-    if (severity === "safe") severity = "medium"
+    severity = mergeSeverity(severity, "medium")
   }
 
-  // Check for zsh dangerous commands
-  const tokens = command.trim().split(/\s+/)
+  const tokens = command.trim().split(/\s+/).filter(Boolean)
   const zshDanger = hasZshDangerousCommand(tokens)
   if (zshDanger) {
     reasons.push(`Zsh dangerous command: ${zshDanger}`)
@@ -152,34 +107,28 @@ function detectBashDanger(command: string): BashDetectionResult {
     severity = "high"
   }
 
-  // Check for obfuscated flags
   for (const { pattern, message } of OBFUSCATED_FLAG_PATTERNS) {
-    if (pattern.test(command)) {
-      reasons.push(message)
-      patterns.push(`obfuscation:${message}`)
-      if (severity !== "high") severity = "medium"
-    }
+    if (!pattern.test(command)) continue
+    reasons.push(message)
+    patterns.push(`obfuscation:${message}`)
+    severity = mergeSeverity(severity, "medium")
   }
 
-  // Check for pipe to shell (curl | bash style)
   if (/\|.*(?:sh|bash|zsh|pwsh|powershell|cmd)\b/i.test(command)) {
     reasons.push("Pipe to shell interpreter detected")
     patterns.push("pipe_to_shell")
     severity = "high"
   }
 
-  // Check for dangerous environment variables
   const envVars = command.match(/\b([A-Z_][A-Z0-9_]*)=/g) || []
   for (const envVar of envVars) {
     const varName = envVar.slice(0, -1)
-    if (BINARY_HIJACK_VARS.test(varName)) {
-      reasons.push(`Dangerous environment variable: ${varName}`)
-      patterns.push(`dangerous_env:${varName}`)
-      severity = "high"
-    }
+    if (!BINARY_HIJACK_VARS.test(varName)) continue
+    reasons.push(`Dangerous environment variable: ${varName}`)
+    patterns.push(`dangerous_env:${varName}`)
+    severity = "high"
   }
 
-  // Check for dangerous redirections
   if (/rm\s+-rf\s+(\/|\*|~)/i.test(command)) {
     reasons.push("Dangerous recursive delete pattern")
     patterns.push("rm_rf_root")
@@ -189,93 +138,134 @@ function detectBashDanger(command: string): BashDetectionResult {
   return { severity, reasons, patterns }
 }
 
-// ============================================================
-// PowerShell Detection
-// ============================================================
-
-function detectPowerShellDanger(command: string): BashDetectionResult {
+function detectCmdDanger(command: string): DetectionResult {
   const reasons: string[] = []
   const patterns: string[] = []
   let severity: DangerSeverity = "safe"
+  const normalized = command.toLowerCase()
 
-  // Use existing PowerShell validation
-  const psResult = validatePowerShellCommand(command)
-
-  if (!psResult.valid) {
-    for (const check of psResult.checks) {
-      reasons.push(check.message || check.cmdlet)
-      patterns.push(`ps:${check.cmdlet}`)
-    }
-    severity = psResult.severity
-  }
-
-  // Enhanced AST-based detection for deeper analysis
-  const astResult = parsePowerShellAst(command)
-  if (astResult.valid && astResult.dangerousNodes.length > 0) {
-    for (const node of astResult.dangerousNodes) {
-      if (!reasons.some((r) => r.includes(node.reason))) {
-        reasons.push(node.reason)
-        patterns.push(`ast:${node.nodeType}`)
-        // Upgrade severity if AST finds high severity issues
-        if (node.severity === "high" && severity !== "high") {
-          severity = "high"
-        }
-      }
-    }
-  }
-
-  // Check for encoded commands
-  for (const { pattern, message } of ENCODED_COMMAND_PATTERNS) {
-    if (pattern.test(command)) {
-      reasons.push(message)
-      patterns.push(`encoded:${message}`)
-      severity = "high"
-    }
-  }
-
-  // Check for remote execution
-  for (const { pattern, message } of REMOTE_EXECUTION_PATTERNS) {
-    if (pattern.test(command)) {
-      reasons.push(message)
-      patterns.push(`remote:${message}`)
-      if (severity !== "high") severity = "medium"
-    }
-  }
-
-  // Check for AMSI bypass attempts
-  if (/\[Ref\]\.Assembly\.GetType/i.test(command)) {
-    reasons.push("AMSI bypass attempt")
-    patterns.push("amsi_bypass")
+  if (hasControlCharacters(command)) {
+    reasons.push("Contains control characters (possible obfuscation)")
+    patterns.push("control_chars")
     severity = "high"
   }
 
-  // Check for rundll32 (living off the land)
-  if (/rundll32\.exe/i.test(command)) {
-    reasons.push("rundll32 execution (living off the land)")
-    patterns.push("rundll32")
+  if (hasUnicodeWhitespace(command)) {
+    reasons.push("Contains unicode whitespace (possible obfuscation)")
+    patterns.push("unicode_whitespace")
     severity = "high"
   }
 
-  // Check for regsvr32 (living off the land)
-  if (/regsvr32\.exe/i.test(command)) {
-    reasons.push("regsvr32 execution (living off the land)")
-    patterns.push("regsvr32")
+  if (hasNewlines(command)) {
+    reasons.push("Contains newline characters")
+    patterns.push("newlines")
+    severity = mergeSeverity(severity, "medium")
+  }
+
+  if (/\|\s*(?:cmd|powershell|pwsh)(?:\.exe)?\b/i.test(command)) {
+    reasons.push("Pipe to shell interpreter detected")
+    patterns.push("pipe_to_shell")
     severity = "high"
   }
 
-  // Check for mshta (living off the land)
-  if (/mshta\.exe/i.test(command)) {
-    reasons.push("mshta execution (living off the land)")
-    patterns.push("mshta")
-    severity = "high"
+  const cmdPatterns: Array<{ pattern: RegExp; reason: string; severity: DangerSeverity; patternKey: string }> = [
+    {
+      pattern: /\bdel(?:\.exe)?\s+.*(?:\/s).*?(?:\\\*|\*|\\windows\\|\\users\\)/i,
+      reason: "Recursive delete via del",
+      severity: "high",
+      patternKey: "cmd_delete",
+    },
+    {
+      pattern: /\brmdir(?:\.exe)?\s+.*(?:\/s).*?(?:\\\*|\*|\\windows\\|\\users\\)/i,
+      reason: "Recursive directory delete via rmdir",
+      severity: "high",
+      patternKey: "cmd_rmdir",
+    },
+    {
+      pattern: /\breg(?:\.exe)?\s+(?:add|delete)\b/i,
+      reason: "Registry modification command",
+      severity: "medium",
+      patternKey: "cmd_reg",
+    },
+    {
+      pattern: /\bsc(?:\.exe)?\s+(?:create|config|delete)\b/i,
+      reason: "Service control command",
+      severity: "medium",
+      patternKey: "cmd_service",
+    },
+    {
+      pattern: /\bschtasks(?:\.exe)?\s+\/create\b/i,
+      reason: "Scheduled task creation",
+      severity: "high",
+      patternKey: "cmd_schtasks",
+    },
+    {
+      pattern: /\brunas(?:\.exe)?\b/i,
+      reason: "Privilege escalation command",
+      severity: "high",
+      patternKey: "cmd_runas",
+    },
+    {
+      pattern: /\b(?:powershell|pwsh)(?:\.exe)?\s+-enc(?:odedcommand)?\b/i,
+      reason: "Encoded PowerShell command launched from cmd",
+      severity: "high",
+      patternKey: "cmd_ps_encoded",
+    },
+  ]
+
+  for (const item of cmdPatterns) {
+    if (!item.pattern.test(command)) continue
+    reasons.push(item.reason)
+    patterns.push(item.patternKey)
+    severity = mergeSeverity(severity, item.severity)
+  }
+
+  if (normalized.includes("&&") || normalized.includes("||")) {
+    reasons.push("Chained cmd execution")
+    patterns.push("cmd_chain")
+    severity = mergeSeverity(severity, "medium")
   }
 
   return { severity, reasons, patterns }
 }
 
-// ============================================================
-// Suggestions Generator
-// ============================================================
+function detectPowerShellDanger(command: string): DetectionResult {
+  const reasons: string[] = []
+  const patterns: string[] = []
+  let severity: DangerSeverity = "safe"
+
+  const psResult = validatePowerShellCommand(command)
+  if (!psResult.valid) {
+    for (const check of psResult.checks) {
+      reasons.push(check.message || check.cmdlet)
+      patterns.push(`ps:${check.cmdlet}`)
+      severity = mergeSeverity(severity, check.severity)
+    }
+  }
+
+  const astResult = parsePowerShellAst(command)
+  for (const node of astResult.dangerousNodes) {
+    reasons.push(node.reason)
+    patterns.push(`ast:${node.nodeType}`)
+    severity = mergeSeverity(severity, node.severity)
+  }
+
+  for (const { pattern, message } of ENCODED_COMMAND_PATTERNS) {
+    if (!pattern.test(command)) continue
+    reasons.push(message)
+    patterns.push(`encoded:${message}`)
+    severity = "high"
+  }
+
+  for (const { pattern, message } of REMOTE_EXECUTION_PATTERNS) {
+    if (!pattern.test(command)) continue
+    reasons.push(message)
+    patterns.push(`remote:${message}`)
+    severity = mergeSeverity(severity, "medium")
+  }
+
+  return { severity, reasons, patterns }
+}
 
 function generateSuggestions(reasons: string[], severity: DangerSeverity): string[] {
   const suggestions: string[] = []
@@ -285,119 +275,80 @@ function generateSuggestions(reasons: string[], severity: DangerSeverity): strin
     suggestions.push("Consider breaking the command into smaller, safer operations")
   }
 
-  if (reasons.some((r) => r.includes("Pipe to shell"))) {
+  if (reasons.some((reason) => reason.includes("Pipe to shell"))) {
     suggestions.push("Download script first, review content, then execute")
     suggestions.push("Use --download-only flag if available")
   }
 
-  if (reasons.some((r) => r.includes("control characters") || r.includes("unicode"))) {
+  if (reasons.some((reason) => reason.includes("control characters") || reason.includes("unicode"))) {
     suggestions.push("Remove unexpected characters from the command")
   }
 
-  if (reasons.some((r) => r.includes("encoded"))) {
+  if (reasons.some((reason) => reason.toLowerCase().includes("encoded"))) {
     suggestions.push("Use decoded command for transparency")
   }
 
-  if (reasons.some((r) => r.includes("rundll32") || r.includes("regsvr32") || r.includes("mshta"))) {
+  if (reasons.some((reason) => /rundll32|regsvr32|mshta/i.test(reason))) {
     suggestions.push("This is a 'living off the land' technique often used by malware")
-    suggestions.push("Ensure the DLL/hta source is trusted")
+    suggestions.push("Ensure the DLL or script source is trusted")
   }
 
   return suggestions
 }
 
-// ============================================================
-// Main Detection Function
-// ============================================================
-
-export function detect(command: string, shell?: string, options?: DangerDetectorOptions): DangerResult {
-  const shellFamily = detectShellFamily(shell)
-  let severity: DangerSeverity = "safe"
+function combineDetections(...detections: DetectionResult[]) {
   const reasons: string[] = []
-  const matchedPatterns: string[] = []
+  const patterns: string[] = []
+  let severity: DangerSeverity = "safe"
 
-  // Detect based on shell family
-  if (shellFamily === "powershell" || shellFamily === "cmd") {
-    const psResult = detectPowerShellDanger(command)
-    severity = psResult.severity
-    reasons.push(...psResult.reasons)
-    matchedPatterns.push(...psResult.patterns)
-  } else if (shellFamily === "posix") {
-    const bashResult = detectBashDanger(command)
-    severity = bashResult.severity
-    reasons.push(...bashResult.reasons)
-    matchedPatterns.push(...bashResult.patterns)
-  } else {
-    // Unknown shell - check both
-    const bashResult = detectBashDanger(command)
-    const psResult = detectPowerShellDanger(command)
-
-    // Take highest severity
-    const severityOrder: Record<DangerSeverity, number> = { safe: 0, low: 1, medium: 2, high: 3 }
-    if (severityOrder[bashResult.severity] >= severityOrder[severity]) {
-      severity = bashResult.severity
-      reasons.push(...bashResult.reasons)
-      matchedPatterns.push(...bashResult.patterns)
-    }
-    if (severityOrder[psResult.severity] >= severityOrder[severity]) {
-      severity = psResult.severity
-      reasons.push(...psResult.reasons)
-      matchedPatterns.push(...psResult.patterns)
-    }
+  for (const detection of detections) {
+    severity = mergeSeverity(severity, detection.severity)
+    reasons.push(...detection.reasons)
+    patterns.push(...detection.patterns)
   }
-
-  // Determine if allowed based on severity and options
-  let allowed = true
-  if (severity === "high") {
-    allowed = false
-  } else if (severity === "medium") {
-    allowed = options?.strictMode ? false : true
-  }
-
-  // Apply options
-  if (!allowed && options?.strictMode === false) {
-    // In non-strict mode, medium commands are allowed with warning
-    if (severity === "medium") {
-      allowed = true
-    }
-  }
-
-  const suggestions = generateSuggestions(reasons, severity)
 
   return {
-    allowed,
     severity,
-    reasons: [...new Set(reasons)], // Deduplicate
-    suggestions,
-    shellFamily,
-    matchedPatterns: [...new Set(matchedPatterns)],
+    reasons: [...new Set(reasons)],
+    patterns: [...new Set(patterns)],
   }
 }
 
-/**
- * Quick check if a command is allowed
- */
+export function detect(command: string, shell?: string, options?: DangerDetectorOptions): DangerResult {
+  const shellFamily = detectShellFamily(shell)
+  const detection =
+    shellFamily === "powershell"
+      ? detectPowerShellDanger(command)
+      : shellFamily === "cmd"
+        ? detectCmdDanger(command)
+        : shellFamily === "posix"
+          ? detectBashDanger(command)
+          : combineDetections(detectBashDanger(command), detectPowerShellDanger(command), detectCmdDanger(command))
+
+  const allowed =
+    detection.severity === "high" ? false : detection.severity === "medium" ? !options?.strictMode : true
+
+  return {
+    allowed,
+    severity: detection.severity,
+    reasons: detection.reasons,
+    suggestions: generateSuggestions(detection.reasons, detection.severity),
+    shellFamily,
+    matchedPatterns: detection.patterns,
+  }
+}
+
 export function isAllowed(command: string, shell?: string, options?: DangerDetectorOptions): boolean {
   return detect(command, shell, options).allowed
 }
 
-/**
- * Get severity of a command
- */
 export function getSeverity(command: string, shell?: string): DangerSeverity {
   return detect(command, shell).severity
 }
 
-/**
- * Explain why a command is flagged
- */
 export function explain(command: string, shell?: string): string[] {
   return detect(command, shell).reasons
 }
-
-// ============================================================
-// Effect-based Service
-// ============================================================
 
 export interface Interface {
   readonly detect: (command: string, shell?: string, options?: DangerDetectorOptions) => Effect.Effect<DangerResult>

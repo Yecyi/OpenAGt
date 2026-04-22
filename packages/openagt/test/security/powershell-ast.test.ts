@@ -1,11 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  parsePowerShellAst,
-  isDangerous,
-  getDangerousReasons,
-  getCommandStructure,
-  type PowerShellAstResult,
-} from "../../src/security/powershell-ast"
+import { parsePowerShellAst, isDangerous, getDangerousReasons, getCommandStructure } from "../../src/security/powershell-ast"
 import { detect, isAllowed } from "../../src/security/dangerous-command-detector"
 
 describe("parsePowerShellAst", () => {
@@ -20,6 +14,7 @@ describe("parsePowerShellAst", () => {
     const result = parsePowerShellAst("Get-Process -Name notepad")
     expect(result.valid).toBe(true)
     expect(result.commands.length).toBeGreaterThan(0)
+    expect(result.commands[0].arguments.some((arg) => arg.type === "parameter" && arg.name === "Name")).toBe(true)
   })
 
   test("parses piped commands", () => {
@@ -62,7 +57,7 @@ describe("parsePowerShellAst", () => {
 
   test("detects schtasks", () => {
     const result = parsePowerShellAst("schtasks.exe /Create /SC ONCE")
-    expect(result.dangerousNodes.length).toBeGreaterThanOrEqual(0)
+    expect(result.dangerousNodes.some((n) => n.reason.includes("Scheduled task"))).toBe(true)
   })
 
   test("warns about no commands", () => {
@@ -72,7 +67,8 @@ describe("parsePowerShellAst", () => {
 
   test("extracts multiple commands", () => {
     const result = parsePowerShellAst("Get-Service | Where-Object { $_.Status -eq 'Running' }")
-    expect(result.commands.length).toBeGreaterThanOrEqual(1)
+    expect(result.commands.length).toBe(2)
+    expect(result.commands[0].hasPipeline).toBe(true)
   })
 })
 
@@ -125,12 +121,14 @@ describe("getCommandStructure", () => {
   test("extracts piped commands", () => {
     const commands = getCommandStructure("Get-Process | Stop-Process")
     expect(commands.length).toBe(2)
+    expect(commands[0].hasPipeline).toBe(true)
   })
 
   test("extracts command with parameters", () => {
-    const commands = getCommandStructure("Get-Process")
+    const commands = getCommandStructure("Get-Process -Name notepad")
     expect(commands.length).toBe(1)
     expect(commands[0].name).toBe("Get-Process")
+    expect(commands[0].arguments.some((arg) => arg.type === "parameter" && arg.value === "notepad")).toBe(true)
   })
 })
 
@@ -161,6 +159,18 @@ describe("edge cases", () => {
   test("handles variables", () => {
     const result = parsePowerShellAst("$result = Get-Process")
     expect(result.valid).toBe(true)
+  })
+
+  test("extracts nested commands from subexpressions", () => {
+    const result = parsePowerShellAst("Invoke-Expression $(Get-Process)")
+    expect(result.commands[0].nested.length).toBe(1)
+    expect(result.commands[0].nested[0].name).toBe("Get-Process")
+  })
+
+  test("tracks usable positions for dangerous nodes", () => {
+    const result = parsePowerShellAst("Invoke-Expression 'whoami'")
+    expect(result.dangerousNodes[0].position.start).toBe(0)
+    expect(result.dangerousNodes[0].position.end).toBeGreaterThan(result.dangerousNodes[0].position.start)
   })
 
   test("handles quotes", () => {

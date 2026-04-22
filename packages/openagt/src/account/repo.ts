@@ -109,46 +109,61 @@ export const layer: Layer.Layer<Service> = Layer.effect(
       ),
     )
 
-    const persistToken = Effect.fn("AccountRepo.persistToken")((input: { accessToken: string; refreshToken?: string; expiry?: number; accountID: AccountID }) =>
-      query((db) =>
-        db
-          .update(AccountTable)
-          .set({
-            access_token: input.accessToken,
-            refresh_token: input.refreshToken,
-            token_expiry: Option.getOrNull(input.expiry),
-          })
-          .where(eq(AccountTable.id, input.accountID))
-          .run(),
-      ).pipe(Effect.asVoid),
+    const persistToken = Effect.fn("AccountRepo.persistToken")(
+      (input: {
+        accountID: AccountID
+        accessToken: AccessToken
+        refreshToken: RefreshToken
+        expiry: Option.Option<number>
+      }) =>
+        query((db) =>
+          db
+            .update(AccountTable)
+            .set({
+              access_token: input.accessToken,
+              refresh_token: input.refreshToken,
+              token_expiry: Option.getOrNull(input.expiry),
+            })
+            .where(eq(AccountTable.id, input.accountID))
+            .run(),
+        ).pipe(Effect.asVoid),
     )
 
-    const persistAccount = Effect.fn("AccountRepo.persistAccount")((input: { id: AccountID; email: string; url: string; token?: string; provider: string }) =>
-      tx((db) => {
-        const url = normalizeServerUrl(input.url)
+    const persistAccount = Effect.fn("AccountRepo.persistAccount")(
+      (input: {
+        id: AccountID
+        email: string
+        url: string
+        accessToken: AccessToken
+        refreshToken: RefreshToken
+        expiry: number
+        orgID: Option.Option<OrgID>
+      }) =>
+        tx((db) => {
+          const url = normalizeServerUrl(input.url)
 
-        db.insert(AccountTable)
-          .values({
-            id: input.id,
-            email: input.email,
-            url,
-            access_token: input.accessToken,
-            refresh_token: input.refreshToken,
-            token_expiry: input.expiry,
-          })
-          .onConflictDoUpdate({
-            target: AccountTable.id,
-            set: {
+          db.insert(AccountTable)
+            .values({
+              id: input.id,
               email: input.email,
               url,
               access_token: input.accessToken,
               refresh_token: input.refreshToken,
               token_expiry: input.expiry,
-            },
-          })
-          .run()
-        void state(db, input.id, input.orgID)
-      }).pipe(Effect.asVoid),
+            })
+            .onConflictDoUpdate({
+              target: AccountTable.id,
+              set: {
+                email: input.email,
+                url,
+                access_token: input.accessToken,
+                refresh_token: input.refreshToken,
+                token_expiry: input.expiry,
+              },
+            })
+            .run()
+          void state(db, input.id, input.orgID)
+        }).pipe(Effect.asVoid),
     )
 
     return Service.of({

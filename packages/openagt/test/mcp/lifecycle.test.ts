@@ -703,6 +703,40 @@ test(
   ),
 )
 
+test(
+  "tools() preserves dynamic schema fields from MCP definitions",
+  withInstance({}, (mcp) =>
+    Effect.gen(function* () {
+      lastCreatedClientName = "schema-server"
+      const serverState = getOrCreateClientState("schema-server")
+      serverState.tools = [
+        {
+          name: "dynamic_input",
+          description: "allows additional fields",
+          inputSchema: {
+            type: "object",
+            properties: {
+              fixed: { type: "string" },
+            },
+            additionalProperties: true,
+          },
+        },
+      ]
+
+      yield* mcp.add("schema-server", {
+        type: "local",
+        command: ["echo", "test"],
+      })
+
+      const tools = yield* mcp.tools()
+      const tool = tools["schema-server_dynamic_input"] as any
+      expect(tool).toBeDefined()
+      expect(tool.inputSchema?.jsonSchema?.additionalProperties).toBe(true)
+      expect(tool.inputSchema?.jsonSchema?.properties?.fixed?.type).toBe("string")
+    }),
+  ),
+)
+
 // ========================================================================
 // Test: transport leak — local stdio timeout (#19168)
 // ========================================================================

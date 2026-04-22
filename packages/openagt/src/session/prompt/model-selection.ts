@@ -16,16 +16,12 @@ const log = Log.create({ service: "model-selection" })
  * Get model by provider and model ID (async wrapper).
  */
 export async function getModel(providerID: string, modelID: string): Promise<Provider.Model> {
-  const effect: Effect.Effect<Provider.Model, Error, Provider.Service> = Effect.gen(function* () {
-    const provider = yield* Provider.Service
-    return yield* provider.getModel(ProviderID.make(providerID), ModelID.make(modelID))
-  }).pipe(
-    Effect.mapError((e) => {
-      if (e instanceof Error) return e
-      return new Error(String(e))
-    }),
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const provider = yield* Provider.Service
+      return yield* provider.getModel(ProviderID.make(providerID), ModelID.make(modelID))
+    }).pipe(Effect.provide(Provider.defaultLayer)),
   )
-  return Effect.runPromise(effect)
 }
 
 /**

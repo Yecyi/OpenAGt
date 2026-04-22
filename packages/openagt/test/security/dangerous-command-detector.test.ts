@@ -232,6 +232,21 @@ describe("detect - cmd shell", () => {
   test("detects dangerous cmd patterns", () => {
     const result = detect("del /s /q C:\\*", "cmd.exe")
     expect(result.shellFamily).toBe("cmd")
-    // CMD shell uses some powershell-style detection too
+    expect(result.severity).toBe("high")
+    expect(result.reasons.some((r) => r.includes("delete"))).toBe(true)
+  })
+
+  test("safe cmd command is not treated as powershell", () => {
+    const result = detect("dir", "cmd.exe")
+    expect(result.shellFamily).toBe("cmd")
+    expect(result.severity).toBe("safe")
+    expect(result.reasons).toHaveLength(0)
+  })
+
+  test("detects encoded powershell launched from cmd", () => {
+    const result = detect("powershell -enc SQBFAFgAIAA=", "cmd.exe")
+    expect(result.shellFamily).toBe("cmd")
+    expect(result.severity).toBe("high")
+    expect(result.matchedPatterns).toContain("cmd_ps_encoded")
   })
 })

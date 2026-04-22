@@ -1,25 +1,15 @@
 /**
- * PowerShell AST Parser
+ * PowerShell structure-aware parsing and supplemental pattern detection.
  *
- * AST-based PowerShell security analysis that goes beyond regex patterns.
- * Parses command structure to detect dangerous patterns semantically.
- *
- * This provides more accurate detection than regex-based approaches by:
- * 1. Parsing command structure (cmdlet, parameters, arguments)
- * 2. Understanding parameter contexts
- * 3. Detecting nested expressions
- * 4. Identifying dangerous data flows
+ * This is intentionally lightweight: it extracts commands, parameters, values,
+ * pipelines, script blocks, and subexpressions, then layers regex-only checks
+ * separately instead of pretending every match came from structured parsing.
  */
 
 import { Effect, Layer, Context } from "effect"
 
-// ============================================================
-// Types
-// ============================================================
-
 export type AstNodeType =
   | "program"
-  | "command"
   | "command_invocation"
   | "command_parameter"
   | "expression"
@@ -27,10 +17,7 @@ export type AstNodeType =
   | "expandable_string"
   | "script_block"
   | "subexpression"
-  | "array_literal"
-  | "hashtable"
   | "pipeline"
-  | "pipe"
   | "comment"
 
 export interface AstNode {
@@ -39,15 +26,15 @@ export interface AstNode {
   children?: AstNode[]
   start: number
   end: number
-  properties?: Record<string, unknown>
 }
 
 export interface CommandInfo {
   name: string
-  arguments: Array<{ type: "parameter" | "value"; name?: string; value: string }>
-  isScriptBlock?: boolean
-  hasPipeline?: boolean
-  nested?: CommandInfo[]
+  position: { start: number; end: number }
+  arguments: Array<{ type: "parameter" | "value"; name?: string; value: string; position: { start: number; end: number } }>
+  isScriptBlock: boolean
+  hasPipeline: boolean
+  nested: CommandInfo[]
 }
 
 export interface DangerousNode {
@@ -55,6 +42,7 @@ export interface DangerousNode {
   reason: string
   severity: "high" | "medium" | "low"
   position: { start: number; end: number }
+  source: "ast" | "pattern"
 }
 
 export interface PowerShellAstResult {
@@ -65,315 +53,32 @@ export interface PowerShellAstResult {
   warnings: string[]
 }
 
-// ============================================================
-// Tokenizer
-// ============================================================
+type TokenType =
+  | "word"
+  | "string_single"
+  | "string_double"
+  | "parameter"
+  | "variable"
+  | "subexpression"
+  | "script_block"
+  | "pipe"
+  | "semicolon"
+  | "comment"
+  | "operator"
+  | "whitespace"
+  | "unknown"
 
 interface Token {
-  type:
-    | "command"
-    | "parameter"
-    | "string_single"
-    | "string_double"
-    | "string_expandable"
-    | "script_block_start"
-    | "script_block_end"
-    | "subexpression_start"
-    | "subexpression_end"
-    | "pipe"
-    | "semicolon"
-    | "newline"
-    | "lbracket"
-    | "rbracket"
-    | "lbrace"
-    | "rbrace"
-    | "lparen"
-    | "rparen"
-    | "operator"
-    | "comment"
-    | "whitespace"
-    | "variable"
-    | "unknown"
+  type: TokenType
   value: string
   start: number
   end: number
 }
 
-function tokenize(input: string): Token[] {
-  const tokens: Token[] = []
-  let pos = 0
+const COMMAND_BOUNDARY = new Set<TokenType>(["pipe", "semicolon"])
+const VALUE_TOKEN_TYPES = new Set<TokenType>(["word", "string_single", "string_double", "variable", "subexpression", "script_block"])
 
-  while (pos < input.length) {
-    const char = input[pos]
-
-    if (/\s/.test(char)) {
-      let start = pos
-      while (pos < input.length && /\s/.test(input[pos])) pos++
-      tokens.push({ type: "whitespace", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    if (char === "#") {
-      const start = pos
-      while (pos < input.length && input[pos] !== "\n") pos++
-      tokens.push({ type: "comment", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    if (char === '"') {
-      const start = pos
-      pos++
-      while (pos < input.length && input[pos] !== '"') {
-        if (input[pos] === "\\" && pos + 1 < input.length) pos++
-        pos++
-      }
-      if (pos < input.length) pos++
-      tokens.push({ type: "string_double", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    if (char === "'") {
-      const start = pos
-      pos++
-      while (pos < input.length && input[pos] !== "'") pos++
-      if (pos < input.length) pos++
-      tokens.push({ type: "string_single", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    if (char === "$") {
-      const start = pos
-      pos++
-      while (pos < input.length && /[a-zA-Z0-9_]/.test(input[pos])) pos++
-      tokens.push({ type: "variable", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    if (char === "|") {
-      tokens.push({ type: "pipe", value: "|", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === ";") {
-      tokens.push({ type: "semicolon", value: ";", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "(") {
-      tokens.push({ type: "lparen", value: "(", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === ")") {
-      tokens.push({ type: "rparen", value: ")", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "{") {
-      tokens.push({ type: "lbrace", value: "{", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "}") {
-      tokens.push({ type: "rbrace", value: "}", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "[") {
-      tokens.push({ type: "lbracket", value: "[", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "]") {
-      tokens.push({ type: "rbracket", value: "]", start: pos, end: pos + 1 })
-      pos++
-      continue
-    }
-
-    if (char === "-") {
-      const start = pos
-      pos++
-      if (pos < input.length && /[a-zA-Z]/.test(input[pos])) {
-        while (pos < input.length && /[a-zA-Z0-9_]/.test(input[pos])) pos++
-        tokens.push({ type: "parameter", value: input.slice(start, pos), start, end: pos })
-      } else {
-        tokens.push({ type: "operator", value: "-", start, end: pos })
-      }
-      continue
-    }
-
-    if (char === "$") {
-      const start = pos
-      pos++
-      if (pos < input.length && input[pos] === "(") {
-        tokens.push({ type: "subexpression_start", value: "$(", start, end: pos + 1 })
-        pos++
-      } else {
-        // Just a variable start, already consumed the $
-        while (pos < input.length && /[a-zA-Z0-9_]/.test(input[pos])) pos++
-        tokens.push({ type: "variable", value: input.slice(start, pos), start, end: pos })
-      }
-      continue
-    }
-
-    if (char === "{") {
-      const start = pos
-      pos++
-      while (pos < input.length && input[pos] !== "}") pos++
-      if (pos < input.length) pos++
-      tokens.push({ type: "script_block_start", value: input.slice(start, pos), start, end: pos })
-      continue
-    }
-
-    const start = pos
-    if (/[a-zA-Z]/.test(char)) {
-      while (pos < input.length && /[a-zA-Z0-9_:\-]/.test(input[pos])) pos++
-      const value = input.slice(start, pos)
-
-      if (value.startsWith("-")) {
-        tokens.push({ type: "parameter", value, start, end: pos })
-      } else {
-        tokens.push({ type: "command", value, start, end: pos })
-      }
-      continue
-    }
-
-    tokens.push({ type: "unknown", value: char, start: pos, end: pos + 1 })
-    pos++
-  }
-
-  return tokens
-}
-
-// ============================================================
-// AST Parser
-// ============================================================
-
-function buildAst(tokens: Token[]): AstNode {
-  const program: AstNode = {
-    type: "program",
-    value: "",
-    children: [],
-    start: 0,
-    end: tokens.length > 0 ? tokens[tokens.length - 1].end : 0,
-  }
-
-  let currentCommand: AstNode | null = null
-  let currentPipeline: AstNode | null = null
-
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i]
-
-    if (token.type === "command") {
-      if (currentPipeline) {
-        currentPipeline.children?.push({
-          type: "command_invocation",
-          value: token.value,
-          start: token.start,
-          end: token.end,
-          children: [],
-        })
-      } else {
-        currentPipeline = {
-          type: "pipeline",
-          value: "",
-          children: [
-            {
-              type: "command_invocation",
-              value: token.value,
-              start: token.start,
-              end: token.end,
-              children: [],
-            },
-          ],
-          start: token.start,
-          end: token.end,
-        }
-      }
-      currentCommand = currentPipeline.children![currentPipeline.children!.length - 1]
-    } else if (token.type === "parameter" && currentCommand) {
-      const paramNode: AstNode = {
-        type: "command_parameter",
-        value: token.value,
-        start: token.start,
-        end: token.end,
-      }
-
-      if (tokens[i + 1] && (tokens[i + 1].type === "string_double" || tokens[i + 1].type === "string_single" || tokens[i + 1].type === "variable" || tokens[i + 1].type === "command")) {
-        i++
-        paramNode.children = [
-          {
-            type: tokens[i].type === "command"
-              ? "expression"
-              : (tokens[i].type === "comment"
-                ? "comment"
-                : tokens[i].type === "pipe"
-                  ? "pipe"
-                  : "expression") as AstNodeType,
-            value: tokens[i].value,
-            start: tokens[i].start,
-            end: tokens[i].end,
-          },
-        ]
-      }
-
-      currentCommand.children?.push(paramNode)
-    } else if (token.type === "pipe") {
-      if (currentPipeline) {
-        program.children?.push(currentPipeline)
-        currentPipeline = null
-        currentCommand = null
-      }
-    }
-  }
-
-  if (currentPipeline) {
-    program.children?.push(currentPipeline)
-  }
-
-  return program
-}
-
-// ============================================================
-// Command Extraction
-// ============================================================
-
-function extractCommands(ast: AstNode): CommandInfo[] {
-  const commands: CommandInfo[] = []
-
-  function traverse(node: AstNode, parent?: CommandInfo) {
-    if (node.type === "command_invocation" && node.value) {
-      const cmd: CommandInfo = {
-        name: node.value,
-        arguments: [],
-      }
-      parent?.nested?.push(cmd)
-      commands.push(cmd)
-    }
-
-    if (node.children) {
-      for (const child of node.children) {
-        traverse(child, commands[commands.length - 1])
-      }
-    }
-  }
-
-  traverse(ast)
-  return commands
-}
-
-// ============================================================
-// Dangerous Pattern Detection
-// ============================================================
-
-const DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
+const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
   "invoke-expression": { severity: "high", reason: "Dynamic code execution" },
   iex: { severity: "high", reason: "Invoke-Expression alias - dynamic code execution" },
   "invoke-command": { severity: "high", reason: "Remote command execution" },
@@ -396,102 +101,329 @@ const DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: s
   "add-type": { severity: "high", reason: "Dynamic type loading" },
 }
 
-const DANGEROUS_SCRIPT_BLOCK_PATTERNS = [
-  /\{[^}]*\}\s*\)/,
-  /ScriptBlock/i,
+const PATTERN_DANGERS: Array<{ pattern: RegExp; reason: string; severity: "high" | "medium"; nodeType: AstNodeType }> = [
+  { pattern: /-enc(?:odedCommand)?\s+\S+/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
+  { pattern: /FromBase64String/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
+  { pattern: /\[Ref\]\.Assembly\.GetType/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
+  { pattern: /AmsiUtils/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
+  { pattern: /rundll32\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /regsvr32\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /mshta\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /cscript\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /wscript\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
 ]
 
-const ENCODED_COMMAND_PATTERNS = [
-  /-enc(?:odedCommand)?\s+/i,
-  /-encode\s+/i,
-  /FromBase64String/i,
-  /\[System\.Convert\]::FromBase64String/i,
-]
+function readQuoted(input: string, start: number, quote: "'" | '"') {
+  let pos = start + 1
+  while (pos < input.length) {
+    const char = input[pos]
+    if (char === "`" && pos + 1 < input.length) {
+      pos += 2
+      continue
+    }
+    if (char === quote) {
+      return pos + 1
+    }
+    pos++
+  }
+  return input.length
+}
 
-const AMBI_PATTERNS = [
-  /\[Ref\]\.Assembly\.GetType/i,
-  /AmsiUtils/i,
-  /\.GetField\s*\(/i,
-]
+function readBalanced(input: string, start: number, open: string, close: string) {
+  let pos = start
+  let depth = 0
+  while (pos < input.length) {
+    const char = input[pos]
+    if (char === "'" || char === '"') {
+      pos = readQuoted(input, pos, char as "'" | '"')
+      continue
+    }
+    if (char === open) depth++
+    if (char === close) {
+      depth--
+      if (depth === 0) {
+        return pos + 1
+      }
+    }
+    pos++
+  }
+  return input.length
+}
 
-const LIVING_OFF_LAND = [
-  /rundll32\.exe/i,
-  /regsvr32\.exe/i,
-  /mshta\.exe/i,
-  /cscript\.exe/i,
-  /wscript\.exe/i,
-  /bitsadmin\.exe/i,
-  /certutil\.exe.*-decode/i,
-  /cmstp\.exe/i,
-]
+function tokenize(input: string): Token[] {
+  const tokens: Token[] = []
+  let pos = 0
 
-function detectDangerousNodes(ast: AstNode, input: string): DangerousNode[] {
-  const nodes: DangerousNode[] = []
+  while (pos < input.length) {
+    const char = input[pos]
 
-  const commands = extractCommands(ast)
-  for (const cmd of commands) {
-    const lowerName = cmd.name.toLowerCase()
-    const dangerous = DANGEROUS_CMDLETS[lowerName]
+    if (/\s/.test(char)) {
+      const start = pos
+      while (pos < input.length && /\s/.test(input[pos])) pos++
+      tokens.push({ type: "whitespace", value: input.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    if (char === "#") {
+      const start = pos
+      while (pos < input.length && input[pos] !== "\n") pos++
+      tokens.push({ type: "comment", value: input.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    if (char === "$" && input[pos + 1] === "(") {
+      const end = readBalanced(input, pos + 1, "(", ")")
+      tokens.push({ type: "subexpression", value: input.slice(pos, end), start: pos, end })
+      pos = end
+      continue
+    }
+
+    if (char === "{") {
+      const end = readBalanced(input, pos, "{", "}")
+      tokens.push({ type: "script_block", value: input.slice(pos, end), start: pos, end })
+      pos = end
+      continue
+    }
+
+    if (char === "'" || char === '"') {
+      const end = readQuoted(input, pos, char as "'" | '"')
+      tokens.push({
+        type: char === "'" ? "string_single" : "string_double",
+        value: input.slice(pos, end),
+        start: pos,
+        end,
+      })
+      pos = end
+      continue
+    }
+
+    if (char === "$") {
+      const start = pos
+      pos++
+      while (pos < input.length && /[a-zA-Z0-9_:\-]/.test(input[pos])) pos++
+      tokens.push({ type: "variable", value: input.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    if (char === "|") {
+      tokens.push({ type: "pipe", value: "|", start: pos, end: pos + 1 })
+      pos++
+      continue
+    }
+
+    if (char === ";") {
+      tokens.push({ type: "semicolon", value: ";", start: pos, end: pos + 1 })
+      pos++
+      continue
+    }
+
+    if (char === "=") {
+      tokens.push({ type: "operator", value: "=", start: pos, end: pos + 1 })
+      pos++
+      continue
+    }
+
+    const start = pos
+    while (pos < input.length && !/\s/.test(input[pos]) && !"|;".includes(input[pos])) {
+      if (input[pos] === "'" || input[pos] === '"' || (input[pos] === "$" && input[pos + 1] === "(") || input[pos] === "{") {
+        break
+      }
+      pos++
+    }
+
+    if (pos === start) {
+      tokens.push({ type: "unknown", value: input[pos], start: pos, end: pos + 1 })
+      pos++
+      continue
+    }
+
+    const value = input.slice(start, pos)
+    tokens.push({
+      type: value.startsWith("-") && /-[a-zA-Z]/.test(value) ? "parameter" : "word",
+      value,
+      start,
+      end: pos,
+    })
+  }
+
+  return tokens
+}
+
+function buildAst(tokens: Token[]): AstNode {
+  const commandNodes: AstNode[] = tokens
+    .filter((token) => token.type !== "whitespace")
+    .map((token) => ({
+      type:
+        token.type === "parameter"
+          ? "command_parameter"
+          : token.type === "script_block"
+            ? "script_block"
+            : token.type === "subexpression"
+              ? "subexpression"
+              : token.type === "comment"
+                ? "comment"
+                : token.type === "pipe"
+                  ? "pipeline"
+                  : token.type === "string_single"
+                    ? "string_literal"
+                    : token.type === "string_double"
+                      ? "expandable_string"
+                      : "expression",
+      value: token.value,
+      start: token.start,
+      end: token.end,
+    }))
+
+  return {
+    type: "program",
+    start: 0,
+    end: tokens.length > 0 ? tokens[tokens.length - 1].end : 0,
+    children: commandNodes,
+  }
+}
+
+function shouldSkipToken(token: Token) {
+  return token.type === "whitespace" || token.type === "comment"
+}
+
+function markPipeline(command: CommandInfo | null) {
+  if (!command) return
+  command.hasPipeline = true
+}
+
+function extractCommands(tokens: Token[]): CommandInfo[] {
+  const commands: CommandInfo[] = []
+  let current: CommandInfo | null = null
+
+  const startCommand = (token: Token) => {
+    const command: CommandInfo = {
+      name: token.value,
+      position: { start: token.start, end: token.end },
+      arguments: [],
+      isScriptBlock: false,
+      hasPipeline: false,
+      nested: [],
+    }
+    commands.push(command)
+    current = command
+  }
+
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index]
+    if (shouldSkipToken(token)) continue
+
+    if (COMMAND_BOUNDARY.has(token.type)) {
+      if (token.type === "pipe") markPipeline(current)
+      current = null
+      continue
+    }
+
+    if (!current) {
+      if (token.type === "word") {
+        startCommand(token)
+      }
+      continue
+    }
+
+    const active = current as CommandInfo
+
+    if (token.type === "parameter") {
+      const next = tokens.slice(index + 1).find((candidate) => !shouldSkipToken(candidate))
+      const argument = {
+        type: "parameter" as const,
+        name: token.value.replace(/^-+/, ""),
+        value: next && VALUE_TOKEN_TYPES.has(next.type) ? next.value : "",
+        position: {
+          start: token.start,
+          end: next && VALUE_TOKEN_TYPES.has(next.type) ? next.end : token.end,
+        },
+      }
+      active.arguments.push(argument)
+      continue
+    }
+
+    if (VALUE_TOKEN_TYPES.has(token.type)) {
+      active.arguments.push({
+        type: "value",
+        value: token.value,
+        position: { start: token.start, end: token.end },
+      })
+      if (token.type === "script_block") {
+        active.isScriptBlock = true
+      }
+      if (token.type === "subexpression") {
+        const nested = extractCommands(tokenize(token.value.slice(2, -1)))
+        active.nested.push(...nested)
+      }
+    }
+  }
+
+  return commands
+}
+
+function structuredDangerNodes(commands: CommandInfo[]): DangerousNode[] {
+  return commands.flatMap((command) => {
+    const dangerous = STRUCTURED_DANGEROUS_CMDLETS[command.name.toLowerCase()]
+    const nodes: DangerousNode[] = []
+
     if (dangerous) {
       nodes.push({
         nodeType: "command_invocation",
-        reason: `${cmd.name}: ${dangerous.reason}`,
+        reason: `${command.name}: ${dangerous.reason}`,
         severity: dangerous.severity,
-        position: { start: 0, end: cmd.name.length },
+        position: command.position,
+        source: "ast",
       })
     }
-  }
 
-  for (const pattern of ENCODED_COMMAND_PATTERNS) {
-    if (pattern.test(input)) {
+    for (const nested of command.nested) {
+      const dangerousNested = STRUCTURED_DANGEROUS_CMDLETS[nested.name.toLowerCase()]
+      if (!dangerousNested) continue
       nodes.push({
-        nodeType: "expression",
-        reason: "Encoded command detected",
-        severity: "high",
-        position: { start: 0, end: input.length },
+        nodeType: "subexpression",
+        reason: `${nested.name}: ${dangerousNested.reason}`,
+        severity: dangerousNested.severity,
+        position: nested.position,
+        source: "ast",
       })
     }
-  }
 
-  for (const pattern of AMBI_PATTERNS) {
-    if (pattern.test(input)) {
-      nodes.push({
-        nodeType: "expression",
-        reason: "AMSI bypass attempt",
-        severity: "high",
-        position: { start: 0, end: input.length },
-      })
-    }
-  }
-
-  for (const pattern of LIVING_OFF_LAND) {
-    if (pattern.test(input)) {
-      nodes.push({
-        nodeType: "expression",
-        reason: "Living-off-the-land binary usage",
-        severity: "high",
-        position: { start: 0, end: input.length },
-      })
-    }
-  }
-
-  return nodes
+    return nodes
+  })
 }
 
-// ============================================================
-// Main Parser Function
-// ============================================================
+function patternDangerNodes(input: string): DangerousNode[] {
+  return PATTERN_DANGERS.flatMap((item) => {
+    const match = item.pattern.exec(input)
+    if (!match || match.index === undefined) return []
+    return [
+      {
+        nodeType: item.nodeType,
+        reason: item.reason,
+        severity: item.severity,
+        position: { start: match.index, end: match.index + match[0].length },
+        source: "pattern" as const,
+      },
+    ]
+  })
+}
+
+function dedupeDangerNodes(nodes: DangerousNode[]) {
+  const seen = new Set<string>()
+  return nodes.filter((node) => {
+    const key = `${node.reason}:${node.position.start}:${node.position.end}:${node.source}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 
 export function parsePowerShellAst(input: string): PowerShellAstResult {
   const tokens = tokenize(input)
   const ast = buildAst(tokens)
-  const commands = extractCommands(ast)
-  const dangerousNodes = detectDangerousNodes(ast, input)
-
-  const warnings: string[] = []
-  if (commands.length === 0) {
-    warnings.push("No valid commands detected")
-  }
+  const commands = extractCommands(tokens)
+  const dangerousNodes = dedupeDangerNodes([...structuredDangerNodes(commands), ...patternDangerNodes(input)])
+  const warnings = commands.length === 0 ? ["No valid commands detected"] : []
 
   return {
     valid: commands.length > 0,
@@ -502,28 +434,17 @@ export function parsePowerShellAst(input: string): PowerShellAstResult {
   }
 }
 
-// ============================================================
-// Convenience Functions
-// ============================================================
-
 export function isDangerous(input: string): boolean {
-  const result = parsePowerShellAst(input)
-  return result.dangerousNodes.some((n) => n.severity === "high")
+  return parsePowerShellAst(input).dangerousNodes.some((node) => node.severity === "high")
 }
 
 export function getDangerousReasons(input: string): string[] {
-  const result = parsePowerShellAst(input)
-  return result.dangerousNodes.map((n) => n.reason)
+  return parsePowerShellAst(input).dangerousNodes.map((node) => node.reason)
 }
 
 export function getCommandStructure(input: string): CommandInfo[] {
-  const result = parsePowerShellAst(input)
-  return result.commands
+  return parsePowerShellAst(input).commands
 }
-
-// ============================================================
-// Effect-based Service
-// ============================================================
 
 export interface Interface {
   readonly parse: (input: string) => Effect.Effect<PowerShellAstResult>

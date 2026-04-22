@@ -1,10 +1,11 @@
 import { Effect, Layer, Context, Option } from "effect"
+import z from "zod"
 import { Provider } from "@/provider"
 import { Config } from "@/config"
 import { Log } from "@/util"
 import { ModelID, ProviderID } from "./schema"
 import { Bus } from "@/bus"
-import z from "zod"
+import { BusEvent } from "@/bus/bus-event"
 
 const log = Log.create({ service: "provider.fallback" })
 
@@ -22,16 +23,6 @@ export interface FallbackState {
   maxRetries: number
   retryOnRateLimit: boolean
   retryOnServerError: boolean
-}
-
-/**
- * Fallback event for observability
- */
-export interface FallbackHopEvent {
-  from: { provider: string; model: string }
-  to: { provider: string; model: string }
-  attempt: number
-  reason?: string
 }
 
 export interface Interface {
@@ -54,35 +45,11 @@ export interface FallbackMetrics {
   fallbackByProvider: Record<string, number>
   hopLatencies: number[]
   providerErrors: Record<string, number>
-  lastFallback?: FallbackHopEvent
+  lastFallback?: z.infer<typeof BusEvent.FallbackHopEvent.properties>
 }
 
-let metrics: FallbackMetrics = {
-  totalAttempts: 0,
-  totalFallbacks: 0,
-  fallbackRate: 0,
-  fallbackByReason: {},
-  fallbackByProvider: {},
-  hopLatencies: [],
-  providerErrors: {},
-}
-
-let hopStartTime: number | null = null
-
-function recordHopLatency(durationMs: number): void {
-  metrics.hopLatencies.push(durationMs)
-  if (metrics.hopLatencies.length > 100) {
-    metrics.hopLatencies = metrics.hopLatencies.slice(-100)
-  }
-}
-
-function calculateFallbackRate(): number {
-  if (metrics.totalAttempts === 0) return 0
-  return Math.round((metrics.totalFallbacks / metrics.totalAttempts) * 100 * 100) / 100
-}
-
-export function resetMetrics(): void {
-  metrics = {
+function createMetrics(): FallbackMetrics {
+  return {
     totalAttempts: 0,
     totalFallbacks: 0,
     fallbackRate: 0,
@@ -91,7 +58,6 @@ export function resetMetrics(): void {
     hopLatencies: [],
     providerErrors: {},
   }
-  hopStartTime = null
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProviderFallback") {}
@@ -102,35 +68,22 @@ type ParsedError = {
   reason?: string
 }
 
-// Define FallbackHopEvent locally to avoid module initialization order issues
-const FallbackHopEvent = {
-  type: "provider.fallback.hop" as const,
-  properties: z.object({
-    from: z.object({
-      provider: z.string(),
-      model: z.string(),
-    }),
-    to: z.object({
-      provider: z.string(),
-      model: z.string(),
-    }),
-    attempt: z.number(),
-    reason: z.string().optional(),
-  }),
-}
-
 export const layer: Layer.Layer<Service, never, Config.Service | Provider.Service | Bus.Service> = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = yield* Config.Service
     const provider = yield* Provider.Service
     const bus = yield* Bus.Service
+    const runtimeState = {
+      metrics: createMetrics(),
+      hopStartTime: null as number | null,
+    }
 
     const createState: Interface["createState"] = Effect.fn("ProviderFallback.createState")(function* (
       providerID: string,
       modelID: string,
     ) {
-      hopStartTime = Date.now()
+      runtimeState.hopStartTime = Date.now()
       const cfg = yield* config.get()
       const fallback = cfg.provider?.[providerID]?.fallback
       if (!fallback?.enabled) return undefined
@@ -160,47 +113,50 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       }
     })
 
-    const next: Interface["next"] = Effect.fn("ProviderFallback.next")(function* (state: FallbackState) {
-      if (state.attempts >= state.maxRetries) return undefined
+    const next: Interface["next"] = Effect.fn("ProviderFallback.next")(function* (fallbackState: FallbackState) {
+      if (fallbackState.attempts >= fallbackState.maxRetries) return undefined
 
-      let index = state.index + 1
-      let attempts = state.attempts
-      while (index < state.chain.length && attempts < state.maxRetries) {
-        const entry = state.chain[index]
+      let index = fallbackState.index + 1
+      let attempts = fallbackState.attempts
+      while (index < fallbackState.chain.length && attempts < fallbackState.maxRetries) {
+        const entry = fallbackState.chain[index]
         const fallbackModel = yield* provider
           .getModel(ProviderID.make(entry.provider), ModelID.make(entry.model))
           .pipe(Effect.option)
         attempts += 1
         if (Option.isSome(fallbackModel)) {
-          const nextState: FallbackState = { ...state, index, attempts }
-          const hopEvent: FallbackHopEvent = {
-            from: { provider: state.baseProviderID, model: state.baseModelID },
+          const nextState: FallbackState = { ...fallbackState, index, attempts }
+          const hopEvent: z.infer<typeof BusEvent.FallbackHopEvent.properties> = {
+            from: { provider: fallbackState.baseProviderID, model: fallbackState.baseModelID },
             to: { provider: entry.provider, model: entry.model },
             attempt: nextState.attempts,
           }
 
           // Update metrics
-          metrics.totalFallbacks++
-          metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] =
-            (metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] ?? 0) + 1
-          metrics.lastFallback = hopEvent
+          runtimeState.metrics.totalFallbacks++
+          runtimeState.metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] =
+            (runtimeState.metrics.fallbackByProvider[`${entry.provider}/${entry.model}`] ?? 0) + 1
+          runtimeState.metrics.lastFallback = hopEvent
 
           // Record hop latency
-          if (hopStartTime !== null) {
-            const latencyMs = Date.now() - hopStartTime
-            recordHopLatency(latencyMs)
-            hopStartTime = Date.now()
+          if (runtimeState.hopStartTime !== null) {
+            const latencyMs = Date.now() - runtimeState.hopStartTime
+            runtimeState.metrics.hopLatencies.push(latencyMs)
+            if (runtimeState.metrics.hopLatencies.length > 100) {
+              runtimeState.metrics.hopLatencies = runtimeState.metrics.hopLatencies.slice(-100)
+            }
+            runtimeState.hopStartTime = Date.now()
           }
 
           // Emit fallback hop event to Bus for observability
-          yield* bus.publish(FallbackHopEvent, hopEvent)
+          yield* bus.publish(BusEvent.FallbackHopEvent, hopEvent)
 
           log.info("provider.fallback.hop", {
-            from: `${state.baseProviderID}/${state.baseModelID}`,
+            from: `${fallbackState.baseProviderID}/${fallbackState.baseModelID}`,
             to: `${entry.provider}/${entry.model}`,
             attempt: nextState.attempts,
             totalAttempts: nextState.attempts,
-            chainLength: state.chain.length,
+            chainLength: fallbackState.chain.length,
           })
 
           return { model: fallbackModel.value, state: nextState }
@@ -213,42 +169,42 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
 
     const shouldFallback: Interface["shouldFallback"] = Effect.fn("ProviderFallback.shouldFallback")(function* (
       error: unknown,
-      state: FallbackState,
+      fallbackState: FallbackState,
     ) {
       const parsed = parseError(error)
       if (!parsed) return false
 
       let shouldRetry = false
       if (parsed.statusCode === 429) {
-        shouldRetry = state.retryOnRateLimit
+        shouldRetry = fallbackState.retryOnRateLimit
         if (shouldRetry) {
-          metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+          runtimeState.metrics.fallbackByReason["rate_limit"] = (runtimeState.metrics.fallbackByReason["rate_limit"] ?? 0) + 1
         }
       } else if (parsed.statusCode !== undefined && parsed.statusCode >= 500 && parsed.statusCode < 600) {
-        shouldRetry = state.retryOnServerError
+        shouldRetry = fallbackState.retryOnServerError
         if (shouldRetry) {
-          metrics.fallbackByReason[`server_error_${parsed.statusCode}`] =
-            (metrics.fallbackByReason[`server_error_${parsed.statusCode}`] ?? 0) + 1
+          runtimeState.metrics.fallbackByReason[`server_error_${parsed.statusCode}`] =
+            (runtimeState.metrics.fallbackByReason[`server_error_${parsed.statusCode}`] ?? 0) + 1
         }
       }
 
       if (!shouldRetry) {
         if (parsed.message.includes("rate limit")) {
-          shouldRetry = state.retryOnRateLimit
+          shouldRetry = fallbackState.retryOnRateLimit
           if (shouldRetry) {
-            metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+            runtimeState.metrics.fallbackByReason["rate_limit"] = (runtimeState.metrics.fallbackByReason["rate_limit"] ?? 0) + 1
           }
         }
         if (parsed.message.includes("too many requests")) {
-          shouldRetry = state.retryOnRateLimit
+          shouldRetry = fallbackState.retryOnRateLimit
           if (shouldRetry) {
-            metrics.fallbackByReason["rate_limit"] = (metrics.fallbackByReason["rate_limit"] ?? 0) + 1
+            runtimeState.metrics.fallbackByReason["rate_limit"] = (runtimeState.metrics.fallbackByReason["rate_limit"] ?? 0) + 1
           }
         }
         if (parsed.message.includes("overloaded")) {
-          shouldRetry = state.retryOnServerError
+          shouldRetry = fallbackState.retryOnServerError
           if (shouldRetry) {
-            metrics.fallbackByReason["overloaded"] = (metrics.fallbackByReason["overloaded"] ?? 0) + 1
+            runtimeState.metrics.fallbackByReason["overloaded"] = (runtimeState.metrics.fallbackByReason["overloaded"] ?? 0) + 1
           }
         }
       }
@@ -257,19 +213,30 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
     })
 
     const getMetrics: Interface["getMetrics"] = () => {
-      metrics.fallbackRate = calculateFallbackRate()
+      const metrics = {
+        ...runtimeState.metrics,
+        fallbackRate:
+          runtimeState.metrics.totalAttempts === 0
+            ? 0
+            : Math.round((runtimeState.metrics.totalFallbacks / runtimeState.metrics.totalAttempts) * 100 * 100) / 100,
+        fallbackByReason: { ...runtimeState.metrics.fallbackByReason },
+        fallbackByProvider: { ...runtimeState.metrics.fallbackByProvider },
+        hopLatencies: [...runtimeState.metrics.hopLatencies],
+        providerErrors: { ...runtimeState.metrics.providerErrors },
+      }
       return metrics
     }
 
     const recordAttempt: Interface["recordAttempt"] = (provider: string, success: boolean) => {
-      metrics.totalAttempts++
+      runtimeState.metrics.totalAttempts++
       if (!success) {
-        metrics.providerErrors[provider] = (metrics.providerErrors[provider] ?? 0) + 1
+        runtimeState.metrics.providerErrors[provider] = (runtimeState.metrics.providerErrors[provider] ?? 0) + 1
       }
     }
 
     const resetMetricsFn: Interface["resetMetrics"] = () => {
-      resetMetrics()
+      runtimeState.metrics = createMetrics()
+      runtimeState.hopStartTime = null
     }
 
     return Service.of({ createState, next, shouldFallback, getMetrics: getMetrics, recordAttempt, resetMetrics: resetMetricsFn })

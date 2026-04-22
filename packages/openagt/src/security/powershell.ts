@@ -41,13 +41,6 @@ export const DANGEROUS_CMDLETS = [
   "Extract ntds", // NTDS extraction for AD
   "ntdsutil",
 
-  // System information gathering
-  "Get-Process",
-  "Get-Service",
-  "Get-WmiObject",
-  "Get-CimInstance",
-  "gwmi", // Alias for Get-WmiObject
-
   // Registry manipulation
   "Set-ItemProperty",
   "Remove-ItemProperty",
@@ -130,7 +123,7 @@ export const HIGH_SEVERITY_CMDLETS = [
  */
 export const ENCODED_COMMAND_PATTERNS = [
   { pattern: /-enc(?:odedCommand)?\s+\S+/i, message: "Encoded PowerShell command" },
-  { pattern: /-e(?:xec)?\s+\S+/i, message: "Short form encoded command" },
+  { pattern: /-e(?:xec)?\s+\S+/i, message: "Encoded command (short flag)" },
   { pattern: /FromBase64String/i, message: "Base64 decoded command" },
 ] as const
 
@@ -138,12 +131,12 @@ export const ENCODED_COMMAND_PATTERNS = [
  * Patterns for remote execution attempts
  */
 export const REMOTE_EXECUTION_PATTERNS = [
-  { pattern: /-ComputerName\s+\S+/i, message: "Remote computer target" },
-  { pattern: /-Session\s+\S+/i, message: "Remote session target" },
-  { pattern: /-RemoteServer\s+\S+/i, message: "Remote server target" },
-  { pattern: /Enter-PSSession/i, message: "PowerShell remoting session" },
-  { pattern: /New-PSSession/i, message: "PowerShell remoting session creation" },
+  { pattern: /Enter-PSSession/i, message: "PowerShell remoting PSSession" },
+  { pattern: /New-PSSession/i, message: "PowerShell remoting PSSession creation" },
   { pattern: /Invoke-Command.*-ComputerName/i, message: "Remote command execution" },
+  { pattern: /-ComputerName\s+\S+/i, message: "Remote computer target" },
+  { pattern: /-Session\s+\S+/i, message: "Remote Session target" },
+  { pattern: /-RemoteServer\s+\S+/i, message: "Remote server target" },
 ] as const
 
 export type DangerSeverity = "high" | "medium" | "low" | "safe"

@@ -132,15 +132,14 @@ const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
 
 // Convert MCP tool definition to AI SDK Tool type
 function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool {
-  const inputSchema = mcpTool.inputSchema
-
-  // Spread first, then override type to ensure it's always "object"
-  const schema: JSONSchema7 = {
-    ...(inputSchema as JSONSchema7),
-    type: "object",
-    properties: (inputSchema.properties ?? {}) as JSONSchema7["properties"],
-    additionalProperties: false,
-  }
+  const inputSchema = mcpTool.inputSchema as JSONSchema7 | undefined
+  const schema: JSONSchema7 =
+    inputSchema && typeof inputSchema === "object"
+      ? { ...inputSchema }
+      : {
+          type: "object",
+          properties: {},
+        }
 
   return dynamicTool({
     description: mcpTool.description ?? "",
