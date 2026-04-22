@@ -1,182 +1,275 @@
-<p align="center">
-  <a href="https://github.com/Yecyi/OpenAGt">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenAGt logo">
-    </picture>
-  </a>
-</p>
-<p align="center">开源的 AI Coding Agent</p>
-<p align="center">
-  <a href="https://github.com/Yecyi/OpenAGt/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/openagt-ai"><img alt="npm" src="https://img.shields.io/npm/v/openagt-ai?style=flat-square" /></a>
-  <a href="https://github.com/Yecyi/OpenAGt/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/openagt/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# OpenAGt
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁体中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ภาษาไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+OpenAGt 是一个基于 [OpenCode](https://github.com/anomalyco/opencode) 演化出来的 AI Coding Agent 项目。当前仓库更准确的定位不是“完全独立重写的新系统”，而是一个带有 OpenAGt 品牌、加入了额外运行时实验、安全增强与 Flutter 移动端 MVP 的 OpenCode 衍生分支。
 
-[![OpenAGt Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://github.com/Yecyi/OpenAGt)
+换句话说，这个项目的正确介绍方式应该是：
 
----
+> OpenAGt 基于 OpenCode，围绕运行时、安全、客户端形态和部分工程能力做了本地扩展。
 
-## 目录
+## 当前仓库的真实状态
 
-- [安装](#安装)
-- [桌面应用程序 (BETA)](#桌面应用程序-beta)
-  - [安装目录](#安装目录)
-- [Agents](#agents)
-- [文档](#文档)
-- [参与贡献](#参与贡献)
-- [基于 OpenAGt 进行开源](#基于-openagt-进行开源)
-- [常见问题 (FAQ)](#常见问题-faq)
-  - [这和 Claude Code 有什么不同？](#这和-claude-code-有什么不同)
-- [OpenAGt 扩展](#openagt-扩展)
-  - [主要增强](#主要增强)
-  - [核心模块文档](#核心模块文档)
+这份 README 以当前代码为准，不沿用旧文档里已经失真的描述。
 
----
+当前仓库里真正重要的模块如下：
 
-### 安装
+| 路径 | 作用 |
+| --- | --- |
+| `packages/openagt` | 核心 runtime、CLI、Hono 服务端、工具系统、会话系统、MCP/LSP/ACP 集成 |
+| `packages/app` | Solid/Vite Web 客户端 |
+| `packages/sdk/js` | 生成式 JavaScript SDK |
+| `packages/openagt_flutter` | Flutter 移动端 MVP |
+| `packages/console/*` | 控制台/控制平面相关服务与应用 |
+| `packages/web` | 文档与站点 |
+| `packages/opencode` | 遗留兼容包，不是当前主 runtime |
+
+需要特别说明的一点：
+
+- 根目录 `package.json` 里仍然有一些过时脚本引用，例如 `packages/desktop-electron`，但该目录在当前仓库快照中并不存在。因此 README 不应该继续把“桌面端本地可运行/可打包”写成已验证事实。
+
+## 与 OpenCode 的关系
+
+仓库中保留了大量非常明确的 OpenCode 血缘痕迹，这不是猜测，而是代码事实：
+
+- `packages/openagt/bin/opencode` 仍然存在，用作兼容入口。
+- 安装脚本会同时创建 `openagt` 和 `opencode` 的链接。
+- runtime 同时设置 `OPENAGT_*` 和 `OPENCODE_*` 环境变量。
+- 仓库内仍有 `.opencode/` 与 `packages/opencode/`。
+- 很多 UI 文案、配置说明和路径命名仍保留 `OpenCode/opencode`。
+
+因此，README 最需要修正的第一件事，就是明确来源，而不是再把项目写成与 OpenCode 无关的独立体系。
+
+## 已验证的技术能力
+
+### 1. 核心运行时
+
+`packages/openagt` 是当前仓库真正的核心。它负责：
+
+- CLI 命令入口
+- headless server
+- session / message 编排
+- tool 注册与执行
+- provider / model 管理
+- SQLite 持久化与 JSON 到 SQLite 的迁移
+- MCP / LSP / ACP / plugin / agent 集成
+- shell review、permission 和安全检测相关逻辑
+
+从架构上看，这是一个 Bun 优先、同时保留部分 Node 兼容分支的 runtime。
+
+### 2. 工具并发与调度
+
+仓库里确实实现了工具并发控制，但旧 README 的说法过度夸张。
+
+代码里真实存在的能力包括：
+
+- `packages/openagt/src/tool/partition.ts` 对工具做 safe / unsafe 分类
+- safe 工具目前包括 `read`、`glob`、`grep`、`webfetch`、`codesearch`、`websearch`、`lsp`、`question`、`skill`
+- `bash`、`edit`、`write`、`task`、`todo`、`plan`、`apply_patch` 等工具会被串行化
+- `packages/openagt/src/session/prompt/tool-resolution.ts` 还做了路径提取与路径冲突阻塞，避免有文件重叠的操作同时执行
+
+更准确的文档表述应该是：
+
+- 已实现 safe/unsafe 工具分区
+- 已实现基于路径冲突的额外阻塞
+- 尚不能把它包装成“通用高性能 DAG 调度器”
+- 也不应在 README 中写死 `2x-3x` 延迟收益，除非补上基准测试
+
+### 3. Provider 抽象与降级链
+
+这一块在代码里是实打实存在的，不是概念稿。
+
+已实现内容：
+
+- 多 provider / model 加载
+- 配置驱动的 fallback chain
+- 针对 rate limit 与 5xx 错误的 fallback 判定
+- fallback metrics 统计
+- fallback hop 事件发布
+
+因此 README 可以明确写：
+
+- 支持多 provider 抽象
+- 支持配置驱动的 fallback
+- 支持一定程度的可观测性
+
+但不要只写一句模糊的“自动容灾”，最好点明它是配置和状态驱动的实现。
+
+### 4. Shell 安全分析
+
+这一部分也是当前仓库比较明确的增强点之一。
+
+代码里能确认的能力：
+
+- POSIX 风格命令危险模式检测
+- PowerShell 专用危险 cmdlet 检测
+- 编码命令、远程执行、AMSI bypass、LOLBin 等特征检测
+- `packages/openagt/src/security/powershell-ast.ts` 中的自定义 PowerShell AST/tokenizer 分析
+- `packages/openagt/src/security/dangerous-command-detector.ts` 中的统一检测入口
+
+需要注意的边界：
+
+- 这是项目内自定义的轻量 PowerShell 结构分析，不是官方 PowerShell 解释器 AST
+- 它比纯正则更强，但不是形式化安全证明
+
+所以更准确的 README 写法是：
+
+- “具备启发式 shell 安全检测，并为 PowerShell 增加了自定义 AST 层”
+
+而不是把它写成无懈可击的“深度语义安全引擎”。
+
+### 5. 上下文压缩与会话系统
+
+旧 README 中关于 compaction 的描述方向没有错，但数字表达不严谨。
+
+代码里能确认：
+
+- 存在 `micro`、`auto`、`full` 等 compaction 路径
+- session/message 是核心子系统
+- prompt 组装、summary、overflow、memory、retry 等逻辑都存在
+
+但下面这些说法当前缺少可验证 benchmark 支撑：
+
+- 固定 `40%-55%` token 节省
+- 固定延迟收益
+- 固定成本收益
+
+因此 README 应改成“支持多级上下文压缩策略”，不要继续给出未经验证的精确百分比。
+
+### 6. 客户端形态
+
+当前仓库中的客户端形态包括：
+
+- CLI/TUI：`packages/openagt`
+- Web：`packages/app`
+- Console 系列页面：`packages/console/app`
+- Flutter 移动端：`packages/openagt_flutter`
+
+Flutter 不是空壳。代码中可以看到：
+
+- API 层
+- SSE 层
+- chat 模块
+- session 模块
+- theme 模块
+
+所以它可以写成“移动端 MVP”，但不应写成“已经完整成熟的移动端产品”。
+
+## 快速开始
+
+### 环境要求
+
+- Bun 1.3+
+- Git
+- 如果要跑移动端，再安装 Flutter 3.41+
+
+### 新仓库克隆后的必要步骤
+
+这个仓库在 fresh clone 后，**先要生成 JS SDK**，否则 `packages/openagt` 启动时会因为缺少生成文件而报错。
 
 ```bash
-# 直接安装 (YOLO)
-curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
-
-# 软件包管理器
-npm i -g openagt-ai@latest        # 也可使用 bun/pnpm/yarn
-scoop install openagt             # Windows
-choco install openagt             # Windows
-brew install anomalyco/tap/openagt # macOS 和 Linux（推荐，始终保持最新）
-brew install openagt              # macOS 和 Linux（官方 brew formula，更新频率较低）
-sudo pacman -S openagt            # Arch Linux (Stable)
-paru -S openagt-bin               # Arch Linux (Latest from AUR)
-mise use -g openagt               # 任意系统
-nix run nixpkgs#openagt           # 或用 github:anomalyco/openagt 获取最新 dev 分支
+bun install
+bun run --cwd packages/sdk/js script/build.ts
 ```
 
-> [!TIP]
-> 安装前请先移除 0.1.x 之前的旧版本。
+这是当前仓库最容易踩坑的一步，也应当明确写进 README。
 
-### 桌面应用程序 (BETA)
-
-OpenAGt 也提供桌面版应用。可直接从 [发布页](https://github.com/Yecyi/OpenAGt/releases) 或 [github.com/Yecyi/OpenAGt/download](https://github.com/Yecyi/OpenAGt/download) 下载。
-
-| 平台                  | 下载文件                              |
-| --------------------- | ------------------------------------- |
-| macOS (Apple Silicon) | `openagt-desktop-darwin-aarch64.dmg` |
-| macOS (Intel)         | `openagt-desktop-darwin-x64.dmg`     |
-| Windows               | `openagt-desktop-windows-x64.exe`    |
-| Linux                 | `.deb`、`.rpm` 或 `AppImage`         |
+### 运行核心 CLI
 
 ```bash
-# macOS (Homebrew Cask)
-brew install --cask openagt-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/openagt-desktop
+bun run --cwd packages/openagt src/index.ts --help
+bun run --cwd packages/openagt src/index.ts
 ```
 
-#### 安装目录
+说明：
 
-安装脚本按照以下优先级决定安装路径：
+- 当前 fork 的主命令名是 `openagt`
+- `opencode` 仍保留为兼容入口
 
-1. `$OPENCODE_INSTALL_DIR` - 自定义安装目录
-2. `$XDG_BIN_DIR` - 符合 XDG 基础目录规范的路径
-3. `$HOME/bin` - 如果存在或可创建的用户二级目录
-4. `$HOME/.openagt/bin` - 默认备选路径
+### 运行 Headless Server
 
 ```bash
-# 示例
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://github.com/Yecyi/OpenAGt/install | bash
+bun run --cwd packages/openagt src/index.ts serve
 ```
 
-### Agents
+### 运行 Web 客户端
 
-OpenAGt 内置两种 Agent，可用 `Tab` 键快速切换：
+```bash
+bun run --cwd packages/app dev
+```
 
-- **build** - 默认模式，具备完整权限，适合开发工作
-- **plan** - 只读模式，适合代码分析与回顾
-  - 默认拒绝修改文件
-  - 运行 bash 命令前会询问
-  - 便于探索未知代码库或规划改动
+### 运行文档站点
 
-另外还包含一个 **general** 通用 Agent，用于复合搜索和多步任务，内部使用，也可在消息中输入 `@general` 调用。
+```bash
+bun run --cwd packages/web dev
+```
 
-了解更多 [Agents](https://github.com/Yecyi/OpenAGt/docs/agents) 相关信息。
+### 运行 Flutter 移动端 MVP
 
-### 文档
+```bash
+cd packages/openagt_flutter
+flutter pub get
+flutter run
+```
 
-更多配置说明请查看我们的 [**官方文档**](https://github.com/Yecyi/OpenAGt/docs)。
+## 开发建议
 
-### 参与贡献
+### 重新生成 JS SDK
 
-如有兴趣贡献代码，请在提交 PR 前阅读[贡献指南 (Contributing Docs)](./CONTRIBUTING.md)。
+当 API 或 schema 变化后，按仓库约定重新生成 SDK：
 
-### 基于 OpenAGt 进行开源
+```bash
+bun run --cwd packages/sdk/js script/build.ts
+```
 
-如果你在项目名中使用 "openagt"（如 "openagt-dashboard" 或 "openagt-mobile"），请在 README 中声明该项目不是 OpenAGt 团队官方开发，也不存在任何附属关系。
+### 类型检查
 
-### 常见问题 (FAQ)
+按照仓库约定，不要直接在根目录跑 `tsc`，也不要从 repo root 跑测试。
 
-#### 这和 Claude Code 有什么不同？
+推荐这样执行：
 
-功能上很相似，关键差异：
+```bash
+cd packages/openagt
+bun typecheck
+```
 
-- 100% 开源。
-- 不绑定特定提供商。推荐使用 [OpenAGt Zen](https://github.com/Yecyi/OpenAGt/zen) 的模式，但也可兼容 Claude、OpenAI、Google 甚至本地模型。模型互换：缩小误差、降低成本，因此保持 provider-agnostic 很重要。
-- 内置 LSP 支持。
-- 专注终端界面 (TUI)。OpenCode 用 Neovim 粉丝和 [terminal.shop](https://terminal.shop) 创建者的风格打造，会持续探索终点的极限。
-- 客户端-服务器架构。可在本地运行，同时用移动设备远程驱动。TUI 只是众多客户端之一。
+其他常见包也可以分别执行：
 
----
+```bash
+cd packages/app
+bun typecheck
+```
 
-## OpenAGt 扩展
+### 测试
 
-OpenAGt 是基于 OpenAGt 的增强版本，增加了以下高级功能。
+根目录 `test` 脚本会故意失败并提示不要在 root 运行。
 
-### 主要增强
+正确方式是进入包目录：
 
-- **三层渐进式压缩** — 上下文管理，减少 40-55% Token 使用
-- **工具并发分区** — 并行执行，延迟降低 2-3 倍
-- **Provider 降级链** — 自动故障切换
-- **Prompt 注入防护** — 安全扫描
-- **Flutter 移动客户端 (MVP)** — 原生 App：会话管理、实时 SSE 聊天、亮色/暗色主题
+```bash
+cd packages/openagt
+bun test
+```
 
-### 核心模块文档
+## README 需要纠正的重点
 
-| 文档 | 描述 |
-|------|------|
-| [README.md](./README.md) | 完整技术文档（英文） |
-| [packages/openagt/README.md](./packages/openagt/README.md) | 核心智能体引擎 |
-| [packages/openagt/src/effect/README.md](./packages/openagt/src/effect/README.md) | Effect Framework |
-| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP 协议 |
-| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | 事件溯源 |
-| [packages/openagt/src/provider/README.md](./packages/openagt/src/provider/README.md) | LLM Provider |
+相比旧版 README，最需要修正的是这些点：
 
----
+1. 把项目来源明确写成基于 OpenCode 的衍生项目。
+2. 删除或弱化未经 benchmark 支撑的精确性能数字。
+3. 不再把当前仓库里不存在的桌面端包写成现成能力。
+4. 把“先生成 SDK 再启动”写进 Quick Start。
+5. 清楚说明 `openagt` 与 `opencode` 的兼容关系。
+6. 把 Flutter 客户端定位为 MVP。
+7. 去掉乱码、路径失真和与代码结构不一致的模块说明。
 
-**加入我们的社群：** [飞书](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=738j8655-cd59-4633-a30a-1124e0096789&qr_code=true) | [X.com](https://x.com/openagt)
+## 延伸阅读
+
+- [OpenCode 上游仓库](https://github.com/anomalyco/opencode)
+- [技术分析报告](./docs/TECHNICAL_ANALYSIS_REPORT.md)
+- [核心 runtime 包](./packages/openagt/README.md)
+- [Web 应用](./packages/app/README.md)
+- [JavaScript SDK](./packages/sdk/js/package.json)
+- [Flutter 客户端](./packages/openagt_flutter/pubspec.yaml)
+
+## License
+
+MIT，见 [LICENSE](./LICENSE)。

