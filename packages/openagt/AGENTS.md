@@ -98,10 +98,100 @@ See `specs/effect/migration.md` for the compact pattern reference and examples.
 - Use `InstanceState` (from `src/effect/instance-state.ts`) for per-directory or per-project state that needs per-instance cleanup. It uses `ScopedCache` keyed by directory — each open project gets its own state, automatically cleaned up on disposal.
 - If two open directories should not share one copy of the service, it needs `InstanceState`.
 - Do the work directly in the `InstanceState.make` closure — `ScopedCache` handles run-once semantics. Don't add fibers, `ensure()` callbacks, or `started` flags on top.
-- Use `Effect.addFinalizer` or `Effect.acquireRelease` inside the `InstanceState.make` closure for cleanup (subscriptions, process teardown, etc.).
-- Use `Effect.forkScoped` inside the closure for background stream consumers — the fiber is interrupted when the instance is disposed.
-- To make a service's `init()` non-blocking, fork `InstanceState.get(state)` at the `init()` call site (e.g. `Effect.forkIn(scope)`), not by forking work inside the `InstanceState.make` closure. Forking inside the closure leaves state incomplete for other methods that read it.
-- `src/project/bootstrap.ts` already wraps every service `init()` in `Effect.forkDetach`, so `init()` is fire-and-forget in production. Keep `init()` methods synchronous internally; the caller controls concurrency.
+
+## Phase 1 Bug-Fix Findings (dev branch, commit ea50c2d8e)
+
+The following patterns were confirmed as real bugs and should be watched for in future code reviews:
+
+### PowerShell AST (`src/security/powershell-ast.ts`)
+- The PowerShell tokenizer had unreachable `$(` and `{` branches due to earlier `$` and `{` branches already consuming those characters. Nested subexpression and script block parsing was silently broken.
+- `extractCommands()` never populated the `arguments` array, never initialized `nested`, and passed the last global command as parent instead of the real pipeline parent. The AST was effectively a "command name collector."
+- `detectDangerousNodes()` ran regex patterns against the raw `input` string rather than AST nodes, so all position data was `{start: 0}` or `{start:0, end: input.length}` — indistinguishable from full-string matches.
+- **Deep review fixes:** script_block tokens now have their inner parameters extracted; `isDangerous()` now checks `obfuscationReport.overallRisk === "high"`; `overallRisk` requires base64 decoded length >= 4; missing aliases added (`curl`, `wget`, `hk`).
+
+### Dangerous Command Detection (`src/security/dangerous-command-detector.ts`)
+- Windows `cmd` shell commands (del, copy, reg, sc) were routed through the PowerShell detection path, producing false positives and negatives.
+
+### Provider Fallback (`src/provider/fallback-service.ts`)
+- `metrics` and `hopStartTime` were module-level `let` variables, causing data races across concurrent sessions. Moved into `runtimeState` on the `Service` instance.
+- `FallbackHopEvent` was duplicated in both `bus-event.ts` and `fallback-service.ts`, causing type system divergence. Import from `bus-event.ts`.
+- **Deep review fixes:** `next()` now calls `recordAttempt()` for every provider lookup attempt; circuit breaker is reset on successful model retrieval; duplicate key in template literals (both lines used `${entry.provider}/${entry.model}` instead of `${entry.provider}/${entry.model}`) is actually correct increment logic (read-modify-write pattern).
+
+### MCP (`src/mcp/index.ts`)
+- `additionalProperties: false` on tool schemas broke remote tools with dynamic field definitions.
+
+### Sandbox (`src/sandbox/process-sandbox.ts`)
+- `mergedEnv` was calculated but discarded; `maxStack` never took effect; `spawnWithSandboxSync` bypassed all resource limits entirely.
+
+### Tests (`test/security/powershell-ast.test.ts`)
+- `Scheduled task` detection relied on substring matching the full template string; switched to `.some(n => n.reason.includes("Scheduled task"))`.
+
+## Phase 2 Implementation Summary (implemented)
+
+The following features were built as Phase 2 improvements:
+
+### Windows Resource Monitoring (`src/sandbox/process-sandbox.ts`)
+- `getWindowsResourceUsage()` now collects CPU, `ReadTransferCount`, and `WriteTransferCount` via PowerShell.
+- `ResourceUsage` interface extended with `ioReadBytes` and `ioWriteBytes`.
+- Linux path reads `/proc/$pid/io` for the same metrics.
+- Errors are now logged instead of silently swallowed.
+
+### Memory Config (`src/session/memory.ts`, `src/config/config.ts`)
+- `MemoryConfig` interface with `template`, `maxTokens`, and `trigger` fields.
+- `getTriggerThresholds()` applies config overrides with sensible defaults.
+- Config added under `experimental.memory` in `InfoSchema`.
+
+### OAuth Security (`src/mcp/oauth-callback.ts`)
+- Port range enforced (3000-3010).
+- `redirect_uri` validated via `normalizeOrigin()` (resolves `localhost`/`127.0.0.1` to canonical form).
+- `registerRedirectUri()` API added; `registeredRedirectUri` cleared on `stop()`.
+
+### Tool Quality Weights (`src/mcp/tool-quality.ts`, `src/config/config.ts`)
+- `ToolQualityWeights` interface for per-check score weights.
+- `checkToolQuality()` and `checkToolsQuality()` accept optional `weights` overrides.
+- Config added under `experimental.toolQuality` in `InfoSchema`.
+
+### Provider Retry Policy (`src/provider/fallback-service.ts`, `src/config/provider.ts`)
+- `RetryPolicy` interface: `baseDelayMs`, `maxDelayMs`, `jitterFactor`, `circuitBreakerThreshold`, `circuitBreakerResetMs`.
+- Exponential backoff with jitter in `computeBackoff()`.
+- Circuit breaker state in `runtimeState.circuitBreaker` — opens after N consecutive failures, resets on successful model retrieval and after `circuitBreakerResetMs`.
+- Config added under `fallback.retryPolicy` in `InfoSchema`.
+- `next()` now calls `recordAttempt()` for every provider lookup attempt.
+
+### Path Extraction (`src/tool/path-overlap.ts`)
+- `extractFromBashCommand()` parses `cd`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `cat`, `head`, `tail`, `grep` paths from `Bash` tool `command` input.
+- Handles quoted paths (`"` and `'`) via `extractQuotedPaths()`.
+- `extractGlobPrefix()` extracts directory prefix from `Glob` patterns.
+- `pathsOverlap()` checks prefix overlap for glob-based conflict detection.
+
+### Bus Event Persistence (`src/bus/index.ts`)
+- `EventBuffer` ring buffer (max 1000 events) persisted to `$XDG_STATE_HOME/opencode/events/events.jsonl`.
+- Critical events (`provider.fallback.hop`, `tools.changed`, etc.) written to buffer.
+- `getRecentEvents()` and `replayEvents()` added to `Bus.Service` interface.
+- Buffer flushed on service shutdown.
+- All `catch {}` blocks now log errors instead of silently swallowing them.
+
+### LRU Memo Cache (`src/session/system.ts`)
+- `LRUCache<K,V>` class with `get()`, `set()`, `evictOldest()`, `getStats()`, `resetStats()`, `entries()`, and `Symbol.toStringTag`.
+- `skillsMemo` and `environmentMemo` replaced `Map` with `LRUCache` (default 50 entries).
+- `evictIfOverTokenLimit()` evicts by total token estimate when over limit.
+- `MemoStats` tracks `hits`, `misses`, `evictions`.
+- `computeHash()` uses DJB2 with xor (`((h<<5)+h)^c`) — mod 2^32 for collision resistance.
+
+### PowerShell Anti-Obfuscation (`src/security/powershell-ast.ts`)
+- `POWERSHELL_ALIASES` map (60+ aliases) with `expandAliases()`.
+- `analyzeObfuscation()` detects indirect calls (`$c="call"; &$c`), recursive Base64 decoding (up to 3x), and alias expansion count.
+- `ObfuscationReport` returned as `obfuscationReport` in `PowerShellAstResult`.
+- `structuredDangerNodes()` runs alias expansion before lookup.
+- `isDangerous()` checks `obfuscationReport.overallRisk === "high"` in addition to high-severity nodes.
+- `overallRisk` is "high" when `indirectCalls.length > 0` or when base64 decodes to content length >= 4.
+- Missing aliases added: `curl`, `wget`, `hk`.
+
+### Token-Based Cache Invalidation (`src/session/system-prompt.ts`)
+- `SystemPromptResult` interface: `prompt`, `truncated`, `skippedSegments`, `tokenEstimate`.
+- `getSystemPrompt()` returns cached static prompt for non-dynamic requests.
+- `getStaticPrompt()` and `getStaticPromptSync()` cache static prompt content.
+- Dynamic segments trimmed oldest-first when over limit; `truncated: true` and `skippedSegments` returned.
 
 ## Effect v4 beta API
 

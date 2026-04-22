@@ -8,6 +8,7 @@
 import { spawn } from "bun"
 import { Effect, Layer, Context } from "effect"
 import { spawn as nodeSpawn } from "child_process"
+import { Log } from "../util"
 
 type BunChildProcess = {
   pid?: number
@@ -46,6 +47,8 @@ export interface ProcessSandboxStats {
   totalTimeouts: number
   currentRunning: number
 }
+
+const log = Log.create({ service: "process-sandbox" })
 
 const DEFAULT_CMD = "C:\\WINDOWS\\system32\\cmd.exe"
 const DEFAULT_POWERSHELL = "powershell.exe"
@@ -357,6 +360,8 @@ export interface ResourceUsage {
   pid: number
   memoryMB?: number
   cpuPercent?: number
+  ioReadBytes?: number
+  ioWriteBytes?: number
   timestamp: number
 }
 
@@ -366,14 +371,27 @@ function getWindowsResourceUsage(pid: number): ResourceUsage {
   try {
     const { execSync } = require("child_process")
     const result = execSync(
-      `powershell -NoLogo -NoProfile -Command "Get-Process -Id ${pid} | Select-Object WorkingSet64 | ConvertTo-Json -Compress"`,
+      `powershell -NoLogo -NoProfile -Command "Get-Process -Id ${pid} | Select-Object WorkingSet64, CPU, ReadTransferCount, WriteTransferCount | ConvertTo-Json -Compress"`,
       { encoding: "utf8", timeout: 5000 },
     )
     const json = JSON.parse(result.trim())
-    if (json && json.WorkingSet64) {
-      usage.memoryMB = Math.round(json.WorkingSet64 / 1024 / 1024)
+    if (json) {
+      if (json.WorkingSet64) {
+        usage.memoryMB = Math.round(json.WorkingSet64 / 1024 / 1024)
+      }
+      if (json.CPU != null) {
+        usage.cpuPercent = Math.round(json.CPU * 100) / 100
+      }
+      if (json.ReadTransferCount) {
+        usage.ioReadBytes = Number(json.ReadTransferCount)
+      }
+      if (json.WriteTransferCount) {
+        usage.ioWriteBytes = Number(json.WriteTransferCount)
+      }
     }
-  } catch {}
+  } catch (error) {
+    log.warn("failed to get windows resource usage", { pid, error })
+  }
 
   return usage
 }
@@ -392,7 +410,22 @@ export function getResourceUsage(pid: number): ResourceUsage {
     if (vmRss) {
       usage.memoryMB = parseInt(vmRss[1]!, 10) / 1024
     }
-  } catch {}
+
+    const ioPath = `/proc/${pid}/io`
+    if (fs.existsSync(ioPath)) {
+      const ioData = fs.readFileSync(ioPath, "utf8")
+      const readBytes = ioData.match(/read_bytes:\s+(\d+)/)
+      const writeBytes = ioData.match(/write_bytes:\s+(\d+)/)
+      if (readBytes) {
+        usage.ioReadBytes = parseInt(readBytes[1]!, 10)
+      }
+      if (writeBytes) {
+        usage.ioWriteBytes = parseInt(writeBytes[1]!, 10)
+      }
+    }
+  } catch (error) {
+    log.warn("failed to get resource usage", { pid, error })
+  }
 
   return usage
 }

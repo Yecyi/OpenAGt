@@ -239,6 +239,41 @@ const InfoSchema = Schema.Struct({
           broker_idle_ttl_ms: Schema.optional(PositiveInt),
         }),
       ),
+      memory: Schema.optional(
+        Schema.Struct({
+          template: Schema.optional(Schema.String).annotate({ description: "Custom memory.md template path" }),
+          maxTokens: Schema.optional(PositiveInt).annotate({ description: "Max tokens for memory.md (default: 4096)" }),
+          trigger: Schema.optional(
+            Schema.Struct({
+              minimumMessageTokensToInit: Schema.optional(PositiveInt).annotate({
+                description: "Initialize memory after N tokens (default: 6000)",
+              }),
+              minimumTokensBetweenUpdate: Schema.optional(PositiveInt).annotate({
+                description: "Update memory after N additional tokens (default: 4000)",
+              }),
+              toolCallsBetweenUpdates: Schema.optional(PositiveInt).annotate({
+                description: "Update memory after N tool calls (default: 10)",
+              }),
+            }),
+          ),
+        }),
+      ).annotate({ description: "Session memory configuration" }),
+      toolQuality: Schema.optional(
+        Schema.Struct({
+          weights: Schema.optional(
+            Schema.Struct({
+              hasValidSchema: Schema.optional(NonNegativeInt).annotate({ description: "Score for valid schema (default: 20)" }),
+              hasDescription: Schema.optional(NonNegativeInt).annotate({ description: "Score for description (default: 15)" }),
+              hasParameterDescriptions: Schema.optional(NonNegativeInt).annotate({ description: "Score for parameter descriptions (default: 20)" }),
+              hasReturnTypeDescription: Schema.optional(NonNegativeInt).annotate({ description: "Score for return type description (default: 10)" }),
+              hasExamples: Schema.optional(NonNegativeInt).annotate({ description: "Score for examples (default: 10)" }),
+              hasVersion: Schema.optional(NonNegativeInt).annotate({ description: "Score for version (default: 5)" }),
+              isNamingConsistent: Schema.optional(NonNegativeInt).annotate({ description: "Score for consistent naming (default: 10)" }),
+              hasDeprecationWarning: Schema.optional(NonNegativeInt).annotate({ description: "Score for deprecation warning (default: 10)" }),
+            }),
+          ).annotate({ description: "Quality score weights for each checklist item" }),
+        }),
+      ).annotate({ description: "MCP tool quality scoring configuration" }),
     }),
   ),
 })

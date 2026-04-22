@@ -20,12 +20,29 @@ const MAX_MEMORY_TOKENS = 4096
 const CHARS_PER_TOKEN = 4
 const MAX_MEMORY_CHARS = MAX_MEMORY_TOKENS * CHARS_PER_TOKEN
 
-// CC-style trigger thresholds
-export const SESSION_MEMORY_TRIGGER = {
-  minimumMessageTokensToInit: 6000, // Initialize memory after ~6000 tokens
-  minimumTokensBetweenUpdate: 4000, // Update after ~4000 more tokens
-  toolCallsBetweenUpdates: 10, // Update after 10 tool calls
-} as const
+/**
+ * Memory configuration from opencode.json
+ */
+export interface MemoryConfig {
+  template?: string
+  maxTokens?: number
+  trigger?: {
+    minimumMessageTokensToInit?: number
+    minimumTokensBetweenUpdate?: number
+    toolCallsBetweenUpdates?: number
+  }
+}
+
+/**
+ * Runtime trigger thresholds — defaults with optional overrides from config
+ */
+export function getTriggerThresholds(config?: MemoryConfig) {
+  return {
+    minimumMessageTokensToInit: config?.trigger?.minimumMessageTokensToInit ?? 6000,
+    minimumTokensBetweenUpdate: config?.trigger?.minimumTokensBetweenUpdate ?? 4000,
+    toolCallsBetweenUpdates: config?.trigger?.toolCallsBetweenUpdates ?? 10,
+  }
+}
 
 export interface SessionMemory {
   sessionID: SessionID
@@ -167,20 +184,25 @@ export function updateMemorySection(
   return result.join("\n")
 }
 
+function getMaxMemoryChars(config?: MemoryConfig): number {
+  const maxTokens = config?.maxTokens ?? MAX_MEMORY_TOKENS
+  return maxTokens * CHARS_PER_TOKEN
+}
+
 function getMemoryPath(sessionID: SessionID): string {
   const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
   return path.join(stateHome, "opencode", "sessions", sessionID, "memory.md")
 }
 
-export async function loadMemory(sessionID: SessionID): Promise<string | null> {
+export async function loadMemory(sessionID: SessionID, config?: MemoryConfig): Promise<string | null> {
   const memoryPath = getMemoryPath(sessionID)
+  const maxChars = getMaxMemoryChars(config)
   try {
     const stat = await fs.promises.stat(memoryPath)
-    if (stat.size > MAX_MEMORY_CHARS) {
-      // Truncate if too large
+    if (stat.size > maxChars) {
       const fd = await fs.promises.open(memoryPath, "r")
-      const buffer = Buffer.alloc(MAX_MEMORY_CHARS)
-      await fd.read(buffer, 0, MAX_MEMORY_CHARS, 0)
+      const buffer = Buffer.alloc(maxChars)
+      await fd.read(buffer, 0, maxChars, 0)
       await fd.close()
       return buffer.toString("utf-8")
     }
@@ -193,11 +215,11 @@ export async function loadMemory(sessionID: SessionID): Promise<string | null> {
   }
 }
 
-export async function saveMemory(sessionID: SessionID, content: string): Promise<void> {
+export async function saveMemory(sessionID: SessionID, content: string, config?: MemoryConfig): Promise<void> {
   const memoryPath = getMemoryPath(sessionID)
-  const truncated = content.length > MAX_MEMORY_CHARS ? content.slice(0, MAX_MEMORY_CHARS) : content
+  const maxChars = getMaxMemoryChars(config)
+  const truncated = content.length > maxChars ? content.slice(0, maxChars) : content
 
-  // Ensure directory exists
   await fs.promises.mkdir(path.dirname(memoryPath), { recursive: true })
 
   await fs.promises.writeFile(memoryPath, truncated, "utf-8")
@@ -209,8 +231,9 @@ export async function saveMemory(sessionID: SessionID, content: string): Promise
 export async function updateMemory(
   sessionID: SessionID,
   updates: Partial<Record<keyof MemorySections, string>>,
+  config?: MemoryConfig,
 ): Promise<string> {
-  const existingContent = await loadMemory(sessionID)
+  const existingContent = await loadMemory(sessionID, config)
   const content = existingContent ?? SESSION_MEMORY_TEMPLATE
 
   let updated = content
@@ -220,7 +243,7 @@ export async function updateMemory(
     }
   }
 
-  await saveMemory(sessionID, updated)
+  await saveMemory(sessionID, updated, config)
   return updated
 }
 
@@ -246,27 +269,52 @@ export async function memoryExists(sessionID: SessionID): Promise<boolean> {
 }
 
 /**
- * Check if memory should be initialized based on token count
+ * Determine which memory action to take given current session state.
+ * Returns "init" if memory hasn't been created yet and threshold is met.
+ * Returns "update" if memory exists and should be refreshed.
+ * Returns null if no action is warranted.
  */
-export function shouldInitializeMemory(tokenCount: number): boolean {
-  return tokenCount >= SESSION_MEMORY_TRIGGER.minimumMessageTokensToInit
+export function shouldTriggerMemory(
+  currentTokenCount: number,
+  currentToolCallCount: number,
+  memoryExists: boolean,
+  lastTokenCount: number = 0,
+  lastToolCallCount: number = 0,
+  config?: MemoryConfig,
+): "init" | "update" | null {
+  const thresholds = getTriggerThresholds(config)
+  if (!memoryExists) {
+    if (currentTokenCount >= thresholds.minimumMessageTokensToInit) return "init"
+    return null
+  }
+  const tokensSinceUpdate = currentTokenCount - lastTokenCount
+  const toolCallsSinceUpdate = currentToolCallCount - lastToolCallCount
+  if (
+    tokensSinceUpdate >= thresholds.minimumTokensBetweenUpdate ||
+    toolCallsSinceUpdate >= thresholds.toolCallsBetweenUpdates
+  ) {
+    return "update"
+  }
+  return null
 }
 
-/**
- * Check if memory should be updated based on token/tool call count
- */
+export function shouldInitializeMemory(tokenCount: number, config?: MemoryConfig): boolean {
+  return tokenCount >= getTriggerThresholds(config).minimumMessageTokensToInit
+}
+
 export function shouldUpdateMemory(
   currentTokenCount: number,
   currentToolCallCount: number,
   lastTokenCount: number,
   lastToolCallCount: number,
+  config?: MemoryConfig,
 ): boolean {
+  const thresholds = getTriggerThresholds(config)
   const tokensSinceUpdate = currentTokenCount - lastTokenCount
   const toolCallsSinceUpdate = currentToolCallCount - lastToolCallCount
-
   return (
-    tokensSinceUpdate >= SESSION_MEMORY_TRIGGER.minimumTokensBetweenUpdate ||
-    toolCallsSinceUpdate >= SESSION_MEMORY_TRIGGER.toolCallsBetweenUpdates
+    tokensSinceUpdate >= thresholds.minimumTokensBetweenUpdate ||
+    toolCallsSinceUpdate >= thresholds.toolCallsBetweenUpdates
   )
 }
 

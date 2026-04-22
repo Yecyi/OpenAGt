@@ -55,6 +55,8 @@ function createBusLayer(events: Array<{ type: string; properties: unknown }> = [
       subscribeAll: () => Effect.fail(new Error("unused")) as any,
       subscribeCallback: () => Effect.fail(new Error("unused")) as any,
       subscribeAllCallback: () => Effect.fail(new Error("unused")) as any,
+      getRecentEvents: () => [],
+      replayEvents: () => Effect.void,
     }),
   )
 }

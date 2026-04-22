@@ -98,6 +98,25 @@ export class Info extends Schema.Class<Info>("ProviderConfig")({
       maxRetries: Schema.optional(PositiveInt).annotate({
         description: "Maximum fallback hops for a single request (default: 3)",
       }),
+      retryPolicy: Schema.optional(
+        Schema.Struct({
+          baseDelayMs: Schema.optional(PositiveInt).annotate({
+            description: "Initial retry delay in ms (default: 1000)",
+          }),
+          maxDelayMs: Schema.optional(PositiveInt).annotate({
+            description: "Maximum retry delay in ms (default: 30000)",
+          }),
+          jitterFactor: Schema.optional(Schema.Number).annotate({
+            description: "Random jitter factor 0-1 (default: 0.3)",
+          }),
+          circuitBreakerThreshold: Schema.optional(PositiveInt).annotate({
+            description: "Consecutive failures before skipping provider (default: 5)",
+          }),
+          circuitBreakerResetMs: Schema.optional(PositiveInt).annotate({
+            description: "Circuit breaker reset time in ms (default: 60000)",
+          }),
+        }),
+      ).annotate({ description: "Retry policy: exponential backoff, jitter, and circuit breaker" }),
     }),
   ).annotate({ description: "Fallback provider configuration for automatic failover" }),
   options: Schema.optional(

@@ -101,3 +101,9 @@ const table = sqliteTable("session", {
 ## Type Checking
 
 - Always run `bun typecheck` from package directories (e.g., `packages/openagt`), never `tsc` directly.
+
+## Code Review & Bug-Fixing Workflow
+
+When the user provides a bug report with exact file:line references, treat it as authoritative and verify each item against source before planning. Use a two-phase plan structure: Phase 1 for bug fixes, Phase 2 for improvements.
+
+When TypeScript reports unusual syntax errors (e.g., spurious duplicate-key errors), inspect the actual file bytes with PowerShell hex tools (`Format-Hex`) — hidden unicode/BOM characters can corrupt parsing without appearing in normal diffs.

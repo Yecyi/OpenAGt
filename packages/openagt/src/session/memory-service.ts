@@ -19,7 +19,7 @@ import {
   countToolCalls,
   parseMemorySections,
   SESSION_MEMORY_TEMPLATE,
-  SESSION_MEMORY_TRIGGER,
+  type MemoryConfig,
   type MemorySections,
 } from "./memory"
 import { SessionID } from "./schema"

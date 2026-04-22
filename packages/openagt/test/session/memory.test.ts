@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import {
   SESSION_MEMORY_TEMPLATE,
-  SESSION_MEMORY_TRIGGER,
+  getTriggerThresholds,
   parseMemorySections,
   updateMemorySection,
   loadMemory,
@@ -45,11 +45,36 @@ describe("SESSION_MEMORY_TEMPLATE", () => {
   })
 })
 
-describe("SESSION_MEMORY_TRIGGER", () => {
-  test("has correct trigger thresholds", () => {
-    expect(SESSION_MEMORY_TRIGGER.minimumMessageTokensToInit).toBe(6000)
-    expect(SESSION_MEMORY_TRIGGER.minimumTokensBetweenUpdate).toBe(4000)
-    expect(SESSION_MEMORY_TRIGGER.toolCallsBetweenUpdates).toBe(10)
+describe("getTriggerThresholds", () => {
+  test("has correct default trigger thresholds", () => {
+    const thresholds = getTriggerThresholds()
+    expect(thresholds.minimumMessageTokensToInit).toBe(6000)
+    expect(thresholds.minimumTokensBetweenUpdate).toBe(4000)
+    expect(thresholds.toolCallsBetweenUpdates).toBe(10)
+  })
+
+  test("overrides with config values", () => {
+    const thresholds = getTriggerThresholds({
+      trigger: {
+        minimumMessageTokensToInit: 3000,
+        minimumTokensBetweenUpdate: 2000,
+        toolCallsBetweenUpdates: 5,
+      },
+    })
+    expect(thresholds.minimumMessageTokensToInit).toBe(3000)
+    expect(thresholds.minimumTokensBetweenUpdate).toBe(2000)
+    expect(thresholds.toolCallsBetweenUpdates).toBe(5)
+  })
+
+  test("partial config only overrides specified values", () => {
+    const thresholds = getTriggerThresholds({
+      trigger: {
+        minimumMessageTokensToInit: 10000,
+      },
+    })
+    expect(thresholds.minimumMessageTokensToInit).toBe(10000)
+    expect(thresholds.minimumTokensBetweenUpdate).toBe(4000)
+    expect(thresholds.toolCallsBetweenUpdates).toBe(10)
   })
 })
 
@@ -208,6 +233,11 @@ describe("shouldInitializeMemory", () => {
     expect(shouldInitializeMemory(6000)).toBe(true)
     expect(shouldInitializeMemory(10000)).toBe(true)
   })
+
+  test("respects custom config threshold", () => {
+    expect(shouldInitializeMemory(5000, { trigger: { minimumMessageTokensToInit: 3000 } })).toBe(true)
+    expect(shouldInitializeMemory(5000, { trigger: { minimumMessageTokensToInit: 8000 } })).toBe(false)
+  })
 })
 
 describe("shouldUpdateMemory", () => {
@@ -221,6 +251,11 @@ describe("shouldUpdateMemory", () => {
 
   test("returns false when below both thresholds", () => {
     expect(shouldUpdateMemory(3000, 5, 1000, 0)).toBe(false)
+  })
+
+  test("respects custom config thresholds", () => {
+    expect(shouldUpdateMemory(2000, 0, 1000, 0, { trigger: { minimumTokensBetweenUpdate: 500 } })).toBe(true)
+    expect(shouldUpdateMemory(2000, 3, 1000, 0, { trigger: { toolCallsBetweenUpdates: 2 } })).toBe(true)
   })
 })
 
@@ -312,7 +347,9 @@ describe("updateMemory", () => {
       title: "New Session",
     })
     expect(result).toContain("New Session")
-    expect(result).toContain(SESSION_MEMORY_TEMPLATE)
+    expect(result).toContain("# Session Title")
+    expect(result).toContain("# Current State")
+    expect(result).toContain("# Task specification")
   })
 
   test("updates existing memory sections", async () => {

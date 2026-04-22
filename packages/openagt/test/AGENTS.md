@@ -131,3 +131,7 @@ Use `provideTmpdirInstance(...)` by default when a test only needs one temp inst
 - Yield services directly with `yield* MyService.Service` or `yield* MyTool`.
 - Avoid custom `ManagedRuntime`, `attach(...)`, or ad hoc `run(...)` wrappers when `testEffect(...)` already provides the runtime.
 - When a test needs instance-local state, prefer `provideTmpdirInstance(...)` or `provideInstance(...)` over manual `Instance.provide(...)` inside Promise-style tests.
+
+### Memory Tests
+
+When `updateMemory()` creates new memory from the template and then updates a section (e.g., `title`), the result contains only the updated section content — the template placeholder text for unchanged sections is consumed by `updateMemorySection()` (which skips lines that are just placeholder text `_..._`). Test assertions should check for section headers and updated content rather than the full template string.

@@ -28,7 +28,18 @@ export interface ToolQualityReport {
   suggestions: string[]
 }
 
-const QUALITY_WEIGHTS: Record<keyof ToolQualityChecklist, number> = {
+export interface ToolQualityWeights {
+  hasValidSchema?: number
+  hasDescription?: number
+  hasParameterDescriptions?: number
+  hasReturnTypeDescription?: number
+  hasExamples?: number
+  hasVersion?: number
+  isNamingConsistent?: number
+  hasDeprecationWarning?: number
+}
+
+const DEFAULT_WEIGHTS: Record<keyof ToolQualityChecklist, number> = {
   hasValidSchema: 20,
   hasDescription: 15,
   hasParameterDescriptions: 20,
@@ -39,7 +50,14 @@ const QUALITY_WEIGHTS: Record<keyof ToolQualityChecklist, number> = {
   hasDeprecationWarning: 10,
 }
 
-export function checkToolQuality(tool: MCPToolDef, clientName: string): ToolQualityReport {
+function mergeWeights(overrides?: ToolQualityWeights): Record<keyof ToolQualityChecklist, number> {
+  return {
+    ...DEFAULT_WEIGHTS,
+    ...overrides,
+  }
+}
+
+export function checkToolQuality(tool: MCPToolDef, clientName: string, weights?: ToolQualityWeights): ToolQualityReport {
   const issues: string[] = []
   const suggestions: string[] = []
 
@@ -74,7 +92,7 @@ export function checkToolQuality(tool: MCPToolDef, clientName: string): ToolQual
     suggestions.push("Use snake_case or camelCase consistently")
   }
 
-  const overallScore = calculateScore(checks)
+  const overallScore = calculateScore(checks, weights)
 
   return {
     toolName: tool.name,
@@ -106,11 +124,12 @@ function isNamingConsistent(name: string): boolean {
   return !!(snakeCase.test(name) || camelCase.test(name) || kebabCase.test(name))
 }
 
-function calculateScore(checks: ToolQualityChecklist): number {
+function calculateScore(checks: ToolQualityChecklist, weights?: ToolQualityWeights): number {
+  const activeWeights = mergeWeights(weights)
   let score = 0
   let totalWeight = 0
 
-  for (const [key, weight] of Object.entries(QUALITY_WEIGHTS)) {
+  for (const [key, weight] of Object.entries(activeWeights)) {
     totalWeight += weight
     if (checks[key as keyof ToolQualityChecklist]) {
       score += weight
@@ -122,6 +141,7 @@ function calculateScore(checks: ToolQualityChecklist): number {
 
 export function checkToolsQuality(
   tools: Array<{ tool: MCPToolDef; clientName: string }>,
+  weights?: ToolQualityWeights,
 ): {
   reports: ToolQualityReport[]
   averageScore: number
@@ -129,7 +149,7 @@ export function checkToolsQuality(
   lowQualityTools: string[]
   commonIssues: Record<string, number>
 } {
-  const reports = tools.map(({ tool, clientName }) => checkToolQuality(tool, clientName))
+  const reports = tools.map(({ tool, clientName }) => checkToolQuality(tool, clientName, weights))
   const averageScore = reports.length > 0 ? Math.round(reports.reduce((sum, r) => sum + r.overallScore, 0) / reports.length) : 0
 
   const highQualityTools = reports.filter((r) => r.overallScore >= 80).map((r) => `${r.clientName}:${r.toolName}`)

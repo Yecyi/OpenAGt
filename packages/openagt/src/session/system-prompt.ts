@@ -35,6 +35,14 @@ export interface SystemPromptOptions {
   agentName?: string
   model?: string
   includeDynamic?: boolean
+  maxPromptTokens?: number
+}
+
+export interface SystemPromptResult {
+  prompt: string
+  truncated: boolean
+  skippedSegments: string[]
+  tokenEstimate: number
 }
 
 // ============================================================
@@ -154,6 +162,10 @@ export function loadPromptFileSync(filename: string): string {
 // ============================================================
 
 export async function getStaticPrompt(model?: string): Promise<string> {
+  const cacheKey = getCacheKey(model, undefined)
+  const cached = cache.get(cacheKey)
+  if (cached) return cached.static
+
   const filename = model ? PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default : PROMPT_FILES.default
   const content = await loadPromptFile(filename)
 
@@ -164,6 +176,10 @@ export async function getStaticPrompt(model?: string): Promise<string> {
 }
 
 export function getStaticPromptSync(model?: string): string {
+  const cacheKey = getCacheKey(model, undefined)
+  const cached = cache.get(cacheKey)
+  if (cached) return cached.static
+
   const filename = model ? PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default : PROMPT_FILES.default
   const content = loadPromptFileSync(filename)
 
@@ -181,39 +197,127 @@ export async function getSystemPrompt(
   model?: string,
   dynamicContent?: string,
   options?: SystemPromptOptions,
-): Promise<string> {
-  const cacheKey = getCacheKey(model, options?.agentName)
-  let cached = getCache(model, options?.agentName)
+): Promise<SystemPromptResult> {
+  const maxPromptTokens = options?.maxPromptTokens ?? 200000
+
+  // Use cache only for static prompts (no dynamic content)
+  if (!dynamicContent) {
+    const cached = getCache(model, options?.agentName)
+    if (cached) {
+      return {
+        prompt: cached.full,
+        truncated: false,
+        skippedSegments: [],
+        tokenEstimate: cached.tokenEstimate ?? estimateTokens(cached.full),
+      }
+    }
+  }
 
   const staticPrompt = await getStaticPrompt(model)
   const fullPrompt = dynamicContent
     ? `${staticPrompt}\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n${dynamicContent}`
     : staticPrompt
 
+  const tokenEstimate = estimateTokens(fullPrompt)
+  let truncated = false
+  let skippedSegments: string[] = []
+  let resultPrompt = fullPrompt
+
+  if (tokenEstimate > maxPromptTokens) {
+    const segments = parsePromptSegments(fullPrompt)
+    const dynamicSegs = segments.filter(isDynamicSegment)
+    const staticSegs = segments.filter(isStaticSegment)
+
+    let currentTokens = estimateTokens(staticSegs.map((s) => s.content).join("\n\n"))
+    const keptDynamic: string[] = []
+
+    for (const seg of dynamicSegs) {
+      const segTokens = estimateTokens(seg.content)
+      if (currentTokens + segTokens <= maxPromptTokens) {
+        keptDynamic.push(seg.content)
+        currentTokens += segTokens
+      } else {
+        skippedSegments.push(seg.content.slice(0, 50))
+      }
+    }
+
+    if (keptDynamic.length < dynamicSegs.length) {
+      truncated = true
+      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")].filter(Boolean).join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
+    }
+  }
+
   const result: SystemPromptCache = {
     static: staticPrompt,
     dynamic: dynamicContent ?? "",
-    full: fullPrompt,
+    full: resultPrompt,
     lastUpdated: Date.now(),
-    tokenEstimate: estimateTokens(fullPrompt),
+    tokenEstimate,
   }
 
   setCache(model, options?.agentName, result)
-  return fullPrompt
+  return {
+    prompt: resultPrompt,
+    truncated,
+    skippedSegments,
+    tokenEstimate,
+  }
 }
 
 export function getSystemPromptSync(
   model?: string,
   dynamicContent?: string,
   options?: SystemPromptOptions,
-): string {
+): SystemPromptResult {
   const staticPrompt = getStaticPromptSync(model)
 
   if (!dynamicContent) {
-    return staticPrompt
+    const tokenEstimate = estimateTokens(staticPrompt)
+    return {
+      prompt: staticPrompt,
+      truncated: false,
+      skippedSegments: [],
+      tokenEstimate,
+    }
   }
 
-  return `${staticPrompt}\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n${dynamicContent}`
+  const fullPrompt = `${staticPrompt}\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n${dynamicContent}`
+  const maxPromptTokens = options?.maxPromptTokens ?? 200000
+  const tokenEstimate = estimateTokens(fullPrompt)
+  let truncated = false
+  let skippedSegments: string[] = []
+  let resultPrompt = fullPrompt
+
+  if (tokenEstimate > maxPromptTokens) {
+    const segments = parsePromptSegments(fullPrompt)
+    const dynamicSegs = segments.filter(isDynamicSegment)
+    const staticSegs = segments.filter(isStaticSegment)
+
+    let currentTokens = estimateTokens(staticSegs.map((s) => s.content).join("\n\n"))
+    const keptDynamic: string[] = []
+
+    for (const seg of dynamicSegs) {
+      const segTokens = estimateTokens(seg.content)
+      if (currentTokens + segTokens <= maxPromptTokens) {
+        keptDynamic.push(seg.content)
+        currentTokens += segTokens
+      } else {
+        skippedSegments.push(seg.content.slice(0, 50))
+      }
+    }
+
+    if (keptDynamic.length < dynamicSegs.length) {
+      truncated = true
+      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")].filter(Boolean).join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
+    }
+  }
+
+  return {
+    prompt: resultPrompt,
+    truncated,
+    skippedSegments,
+    tokenEstimate,
+  }
 }
 
 // ============================================================

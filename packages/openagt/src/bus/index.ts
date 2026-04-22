@@ -6,8 +6,107 @@ import { BusEvent } from "./bus-event"
 import { GlobalBus } from "./global"
 import { InstanceState } from "@/effect"
 import { makeRuntime } from "@/effect/run-service"
+import path from "path"
+import os from "os"
+import fs from "fs/promises"
 
 const log = Log.create({ service: "bus" })
+
+/**
+ * Critical event types that should be persisted to disk
+ */
+const CRITICAL_EVENT_TYPES = [
+  "provider.fallback.hop",
+  "tools.changed",
+  "mcp.server.connected",
+  "mcp.server.disconnected",
+]
+
+/**
+ * Ring buffer for event persistence with bounded capacity.
+ * Max capacity is configurable via the `OPENCODE_EVENT_BUFFER_SIZE` environment variable.
+ */
+const DEFAULT_EVENT_BUFFER_SIZE = 1000
+
+function getEventBufferSize(): number {
+  const env = process.env.OPENCODE_EVENT_BUFFER_SIZE
+  if (env) {
+    const parsed = parseInt(env, 10)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+    log.warn("invalid OPENCODE_EVENT_BUFFER_SIZE, using default", { value: env })
+  }
+  return DEFAULT_EVENT_BUFFER_SIZE
+}
+
+class EventBuffer {
+  private events: Array<{ timestamp: number; payload: unknown }> = []
+  private maxCapacity: number
+  private bufferPath: string | null = null
+
+  constructor(maxCapacity: number = DEFAULT_EVENT_BUFFER_SIZE) {
+    this.maxCapacity = maxCapacity
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
+      const eventsDir = path.join(stateHome, "opencode", "events")
+      await fs.mkdir(eventsDir, { recursive: true })
+      this.bufferPath = path.join(eventsDir, "events.jsonl")
+    } catch (error) {
+      log.warn("failed to initialize event buffer", { error })
+    }
+  }
+
+  push(event: { timestamp: number; payload: unknown }): void {
+    this.events.push(event)
+    if (this.events.length > this.maxCapacity) {
+      this.events = this.events.slice(-this.maxCapacity)
+    }
+  }
+
+  async persist(): Promise<void> {
+    if (!this.bufferPath || this.events.length === 0) return
+    try {
+      const lines = this.events.map((e) => JSON.stringify(e)).join("\n") + "\n"
+      await fs.appendFile(this.bufferPath, lines, "utf-8")
+      this.events = []
+    } catch (error) {
+      log.warn("failed to persist events", { error })
+    }
+  }
+
+  getRecent(count: number = 100): Array<{ timestamp: number; payload: unknown }> {
+    return this.events.slice(-count)
+  }
+
+  async replay(callback: (event: { timestamp: number; payload: unknown }) => void): Promise<void> {
+    if (!this.bufferPath) return
+    try {
+      const content = await fs.readFile(this.bufferPath, "utf-8")
+      const lines = content.split("\n").filter((line) => line.trim())
+      for (const line of lines) {
+        try {
+          const event = JSON.parse(line)
+          callback(event)
+        } catch (error) {
+          log.warn("failed to parse event line during replay", { error })
+        }
+      }
+    } catch (error) {
+      log.warn("failed to replay events from disk", { error })
+    }
+  }
+
+  async clear(): Promise<void> {
+    if (!this.bufferPath) return
+    try {
+      await fs.unlink(this.bufferPath)
+    } catch (error) {
+      log.warn("failed to clear event buffer", { error })
+    }
+  }
+}
 
 export const InstanceDisposed = BusEvent.define(
   "server.instance.disposed",
@@ -38,6 +137,8 @@ export interface Interface {
     callback: (event: Payload<D>) => unknown,
   ) => Effect.Effect<() => void>
   readonly subscribeAllCallback: (callback: (event: any) => unknown) => Effect.Effect<() => void>
+  readonly getRecentEvents: (count?: number) => Array<{ timestamp: number; payload: unknown }>
+  readonly replayEvents: (callback: (event: { timestamp: number; payload: unknown }) => void) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Bus") {}
@@ -45,6 +146,9 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Bu
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const eventBuffer = new EventBuffer(getEventBufferSize())
+    yield* Effect.promise(() => eventBuffer.initialize())
+
     const state = yield* InstanceState.make<State>(
       Effect.fn("Bus.state")(function* (ctx) {
         const wildcard = yield* PubSub.unbounded<Payload>()
@@ -61,6 +165,7 @@ export const layer = Layer.effect(
             for (const ps of typed.values()) {
               yield* PubSub.shutdown(ps)
             }
+            yield* Effect.promise(() => eventBuffer.persist())
           }),
         )
 
@@ -84,6 +189,11 @@ export const layer = Layer.effect(
         const s = yield* InstanceState.get(state)
         const payload: Payload = { type: def.type, properties }
         log.info("publishing", { type: def.type })
+
+        // Persist critical events to buffer
+        if (CRITICAL_EVENT_TYPES.includes(def.type)) {
+          eventBuffer.push({ timestamp: Date.now(), payload })
+        }
 
         const ps = s.typed.get(def.type)
         if (ps) yield* PubSub.publish(ps, payload)
@@ -165,7 +275,19 @@ export const layer = Layer.effect(
       return yield* on(s.wildcard, "*", callback)
     })
 
-    return Service.of({ publish, subscribe, subscribeAll, subscribeCallback, subscribeAllCallback })
+    const getRecentEventsFn = (count?: number) => eventBuffer.getRecent(count)
+    const replayEventsFn = (callback: (event: { timestamp: number; payload: unknown }) => void) =>
+      Effect.promise(() => eventBuffer.replay(callback))
+
+    return Service.of({
+      publish,
+      subscribe,
+      subscribeAll,
+      subscribeCallback,
+      subscribeAllCallback,
+      getRecentEvents: getRecentEventsFn,
+      replayEvents: replayEventsFn,
+    })
   }),
 )
 

@@ -5,7 +5,32 @@ import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oa
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
-// Current callback server configuration (may differ from defaults if custom redirectUri is used)
+// Port range for OAuth callback server binding
+const MIN_CALLBACK_PORT = 3000
+const MAX_CALLBACK_PORT = 3010
+
+// Normalize a URI origin (host + port) for comparison: lowercase, strip trailing slash,
+// and resolve localhost/127.0.0.1 to a canonical form.
+function normalizeOrigin(uri: string): string {
+  try {
+    const url = new URL(uri)
+    const host = url.hostname.toLowerCase()
+    // Normalize localhost variants to "localhost"
+    const normalizedHost = host === "127.0.0.1" ? "localhost" : host
+    const port = url.port || (url.protocol === "https:" ? "443" : "80")
+    return `${normalizedHost}:${port}`
+  } catch {
+    return uri.toLowerCase()
+  }
+}
+
+// Callback timeout in milliseconds (5 minutes)
+const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
+
+// Registered redirect URI for validation (set during OAuth initiation)
+let registeredRedirectUri: string | undefined
+
+// Current callback server configuration
 let currentPort = OAUTH_CALLBACK_PORT
 let currentPath = OAUTH_CALLBACK_PATH
 
@@ -61,8 +86,6 @@ const pendingAuths = new Map<string, PendingAuth>()
 // Reverse index: mcpName → oauthState, so cancelPending(mcpName) can
 // find the right entry in pendingAuths (which is keyed by oauthState).
 const mcpNameToState = new Map<string, string>()
-
-const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
 function cleanupStateIndex(oauthState: string) {
   for (const [name, state] of mcpNameToState) {
@@ -127,6 +150,22 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
     return
   }
 
+  // Validate redirect_uri if one was registered
+  if (registeredRedirectUri) {
+    const callbackOrigin = normalizeOrigin(url.origin)
+    const expectedOrigin = normalizeOrigin(new URL(registeredRedirectUri).origin)
+    if (callbackOrigin !== expectedOrigin) {
+      const errorMsg = "redirect_uri mismatch - potential open redirect attack"
+      log.error("oauth callback redirect_uri mismatch", {
+        expected: expectedOrigin,
+        received: callbackOrigin,
+      })
+      res.writeHead(400, { "Content-Type": "text/html" })
+      res.end(HTML_ERROR(errorMsg))
+      return
+    }
+  }
+
   const pending = pendingAuths.get(state)!
 
   clearTimeout(pending.timeout)
@@ -141,6 +180,12 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
 export async function ensureRunning(redirectUri?: string): Promise<void> {
   // Parse the redirect URI to get port and path (uses defaults if not provided)
   const { port, path } = parseRedirectUri(redirectUri)
+
+  // Enforce port range security: only allow ports within the configured range
+  if (port < MIN_CALLBACK_PORT || port > MAX_CALLBACK_PORT) {
+    log.error("oauth callback port outside allowed range", { port, min: MIN_CALLBACK_PORT, max: MAX_CALLBACK_PORT })
+    throw new Error(`OAuth callback port ${port} is outside the allowed range (${MIN_CALLBACK_PORT}-${MAX_CALLBACK_PORT}). This is a security restriction to prevent unauthorized callback servers.`)
+  }
 
   // If server is running on a different port/path, stop it first
   if (server && (currentPort !== port || currentPath !== path)) {
@@ -197,6 +242,14 @@ export function cancelPending(mcpName: string): void {
   }
 }
 
+/**
+ * Register the expected redirect_uri for validation during callback.
+ * Should be called before waitForCallback() during OAuth initiation.
+ */
+export function registerRedirectUri(uri: string): void {
+  registeredRedirectUri = uri
+}
+
 export async function isPortInUse(port: number = OAUTH_CALLBACK_PORT): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = createConnection(port, "127.0.0.1")
@@ -223,6 +276,7 @@ export async function stop(): Promise<void> {
   }
   pendingAuths.clear()
   mcpNameToState.clear()
+  registeredRedirectUri = undefined
 }
 
 export function isRunning(): boolean {

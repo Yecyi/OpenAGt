@@ -20,6 +20,14 @@ import { DYNAMIC_BOUNDARY_MARKER, parsePromptSegments } from "./system-prompt"
 
 const log = Log.create({ service: "system-prompt" })
 
+const DEFAULT_MAX_MEMO_ENTRIES = 50
+
+export interface MemoStats {
+  hits: number
+  misses: number
+  evictions: number
+}
+
 interface MemoEntry {
   hash: string
   value: string | undefined
@@ -32,17 +40,114 @@ interface EnvironmentMemoEntry {
   timestamp: number
 }
 
-const skillsMemo = new Map<string, MemoEntry>()
-const environmentMemo = new Map<string, EnvironmentMemoEntry>()
+/**
+ * LRU Map implementation using doubly-linked list + Map
+ */
+class LRUCache<K, V> {
+  private _capacity: number
+  private _cache: Map<K, V>
+  private stats: MemoStats
+
+  constructor(capacity: number = DEFAULT_MAX_MEMO_ENTRIES) {
+    this._capacity = capacity
+    this._cache = new Map()
+    this.stats = { hits: 0, misses: 0, evictions: 0 }
+  }
+
+  get [Symbol.toStringTag](): string {
+    return "LRUCache"
+  }
+
+  entries(): IterableIterator<[K, V]> {
+    return this._cache.entries()
+  }
+
+  get(key: K): V | undefined {
+    if (!this._cache.has(key)) {
+      this.stats.misses++
+      return undefined
+    }
+    this.stats.hits++
+    const value = this._cache.get(key)!
+    this._cache.delete(key)
+    this._cache.set(key, value)
+    return value
+  }
+
+  set(key: K, value: V): void {
+    if (this._cache.has(key)) {
+      this._cache.delete(key)
+    } else if (this._cache.size >= this._capacity) {
+      const oldestKey = this._cache.keys().next().value
+      if (oldestKey !== undefined) {
+        this._cache.delete(oldestKey)
+        this.stats.evictions++
+      }
+    }
+    this._cache.set(key, value)
+  }
+
+  delete(key: K): boolean {
+    return this._cache.delete(key)
+  }
+
+  clear(): void {
+    this._cache.clear()
+  }
+
+  getStats(): MemoStats {
+    return { ...this.stats }
+  }
+
+  resetStats(): void {
+    this.stats = { hits: 0, misses: 0, evictions: 0 }
+  }
+
+  get size(): number {
+    return this._cache.size
+  }
+
+  evictOldest(): void {
+    const oldestKey = this._cache.keys().next().value
+    if (oldestKey !== undefined) {
+      this._cache.delete(oldestKey)
+      this.stats.evictions++
+    }
+  }
+}
+
+function computeTokenEstimate(value: string): number {
+  return Math.ceil((value?.length ?? 0) / 4)
+}
+
+interface TokenValuedEntry {
+  value: string | undefined
+}
+
+function evictIfOverTokenLimit(
+  memo: LRUCache<string, unknown>,
+  tokenLimit: number,
+): void {
+  let totalTokens = 0
+  const entries = Array.from((memo as LRUCache<string, TokenValuedEntry>).entries()) as Array<[string, TokenValuedEntry]>
+  for (const [, entry] of entries) {
+    totalTokens += computeTokenEstimate(entry.value ?? "")
+    while (totalTokens > tokenLimit && memo.size > 0) {
+      memo.evictOldest()
+      totalTokens = Math.max(0, totalTokens - 1000)
+    }
+  }
+}
+
+const skillsMemo = new LRUCache<string, MemoEntry>()
+const environmentMemo = new LRUCache<string, EnvironmentMemoEntry>()
 
 function computeHash(input: string): string {
-  let hash = 0
+  let hash = 5381
   for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i)
-    hash = (hash << 5) - hash + char
-    hash = hash & hash
+    hash = ((hash << 5) + hash) ^ input.charCodeAt(i)
   }
-  return Math.abs(hash).toString(36)
+  return (hash >>> 0).toString(36)
 }
 
 function getSkillsMemoKey(agent: Agent.Info): string {
@@ -74,6 +179,8 @@ export interface EnvironmentResult {
 export interface Interface {
   readonly environment: (model: Provider.Model) => EnvironmentResult
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
+  readonly getMemoStats: () => { skillsMemo: MemoStats; environmentMemo: MemoStats }
+  readonly resetMemoStats: () => void
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -114,6 +221,7 @@ export const layer = Layer.effect(
         }
 
         environmentMemo.set(memoKey, { hash, value: result, timestamp: Date.now() })
+        evictIfOverTokenLimit(environmentMemo as unknown as LRUCache<string, EnvironmentMemoEntry>, 10000)
 
         return result
       },
@@ -137,9 +245,22 @@ export const layer = Layer.effect(
         ].join("\n")
 
         skillsMemo.set(memoKey, { hash, value: result, timestamp: Date.now() })
+        evictIfOverTokenLimit(skillsMemo, 5000)
 
         return result
       }),
+
+      getMemoStats() {
+        return {
+          skillsMemo: skillsMemo.getStats(),
+          environmentMemo: environmentMemo.getStats(),
+        }
+      },
+
+      resetMemoStats() {
+        skillsMemo.resetStats()
+        environmentMemo.resetStats()
+      },
     })
   }),
 )
