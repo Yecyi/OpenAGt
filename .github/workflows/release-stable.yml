@@ -95,7 +95,7 @@ jobs:
           .\packages\openagt\script\build-windows-installer.ps1 -Version $env:OPENAGT_VERSION
 
       - name: Azure login for Trusted Signing
-        if: runner.os == 'Windows' && (inputs.release_kind == 'ga' || secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID != '')
+        if: runner.os == 'Windows' && inputs.release_kind == 'ga'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
         with:
           client-id: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID }}
