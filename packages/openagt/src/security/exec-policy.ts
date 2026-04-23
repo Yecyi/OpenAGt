@@ -21,6 +21,39 @@ export type EvaluationResult = {
   reason: string
 }
 
+export const DEFAULT_RULES: Rule[] = [
+  {
+    pattern: ["git", "-c"],
+    decision: "confirm",
+    justification: "git -c can redirect configuration and requires confirmation.",
+  },
+  {
+    pattern: ["git", "--git-dir"],
+    decision: "confirm",
+    justification: "git --git-dir can redirect repository context and requires confirmation.",
+  },
+  {
+    pattern: ["git", "--work-tree"],
+    decision: "confirm",
+    justification: "git --work-tree can redirect filesystem writes and requires confirmation.",
+  },
+  {
+    pattern: ["git", "--exec-path"],
+    decision: "confirm",
+    justification: "git --exec-path can redirect helper resolution and requires confirmation.",
+  },
+  {
+    pattern: [["sudo", "su", "doas", "runas"]],
+    decision: "confirm",
+    justification: "Privilege escalation commands require confirmation.",
+  },
+  {
+    pattern: ["start-process", "-verb", "runas"],
+    decision: "confirm",
+    justification: "PowerShell elevation via Start-Process RunAs requires confirmation.",
+  },
+]
+
 const DECISION_ORDER: Record<ExecPolicyDecision, number> = {
   allow: 0,
   confirm: 1,
@@ -157,7 +190,7 @@ export const layer = Layer.effect(
 
     const evaluate: Interface["evaluate"] = Effect.fn("ExecPolicy.evaluate")(function* (input) {
       const cfg = yield* config.get()
-      const rules = cfg.exec_policy?.rules ?? []
+      const rules = [...DEFAULT_RULES, ...(cfg.exec_policy?.rules ?? [])]
       const tokens = tokenizeCommand(input.command)
       const matchedRules = rules.flatMap((rule, index) => {
         if (!matchesPattern(rule.pattern, tokens, input.shellFamily)) return []

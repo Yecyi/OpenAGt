@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { ShellSecurity, type AnalyzeInput, type ShellSecurityResult } from "../../src/security/shell-security"
+import {
+  ShellSecurity,
+  type AnalyzeInput,
+  type ShellSecurityResult,
+  classifyApprovalKind,
+  formatShellSafety,
+} from "../../src/security/shell-security"
 import { Effect, Layer } from "effect"
 
 /**
@@ -141,6 +147,44 @@ describe("ShellSecurity.Service", () => {
     expect(result.shellFamily).toBeDefined()
     expect(result.riskLevel).toBe("safe")
     expect(result.decision).toBe("allow")
+    expect(result.safetySummary).toBe("Allowed: No risky shell features detected.")
+    expect(result.safetyDetails).toContain("Risk: safe")
+    expect(result.shell_safety.summary).toBe("Allowed: No risky shell features detected.")
+    expect(result.shell_safety.details).toEqual(result.safetyDetails)
+    expect(result.shell_safety.approval.required).toBe(false)
+    expect(result.shell_safety.approval.reviewer).toBe("disabled")
+    expect(result.shell_safety.policy.source).toBe("shell_security")
+  })
+})
+
+describe("shell safety formatting", () => {
+  test("uses stable detail order for approval envelopes", () => {
+    const result = formatShellSafety({
+      decision: "confirm",
+      riskLevel: "medium",
+      reason: "Remote downloads require confirmation.",
+      approvalKind: classifyApprovalKind({
+        decision: "confirm",
+        reason: "Remote downloads require confirmation.",
+        matchedRules: ["curl"],
+      }),
+      policySource: "exec_policy",
+      backendPreference: "process",
+      enforcement: "required",
+      filesystemPolicy: "workspace_write",
+      networkPolicy: "full",
+      matchedRules: ["curl"],
+    })
+
+    expect(result.details).toEqual([
+      "Risk: medium",
+      "Approval: exec_policy_rule",
+      "Policy: Remote downloads require confirmation.",
+      "Boundary: backend=process, enforcement=required",
+      "Filesystem: workspace_write",
+      "Network: full",
+      "Matched rules: curl",
+    ])
   })
 })
 

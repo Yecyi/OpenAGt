@@ -248,11 +248,12 @@ describe("tool.bash permissions", () => {
             capture(requests),
           ),
         )
-        expect(result.output).toContain("Dangerous command blocked")
+        expect(result.output).toBe("Blocked: Command pipes output to a shell interpreter")
         expect(result.metadata.exit).toBeNull()
         expect(result.metadata.decision).toBe("block")
         expect(result.metadata.reviewMode).toBe("disabled")
         expect(result.metadata.reviewStatus).toBe("not_requested")
+        expect(result.metadata.shell_safety?.approval.kind).toBe("dangerous_command")
         expect(requests).toHaveLength(0)
       },
     })
@@ -318,6 +319,204 @@ describe("tool.bash permissions", () => {
           decision: "confirm",
           policyDecision: "confirm",
           policyReason: "Remote downloads require confirmation.",
+        })
+        expect(confirm?.metadata?.shell_safety).toMatchObject({
+          decision: "confirm",
+          approval: {
+            kind: "exec_policy_rule",
+            required: true,
+            reviewer: "user",
+            reviewable: true,
+          },
+          policy: {
+            source: "exec_policy",
+            reason: "Remote downloads require confirmation.",
+            matched_rules: ["curl|wget"],
+          },
+        })
+      },
+    })
+  })
+
+  each("built-in exec policy confirms git global overrides", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        await Effect.runPromise(
+          bash.execute(
+            {
+              command: "git -c core.pager=cat status",
+              description: "Run git with inline config",
+            },
+            capture(requests),
+          ),
+        )
+        const confirm = requests.find((item) => item.permission === "shell_execute")
+        expect(confirm?.metadata).toMatchObject({
+          decision: "confirm",
+          policyDecision: "confirm",
+          policyReason: "git -c can redirect configuration and requires confirmation.",
+          safetySummary: "Confirmation required: git -c can redirect configuration and requires confirmation.",
+        })
+        expect(Array.isArray(confirm?.metadata?.safetyDetails)).toBe(true)
+        expect(confirm?.metadata?.shell_safety).toMatchObject({
+          summary: "Confirmation required: git -c can redirect configuration and requires confirmation.",
+          approval: {
+            kind: "exec_policy_rule",
+            required: true,
+            reviewer: "user",
+            reviewable: true,
+          },
+          policy: {
+            source: "exec_policy",
+            matched_rules: ["git -c"],
+          },
+        })
+      },
+    })
+  })
+
+  each("network access prompts carry canonical shell safety metadata", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        await Effect.runPromise(
+          bash.execute(
+            {
+              command: "curl https://example.com",
+              description: "Fetch remote content",
+            },
+            capture(requests),
+          ),
+        )
+        const network = requests.find((item) => item.permission === "shell_network")
+        expect(network?.metadata).toMatchObject({
+          decision: "confirm",
+          shell_safety: {
+            approval: {
+              kind: "network_access",
+              required: true,
+              reviewer: "user",
+              reviewable: true,
+            },
+            policy: {
+              source: "sandbox_policy",
+            },
+          },
+        })
+      },
+    })
+  })
+
+  each("privilege escalation commands are categorized distinctly", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await initBash()
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        await Effect.runPromise(
+          bash.execute(
+            {
+              command: "sudo npm install",
+              description: "Install package with sudo",
+            },
+            capture(requests),
+          ),
+        )
+        const confirm = requests.find((item) => item.permission === "shell_execute")
+        expect(confirm?.metadata?.shell_safety).toMatchObject({
+          approval: {
+            kind: "privilege_escalation",
+            required: true,
+            reviewer: "user",
+            reviewable: false,
+          },
+        })
+      },
+    })
+  })
+
+  each("unavailable explicit sandbox backends require sandbox escalation confirmation", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const unavailableBackend = process.platform === "win32" ? "seatbelt" : "windows_native"
+        const configWithUnavailableSandbox = Layer.succeed(
+          Config.Service,
+          Config.Service.of({
+            get: () =>
+              Effect.succeed({
+                experimental: {
+                  sandbox: {
+                    enabled: true,
+                    backend: unavailableBackend,
+                    failure_policy: "confirm_downgrade",
+                    report_only: false,
+                    broker_idle_ttl_ms: 300_000,
+                  },
+                },
+              }),
+            getGlobal: () => Effect.succeed({}),
+            getConsoleState: () =>
+              Effect.succeed({
+                consoleManagedProviders: [],
+                activeOrgName: undefined,
+                switchableOrgCount: 0,
+              }),
+            update: () => Effect.void,
+            updateGlobal: () => Effect.succeed({}),
+            invalidate: () => Effect.void,
+            invalidateDirectory: () => Effect.void,
+            directories: () => Effect.succeed([]),
+            waitForDependencies: () => Effect.void,
+          }),
+        )
+        const bash = await initBash(configWithUnavailableSandbox)
+        const err = new Error("stop after permission")
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        const stopOnShellExecute = {
+          ...ctx,
+          ask: (req: Omit<Permission.Request, "id" | "sessionID" | "tool">) =>
+            Effect.sync(() => {
+              requests.push(req)
+              if (req.permission === "shell_execute") throw err
+            }),
+        }
+        await expect(
+          Effect.runPromise(
+            bash.execute(
+              {
+                command: "echo sandbox-escalation",
+                description: "Echo with unavailable sandbox backend",
+              },
+              stopOnShellExecute,
+            ),
+          ),
+        ).rejects.toThrow(err.message)
+        const confirm = requests.find((item) => item.permission === "shell_execute")
+        expect(confirm?.metadata).toMatchObject({
+          decision: "confirm",
+          reason: `Sandbox backend ${unavailableBackend} is unavailable; confirmation required before downgrade.`,
+        })
+        expect(confirm?.metadata?.shell_safety).toMatchObject({
+          approval: {
+            kind: "sandbox_escalation",
+            required: true,
+            reviewer: "user",
+            reviewable: true,
+          },
+          policy: {
+            source: "sandbox_policy",
+            reason: `Sandbox backend ${unavailableBackend} is unavailable; confirmation required before downgrade.`,
+          },
         })
       },
     })

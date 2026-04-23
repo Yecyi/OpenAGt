@@ -44,6 +44,56 @@ describe("ExecPolicy", () => {
     expect(result.matchedRules).toHaveLength(0)
   })
 
+  test("applies built-in git confirmation rules by default", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "git -c core.pager=cat status",
+          shellFamily: "posix",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+
+    expect(result.decision).toBe("confirm")
+    expect(result.justification).toBe("git -c can redirect configuration and requires confirmation.")
+    expect(result.matchedRules).toHaveLength(1)
+  })
+
+  test("applies built-in privilege escalation rules by default", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "sudo apt-get update",
+          shellFamily: "posix",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+
+    expect(result.decision).toBe("confirm")
+    expect(result.justification).toBe("Privilege escalation commands require confirmation.")
+    expect(result.matchedRules).toHaveLength(1)
+    expect(result.matchedRules[0]?.pattern).toEqual(["sudo|su|doas|runas"])
+  })
+
+  test("applies built-in powershell elevation rules by default", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "Start-Process -Verb RunAs powershell.exe",
+          shellFamily: "powershell",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+
+    expect(result.decision).toBe("confirm")
+    expect(result.justification).toBe("PowerShell elevation via Start-Process RunAs requires confirmation.")
+    expect(result.matchedRules).toHaveLength(1)
+    expect(result.matchedRules[0]?.pattern).toEqual(["start-process", "-verb", "runas"])
+  })
+
   test("matches prefix rules with alternatives", async () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {
@@ -105,7 +155,7 @@ describe("ExecPolicy", () => {
 
     expect(result.decision).toBe("block")
     expect(result.justification).toBe("git -c can redirect config and must not be auto-approved.")
-    expect(result.matchedRules).toHaveLength(2)
+    expect(result.matchedRules).toHaveLength(3)
   })
 
   test("matches executable basenames on windows shells", async () => {

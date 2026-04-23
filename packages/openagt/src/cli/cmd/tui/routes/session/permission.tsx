@@ -5,6 +5,7 @@ import type { TextareaRenderable } from "@opentui/core"
 import { useKeybind } from "../../context/keybind"
 import { useTheme, selectedForeground } from "../../context/theme"
 import type { PermissionRequest } from "@openagt/sdk/v2"
+import { getShellSafety } from "@openagt/sdk/v2"
 import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../component/border"
 import { useSync } from "../../context/sync"
@@ -132,8 +133,17 @@ function TextBody(props: { title: string; description?: string; icon?: string })
 function ShellPermissionBody(props: { request: PermissionRequest; command: string }) {
   const { theme } = useTheme()
   const meta = props.request.metadata ?? {}
+  const shellSafety = getShellSafety(meta)
   const riskLevel = typeof meta["riskLevel"] === "string" ? meta["riskLevel"] : undefined
   const reason = typeof meta["reason"] === "string" ? meta["reason"] : undefined
+  const safetySummary = shellSafety?.summary ?? (typeof meta["safetySummary"] === "string" ? meta["safetySummary"] : undefined)
+  const safetyDetails =
+    shellSafety
+      ? shellSafety.details.slice(0, 6)
+      : Array.isArray(meta["safetyDetails"])
+        ? meta["safetyDetails"].filter((item): item is string => typeof item === "string").slice(0, 6)
+        : []
+  const approvalKind = shellSafety?.approval.kind
   const backendPreference = typeof meta["backendPreference"] === "string" ? meta["backendPreference"] : undefined
   const enforcement = typeof meta["enforcement"] === "string" ? meta["enforcement"] : undefined
   const filesystemPolicy = typeof meta["filesystemPolicy"] === "string" ? meta["filesystemPolicy"] : undefined
@@ -162,10 +172,21 @@ function ShellPermissionBody(props: { request: PermissionRequest; command: strin
       <Show when={props.command}>
         <text fg={theme.text}>{"$ " + props.command}</text>
       </Show>
-      <Show when={riskLevel || backendPreference || workdir || enforcement || filesystemPolicy || networkPolicy}>
+      <Show when={safetySummary}>
+        <text fg={theme.textMuted}>{safetySummary}</text>
+      </Show>
+      <Show when={safetyDetails.length > 0}>
+        <box flexDirection="column">
+          <For each={safetyDetails}>{(item) => <text fg={theme.textMuted}>{"- " + item}</text>}</For>
+        </box>
+      </Show>
+      <Show when={safetyDetails.length === 0 && (riskLevel || backendPreference || workdir || enforcement || filesystemPolicy || networkPolicy)}>
         <box flexDirection="column">
           <Show when={riskLevel}>
             <text fg={theme.textMuted}>{"Risk: " + riskLevel}</text>
+          </Show>
+          <Show when={approvalKind}>
+            <text fg={theme.textMuted}>{"Approval: " + approvalKind}</text>
           </Show>
           <Show when={backendPreference}>
             <text fg={theme.textMuted}>{"Sandbox backend: " + backendPreference}</text>
@@ -187,7 +208,7 @@ function ShellPermissionBody(props: { request: PermissionRequest; command: strin
           </Show>
         </box>
       </Show>
-      <Show when={reason}>
+      <Show when={safetySummary === undefined && reason}>
         <text fg={theme.textMuted}>{"Reason: " + reason}</text>
       </Show>
       <Show when={findings.length > 0}>

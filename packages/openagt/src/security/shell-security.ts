@@ -95,9 +95,61 @@ export type ShellPermissionMetadata = {
   backendAvailability: string
   externalPaths: string[]
   reason: string
+  shell_safety: ShellSafety
+  safetySummary: string
+  safetyDetails: string[]
   reviewApiVersion: ReviewAPIVersion
   reviewMode: ReviewMode
   reviewStatus: ReviewStatus
+}
+
+export type ShellApprovalKind =
+  | "exec_policy_rule"
+  | "sandbox_escalation"
+  | "network_access"
+  | "privilege_escalation"
+  | "dangerous_command"
+
+export type ShellSafety = {
+  summary: string
+  details: string[]
+  decision: ShellDecision
+  risk_level: ShellRiskLevel
+  reason: string
+  boundary: {
+    backend_preference?: SandboxBackendPreference
+    backend_availability?: string
+    enforcement?: SandboxEnforcement
+    filesystem_policy?: SandboxFilesystemPolicy
+    network_policy?: SandboxNetworkPolicy
+  }
+  approval: {
+    required: boolean
+    kind: ShellApprovalKind
+    reviewer: "user" | "disabled"
+    reviewable: boolean
+  }
+  policy: {
+    source: "shell_security" | "exec_policy" | "sandbox_policy"
+    reason: string
+    matched_rules: string[]
+  }
+}
+
+export type ShellSafetyInput = {
+  decision: ShellDecision
+  riskLevel: ShellRiskLevel
+  reason: string
+  approvalKind: ShellApprovalKind
+  approvalRequired?: boolean
+  policySource: ShellSafety["policy"]["source"]
+  policyReason?: string
+  backendPreference?: SandboxBackendPreference
+  enforcement?: SandboxEnforcement
+  filesystemPolicy?: SandboxFilesystemPolicy
+  networkPolicy?: SandboxNetworkPolicy
+  backendAvailability?: string
+  matchedRules?: string[]
 }
 
 function mapShellFamily(shell: string): ShellFamily {
@@ -181,6 +233,88 @@ function reviewCandidates(result: { findings: ShellFinding[]; decision: ShellDec
       id: item.id,
       reason: item.evidence,
     }))
+}
+
+function decisionLabel(decision: ShellDecision) {
+  if (decision === "block") return "Blocked"
+  if (decision === "confirm") return "Confirmation required"
+  return "Allowed"
+}
+
+function approvalReviewable(kind: ShellApprovalKind) {
+  return kind === "exec_policy_rule" || kind === "network_access" || kind === "sandbox_escalation"
+}
+
+export function classifyApprovalKind(input: {
+  decision: ShellDecision
+  reason: string
+  matchedRules?: string[]
+  needsNetworkPermission?: boolean
+  privilegeEscalation?: boolean
+  sandboxEscalation?: boolean
+}): ShellApprovalKind {
+  if (input.privilegeEscalation) return "privilege_escalation"
+  if (input.matchedRules?.length) return "exec_policy_rule"
+  if (input.decision === "block") return "dangerous_command"
+  if (input.sandboxEscalation) return "sandbox_escalation"
+  if (input.needsNetworkPermission) return "network_access"
+  return "dangerous_command"
+}
+
+export function isPrivilegeEscalationCommand(command: string) {
+  return (
+    /\b(sudo|su|doas|runas)\b/i.test(command) ||
+    /start-process\s+-verb\s+runas/i.test(command)
+  )
+}
+
+export function formatShellSafety(input: ShellSafetyInput): ShellSafety {
+  const approvalRequired = input.approvalRequired ?? input.decision !== "allow"
+  const policyReason = input.policyReason ?? input.reason
+  const summary = `${decisionLabel(input.decision)}: ${input.reason}`
+  const details = [
+    `Risk: ${input.riskLevel}`,
+    `Approval: ${approvalRequired ? input.approvalKind : "none"}`,
+    `Policy: ${policyReason}`,
+    ...(input.backendPreference || input.enforcement
+      ? [
+          `Boundary: ${[
+            input.backendPreference ? `backend=${input.backendPreference}` : undefined,
+            input.enforcement ? `enforcement=${input.enforcement}` : undefined,
+          ]
+            .filter(Boolean)
+            .join(", ")}`,
+        ]
+      : []),
+    ...(input.filesystemPolicy ? [`Filesystem: ${input.filesystemPolicy}`] : []),
+    ...(input.networkPolicy ? [`Network: ${input.networkPolicy}`] : []),
+    ...(input.matchedRules?.length ? [`Matched rules: ${input.matchedRules.join(", ")}`] : []),
+  ]
+  return {
+    summary,
+    details,
+    decision: input.decision,
+    risk_level: input.riskLevel,
+    reason: input.reason,
+    boundary: {
+      ...(input.backendPreference ? { backend_preference: input.backendPreference } : {}),
+      ...(input.backendAvailability ? { backend_availability: input.backendAvailability } : {}),
+      ...(input.enforcement ? { enforcement: input.enforcement } : {}),
+      ...(input.filesystemPolicy ? { filesystem_policy: input.filesystemPolicy } : {}),
+      ...(input.networkPolicy ? { network_policy: input.networkPolicy } : {}),
+    },
+    approval: {
+      required: approvalRequired,
+      kind: input.approvalKind,
+      reviewer: approvalRequired ? "user" : "disabled",
+      reviewable: approvalRequired && approvalReviewable(input.approvalKind),
+    },
+    policy: {
+      source: input.policySource,
+      reason: policyReason,
+      matched_rules: input.matchedRules ?? [],
+    },
+  }
 }
 
 export type AnalyzeInput = {
@@ -277,27 +411,51 @@ export const layer = Layer.effect(
       description: string
       workdir: string
       externalPaths: string[]
-    }): ShellPermissionMetadata => ({
-      command: input.result.command,
-      normalizedCommand: input.result.normalized_command,
-      description: input.description,
-      shellFamily: input.result.shell_family,
-      riskLevel: input.result.risk_level,
-      decision: input.result.decision,
-      findings: input.result.findings,
-      workdir: input.workdir,
-      backendPreference: input.result.sandbox_requirement.backend_preference,
-      enforcement: input.result.sandbox_requirement.enforcement,
-      filesystemPolicy: input.result.sandbox_requirement.filesystem_policy,
-      networkPolicy: input.result.sandbox_requirement.network_policy,
-      allowedPathsSummary: input.result.sandbox_requirement.allowed_paths,
-      backendAvailability: "pending",
-      externalPaths: input.externalPaths,
-      reason: input.result.explanation,
-      reviewApiVersion: input.result.review_api_version,
-      reviewMode: input.result.review_mode,
-      reviewStatus: input.result.review_status,
-    })
+    }): ShellPermissionMetadata => {
+      const privilegeEscalation = isPrivilegeEscalationCommand(
+        input.result.normalized_command || input.result.command,
+      )
+      const shellSafety = formatShellSafety({
+        decision: input.result.decision,
+        riskLevel: input.result.risk_level,
+        reason: input.result.explanation,
+        approvalKind: classifyApprovalKind({
+          decision: input.result.decision,
+          reason: input.result.explanation,
+          privilegeEscalation,
+        }),
+        policySource: "shell_security",
+        backendPreference: input.result.sandbox_requirement.backend_preference,
+        enforcement: input.result.sandbox_requirement.enforcement,
+        filesystemPolicy: input.result.sandbox_requirement.filesystem_policy,
+        networkPolicy: input.result.sandbox_requirement.network_policy,
+        backendAvailability: "pending",
+      })
+      return {
+        command: input.result.command,
+        normalizedCommand: input.result.normalized_command,
+        description: input.description,
+        shellFamily: input.result.shell_family,
+        riskLevel: input.result.risk_level,
+        decision: input.result.decision,
+        findings: input.result.findings,
+        workdir: input.workdir,
+        backendPreference: input.result.sandbox_requirement.backend_preference,
+        enforcement: input.result.sandbox_requirement.enforcement,
+        filesystemPolicy: input.result.sandbox_requirement.filesystem_policy,
+        networkPolicy: input.result.sandbox_requirement.network_policy,
+        allowedPathsSummary: input.result.sandbox_requirement.allowed_paths,
+        backendAvailability: "pending",
+        externalPaths: input.externalPaths,
+        reason: input.result.explanation,
+        shell_safety: shellSafety,
+        safetySummary: shellSafety.summary,
+        safetyDetails: shellSafety.details,
+        reviewApiVersion: input.result.review_api_version,
+        reviewMode: input.result.review_mode,
+        reviewStatus: input.result.review_status,
+      }
+    }
 
     return Service.of({
       analyze,

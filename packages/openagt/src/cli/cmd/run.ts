@@ -7,7 +7,7 @@ import { Flag } from "../../flag/flag"
 import { bootstrap } from "../bootstrap"
 import { EOL } from "os"
 import { Filesystem } from "../../util"
-import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@openagt/sdk/v2"
+import { createOpencodeClient, getShellSafety, type OpencodeClient, type ToolPart } from "@openagt/sdk/v2"
 import { Server } from "../../server/server"
 import { Provider } from "../../provider"
 import { Agent } from "../../agent/agent"
@@ -540,6 +540,7 @@ export const RunCommand = cmd({
           if (event.type === "permission.asked") {
             const permission = event.properties
             if (permission.sessionID !== sessionID) continue
+            const shellSafety = getShellSafety(permission.metadata)
 
             if (args["dangerously-skip-permissions"]) {
               await sdk.permission.reply({
@@ -550,7 +551,9 @@ export const RunCommand = cmd({
               UI.println(
                 UI.Style.TEXT_WARNING_BOLD + "!",
                 UI.Style.TEXT_NORMAL +
-                  `permission requested: ${permission.permission} (${permission.patterns.join(", ")}); auto-rejecting`,
+                  `permission requested: ${
+                    shellSafety?.summary ?? `${permission.permission} (${permission.patterns.join(", ")})`
+                  }; auto-rejecting`,
               )
               await sdk.permission.reply({
                 requestID: permission.id,

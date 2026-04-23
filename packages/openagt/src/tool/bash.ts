@@ -13,7 +13,9 @@ import { fileURLToPath } from "url"
 import { Flag } from "@/flag/flag"
 import { Shell } from "@/shell/shell"
 import { ShellRunner } from "@/shell/runner"
+import { SandboxBroker } from "@/sandbox/broker"
 import { SandboxPolicy } from "@/sandbox/policy"
+import type { ResolvedPolicy } from "@/sandbox/policy"
 
 import { BashArity } from "@/permission/arity"
 import * as Truncate from "./truncate"
@@ -23,11 +25,18 @@ import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { ShellSecurity } from "../security/shell-security"
-import type { ShellDecision, ShellFinding, ShellRiskLevel } from "../security/shell-security"
+import {
+  classifyApprovalKind,
+  formatShellSafety,
+  isPrivilegeEscalationCommand,
+  ShellSecurity,
+} from "../security/shell-security"
+import type { ShellDecision, ShellFinding, ShellRiskLevel, ShellSafety } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
 import type { ExecPolicyDecision } from "@/security/exec-policy"
 import type {
+  SandboxBackendName,
+  SandboxBackendStatus,
   SandboxBackendPreference,
   SandboxEnforcement,
   SandboxFilesystemPolicy,
@@ -48,6 +57,9 @@ type BashMetadata = {
   policyDecision?: ExecPolicyDecision
   policyReason?: string
   matchedRules?: string[]
+  shell_safety?: ShellSafety
+  safetySummary?: string
+  safetyDetails?: string[]
   outputPath?: string
   backendPreference?: SandboxBackendPreference
   enforcement?: SandboxEnforcement
@@ -360,6 +372,56 @@ function stricterDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): 
   return DECISION_ORDER[left] >= DECISION_ORDER[right] ? left : right
 }
 
+function preferredBackendName(preference: SandboxBackendPreference): SandboxBackendName | undefined {
+  if (preference !== "auto") return preference
+  if (process.platform === "darwin") return "seatbelt"
+  if (process.platform === "win32") return "windows_native"
+  return "landlock"
+}
+
+function preferredBackendStatus(
+  preference: SandboxBackendPreference,
+  capabilities: SandboxBackendStatus[],
+) {
+  const name = preferredBackendName(preference)
+  if (!name) return
+  return capabilities.find((item) => item.name === name)
+}
+
+function backendAvailability(
+  preference: SandboxBackendPreference,
+  capabilities: SandboxBackendStatus[],
+) {
+  const backend = preferredBackendStatus(preference, capabilities)
+  if (!backend) return preference === "auto" ? "auto:unknown" : `${preference}:unknown`
+  if (backend.available) return `${backend.name}:available`
+  return `${backend.name}:unavailable${backend.reason ? ` (${backend.reason})` : ""}`
+}
+
+function sandboxEscalationReason(input: {
+  decision: ShellDecision
+  matchedRules: string[]
+  privilegeEscalation: boolean
+  needsNetworkPermission: boolean
+  policy: Pick<ResolvedPolicy, "sandbox" | "backend_preference">
+  capabilities: SandboxBackendStatus[]
+}) {
+  if (input.decision === "block") return
+  if (input.matchedRules.length > 0) return
+  if (input.privilegeEscalation) return
+  if (input.needsNetworkPermission) return
+  if (!input.policy.sandbox.enabled) {
+    return "Sandbox is disabled; confirmation required before running without isolation."
+  }
+  if (input.policy.sandbox.report_only) {
+    return "Sandbox enforcement is in report-only mode; confirmation required before running without enforcement."
+  }
+  const backend = preferredBackendStatus(input.policy.backend_preference, input.capabilities)
+  if (!backend?.available && input.policy.backend_preference !== "auto" && input.policy.sandbox.failure_policy !== "closed") {
+    return `Sandbox backend ${backend?.name ?? input.policy.backend_preference} is unavailable; confirmation required before downgrade.`
+  }
+}
+
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
   const { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
@@ -396,6 +458,7 @@ export const BashTool = Tool.define(
     const plugin = yield* Plugin.Service
     const shellSecurity = yield* ShellSecurity.Service
     const execPolicy = yield* ExecPolicy.Service
+    const sandboxBroker = yield* SandboxBroker.Service
     const shellRunner = yield* ShellRunner.Service
     const sandboxPolicy = yield* SandboxPolicy.Service
 
@@ -570,9 +633,9 @@ export const BashTool = Tool.define(
             command: security.normalized_command || params.command,
             shellFamily: security.shell_family,
           })
-          const finalDecision = stricterDecision(security.decision, policyDecision.decision)
-          const finalReason =
-            finalDecision === policyDecision.decision && policyDecision.matchedRules.length > 0
+          const preliminaryDecision = stricterDecision(security.decision, policyDecision.decision)
+          const preliminaryReason =
+            preliminaryDecision === policyDecision.decision && policyDecision.matchedRules.length > 0
               ? policyDecision.reason
               : security.explanation
           const matchedRules = policyDecision.matchedRules.map((item) => item.pattern.join(" "))
@@ -583,12 +646,80 @@ export const BashTool = Tool.define(
             workdir: cwd,
             externalPaths,
           })
-          const policy = yield* sandboxPolicy.resolve({
+          const preliminaryPolicy = yield* sandboxPolicy.resolve({
             result: security,
-            decision: finalDecision,
+            decision: preliminaryDecision,
             cwd,
             externalPaths,
           })
+          const capabilities = yield* sandboxBroker.capabilities()
+          const privilegeEscalation = isPrivilegeEscalationCommand(security.normalized_command || params.command)
+          const escalationReason = sandboxEscalationReason({
+            decision: preliminaryDecision,
+            matchedRules,
+            privilegeEscalation,
+            needsNetworkPermission: preliminaryPolicy.needs_network_permission,
+            policy: preliminaryPolicy,
+            capabilities,
+          })
+          const finalDecision = escalationReason ? stricterDecision(preliminaryDecision, "confirm") : preliminaryDecision
+          const finalReason = escalationReason && preliminaryDecision === "allow" ? escalationReason : preliminaryReason
+          const policy = finalDecision === preliminaryDecision
+            ? preliminaryPolicy
+            : yield* sandboxPolicy.resolve({
+                result: security,
+                decision: finalDecision,
+                cwd,
+                externalPaths,
+              })
+          const backendAvailabilitySummary = backendAvailability(policy.backend_preference, capabilities)
+          const approvalKind = classifyApprovalKind({
+            decision: finalDecision,
+            reason: finalReason,
+            matchedRules,
+            needsNetworkPermission: policy.needs_network_permission,
+            privilegeEscalation,
+            sandboxEscalation: Boolean(escalationReason),
+          })
+          const shellSafety = formatShellSafety({
+            decision: finalDecision,
+            riskLevel: security.risk_level,
+            reason: finalReason,
+            approvalKind,
+            approvalRequired: finalDecision !== "allow" || policy.needs_network_permission,
+            policySource: policyDecision.matchedRules.length > 0
+              ? "exec_policy"
+              : escalationReason
+                ? "sandbox_policy"
+              : policy.needs_network_permission
+                ? "sandbox_policy"
+                : "shell_security",
+            backendPreference: policy.backend_preference,
+            enforcement: policy.enforcement,
+            filesystemPolicy: policy.filesystem_policy,
+            networkPolicy: policy.network_policy,
+            backendAvailability: backendAvailabilitySummary,
+            policyReason: finalReason,
+            matchedRules,
+          })
+          const networkReason = "Command requires network access."
+          const networkShellSafety = policy.needs_network_permission
+            ? formatShellSafety({
+                decision: "confirm",
+                riskLevel: security.risk_level,
+                reason: networkReason,
+                approvalKind: "network_access",
+                approvalRequired: true,
+                policySource: "sandbox_policy",
+                backendPreference: policy.backend_preference,
+                enforcement: policy.enforcement,
+                filesystemPolicy: policy.filesystem_policy,
+                networkPolicy: policy.network_policy,
+                backendAvailability: backendAvailabilitySummary,
+                policyReason: finalReason,
+                matchedRules,
+              })
+            : undefined
           const metadata = {
             ...permissionMetadata,
             decision: finalDecision,
@@ -598,14 +729,27 @@ export const BashTool = Tool.define(
             filesystemPolicy: policy.filesystem_policy,
             networkPolicy: policy.network_policy,
             allowedPathsSummary: policy.allowed_paths,
-            backendAvailability: policy.sandbox.backend,
+            backendAvailability: backendAvailabilitySummary,
             ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
             ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
             ...(matchedRules.length > 0 ? { matchedRules } : {}),
+            shell_safety: shellSafety,
+            safetySummary: shellSafety.summary,
+            safetyDetails: shellSafety.details,
           }
+          const networkMetadata = networkShellSafety
+            ? {
+                ...metadata,
+                decision: "confirm" as const,
+                reason: networkReason,
+                shell_safety: networkShellSafety,
+                safetySummary: networkShellSafety.summary,
+                safetyDetails: networkShellSafety.details,
+              }
+            : metadata
 
           if (finalDecision === "block") {
-            const errorMsg = `Dangerous command blocked: ${finalReason}`
+            const errorMsg = shellSafety.summary
             return {
               title: "Bash Command Blocked",
               metadata: {
@@ -622,6 +766,9 @@ export const BashTool = Tool.define(
                 ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
                 ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
                 ...(matchedRules.length > 0 ? { matchedRules } : {}),
+                shell_safety: shellSafety,
+                safetySummary: shellSafety.summary,
+                safetyDetails: shellSafety.details,
               } satisfies BashMetadata,
               output: errorMsg,
             }
@@ -637,7 +784,7 @@ export const BashTool = Tool.define(
           if (policy.needs_network_permission) {
             yield* askShellNetwork(ctx, {
               patterns: [security.normalized_command || params.command],
-              metadata,
+              metadata: networkMetadata,
             })
           }
 
@@ -676,6 +823,9 @@ export const BashTool = Tool.define(
                 ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
                 ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
                 ...(matchedRules.length > 0 ? { matchedRules } : {}),
+                shell_safety: shellSafety,
+                safetySummary: shellSafety.summary,
+                safetyDetails: shellSafety.details,
               },
             })),
           )
