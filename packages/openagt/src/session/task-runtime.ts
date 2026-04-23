@@ -335,17 +335,22 @@ export const layer = Layer.effect(
 
     const wait: Interface["wait"] = Effect.fn("TaskRuntime.wait")(function* (input) {
       const terminal = new Set<TaskStatus>(["completed", "failed", "cancelled"])
+      const matched = (records: TaskRecord[]) => records.filter((item) => input.taskIDs.includes(item.task_id))
+      const terminalMatched = (records: TaskRecord[]) => matched(records).filter((item) => terminal.has(item.status))
       const ready = (records: TaskRecord[]) => {
-        const matched = records.filter((item) => input.taskIDs.includes(item.task_id))
+        const current = matched(records)
         if (input.mode === "all") {
-          if (matched.length !== input.taskIDs.length) return false
-          return matched.every((item) => terminal.has(item.status))
+          if (current.length !== input.taskIDs.length) return false
+          return current.every((item) => terminal.has(item.status))
         }
-        return matched.some((item) => terminal.has(item.status))
+        return terminalMatched(records).length > 0
       }
 
       const initial = yield* list(input.parentSessionID)
-      if (ready(initial)) return initial.filter((item) => input.taskIDs.includes(item.task_id)).map(resultFromRecord)
+      if (ready(initial)) {
+        const records = input.mode === "all" ? matched(initial) : terminalMatched(initial)
+        return records.map(resultFromRecord)
+      }
 
       const stream = bus.subscribe(Event.Updated).pipe(
         Stream.filter((event) => event.properties.parent_session_id === input.parentSessionID),
@@ -356,7 +361,7 @@ export const layer = Layer.effect(
       )
       const waitForRecords = stream.pipe(
         Effect.map((records) => (Option.isSome(records) ? records.value : [])),
-        Effect.map((records) => records.filter((item) => input.taskIDs.includes(item.task_id)).map(resultFromRecord)),
+        Effect.map((records) => (input.mode === "all" ? matched(records) : terminalMatched(records)).map(resultFromRecord)),
       )
       if (!input.timeoutMs) return yield* waitForRecords
       return yield* waitForRecords.pipe(

@@ -512,4 +512,48 @@ describe("tool.task", () => {
       }),
     ),
   )
+
+  it.live("wait mode any returns only terminal matched tasks", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const tasks = yield* TaskRuntime.Service
+        const { chat } = yield* seed()
+        const first = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_any_done" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "done task",
+          prompt: "do first",
+          dependsOn: [],
+        })
+        const second = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_any_pending" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "pending task",
+          prompt: "do second",
+          dependsOn: [],
+        })
+
+        yield* tasks.complete({
+          taskID: first.task_id,
+          parentSessionID: chat.id,
+          output: "finished first",
+        })
+
+        const result = yield* tasks.wait({
+          parentSessionID: chat.id,
+          taskIDs: [first.task_id, second.task_id],
+          mode: "any",
+          timeoutMs: 1000,
+        })
+
+        expect(result).toHaveLength(1)
+        expect(result[0]?.task_id).toBe(first.task_id)
+        expect(result[0]?.status).toBe("completed")
+      }),
+    ),
+  )
 })
