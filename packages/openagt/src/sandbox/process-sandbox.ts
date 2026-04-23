@@ -8,6 +8,7 @@
 import { spawn } from "bun"
 import { Effect, Layer, Context } from "effect"
 import { spawn as nodeSpawn } from "child_process"
+import { Shell } from "@/shell/shell"
 import { Log } from "../util"
 
 type BunChildProcess = {
@@ -82,9 +83,9 @@ export function resetSandboxStats(): void {
 
 function shellKind(shell?: string) {
   if (process.platform !== "win32") return "posix" as const
-  const lower = shell?.toLowerCase()
-  if (!lower) return "cmd" as const
-  if (lower.includes("powershell") || lower.includes("pwsh")) return "powershell" as const
+  const name = shell ? Shell.name(shell) : "cmd"
+  if (name === "powershell" || name === "pwsh") return "powershell" as const
+  if (Shell.posix(shell || "")) return "posix" as const
   return "cmd" as const
 }
 
@@ -92,6 +93,9 @@ function buildArgs(command: string, shell?: string): [string, string[]] {
   if (process.platform === "win32") {
     if (shellKind(shell) === "powershell") {
       return [shell || DEFAULT_POWERSHELL, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]]
+    }
+    if (shellKind(shell) === "posix") {
+      return [shell || "/bin/sh", [Shell.login(shell || "") ? "-lc" : "-c", command]]
     }
     return [shell || DEFAULT_CMD, ["/d", "/s", "/c", command]]
   }

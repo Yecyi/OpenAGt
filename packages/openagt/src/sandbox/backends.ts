@@ -1,6 +1,7 @@
 import path from "path"
 import { Global } from "@/global"
 import { Flag } from "@/flag/flag"
+import { Shell } from "@/shell/shell"
 import { spawn } from "child_process"
 import type {
   SandboxBackendName,
@@ -62,6 +63,10 @@ function shellArgs(request: SandboxExecRequest) {
   if (process.platform === "win32") {
     if (request.shell_family === "powershell") {
       return [request.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", request.command]] as const
+    }
+    if (request.shell_family === "posix") {
+      const login = Shell.login(request.shell)
+      return [request.shell, [login ? "-lc" : "-c", request.command]] as const
     }
     return [request.shell, ["/d", "/s", "/c", request.command]] as const
   }

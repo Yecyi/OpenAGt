@@ -8,6 +8,7 @@ import {
   spawnWithSandbox,
   spawnWithSandboxSync,
 } from "../../src/sandbox/process-sandbox"
+import { Shell } from "../../src/shell/shell"
 
 const isWindows = process.platform === "win32"
 
@@ -85,6 +86,17 @@ describe("spawnWithSandbox", () => {
       shell: "powershell.exe",
     })
     expect(result.stdout).toContain("sandbox-ps")
+  })
+
+  test("supports posix shells on windows", async () => {
+    if (!isWindows) return
+    const shell = Shell.gitbash()
+    if (!shell) return
+    const result = await spawnWithSandbox("printf 'sandbox-bash'", {
+      timeoutMs: 5000,
+      shell,
+    })
+    expect(result.stdout).toContain("sandbox-bash")
   })
 })
 
