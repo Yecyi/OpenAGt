@@ -28,6 +28,18 @@ Technical documentation:
 - [Technical Architecture](C:\Users\Administrator\Desktop\OpenAG\docs\technical\architecture.md)
 - [Windows Signing](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md)
 
+## OpenCode vs OpenAGt
+
+| Topic | OpenCode | OpenAGt |
+| --- | --- | --- |
+| Primary identity | Historical / compatibility name | Current project and release name |
+| Main CLI | `opencode` | `openagt` |
+| Windows installer branding | Legacy naming not preferred | `OpenAGt-Setup-x64.msi` |
+| Portable Windows asset | Legacy naming not preferred | `openagt-windows-x64.zip` |
+| Config compatibility | `.opencode/`, `opencode.jsonc`, `OPENCODE_*` | `OPENAGT_*` with compatibility support for old names |
+| Runtime direction | Compatibility reference | Active backend-first agentic coding runtime |
+| Release scope | Legacy transition surface | CLI, TUI, server, JavaScript SDK |
+
 ## Release
 
 Current stable release:
