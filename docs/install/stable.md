@@ -23,6 +23,18 @@ Preferred install path:
 
 - `OpenAGt-Setup-x64.msi`
 
+After installing the MSI, open a new terminal and run:
+
+```powershell
+openagt
+```
+
+Compatibility alias:
+
+```powershell
+opencode
+```
+
 Portable install path:
 
 - extract `openagt-windows-x64.zip`

@@ -112,7 +112,10 @@ async function createReleasePackage(input: {
       path.join(binDir, "opencode"),
       `#!/usr/bin/env sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$DIR/openagt" "$@"\n`,
     )
-    await $`chmod 755 ${path.join(binDir, "openagt")} ${path.join(binDir, "opencode")}`
+    await Promise.all([
+      fs.promises.chmod(path.join(binDir, "openagt"), 0o755),
+      fs.promises.chmod(path.join(binDir, "opencode"), 0o755),
+    ])
   }
   await Bun.write(path.join(releaseDir, "README.txt"), releaseReadme(input))
   await Bun.write(path.join(releaseDir, "VERSION.txt"), `${Script.version}\n`)

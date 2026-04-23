@@ -198,6 +198,12 @@ The stable release publishes these first-party assets:
 
 The compatibility alias `opencode` remains available in packaged builds as a wrapper entrypoint.
 
+On Windows, the MSI installs `openagt` into `PATH`. After installation, open a new terminal and run:
+
+```powershell
+openagt
+```
+
 ### Release Validation Status
 
 The current `v1.15.0` release branch has passed these release-critical checks:

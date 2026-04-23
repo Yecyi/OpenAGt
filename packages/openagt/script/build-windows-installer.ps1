@@ -29,8 +29,8 @@ $wxsPath = Join-Path $env:TEMP "openagt-installer-$Version.wxs"
 
 $content = @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="OpenAGt" Manufacturer="OpenAGt" Version="$msiVersion" UpgradeCode="16d54b50-66f9-4d5d-b546-1d7db0b2289a">
-    <MediaTemplate />
+  <Package Name="OpenAGt" Manufacturer="OpenAGt" Version="$msiVersion" UpgradeCode="16d54b50-66f9-4d5d-b546-1d7db0b2289a" Scope="perMachine">
+    <MediaTemplate EmbedCab="yes" />
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenAGt">
         <Directory Id="BIN" Name="bin" />
@@ -51,6 +51,10 @@ $content = @"
       <Component Guid="*">
         <File Source="$((Join-Path $binRoot 'opencode.cmd').Replace('\','\\'))" />
       </Component>
+      <Component Guid="*">
+        <RegistryValue Root="HKLM" Key="Software\OpenAGt" Name="InstallBin" Type="string" Value="[BIN]" KeyPath="yes" />
+        <Environment Name="PATH" Value="[BIN]" Part="last" Action="set" System="yes" />
+      </Component>
     </ComponentGroup>
   </Fragment>
 </Wix>
@@ -59,5 +63,10 @@ $content = @"
 Set-Content -Path $wxsPath -Value $content -Encoding UTF8
 
 & $wix.Source build $wxsPath -arch x64 -o $OutputPath
+
+$wixpdbPath = [System.IO.Path]::ChangeExtension($OutputPath, ".wixpdb")
+if (Test-Path $wixpdbPath) {
+  Remove-Item $wixpdbPath -Force
+}
 
 Write-Host "Built MSI: $OutputPath"
