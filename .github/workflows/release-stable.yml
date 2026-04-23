@@ -94,7 +94,19 @@ jobs:
       - name: Sign Windows MSI
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\script\sign-windows.ps1 .\packages\openagt\dist\OpenAGt-Setup-x64.msi
+        env:
+          OPENAGT_REQUIRE_WINDOWS_SIGNING: ${{ inputs.release_kind == 'ga' && '1' || '0' }}
+        run: |
+          .\script\sign-windows.ps1 `
+            .\packages\openagt\dist\openagt-windows-x64\release\bin\openagt.exe `
+            .\packages\openagt\dist\OpenAGt-Setup-x64.msi
+
+      - name: Repack signed Windows ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item .\packages\openagt\dist\openagt-windows-x64.zip -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path .\packages\openagt\dist\openagt-windows-x64\release\* -DestinationPath .\packages\openagt\dist\openagt-windows-x64.zip -Force
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4

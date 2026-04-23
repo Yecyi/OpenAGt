@@ -1,4 +1,5 @@
 param(
+  [switch] $RequireSigning,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]] $Path
 )
@@ -9,9 +10,8 @@ if (-not $Path -or $Path.Count -eq 0) {
   throw "At least one path is required"
 }
 
-if ($env:GITHUB_ACTIONS -ne "true") {
-  Write-Host "Skipping Windows signing because this is not running on GitHub Actions"
-  exit 0
+if (-not $RequireSigning -and $env:OPENAGT_REQUIRE_WINDOWS_SIGNING -eq "1") {
+  $RequireSigning = $true
 }
 
 $vars = @{
@@ -20,9 +20,21 @@ $vars = @{
   profile = $env:AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE
 }
 
-if ($vars.Values | Where-Object { -not $_ }) {
-  Write-Host "Skipping Windows signing because Azure Artifact Signing is not configured"
+function Complete-SigningSkip {
+  param(
+    [string] $Message
+  )
+
+  if ($RequireSigning) {
+    throw $Message
+  }
+
+  Write-Host $Message
   exit 0
+}
+
+if ($vars.Values | Where-Object { -not $_ }) {
+  Complete-SigningSkip "Skipping Windows signing because Azure Trusted Signing is not configured"
 }
 
 $moduleVersion = "0.5.8"
@@ -47,6 +59,9 @@ if (-not $files -or $files.Count -eq 0) {
   throw "No files matched the requested paths"
 }
 
+Write-Host "Signing files:"
+$files | ForEach-Object { Write-Host " - $_" }
+
 $params = @{
   Endpoint                         = $vars.endpoint
   CodeSigningAccountName           = $vars.account
@@ -68,3 +83,17 @@ $params = @{
 }
 
 Invoke-TrustedSigning @params
+
+$invalid = @($files | ForEach-Object { Get-AuthenticodeSignature $_ } | Where-Object { $_.Status -ne "Valid" })
+
+if ($invalid.Count -gt 0) {
+  $details = $invalid | ForEach-Object { "$($_.Path): $($_.Status) $($_.StatusMessage)" }
+  throw "Windows signing verification failed:`n$($details -join "`n")"
+}
+
+Write-Host "Verified Authenticode signatures:"
+$files | ForEach-Object {
+  $signature = Get-AuthenticodeSignature $_
+  $subject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "<no signer>" }
+  Write-Host " - $_ => $subject"
+}
