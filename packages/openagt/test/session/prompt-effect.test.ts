@@ -44,6 +44,7 @@ import { SandboxBroker } from "../../src/sandbox/broker"
 import { SandboxPolicy } from "../../src/sandbox/policy"
 import { ShellRunner } from "../../src/shell/runner"
 import { ShellSecurity } from "../../src/security/shell-security"
+import { ExecPolicy } from "../../src/security/exec-policy"
 import { provideTmpdirInstance, provideTmpdirServer } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
@@ -178,6 +179,7 @@ function makeHttp() {
     SandboxPolicy.liveLayer,
     ShellRunner.defaultLayer,
     ShellSecurity.defaultLayer,
+    ExecPolicy.defaultLayer,
   ).pipe(Layer.provideMerge(infra))
   const question = Question.layer.pipe(Layer.provideMerge(deps))
   const todo = Todo.layer.pipe(Layer.provideMerge(deps))

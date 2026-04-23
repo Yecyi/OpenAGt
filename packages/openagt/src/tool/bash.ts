@@ -25,6 +25,8 @@ import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner
 
 import { ShellSecurity } from "../security/shell-security"
 import type { ShellDecision, ShellFinding, ShellRiskLevel } from "../security/shell-security"
+import { ExecPolicy } from "@/security/exec-policy"
+import type { ExecPolicyDecision } from "@/security/exec-policy"
 import type {
   SandboxBackendPreference,
   SandboxEnforcement,
@@ -43,6 +45,9 @@ type BashMetadata = {
   reviewApiVersion: 1
   reviewMode: "disabled"
   reviewStatus: "not_requested"
+  policyDecision?: ExecPolicyDecision
+  policyReason?: string
+  matchedRules?: string[]
   outputPath?: string
   backendPreference?: SandboxBackendPreference
   enforcement?: SandboxEnforcement
@@ -345,6 +350,16 @@ const askShellNetwork = Effect.fn(
   })
 })
 
+const DECISION_ORDER: Record<ExecPolicyDecision, number> = {
+  allow: 0,
+  confirm: 1,
+  block: 2,
+}
+
+function stricterDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): ExecPolicyDecision {
+  return DECISION_ORDER[left] >= DECISION_ORDER[right] ? left : right
+}
+
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
   const { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
@@ -380,6 +395,7 @@ export const BashTool = Tool.define(
     const fs = yield* AppFileSystem.Service
     const plugin = yield* Plugin.Service
     const shellSecurity = yield* ShellSecurity.Service
+    const execPolicy = yield* ExecPolicy.Service
     const shellRunner = yield* ShellRunner.Service
     const sandboxPolicy = yield* SandboxPolicy.Service
 
@@ -550,6 +566,16 @@ export const BashTool = Tool.define(
             shell,
             cwd,
           })
+          const policyDecision = yield* execPolicy.evaluate({
+            command: security.normalized_command || params.command,
+            shellFamily: security.shell_family,
+          })
+          const finalDecision = stricterDecision(security.decision, policyDecision.decision)
+          const finalReason =
+            finalDecision === policyDecision.decision && policyDecision.matchedRules.length > 0
+              ? policyDecision.reason
+              : security.explanation
+          const matchedRules = policyDecision.matchedRules.map((item) => item.pattern.join(" "))
           const externalPaths = Array.from(scan.dirs)
           const permissionMetadata = shellSecurity.createPermissionMetadata({
             result: security,
@@ -559,21 +585,27 @@ export const BashTool = Tool.define(
           })
           const policy = yield* sandboxPolicy.resolve({
             result: security,
+            decision: finalDecision,
             cwd,
             externalPaths,
           })
           const metadata = {
             ...permissionMetadata,
+            decision: finalDecision,
+            reason: finalReason,
             backendPreference: policy.backend_preference,
             enforcement: policy.enforcement,
             filesystemPolicy: policy.filesystem_policy,
             networkPolicy: policy.network_policy,
             allowedPathsSummary: policy.allowed_paths,
             backendAvailability: policy.sandbox.backend,
+            ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
+            ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
+            ...(matchedRules.length > 0 ? { matchedRules } : {}),
           }
 
-          if (security.decision === "block") {
-            const errorMsg = `Dangerous command blocked: ${security.explanation}`
+          if (finalDecision === "block") {
+            const errorMsg = `Dangerous command blocked: ${finalReason}`
             return {
               title: "Bash Command Blocked",
               metadata: {
@@ -583,17 +615,20 @@ export const BashTool = Tool.define(
                 truncated: false,
                 findings: security.findings,
                 riskLevel: security.risk_level,
-                decision: security.decision,
+                decision: finalDecision,
                 reviewApiVersion: security.review_api_version,
                 reviewMode: security.review_mode,
                 reviewStatus: security.review_status,
+                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
+                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
+                ...(matchedRules.length > 0 ? { matchedRules } : {}),
               } satisfies BashMetadata,
               output: errorMsg,
             }
           }
 
           yield* ask(ctx, scan, metadata)
-          if (security.decision === "confirm") {
+          if (finalDecision === "confirm") {
             yield* askShellExecute(ctx, {
               patterns: [security.normalized_command || params.command],
               metadata,
@@ -634,10 +669,13 @@ export const BashTool = Tool.define(
                 ...result.metadata,
                 findings: security.findings,
                 riskLevel: security.risk_level,
-                decision: security.decision,
+                decision: finalDecision,
                 reviewApiVersion: security.review_api_version,
                 reviewMode: security.review_mode,
                 reviewStatus: security.review_status,
+                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
+                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
+                ...(matchedRules.length > 0 ? { matchedRules } : {}),
               },
             })),
           )

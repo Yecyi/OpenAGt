@@ -142,6 +142,34 @@ test("loads JSON config file", async () => {
   })
 })
 
+test("loads exec policy rules from config", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await writeConfig(dir, {
+        $schema: "https://opencode.ai/config.json",
+        exec_policy: {
+          rules: [
+            {
+              pattern: [["curl", "wget"]],
+              decision: "confirm",
+              justification: "Remote downloads require confirmation.",
+            },
+          ],
+        },
+      })
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await load()
+      expect(config.exec_policy?.rules).toHaveLength(1)
+      expect(config.exec_policy?.rules[0]?.decision).toBe("confirm")
+      expect(config.exec_policy?.rules[0]?.pattern[0]).toEqual(["curl", "wget"])
+    },
+  })
+})
+
 test("loads formatter boolean config", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

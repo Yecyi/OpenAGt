@@ -14,6 +14,7 @@ import type {
 
 export type ResolveInput = {
   result: ShellSecurityResult
+  decision?: ShellDecision
   cwd: string
   externalPaths: string[]
 }
@@ -90,9 +91,10 @@ export const layer = Layer.effect(
       const needsNetwork = inferNetwork(input.result)
       const allowed = allowedPaths(input.cwd, input.externalPaths)
       const writable = writablePaths(input.cwd, input.externalPaths)
+      const decision = input.decision ?? input.result.decision
       return {
         sandbox,
-        enforcement: enforcement(input.result.decision, input.result.risk_level),
+        enforcement: enforcement(decision, input.result.risk_level),
         backend_preference: sandbox.backend,
         filesystem_policy: "workspace_write",
         network_policy: needsNetwork ? "full" : "none",

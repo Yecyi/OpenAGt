@@ -51,6 +51,7 @@ import { Skill } from "../skill"
 import { Permission } from "@/permission"
 import { ShellRunner } from "@/shell/runner"
 import { ShellSecurity } from "@/security/shell-security"
+import { ExecPolicy } from "@/security/exec-policy"
 import { TaskRuntime } from "@/session/task-runtime"
 import { SandboxBroker } from "@/sandbox/broker"
 import { SandboxPolicy } from "@/sandbox/policy"
@@ -370,6 +371,7 @@ export const defaultLayer = Layer.suspend(() => {
     SandboxPolicy.liveLayer,
     ShellRunner.defaultLayer,
     ShellSecurity.defaultLayer,
+    ExecPolicy.defaultLayer,
     FetchHttpClient.layer,
     Format.defaultLayer,
     CrossSpawnSpawner.defaultLayer,

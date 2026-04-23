@@ -27,6 +27,7 @@ import { InstanceRef } from "@/effect/instance-ref"
 import { zod, ZodOverride } from "@/util/effect-zod"
 import { ConfigAgent } from "./agent"
 import { ConfigCommand } from "./command"
+import { ConfigExecPolicy } from "./exec-policy"
 import { ConfigFormatter } from "./formatter"
 import { ConfigLayout } from "./layout"
 import { ConfigLSP } from "./lsp"
@@ -192,6 +193,9 @@ const InfoSchema = Schema.Struct({
   }),
   layout: Schema.optional(ConfigLayout.Layout).annotate({ description: "@deprecated Always uses stretch layout." }),
   permission: Schema.optional(PermissionRef),
+  exec_policy: Schema.optional(ConfigExecPolicy.Info).annotate({
+    description: "Prefix-based shell execution policy rules that strengthen shell approvals and blocking.",
+  }),
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
   enterprise: Schema.optional(
     Schema.Struct({

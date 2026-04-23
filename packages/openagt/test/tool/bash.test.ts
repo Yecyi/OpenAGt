@@ -16,6 +16,7 @@ import { AppFileSystem } from "@openagt/shared/filesystem"
 import { Plugin } from "../../src/plugin"
 import { ShellRunner } from "../../src/shell/runner"
 import { ShellSecurity } from "../../src/security/shell-security"
+import { ExecPolicy } from "../../src/security/exec-policy"
 import { SandboxBroker } from "../../src/sandbox/broker"
 import { SandboxPolicy } from "../../src/sandbox/policy"
 import { Config } from "../../src/config"
@@ -51,23 +52,28 @@ const config = Layer.succeed(
   }),
 )
 
-const runtime = ManagedRuntime.make(
-  Layer.mergeAll(
-    CrossSpawnSpawner.defaultLayer,
-    AppFileSystem.defaultLayer,
-    config,
-    Plugin.defaultLayer,
-    Truncate.defaultLayer,
-    Agent.defaultLayer,
-    SandboxBroker.defaultLayer,
-    SandboxPolicy.layer.pipe(Layer.provide(config)),
-    ShellRunner.defaultLayer,
-    ShellSecurity.defaultLayer,
-  ),
-)
+function createRuntime(configLayer = config) {
+  return ManagedRuntime.make(
+    Layer.mergeAll(
+      CrossSpawnSpawner.defaultLayer,
+      AppFileSystem.defaultLayer,
+      configLayer,
+      Plugin.defaultLayer,
+      Truncate.defaultLayer,
+      Agent.defaultLayer,
+      SandboxBroker.defaultLayer,
+      SandboxPolicy.layer.pipe(Layer.provide(configLayer)),
+      ShellRunner.defaultLayer,
+      ShellSecurity.defaultLayer,
+      ExecPolicy.layer.pipe(Layer.provide(configLayer)),
+    ),
+  )
+}
 
-function initBash() {
-  return runtime.runPromise(BashTool.pipe(Effect.flatMap((info) => info.init())))
+const runtime = createRuntime()
+
+function initBash(configLayer = config) {
+  return createRuntime(configLayer).runPromise(BashTool.pipe(Effect.flatMap((info) => info.init())))
 }
 
 const ctx = {
@@ -248,6 +254,71 @@ describe("tool.bash permissions", () => {
         expect(result.metadata.reviewMode).toBe("disabled")
         expect(result.metadata.reviewStatus).toBe("not_requested")
         expect(requests).toHaveLength(0)
+      },
+    })
+  })
+
+  each("exec policy can force confirmation for otherwise safe commands", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const configWithPolicy = Layer.succeed(
+          Config.Service,
+          Config.Service.of({
+            get: () =>
+              Effect.succeed({
+                exec_policy: {
+                  rules: [
+                    {
+                      pattern: [["curl", "wget"]],
+                      decision: "confirm",
+                      justification: "Remote downloads require confirmation.",
+                    },
+                  ],
+                },
+                experimental: {
+                  sandbox: {
+                    enabled: true,
+                    backend: "process",
+                    failure_policy: "fallback",
+                    report_only: false,
+                    broker_idle_ttl_ms: 300_000,
+                  },
+                },
+              }),
+            getGlobal: () => Effect.succeed({}),
+            getConsoleState: () =>
+              Effect.succeed({
+                consoleManagedProviders: [],
+                activeOrgName: undefined,
+                switchableOrgCount: 0,
+              }),
+            update: () => Effect.void,
+            updateGlobal: () => Effect.succeed({}),
+            invalidate: () => Effect.void,
+            invalidateDirectory: () => Effect.void,
+            directories: () => Effect.succeed([]),
+            waitForDependencies: () => Effect.void,
+          }),
+        )
+        const bash = await initBash(configWithPolicy)
+        const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
+        await Effect.runPromise(
+          bash.execute(
+            {
+              command: "curl https://example.com",
+              description: "Download remote content",
+            },
+            capture(requests),
+          ),
+        )
+        const confirm = requests.find((item) => item.permission === "shell_execute")
+        expect(confirm?.metadata).toMatchObject({
+          decision: "confirm",
+          policyDecision: "confirm",
+          policyReason: "Remote downloads require confirmation.",
+        })
       },
     })
   })
