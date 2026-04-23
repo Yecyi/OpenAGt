@@ -1503,7 +1503,8 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
 
   const toolprops = {
     get metadata() {
-      return props.part.state.status === "pending" ? {} : (props.part.state.metadata ?? {})
+      if (props.part.state.status === "pending") return {}
+      return isRecord(props.part.state.metadata) ? props.part.state.metadata : {}
     },
     get input() {
       return props.part.state.input ?? {}
@@ -1579,16 +1580,101 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
 
 type ToolProps<T> = {
   input: Partial<Tool.InferParameters<T>>
-  metadata: Partial<Tool.InferMetadata<T>>
-  permission: Record<string, any>
+  metadata: Record<string, unknown>
+  permission: Record<string, unknown> | undefined
   tool: string
-  output?: string
+  output?: unknown
   part: ToolPart
 }
+type DiagnosticEntry = {
+  severity?: number
+  message?: string
+  range?: {
+    start?: {
+      line?: number
+      character?: number
+    }
+  }
+}
+
+type DiagnosticsMap = Record<string, DiagnosticEntry[]>
+
+type PatchFile = {
+  type: string
+  relativePath: string
+  filePath: string
+  patch: string
+  deletions: number
+  movePath?: string
+}
+
+type TodoMetadataItem = {
+  status: string
+  content: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value : undefined
+}
+
+function asNumber(value: unknown) {
+  return typeof value === "number" ? value : undefined
+}
+
+function asStringArray(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === "string")
+}
+
+function asDiagnostics(value: unknown): DiagnosticsMap | undefined {
+  if (!isRecord(value)) return undefined
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, item]) => {
+      if (!Array.isArray(item)) return []
+      return [[key, item.filter((entry): entry is DiagnosticEntry => isRecord(entry))]]
+    }),
+  )
+}
+
+function asPatchFiles(value: unknown): PatchFile[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const type = asString(item.type)
+    const relativePath = asString(item.relativePath)
+    const filePath = asString(item.filePath)
+    const patch = asString(item.patch)
+    const deletions = asNumber(item.deletions)
+    if (!type || !relativePath || !filePath || !patch || deletions === undefined) return []
+    const movePath = asString(item.movePath)
+    return [{ type, relativePath, filePath, patch, deletions, ...(movePath ? { movePath } : {}) }]
+  })
+}
+
+function asTodoItems(value: unknown): TodoMetadataItem[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const status = asString(item.status)
+    const content = asString(item.content)
+    if (!status || !content) return []
+    return [{ status, content }]
+  })
+}
+
+function asAnswerGroups(value: unknown): ReadonlyArray<ReadonlyArray<string>> {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => asStringArray(item))
+}
+
 function GenericTool(props: ToolProps<any>) {
   const { theme } = useTheme()
   const ctx = use()
-  const output = createMemo(() => props.output?.trim() ?? "")
+  const output = createMemo(() => (typeof props.output === "string" ? props.output.trim() : ""))
   const [expanded, setExpanded] = createSignal(false)
   const lines = createMemo(() => output().split("\n"))
   const maxLines = 3
@@ -1766,7 +1852,7 @@ function Bash(props: ToolProps<typeof BashTool>) {
   const { theme } = useTheme()
   const sync = useSync()
   const isRunning = createMemo(() => props.part.state.status === "running")
-  const output = createMemo(() => stripAnsi(props.metadata.output?.trim() ?? ""))
+  const output = createMemo(() => stripAnsi(asString(props.metadata.output)?.trim() ?? ""))
   const [expanded, setExpanded] = createSignal(false)
   const lines = createMemo(() => output().split("\n"))
   const overflow = createMemo(() => lines().length > 10)
@@ -1802,7 +1888,7 @@ function Bash(props: ToolProps<typeof BashTool>) {
 
   return (
     <Switch>
-      <Match when={props.metadata.output !== undefined}>
+      <Match when={asString(props.metadata.output) !== undefined}>
         <BlockTool
           title={title()}
           part={props.part}
@@ -1831,6 +1917,7 @@ function Bash(props: ToolProps<typeof BashTool>) {
 
 function Write(props: ToolProps<typeof WriteTool>) {
   const { theme, syntax } = useTheme()
+  const diagnostics = createMemo(() => asDiagnostics(props.metadata.diagnostics))
   const code = createMemo(() => {
     if (!props.input.content) return ""
     return props.input.content
@@ -1838,7 +1925,7 @@ function Write(props: ToolProps<typeof WriteTool>) {
 
   return (
     <Switch>
-      <Match when={props.metadata.diagnostics !== undefined}>
+      <Match when={diagnostics()}>
         <BlockTool title={"# Wrote " + normalizePath(props.input.filePath!)} part={props.part}>
           <line_number fg={theme.textMuted} minWidth={3} paddingRight={1}>
             <code
@@ -1849,7 +1936,7 @@ function Write(props: ToolProps<typeof WriteTool>) {
               content={code()}
             />
           </line_number>
-          <Diagnostics diagnostics={props.metadata.diagnostics} filePath={props.input.filePath ?? ""} />
+          <Diagnostics diagnostics={diagnostics()} filePath={props.input.filePath ?? ""} />
         </BlockTool>
       </Match>
       <Match when={true}>
@@ -1862,11 +1949,12 @@ function Write(props: ToolProps<typeof WriteTool>) {
 }
 
 function Glob(props: ToolProps<typeof GlobTool>) {
+  const count = createMemo(() => asNumber(props.metadata.count))
   return (
     <InlineTool icon="✱" pending="Finding files..." complete={props.input.pattern} part={props.part}>
       Glob "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
-      <Show when={props.metadata.count}>
-        ({props.metadata.count} {props.metadata.count === 1 ? "match" : "matches"})
+      <Show when={count() !== undefined}>
+        ({count()} {count() === 1 ? "match" : "matches"})
       </Show>
     </InlineTool>
   )
@@ -1878,9 +1966,7 @@ function Read(props: ToolProps<typeof ReadTool>) {
   const loaded = createMemo(() => {
     if (props.part.state.status !== "completed") return []
     if (props.part.state.time.compacted) return []
-    const value = props.metadata.loaded
-    if (!value || !Array.isArray(value)) return []
-    return value.filter((p): p is string => typeof p === "string")
+    return asStringArray(props.metadata.loaded)
   })
   return (
     <>
@@ -1907,11 +1993,12 @@ function Read(props: ToolProps<typeof ReadTool>) {
 }
 
 function Grep(props: ToolProps<typeof GrepTool>) {
+  const matches = createMemo(() => asNumber(props.metadata.matches))
   return (
     <InlineTool icon="✱" pending="Searching content..." complete={props.input.pattern} part={props.part}>
       Grep "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
-      <Show when={props.metadata.matches}>
-        ({props.metadata.matches} {props.metadata.matches === 1 ? "match" : "matches"})
+      <Show when={matches() !== undefined}>
+        ({matches()} {matches() === 1 ? "match" : "matches"})
       </Show>
     </InlineTool>
   )
@@ -1926,19 +2013,19 @@ function WebFetch(props: ToolProps<typeof WebFetchTool>) {
 }
 
 function CodeSearch(props: ToolProps<typeof CodeSearchTool>) {
-  const metadata = props.metadata as { results?: number }
+  const results = createMemo(() => asNumber(props.metadata.results))
   return (
     <InlineTool icon="◇" pending="Searching code..." complete={props.input.query} part={props.part}>
-      Exa Code Search "{props.input.query}" <Show when={metadata.results}>({metadata.results} results)</Show>
+      Exa Code Search "{props.input.query}" <Show when={results() !== undefined}>({results()} results)</Show>
     </InlineTool>
   )
 }
 
 function WebSearch(props: ToolProps<typeof WebSearchTool>) {
-  const metadata = props.metadata as { numResults?: number }
+  const numResults = createMemo(() => asNumber(props.metadata.numResults))
   return (
     <InlineTool icon="◈" pending="Searching web..." complete={props.input.query} part={props.part}>
-      Exa Web Search "{props.input.query}" <Show when={metadata.numResults}>({metadata.numResults} results)</Show>
+      Exa Web Search "{props.input.query}" <Show when={numResults() !== undefined}>({numResults()} results)</Show>
     </InlineTool>
   )
 }
@@ -1946,13 +2033,13 @@ function WebSearch(props: ToolProps<typeof WebSearchTool>) {
 function Task(props: ToolProps<typeof TaskTool>) {
   const { navigate } = useRoute()
   const sync = useSync()
+  const sessionID = createMemo(() => asString(props.metadata.sessionId))
 
   onMount(() => {
-    if (props.metadata.sessionId && !sync.data.message[props.metadata.sessionId]?.length)
-      void sync.session.sync(props.metadata.sessionId)
+    if (sessionID() && !sync.data.message[sessionID()!]?.length) void sync.session.sync(sessionID()!)
   })
 
-  const messages = createMemo(() => sync.data.message[props.metadata.sessionId ?? ""] ?? [])
+  const messages = createMemo(() => sync.data.message[sessionID() ?? ""] ?? [])
 
   const tools = createMemo(() => {
     return messages().flatMap((msg) =>
@@ -2003,8 +2090,8 @@ function Task(props: ToolProps<typeof TaskTool>) {
       pending="Delegating..."
       part={props.part}
       onClick={() => {
-        if (props.metadata.sessionId) {
-          navigate({ type: "session", sessionID: props.metadata.sessionId })
+        if (sessionID()) {
+          navigate({ type: "session", sessionID: sessionID()! })
         }
       }}
     >
@@ -2016,6 +2103,8 @@ function Task(props: ToolProps<typeof TaskTool>) {
 function Edit(props: ToolProps<typeof EditTool>) {
   const ctx = use()
   const { theme, syntax } = useTheme()
+  const diff = createMemo(() => asString(props.metadata.diff))
+  const diagnostics = createMemo(() => asDiagnostics(props.metadata.diagnostics))
 
   const view = createMemo(() => {
     const diffStyle = ctx.tui.diff_style
@@ -2026,15 +2115,13 @@ function Edit(props: ToolProps<typeof EditTool>) {
 
   const ft = createMemo(() => filetype(props.input.filePath))
 
-  const diffContent = createMemo(() => props.metadata.diff)
-
   return (
     <Switch>
-      <Match when={props.metadata.diff !== undefined}>
+      <Match when={diff() !== undefined}>
         <BlockTool title={"← Edit " + normalizePath(props.input.filePath!)} part={props.part}>
           <box paddingLeft={1}>
             <diff
-              diff={diffContent()}
+              diff={diff()!}
               view={view()}
               filetype={ft()}
               syntaxStyle={syntax()}
@@ -2053,7 +2140,7 @@ function Edit(props: ToolProps<typeof EditTool>) {
               removedLineNumberBg={theme.diffRemovedLineNumberBg}
             />
           </box>
-          <Diagnostics diagnostics={props.metadata.diagnostics} filePath={props.input.filePath ?? ""} />
+          <Diagnostics diagnostics={diagnostics()} filePath={props.input.filePath ?? ""} />
         </BlockTool>
       </Match>
       <Match when={true}>
@@ -2068,8 +2155,8 @@ function Edit(props: ToolProps<typeof EditTool>) {
 function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
   const ctx = use()
   const { theme, syntax } = useTheme()
-
-  const files = createMemo(() => props.metadata.files ?? [])
+  const diagnostics = createMemo(() => asDiagnostics(props.metadata.diagnostics))
+  const files = createMemo(() => asPatchFiles(props.metadata.files))
 
   const view = createMemo(() => {
     const diffStyle = ctx.tui.diff_style
@@ -2103,7 +2190,7 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
     )
   }
 
-  function title(file: { type: string; relativePath: string; filePath: string; deletions: number }) {
+  function title(file: PatchFile) {
     if (file.type === "delete") return "# Deleted " + file.relativePath
     if (file.type === "add") return "# Created " + file.relativePath
     if (file.type === "move") return "# Moved " + normalizePath(file.filePath) + " → " + file.relativePath
@@ -2125,7 +2212,7 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
                 }
               >
                 <Diff diff={file.patch} filePath={file.filePath} />
-                <Diagnostics diagnostics={props.metadata.diagnostics} filePath={file.movePath ?? file.filePath} />
+                <Diagnostics diagnostics={diagnostics()} filePath={file.movePath ?? file.filePath} />
               </Show>
             </BlockTool>
           )}
@@ -2141,12 +2228,13 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>) {
 }
 
 function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
+  const todos = createMemo(() => asTodoItems(props.metadata.todos))
   return (
     <Switch>
-      <Match when={props.metadata.todos?.length}>
+      <Match when={todos().length}>
         <BlockTool title="# Todos" part={props.part}>
           <box>
-            <For each={props.input.todos ?? []}>
+            <For each={todos()}>
               {(todo) => <TodoItem status={todo.status} content={todo.content} />}
             </For>
           </box>
@@ -2164,6 +2252,7 @@ function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
 function Question(props: ToolProps<typeof QuestionTool>) {
   const { theme } = useTheme()
   const count = createMemo(() => props.input.questions?.length ?? 0)
+  const answers = createMemo(() => asAnswerGroups(props.metadata.answers))
 
   function format(answer?: ReadonlyArray<string>) {
     if (!answer?.length) return "(no answer)"
@@ -2172,14 +2261,14 @@ function Question(props: ToolProps<typeof QuestionTool>) {
 
   return (
     <Switch>
-      <Match when={props.metadata.answers}>
+      <Match when={answers().length}>
         <BlockTool title="# Questions" part={props.part}>
           <box gap={1}>
             <For each={props.input.questions ?? []}>
               {(q, i) => (
                 <box flexDirection="column">
                   <text fg={theme.textMuted}>{q.question}</text>
-                  <text fg={theme.text}>{format(props.metadata.answers?.[i()])}</text>
+                  <text fg={theme.text}>{format(answers()[i()])}</text>
                 </box>
               )}
             </For>
@@ -2203,12 +2292,26 @@ function Skill(props: ToolProps<typeof SkillTool>) {
   )
 }
 
-function Diagnostics(props: { diagnostics?: Record<string, Record<string, any>[]>; filePath: string }) {
+function Diagnostics(props: { diagnostics?: DiagnosticsMap; filePath: string }) {
   const { theme } = useTheme()
   const errors = createMemo(() => {
     const normalized = Filesystem.normalizePath(props.filePath)
     const arr = props.diagnostics?.[normalized] ?? []
-    return arr.filter((x) => x.severity === 1).slice(0, 3)
+    return arr
+      .filter(
+        (
+          x,
+        ): x is DiagnosticEntry & {
+          severity: number
+          message: string
+          range: { start: { line: number; character: number } }
+        } =>
+          x.severity === 1 &&
+          typeof x.message === "string" &&
+          x.range?.start?.line !== undefined &&
+          x.range.start.character !== undefined,
+      )
+      .slice(0, 3)
   })
 
   return (

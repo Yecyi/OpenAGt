@@ -106,7 +106,7 @@ export const TuiThreadCommand = cmd({
     // (Important when running under `bun run` wrappers on Windows.)
     const unguard = win32InstallCtrlCGuard()
     try {
-      // Must be the very first thing 鈥?disables CTRL_C_EVENT before any Worker
+      // Must be the very first thing — disables CTRL_C_EVENT before any Worker
       // spawn or async work so the OS cannot kill the process group.
       win32DisableProcessedInput()
 

@@ -67,7 +67,7 @@ export function FormatError(input: unknown) {
     const issues: Array<{ message: string; path: string[] }> = Array.isArray(data?.issues) ? data.issues : []
     return [
       `Configuration is invalid${path && path !== "config" ? ` at ${path}` : ""}` + (message ? `: ${message}` : ""),
-      ...issues.map((issue) => "鈫?" + issue.message + " " + issue.path.join(".")),
+      ...issues.map((issue) => "↳ " + issue.message + " " + issue.path.join(".")),
     ].join("\n")
   }
 

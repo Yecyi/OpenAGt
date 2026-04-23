@@ -446,9 +446,13 @@ describe("tool.edit", () => {
             ),
           )
 
-          expect(result.metadata.filediff).toBeDefined()
-          expect(result.metadata.filediff.file).toBe(filepath)
-          expect(result.metadata.filediff.additions).toBeGreaterThan(0)
+          const filediff = result.metadata.filediff
+          expect(filediff).toBeDefined()
+          expect(typeof filediff).toBe("object")
+          expect(Array.isArray(filediff)).toBe(false)
+          if (!filediff || typeof filediff !== "object" || Array.isArray(filediff)) throw new Error("Missing filediff")
+          expect("file" in filediff ? filediff.file : undefined).toBe(filepath)
+          expect("additions" in filediff ? filediff.additions : undefined).toBeGreaterThan(0)
         },
       })
     })

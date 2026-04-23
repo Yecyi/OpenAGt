@@ -9,7 +9,7 @@ type TaskListMetadata = {
   tasks: TaskRuntime.TaskRecord[]
 }
 
-export const TaskListTool = Tool.define(
+export const TaskListTool = Tool.define<typeof parameters, TaskListMetadata, TaskRuntime.Service>(
   "task_list",
   Effect.gen(function* () {
     const tasks = yield* TaskRuntime.Service

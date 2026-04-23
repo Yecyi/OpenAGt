@@ -45,6 +45,7 @@ const config = Layer.succeed(
     update: () => Effect.void,
     updateGlobal: () => Effect.succeed({}),
     invalidate: () => Effect.void,
+    invalidateDirectory: () => Effect.void,
     directories: () => Effect.succeed([]),
     waitForDependencies: () => Effect.void,
   }),

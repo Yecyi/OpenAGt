@@ -28,6 +28,10 @@ const CACHE_MAX_ENTRIES = 500
 const CACHE_MAX_BYTES = 8 * 1024 * 1024
 
 type CacheEntry = { value: string; bytes: number }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
 const cache = new Map<string, CacheEntry>()
 const cacheTotal = { bytes: 0 }
 

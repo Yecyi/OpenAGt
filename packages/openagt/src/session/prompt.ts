@@ -66,6 +66,18 @@ async function computeSHA256(text: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16)
 }
 
+export function parseFilePartRange(url: URL) {
+  const start = url.searchParams.get("start")
+  if (start == null) return {}
+  const startLine = Number.parseInt(start, 10)
+  if (Number.isNaN(startLine)) return {}
+  const end = url.searchParams.get("end")
+  if (end == null) return { start: startLine }
+  const endLine = Number.parseInt(end, 10)
+  if (Number.isNaN(endLine)) return { start: startLine }
+  return { start: startLine, end: endLine }
+}
+
 const STRUCTURED_OUTPUT_DESCRIPTION = `Use this tool to return your final response in the requested structured format.
 
 IMPORTANT:
@@ -392,7 +404,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
         sessionID: input.session.id,
-        abort: options.abortSignal ?? (() => { throw new Error("abortSignal is required for tool execution") }),
+        abort: options.abortSignal ?? AbortSignal.abort(new Error("abortSignal is required for tool execution")),
         messageID: input.processor.message.id,
         callID: options.toolCallId,
         extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
@@ -1136,11 +1148,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               if (part.mime === "text/plain") {
                 let offset: number | undefined
                 let limit: number | undefined
-                const range = { start: url.searchParams.get("start"), end: url.searchParams.get("end") }
-                if (range.start != null) {
+                const range = parseFilePartRange(url)
+                if (range.start !== undefined) {
                   const filePathURI = part.url.split("?")[0]
-                  let start = parseInt(range.start, 10)
-                  let end = range.end !== undefined ? parseInt(range.end, 10) : undefined
+                  let start = range.start
+                  let end = range.end
                   if (start === end) {
                     const symbols = yield* lsp.documentSymbol(filePathURI).pipe(Effect.catch(() => Effect.succeed([])))
                     for (const symbol of symbols) {
@@ -1409,7 +1421,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           )
           // Some providers return "stop" even when the assistant message contains tool calls.
           // Keep the loop running so tool results can be sent back to the model.
-          // Skip provider-executed tool parts 鈥?those were fully handled within the
+          // Skip provider-executed tool parts — those were fully handled within the
           // provider's stream (e.g. DWS Agent Platform) and don't need a re-loop.
           const hasToolCalls =
             lastAssistantMsg?.parts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ?? false

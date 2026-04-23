@@ -69,7 +69,7 @@ function RawMessage(props: {
         <Accordion.Trigger>
           <div class="flex items-center justify-between gap-2 w-full">
             <div class="min-w-0 truncate">
-              {props.message.role} <span class="text-text-base">鈥?{props.message.id}</span>
+              {props.message.role} <span class="text-text-base">• {props.message.id}</span>
             </div>
             <div class="flex items-center gap-3">
               <div class="shrink-0 text-12-regular text-text-weak">{props.time(props.message.time.created)}</div>
@@ -162,13 +162,13 @@ export function SessionContextTab() {
 
   const providerLabel = createMemo(() => {
     const c = ctx()
-    if (!c) return "鈥?
+    if (!c) return "—"
     return c.providerLabel
   })
 
   const modelLabel = createMemo(() => {
     const c = ctx()
-    if (!c) return "鈥?
+    if (!c) return "—"
     return c.modelLabel
   })
 
@@ -197,7 +197,7 @@ export function SessionContextTab() {
   }
 
   const stats = [
-    { label: "context.stats.session", value: () => info()?.title ?? params.id ?? "鈥? },
+    { label: "context.stats.session", value: () => info()?.title ?? params.id ?? "—" },
     { label: "context.stats.messages", value: () => counts().all.toLocaleString(language.intl()) },
     { label: "context.stats.provider", value: providerLabel },
     { label: "context.stats.model", value: modelLabel },

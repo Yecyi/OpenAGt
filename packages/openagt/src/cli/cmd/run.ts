@@ -135,7 +135,7 @@ function webfetch(info: ToolProps<typeof WebFetchTool>) {
 
 function edit(info: ToolProps<typeof EditTool>) {
   const title = normalizePath(info.input.filePath)
-  const diff = info.metadata.diff
+  const diff = typeof info.metadata.diff === "string" ? info.metadata.diff : undefined
   block(
     {
       icon: "←",

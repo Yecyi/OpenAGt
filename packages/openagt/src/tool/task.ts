@@ -157,7 +157,7 @@ export const TaskTool = Tool.define(
             sessionId: nextSession.id,
             model,
             taskId: nextSession.id,
-            status: "pending",
+            status: "pending" as const,
             groupId: params.group_id,
           },
           output: [
@@ -223,7 +223,7 @@ export const TaskTool = Tool.define(
                 sessionId: nextSession.id,
                 model,
                 taskId: nextSession.id,
-                status: "completed",
+                status: "completed" as const,
                 groupId: params.group_id,
               },
               output:

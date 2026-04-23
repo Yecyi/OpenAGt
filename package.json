@@ -12,6 +12,7 @@
     "dev:console": "ulimit -n 10240 2>/dev/null; bun run --cwd packages/console/app dev",
     "dev:storybook": "bun --cwd packages/storybook storybook",
     "lint": "oxlint",
+    "check:integrity": "bun run script/check-source-integrity.ts",
     "typecheck": "bun turbo typecheck",
     "postinstall": "bun run --cwd packages/openagt fix-node-pty",
     "prepare": "husky",

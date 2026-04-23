@@ -17,6 +17,7 @@ function createConfigLayer(config: unknown) {
       update: () => Effect.void,
       updateGlobal: () => Effect.succeed(config as any),
       invalidate: () => Effect.void,
+      invalidateDirectory: () => Effect.void,
       directories: () => Effect.succeed([]),
       waitForDependencies: () => Effect.void,
     }),

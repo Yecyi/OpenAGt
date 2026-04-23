@@ -13,7 +13,7 @@ type TaskStopMetadata = {
   task: TaskRuntime.TaskRecord
 }
 
-export const TaskStopTool = Tool.define(
+export const TaskStopTool = Tool.define<typeof parameters, TaskStopMetadata, TaskRuntime.Service>(
   "task_stop",
   Effect.gen(function* () {
     const tasks = yield* TaskRuntime.Service

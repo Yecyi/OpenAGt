@@ -44,7 +44,7 @@ export class EnvSanitizer {
   sanitize(): Record<string, string> {
     const sanitized: Record<string, string> = {}
     for (const [key, value] of Object.entries(this.env)) {
-      if (this.isSafeEnvVar(key)) {
+      if (this.isSafeEnvVar(key) && value !== undefined) {
         sanitized[key] = value
       }
     }

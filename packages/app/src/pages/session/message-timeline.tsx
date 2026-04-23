@@ -126,7 +126,7 @@ type TimelineStageInput = {
  * Defer-mounts small timeline windows so revealing older turns does not
  * block first paint with a large DOM mount.
  *
- * Once staging completes for a session it never re-stages 鈥?backfill and
+ * Once staging completes for a session it never re-stages — backfill and
  * new messages render immediately.
  */
 function createTimelineStaging(input: TimelineStageInput) {

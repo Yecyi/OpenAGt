@@ -18,7 +18,7 @@ type TaskGetMetadata =
       task: TaskRuntime.TaskRecord
     }
 
-export const TaskGetTool = Tool.define(
+export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskRuntime.Service>(
   "task_get",
   Effect.gen(function* () {
     const tasks = yield* TaskRuntime.Service

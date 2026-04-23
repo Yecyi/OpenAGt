@@ -87,7 +87,7 @@ interface Token {
 const COMMAND_BOUNDARY = new Set<TokenType>(["pipe", "semicolon"])
 const VALUE_TOKEN_TYPES = new Set<TokenType>(["word", "string_single", "string_double", "variable", "subexpression", "script_block"])
 
-const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
+export const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
   "invoke-expression": { severity: "high", reason: "Dynamic code execution" },
   iex: { severity: "high", reason: "Invoke-Expression alias - dynamic code execution" },
   "invoke-command": { severity: "high", reason: "Remote command execution" },

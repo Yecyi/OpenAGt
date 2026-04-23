@@ -6,8 +6,20 @@ import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
 
-type MetadataValue = string | number | boolean | null | undefined | Metadata
-interface Metadata {
+export type MetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly MetadataValue[]
+  | MetadataValue[]
+  | Metadata
+  | Readonly<Record<string, unknown>>
+  | Record<string, unknown>
+  | readonly unknown[]
+  | unknown[]
+export interface Metadata {
   [key: string]: MetadataValue
 }
 
@@ -37,7 +49,7 @@ export interface Def<Parameters extends z.ZodType = z.ZodType, M extends Metadat
   id: string
   description: string
   parameters: Parameters
-  execute(args: z.infer<Parameters>, ctx: Context): Effect.Effect<ExecuteResult<M>>
+  execute(args: z.infer<Parameters>, ctx: Context<M>): Effect.Effect<ExecuteResult<M>>
   formatValidationError?(error: z.ZodError): string
   isConcurrencySafe?: boolean
 }
@@ -72,12 +84,12 @@ function wrap<Parameters extends z.ZodType, Result extends Metadata>(
   init: Init<Parameters, Result>,
   truncate: Truncate.Interface,
   agents: Agent.Interface,
-) {
+): () => Effect.Effect<DefWithoutID<Parameters, Result>> {
   return () =>
     Effect.gen(function* () {
       const toolInfo = typeof init === "function" ? { ...(yield* init()) } : { ...init }
       const execute = toolInfo.execute
-      toolInfo.execute = (args, ctx) => {
+      toolInfo.execute = (args, ctx: Context<Result>) => {
         const attrs = {
           "tool.name": id,
           "session.id": ctx.sessionID,

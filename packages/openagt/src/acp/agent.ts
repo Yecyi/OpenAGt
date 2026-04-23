@@ -1005,10 +1005,10 @@ export class Agent implements ACPAgent {
         // Replay file attachments as appropriate ACP content blocks.
         // OpenCode stores files internally as { type: "file", url, filename, mime }.
         // We convert these back to ACP blocks based on the URL scheme and MIME type:
-        // - file:// URLs 鈫?resource_link
-        // - data: URLs with image/* 鈫?image block
-        // - data: URLs with text/* or application/json 鈫?resource with text
-        // - data: URLs with other types 鈫?resource with blob
+        // - file:// URLs → resource_link
+        // - data: URLs with image/* → image block
+        // - data: URLs with text/* or application/json → resource with text
+        // - data: URLs with other types → resource with blob
         const url = part.url
         const filename = part.filename ?? "file"
         const mime = part.mime || "application/octet-stream"

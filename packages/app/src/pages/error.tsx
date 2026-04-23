@@ -124,7 +124,7 @@ function formatInitError(error: InitError, t: Translator): string {
     }
     case "ConfigInvalidError": {
       const issues = Array.isArray(data.issues)
-        ? data.issues.filter(isIssue).map((issue) => "鈫?" + issue.message + " " + issue.path.join("."))
+        ? data.issues.filter(isIssue).map((issue) => "↳ " + issue.message + " " + issue.path.join("."))
         : []
       const message = typeof data.message === "string" ? data.message : ""
       const path = typeof data.path === "string" ? data.path : json(data.path)

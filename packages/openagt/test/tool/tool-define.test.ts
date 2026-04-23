@@ -4,10 +4,24 @@ import z from "zod"
 import { Agent } from "../../src/agent/agent"
 import { Tool } from "../../src/tool"
 import { Truncate } from "../../src/tool"
+import { MessageID, SessionID } from "../../src/session/schema"
 
 const runtime = ManagedRuntime.make(Layer.mergeAll(Truncate.defaultLayer, Agent.defaultLayer))
 
 const params = z.object({ input: z.string() })
+const richParams = z.object({ enabled: z.boolean() })
+
+type RichMetadata = {
+  truncated: boolean
+  todos: {
+    content: string
+    done: boolean
+  }[]
+  answers: readonly (readonly string[])[]
+  nested: {
+    count: number
+  }
+}
 
 function makeTool(id: string, executeFn?: () => void) {
   return {
@@ -55,5 +69,59 @@ describe("Tool.define", () => {
     const second = await Effect.runPromise(info.init())
 
     expect(first).not.toBe(second)
+  })
+
+  test("supports array metadata and typed execute context", async () => {
+    let updated: RichMetadata | undefined
+    const metadata = {
+      truncated: false,
+      todos: [{ content: "ship phase 2", done: false }],
+      answers: [["yes", "later"]] as const,
+      nested: { count: 1 },
+    } satisfies RichMetadata
+
+    const info = await runtime.runPromise(
+      Tool.define<typeof richParams, RichMetadata, never>(
+        "test-rich-metadata",
+        Effect.succeed({
+          description: "rich metadata tool",
+          parameters: richParams,
+          execute: (_args, ctx: Tool.Context<RichMetadata>) =>
+            Effect.gen(function* () {
+              yield* ctx.metadata({
+                metadata,
+              })
+              return {
+                title: "rich",
+                output: "ok",
+                metadata,
+              }
+            }),
+        }),
+      ),
+    )
+
+    const tool = await Effect.runPromise(info.init())
+    const result = await Effect.runPromise(
+      tool.execute(
+        { enabled: true },
+        {
+          sessionID: SessionID.make("session"),
+          messageID: MessageID.make("message"),
+          agent: "build",
+          abort: new AbortController().signal,
+          messages: [],
+          metadata: (input) =>
+            Effect.sync(() => {
+              updated = input.metadata
+            }),
+          ask: () => Effect.void,
+        },
+      ),
+    )
+
+    expect(updated?.todos[0]?.content).toBe("ship phase 2")
+    expect(result.metadata.answers[0]).toEqual(["yes", "later"])
+    expect(result.metadata.nested.count).toBe(1)
   })
 })

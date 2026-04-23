@@ -29,7 +29,6 @@ const createSessionUrl = action(async (workspaceID: string, returnUrl: string) =
 export function BillingSection() {
   const params = useParams()
   const i18n = useI18n()
-  // ORIGINAL CODE - COMMENTED OUT FOR TESTING
   const billingInfo = createAsync(() => queryBillingInfo(params.id!))
   const checkoutAction = useAction(createCheckoutUrl)
   const checkoutSubmission = useSubmission(createCheckoutUrl)
@@ -84,58 +83,6 @@ export function BillingSection() {
     setStore("showAddBalanceForm", false)
     checkoutSubmission.clear()
   }
-
-  // DUMMY DATA FOR TESTING - UNCOMMENT ONE OF THE SCENARIOS BELOW
-
-  // Scenario 1: User has not added billing details and has no balance
-  // const balanceInfo = () => ({
-  //   balance: 0,
-  //   paymentMethodType: null as string | null,
-  //   paymentMethodLast4: null as string | null,
-  //   reload: false,
-  //   reloadError: null as string | null,
-  //   timeReloadError: null as Date | null,
-  // })
-
-  // Scenario 2: User has not added billing details but has a balance
-  // const balanceInfo = () => ({
-  //   balance: 1500000000, // $15.00
-  //   paymentMethodType: null as string | null,
-  //   paymentMethodLast4: null as string | null,
-  //   reload: false,
-  //   reloadError: null as string | null,
-  //   timeReloadError: null as Date | null
-  // })
-
-  // Scenario 3: User has added billing details (reload enabled)
-  // const balanceInfo = () => ({
-  //   balance: 750000000, // $7.50
-  //   paymentMethodType: "card",
-  //   paymentMethodLast4: "4242",
-  //   reload: true,
-  //   reloadError: null as string | null,
-  //   timeReloadError: null as Date | null
-  // })
-
-  // Scenario 4: User has billing details but reload failed
-  // const balanceInfo = () => ({
-  //   balance: 250000000, // $2.50
-  //   paymentMethodType: "card",
-  //   paymentMethodLast4: "4242",
-  //   reload: true,
-  //   reloadError: "Your card was declined." as string,
-  //   timeReloadError: new Date(Date.now() - 3600000) as Date // 1 hour ago
-  // })
-
-  // Scenario 5: User has Link payment method
-  // const balanceInfo = () => ({
-  //   balance: 500000000, // $5.00
-  //   paymentMethodType: "link",
-  //   paymentMethodLast4: null as string | null,
-  //   reload: true,
-  //   reloadError: null as string | null,
-  //   timeReloadError: null as Date | null
-  // })
 
   return (
     <section class={styles.root}>
@@ -220,7 +167,7 @@ export function BillingSection() {
                   <Switch>
                     <Match when={billingInfo()?.paymentMethodType === "card"}>
                       <Show when={billingInfo()?.paymentMethodLast4} fallback={<span data-slot="number">----</span>}>
-                        <span data-slot="secret">鈥⑩€⑩€⑩€?/span>
+                        <span data-slot="secret">••••</span>
                         <span data-slot="number">{billingInfo()?.paymentMethodLast4}</span>
                       </Show>
                     </Match>

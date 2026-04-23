@@ -433,10 +433,13 @@ describe("tool.task", () => {
             ask: () => Effect.void,
           },
         )
-        expect(listed.output).toContain(result.metadata.taskId)
+        const taskID = result.metadata.taskId
+        expect(taskID).toBeDefined()
+        if (!taskID) throw new Error("Missing taskId")
+        expect(listed.output).toContain(taskID)
 
         const got = yield* taskGet.execute(
-          { task_id: result.metadata.taskId },
+          { task_id: taskID },
           {
             sessionID: chat.id,
             messageID: assistant.id,
@@ -450,7 +453,7 @@ describe("tool.task", () => {
         expect(got.output).toContain("completed")
 
         const waited = yield* taskWait.execute(
-          { task_ids: [result.metadata.taskId], mode: "all", timeout_ms: 1000 },
+          { task_ids: [taskID], mode: "all", timeout_ms: 1000 },
           {
             sessionID: chat.id,
             messageID: assistant.id,
@@ -464,7 +467,7 @@ describe("tool.task", () => {
         expect(waited.output).toContain("completed")
 
         const stopped = yield* taskStop.execute(
-          { task_id: result.metadata.taskId, reason: "user-stop" },
+          { task_id: taskID, reason: "user-stop" },
           {
             sessionID: chat.id,
             messageID: assistant.id,

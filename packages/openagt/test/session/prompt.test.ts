@@ -8,7 +8,7 @@ import { Config } from "../../src/config"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
-import { SessionPrompt } from "../../src/session/prompt"
+import { parseFilePartRange, SessionPrompt } from "../../src/session/prompt"
 import { Log } from "../../src/util"
 import { tmpdir } from "../fixture/fixture"
 
@@ -415,6 +415,13 @@ describe("session.prompt regression", () => {
     } finally {
       void server.stop(true)
     }
+  })
+})
+
+describe("session.prompt range parsing", () => {
+  test("ignores a missing end query param", () => {
+    const range = parseFilePartRange(new URL("file:///tmp/example.ts?start=12"))
+    expect(range).toEqual({ start: 12 })
   })
 })
 
