@@ -134,13 +134,14 @@ const MAX_TOOL_NAME_LENGTH = 128
 const ALLOWED_TOOL_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,127}$/
 
 function validateToolName(name: string): { valid: boolean; reason?: string } {
-  if (!name || name.length === 0) {
+  const sanitized = sanitize(name)
+  if (!sanitized || sanitized.length === 0) {
     return { valid: false, reason: "Empty tool name" }
   }
-  if (name.length > MAX_TOOL_NAME_LENGTH) {
+  if (sanitized.length > MAX_TOOL_NAME_LENGTH) {
     return { valid: false, reason: `Tool name exceeds ${MAX_TOOL_NAME_LENGTH} chars` }
   }
-  if (!ALLOWED_TOOL_NAME_PATTERN.test(name)) {
+  if (!ALLOWED_TOOL_NAME_PATTERN.test(sanitized)) {
     return { valid: false, reason: "Tool name contains invalid characters" }
   }
   if (/\.\.|\/|\$/.test(name)) {

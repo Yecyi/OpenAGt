@@ -18,7 +18,7 @@ const FAST_PATH_COMMANDS = new Set([
 ])
 
 // Version info - hardcoded to avoid importing InstallationVersion
-const VERSION = "1.14.17"
+const VERSION = "1.15.0"
 
 /**
  * Check if the current command should use fast-path
@@ -68,17 +68,17 @@ export function executeFastPath(args: string[]): { exit: boolean; code: number }
  * Get minimal help text without importing full CLI
  */
 function getHelpText(): string {
-  return `OpenAGt ${VERSION}
+  return `openagt ${VERSION}
 
-Usage: opencode [command] [options]
+Usage: openagt [command] [options]
 
 Commands:
   run                 Run the agent in the current directory
   ask                 Ask a single question without starting a session
   session             Manage sessions
   agent               Manage agents
-  provider            Manage AI providers
-  model               Manage models
+  providers           Manage AI providers
+  models              Manage models
   mcp                 Model Context Protocol tools
   serve               Start the OpenAGt server
   web                 Start the web UI
@@ -94,10 +94,10 @@ Options:
   --pure             Run without external plugins
 
 Examples:
-  opencode run                    Start an agent session
-  opencode ask "Hello world"      Ask a single question
-  opencode session list            List all sessions
-  opencode provider add anthropic  Add a provider
+  openagt run                    Start an agent session
+  openagt ask "Hello world"      Ask a single question
+  openagt session list           List all sessions
+  openagt providers login        Add a provider
 
 For more information, see https://openag.dev/docs`
 }

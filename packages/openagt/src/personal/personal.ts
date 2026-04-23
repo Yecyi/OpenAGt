@@ -653,86 +653,91 @@ export const layer = Layer.effect(
       }
     })
 
-    const subscriptions = yield* InstanceState.make(
-      Effect.fn("PersonalAgent.subscriptions")(function* () {
-        const instance = yield* InstanceState.context
-        const workspace = yield* InstanceState.workspaceID
-        const stopCoordinatorCompleted = yield* bus.subscribeCallback(Coordinator.Event.Completed, (event) => {
-          void Effect.runPromise(
-            attachWith(
-              Effect.gen(function* () {
-                const parent = yield* sessions.get(SessionID.make(event.properties.sessionID))
-                yield* synthesizeOnce({
-                  tag: `coordinator_run:${event.properties.id}`,
-                  kind: "coordinator_run_completed",
-                  projectID: parent.projectID,
-                  sessionID: parent.id,
-                  title: `Coordinator completed: ${event.properties.goal}`,
-                  content: event.properties.summary ?? "Coordinator run completed",
-                  importance: 7,
-                })
-              }),
-              {
-                instance,
-                workspace,
-              },
-            ).pipe(Effect.catch(() => Effect.void)),
-          )
-        })
-
-        const stopTaskUpdated = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
-          if (event.properties.result.status !== "completed" || event.properties.result.task_kind !== "verify") return
-          void Effect.runPromise(
-            attachWith(
-              Effect.gen(function* () {
-                const parent = yield* sessions.get(event.properties.parent_session_id)
-                yield* synthesizeOnce({
-                  tag: `verify_task:${event.properties.result.task_id}`,
-                  kind: "verify_completed",
-                  projectID: parent.projectID,
-                  sessionID: parent.id,
-                  title: `Verified: ${event.properties.result.description}`,
-                  content: event.properties.result.summary,
-                  importance: 7,
-                })
-              }),
-              {
-                instance,
-                workspace,
-              },
-            ).pipe(Effect.catch(() => Effect.void)),
-          )
-        })
-
-        const stopSchedulerCompleted = yield* bus.subscribeCallback(Event.SchedulerCompleted, (event) => {
-          void Effect.runPromise(
-            attachWith(
-              synthesizeOnce({
-                tag: `follow_up:${event.properties.id}`,
-                kind: "follow_up_completed",
-                projectID: event.properties.projectID as ProjectID,
-                sessionID: event.properties.sessionID ? SessionID.make(event.properties.sessionID) : undefined,
-                title: `Follow-up completed: ${event.properties.goal}`,
-                content: `Completed scheduled follow-up for ${event.properties.goal}`,
-                importance: 6,
-              }),
-              {
-                instance,
-                workspace,
-              },
-            ).pipe(Effect.catch(() => Effect.void)),
-          )
-        })
-
-        yield* Effect.addFinalizer(() => Effect.sync(stopCoordinatorCompleted))
-        yield* Effect.addFinalizer(() => Effect.sync(stopTaskUpdated))
-        yield* Effect.addFinalizer(() => Effect.sync(stopSchedulerCompleted))
-        return true as const
-      }),
+    const subscriptionStops = new Map<string, () => void>()
+    yield* Effect.addFinalizer(
+      () =>
+        Effect.sync(() => {
+          for (const stop of subscriptionStops.values()) stop()
+          subscriptionStops.clear()
+        }),
     )
 
     const ensureSubscribed = Effect.fn("PersonalAgent.ensureSubscribed")(function* () {
-      yield* InstanceState.get(subscriptions)
+      const instance = yield* InstanceState.context
+      if (subscriptionStops.has(instance.directory)) return
+      const workspace = yield* InstanceState.workspaceID
+      const stopCoordinatorCompleted = yield* bus.subscribeCallback(Coordinator.Event.Completed, (event) => {
+        void Effect.runPromise(
+          attachWith(
+            Effect.gen(function* () {
+              const parent = yield* sessions.get(SessionID.make(event.properties.sessionID))
+              yield* synthesizeOnce({
+                tag: `coordinator_run:${event.properties.id}`,
+                kind: "coordinator_run_completed",
+                projectID: parent.projectID,
+                sessionID: parent.id,
+                title: `Coordinator completed: ${event.properties.goal}`,
+                content: event.properties.summary ?? "Coordinator run completed",
+                importance: 7,
+              })
+            }),
+            {
+              instance,
+              workspace,
+            },
+          ).pipe(Effect.catch(() => Effect.void)),
+        )
+      })
+
+      const stopTaskUpdated = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
+        if (event.properties.result.status !== "completed" || event.properties.result.task_kind !== "verify") return
+        void Effect.runPromise(
+          attachWith(
+            Effect.gen(function* () {
+              const parent = yield* sessions.get(event.properties.parent_session_id)
+              yield* synthesizeOnce({
+                tag: `verify_task:${event.properties.result.task_id}`,
+                kind: "verify_completed",
+                projectID: parent.projectID,
+                sessionID: parent.id,
+                title: `Verified: ${event.properties.result.description}`,
+                content: event.properties.result.summary,
+                importance: 7,
+              })
+            }),
+            {
+              instance,
+              workspace,
+            },
+          ).pipe(Effect.catch(() => Effect.void)),
+        )
+      })
+
+      const stopSchedulerCompleted = yield* bus.subscribeCallback(Event.SchedulerCompleted, (event) => {
+        void Effect.runPromise(
+          attachWith(
+            synthesizeOnce({
+              tag: `follow_up:${event.properties.id}`,
+              kind: "follow_up_completed",
+              projectID: event.properties.projectID as ProjectID,
+              sessionID: event.properties.sessionID ? SessionID.make(event.properties.sessionID) : undefined,
+              title: `Follow-up completed: ${event.properties.goal}`,
+              content: `Completed scheduled follow-up for ${event.properties.goal}`,
+              importance: 6,
+            }),
+            {
+              instance,
+              workspace,
+            },
+          ).pipe(Effect.catch(() => Effect.void)),
+        )
+      })
+      subscriptionStops.set(instance.directory, () => {
+        stopCoordinatorCompleted()
+        stopTaskUpdated()
+        stopSchedulerCompleted()
+        subscriptionStops.delete(instance.directory)
+      })
     })
 
     return Service.of({

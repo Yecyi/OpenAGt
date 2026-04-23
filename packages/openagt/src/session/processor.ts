@@ -34,6 +34,7 @@ export interface Handle {
     toolCallID: string,
     update: (part: MessageV2.ToolPart) => MessageV2.ToolPart,
   ) => Effect.Effect<MessageV2.ToolPart | undefined>
+  readonly failToolCall: (toolCallID: string, error: unknown) => Effect.Effect<boolean>
   readonly completeToolCall: (
     toolCallID: string,
     output: {
@@ -197,12 +198,14 @@ export const layer: Layer.Layer<
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
         if (!match || match.part.state.status !== "running") return false
+        const metadata = "metadata" in match.part.state ? match.part.state.metadata : undefined
         yield* session.updatePart({
           ...match.part,
           state: {
             status: "error",
             input: match.part.state.input,
             error: errorMessage(error),
+            metadata,
             time: { start: match.part.state.time.start, end: Date.now() },
           },
         })
@@ -338,8 +341,14 @@ export const layer: Layer.Layer<
             return
           }
 
-          case "error":
+          case "error": {
+            const handled = yield* Effect.all(
+              Object.keys(ctx.toolcalls).map((toolCallID) => failToolCall(toolCallID, value.error)),
+              { concurrency: "unbounded" },
+            )
+            if (handled.some(Boolean)) return
             throw value.error
+          }
 
           case "start-step":
             if (!ctx.snapshot) ctx.snapshot = yield* snapshot.track()
@@ -588,6 +597,7 @@ export const layer: Layer.Layer<
           return ctx.assistantMessage
         },
         updateToolCall,
+        failToolCall,
         completeToolCall,
         process,
       } satisfies Handle

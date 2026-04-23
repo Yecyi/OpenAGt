@@ -5,6 +5,7 @@ import { Session } from "../session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
 import { Agent } from "../agent/agent"
+import { Provider } from "../provider"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Effect } from "effect"
@@ -57,6 +58,7 @@ export const TaskTool = Tool.define(
   Effect.gen(function* () {
     const agent = yield* Agent.Service
     const config = yield* Config.Service
+    const provider = yield* Provider.Service
     const sessions = yield* Session.Service
     const tasks = yield* TaskRuntime.Service
 
@@ -134,6 +136,10 @@ export const TaskTool = Tool.define(
           model,
         },
       })
+
+      if (next.model) {
+        yield* provider.getModel(model.providerID, model.modelID)
+      }
 
       const ops = ctx.extra?.promptOps as TaskPromptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))

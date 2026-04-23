@@ -46,6 +46,7 @@ import { Process } from "@/util"
 import { Cause, Effect, Exit, Layer, Option, Scope, Context } from "effect"
 import { EffectLogger } from "@/effect"
 import { InstanceState } from "@/effect"
+import { attachWith } from "@/effect/run-service"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
@@ -395,7 +396,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       model: Provider.Model
       session: Session.Info
       tools?: Record<string, boolean>
-      processor: Pick<SessionProcessor.Handle, "message" | "updateToolCall" | "completeToolCall">
+      processor: Pick<SessionProcessor.Handle, "message" | "updateToolCall" | "failToolCall" | "completeToolCall">
       bypassAgentCheck: boolean
       messages: MessageV2.WithParts[]
     }) {
@@ -462,7 +463,18 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
                     { args },
                   )
-                  const result = yield* item.execute(args, ctx)
+                  const exit = yield* item.execute(args, ctx).pipe(Effect.exit)
+                  if (Exit.isFailure(exit)) {
+                    const error = Cause.squash(exit.cause)
+                    const toolError = error instanceof Error ? error : new Error(String(error))
+                    yield* input.processor.failToolCall(options.toolCallId, toolError)
+                    return {
+                      title: item.id,
+                      metadata: { toolError: true },
+                      output: toolError.message,
+                    }
+                  }
+                  const result = exit.value
                   const output = {
                     ...result,
                     attachments: result.attachments?.map((attachment) => ({
@@ -589,7 +601,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
       const { task: taskTool } = yield* registry.named()
-      const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
+      const requestedModel = task.model
+        ? { providerID: task.model.providerID, modelID: task.model.modelID }
+        : { providerID: model.providerID, modelID: model.id }
       const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
         id: MessageID.ascending(),
         role: "assistant",
@@ -601,8 +615,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         path: { cwd: ctx.directory, root: ctx.worktree },
         cost: 0,
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        modelID: taskModel.id,
-        providerID: taskModel.providerID,
+        modelID: requestedModel.modelID,
+        providerID: requestedModel.providerID,
         time: { created: Date.now() },
       })
       let part: MessageV2.ToolPart = yield* sessions.updatePart({
@@ -619,6 +633,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             description: task.description,
             subagent_type: task.agent,
             command: task.command,
+          },
+          title: task.description,
+          metadata: {
+            sessionId: assistantMessage.sessionID,
+            model: requestedModel,
           },
           time: { start: Date.now() },
         },
@@ -646,8 +665,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       let error: Error | undefined
       const taskAbort = new AbortController()
-      const result = yield* taskTool
-        .execute(taskArgs, {
+      const result = yield* Effect.gen(function* () {
+        const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
+        if (assistantMessage.modelID !== taskModel.id || assistantMessage.providerID !== taskModel.providerID) {
+          assistantMessage.modelID = taskModel.id
+          assistantMessage.providerID = taskModel.providerID
+          yield* sessions.updateMessage(assistantMessage)
+        }
+        const execution = taskTool.execute(taskArgs, {
           agent: task.agent,
           messageID: assistantMessage.id,
           sessionID,
@@ -657,10 +682,38 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           messages: msgs,
           metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
             Effect.gen(function* () {
+              const baseMetadata =
+                "metadata" in part.state && part.state.metadata
+                  ? part.state.metadata
+                  : {}
+              const nextState =
+                part.state.status === "pending"
+                  ? {
+                      status: "running" as const,
+                      input: part.state.input,
+                      title: val.title,
+                      metadata: {
+                        sessionId: assistantMessage.sessionID,
+                        model: requestedModel,
+                        ...baseMetadata,
+                        ...val.metadata,
+                      },
+                      time: { start: Date.now() },
+                    }
+                  : {
+                      ...part.state,
+                      ...val,
+                      metadata: {
+                        sessionId: assistantMessage.sessionID,
+                        model: requestedModel,
+                        ...baseMetadata,
+                        ...val.metadata,
+                      },
+                    }
               part = yield* sessions.updatePart({
                 ...part,
                 type: "tool",
-                state: { ...part.state, ...val },
+                state: nextState,
               } satisfies MessageV2.ToolPart)
             }),
           ask: (req: any) =>
@@ -672,34 +725,34 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               })
               .pipe(Effect.orDie),
         })
-        .pipe(
-          Effect.catchCause((cause) => {
-            const defect = Cause.squash(cause)
-            error = defect instanceof Error ? defect : new Error(String(defect))
-            log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
-            return Effect.void
+        const exit = yield* execution.pipe(Effect.exit)
+        if (Exit.isSuccess(exit)) return exit.value
+        const defect = Cause.squash(exit.cause)
+        error = defect instanceof Error ? defect : new Error(String(defect))
+        log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
+        return undefined
+      }).pipe(
+        Effect.onInterrupt(() =>
+          Effect.gen(function* () {
+            taskAbort.abort()
+            assistantMessage.finish = "tool-calls"
+            assistantMessage.time.completed = Date.now()
+            yield* sessions.updateMessage(assistantMessage)
+            if (part.state.status === "running") {
+              yield* sessions.updatePart({
+                ...part,
+                state: {
+                  status: "error",
+                  error: "Cancelled",
+                  time: { start: part.state.time.start, end: Date.now() },
+                  metadata: part.state.metadata,
+                  input: part.state.input,
+                },
+              } satisfies MessageV2.ToolPart)
+            }
           }),
-          Effect.onInterrupt(() =>
-            Effect.gen(function* () {
-              taskAbort.abort()
-              assistantMessage.finish = "tool-calls"
-              assistantMessage.time.completed = Date.now()
-              yield* sessions.updateMessage(assistantMessage)
-              if (part.state.status === "running") {
-                yield* sessions.updatePart({
-                  ...part,
-                  state: {
-                    status: "error",
-                    error: "Cancelled",
-                    time: { start: part.state.time.start, end: Date.now() },
-                    metadata: part.state.metadata,
-                    input: part.state.input,
-                  },
-                } satisfies MessageV2.ToolPart)
-              }
-            }),
-          ),
-        )
+        ),
+      )
 
       const attachments: MessageV2.FilePart[] | undefined = result?.attachments?.map((attachment) => ({
         id: PartID.ascending(),
@@ -991,7 +1044,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
-          ? yield* provider.getModel(model.providerID, model.modelID).pipe(Effect.catchDefect(() => Effect.void))
+          ? yield* provider.getModel(model.providerID, model.modelID).pipe(Effect.option).pipe(Effect.map(Option.getOrUndefined))
           : undefined
       const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
 
@@ -1681,12 +1734,24 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     const loop: (input: z.infer<typeof LoopInput>) => Effect.Effect<MessageV2.WithParts> = Effect.fn(
       "SessionPrompt.loop",
     )(function* (input: z.infer<typeof LoopInput>) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
+      return yield* state.ensureRunning(
+        input.sessionID,
+        attachWith(lastAssistant(input.sessionID), { instance, workspace }),
+        attachWith(runLoop(input.sessionID), { instance, workspace }),
+      )
     })
 
     const shell: (input: ShellInput) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.shell")(
       function* (input: ShellInput) {
-        return yield* state.startShell(input.sessionID, lastAssistant(input.sessionID), shellImpl(input))
+        const instance = yield* InstanceState.context
+        const workspace = yield* InstanceState.workspaceID
+        return yield* state.startShell(
+          input.sessionID,
+          attachWith(lastAssistant(input.sessionID), { instance, workspace }),
+          attachWith(shellImpl(input), { instance, workspace }),
+        )
       },
     )
 

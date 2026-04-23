@@ -24,7 +24,7 @@ export interface MicroCompactConfig {
 export const DEFAULT_MICRO_COMPACT_CONFIG: MicroCompactConfig = {
   timeThresholdMs: MICRO_COMPACT_TIME_THRESHOLD_MS,
   preserveRecentN: 3,
-  compactableTools: new Set(["read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
+  compactableTools: new Set(["bash", "read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
 }
 
 export interface MicroCompactResult {

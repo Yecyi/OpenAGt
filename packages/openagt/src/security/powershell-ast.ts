@@ -115,11 +115,11 @@ const PATTERN_DANGERS: Array<{ pattern: RegExp; reason: string; severity: "high"
   { pattern: /FromBase64String/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
   { pattern: /\[Ref\]\.Assembly\.GetType/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
   { pattern: /AmsiUtils/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
-  { pattern: /rundll32\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /regsvr32\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /mshta\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /cscript\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /wscript\.exe/i, reason: "Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /rundll32(?:\.exe)?/i, reason: "rundll32 Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /regsvr32(?:\.exe)?/i, reason: "regsvr32 Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /mshta(?:\.exe)?/i, reason: "mshta Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /cscript(?:\.exe)?/i, reason: "cscript Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
+  { pattern: /wscript(?:\.exe)?/i, reason: "wscript Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
 ]
 
 /**

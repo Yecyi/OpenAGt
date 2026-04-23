@@ -286,6 +286,13 @@ function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage
   }
 
   if (messagesToCache.length === 0) {
+    const lastSystem = systemMessages[systemMessages.length - 1]
+    if (lastSystem) {
+      messagesToCache.push(lastSystem)
+    }
+  }
+
+  if (messagesToCache.length === 0) {
     const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
     messagesToCache.push(...final.slice(0, 2))
   }
@@ -368,6 +375,8 @@ export function message(msgs: ModelMessage[], model: Provider.Model, options: Re
       model.id.includes("anthropic") ||
       model.id.includes("claude") ||
       model.api.npm === "@ai-sdk/anthropic" ||
+      model.api.npm === "@ai-sdk/google-vertex/anthropic" ||
+      model.api.npm === "@ai-sdk/amazon-bedrock" ||
       model.api.npm === "@ai-sdk/alibaba") &&
     model.api.npm !== "@ai-sdk/gateway"
   ) {

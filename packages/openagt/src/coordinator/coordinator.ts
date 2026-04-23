@@ -9,7 +9,7 @@ import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { Database, desc, eq } from "@/storage"
-import { Context, Effect, Layer, Option, Scope } from "effect"
+import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import {
   CoordinatorNode,
@@ -188,7 +188,6 @@ export const layer = Layer.effect(
     const sessions = yield* Session.Service
     const tasks = yield* TaskRuntime.Service
     const agents = yield* Agent.Service
-    const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
     const scope = yield* Scope.Scope
 
     const publish = (def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed, run: CoordinatorRunType) =>
@@ -229,15 +228,18 @@ export const layer = Layer.effect(
       return all.filter((item) => taskIDs.has(item.task_id))
     })
 
-    const executeTask = Effect.fn("Coordinator.executeTask")(function* (record: TaskRuntime.TaskRecord) {
+    const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn("Coordinator.executeTask")(function* (record) {
+      const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
       const current = yield* tasks.get({
         taskID: record.task_id,
         parentSessionID: record.parent_session_id,
       })
       if (Option.isNone(prompt)) return
       if (Option.isNone(current) || current.value.status !== "pending") return
+      const continueGroup = () =>
+        record.group_id ? dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore) : Effect.void
       yield* tasks.setRunning(record.task_id, record.parent_session_id)
-      const result = yield* prompt.value
+      yield* prompt.value
         .prompt({
           sessionID: record.child_session_id,
           agent: record.subagent_type,
@@ -263,24 +265,39 @@ export const layer = Layer.effect(
               error: error instanceof Error ? error.message : String(error),
             }),
           ),
-          Effect.ignore,
+          Effect.catchCause((cause) => {
+            const error = Cause.squash(cause)
+            return tasks.fail({
+              taskID: record.task_id,
+              parentSessionID: record.parent_session_id,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }),
+          Effect.tap(continueGroup),
         )
-      return result
+      return
     })
 
-    const dispatchReady = Effect.fn("Coordinator.dispatchReady")(function* (id: CoordinatorRunIDType) {
+    const dispatchReady: Interface["dispatch"] = Effect.fn("Coordinator.dispatchReady")(function* (id) {
       const instance = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const run = runOpt.value
       const pending = (yield* relevantTasks(run)).filter((item) => item.status === "pending")
-      const ready = yield* Effect.filter(pending, (item) =>
-        tasks.canRun({
-          parentSessionID: SessionID.make(run.sessionID),
-          task: item,
-        }),
-      )
+      const ready = (
+        yield* Effect.forEach(
+          pending,
+          (item) =>
+            tasks.canRun({
+              parentSessionID: SessionID.make(run.sessionID),
+              task: item,
+            }).pipe(Effect.map((allowed) => (allowed ? item : undefined))),
+          {
+            concurrency: "unbounded",
+          },
+        )
+      ).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
       yield* Effect.forEach(
         ready,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
@@ -296,29 +313,35 @@ export const layer = Layer.effect(
       }
     })
 
-    const subscriptions = yield* InstanceState.make(
-      Effect.fn("Coordinator.subscriptions")(function* () {
-        const instance = yield* InstanceState.context
-        const workspace = yield* InstanceState.workspaceID
-        const stopTaskSubscription = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
-          if (!event.properties.result.group_id) return
-          const runID = event.properties.result.group_id as CoordinatorRunIDType
-          void Effect.runPromise(
-            attachWith(dispatchReady(runID), {
-              instance,
-              workspace,
-            }).pipe(
-              Effect.catch(() => Effect.void),
-            ),
-          )
-        })
-        yield* Effect.addFinalizer(() => Effect.sync(stopTaskSubscription))
-        return true as const
-      }),
+    const subscriptionStops = new Map<string, () => void>()
+    yield* Effect.addFinalizer(
+      () =>
+        Effect.sync(() => {
+          for (const stop of subscriptionStops.values()) stop()
+          subscriptionStops.clear()
+        }),
     )
 
-    const ensureSubscribed = Effect.fn("Coordinator.ensureSubscribed")(function* () {
-      yield* InstanceState.get(subscriptions)
+    const ensureSubscribed: () => Effect.Effect<void, Error> = Effect.fn("Coordinator.ensureSubscribed")(function* () {
+      const instance = yield* InstanceState.context
+      if (subscriptionStops.has(instance.directory)) return
+      const workspace = yield* InstanceState.workspaceID
+      const stopTaskSubscription = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
+        if (!event.properties.result.group_id) return
+        const runID = event.properties.result.group_id as CoordinatorRunIDType
+        void Effect.runPromise(
+          attachWith(dispatchReady(runID), {
+            instance,
+            workspace,
+          }).pipe(
+            Effect.catch(() => Effect.void),
+          ),
+        )
+      })
+      subscriptionStops.set(instance.directory, () => {
+        stopTaskSubscription()
+        subscriptionStops.delete(instance.directory)
+      })
     })
 
     const run: Interface["run"] = Effect.fn("Coordinator.run")(function* (input) {
