@@ -29,6 +29,12 @@ export const TaskUsage = z
   })
   .optional()
 
+export const TaskPriority = z.enum(["high", "normal", "low"])
+export type TaskPriority = z.infer<typeof TaskPriority>
+
+export const TaskOrigin = z.enum(["user", "coordinator", "scheduler", "gateway"])
+export type TaskOrigin = z.infer<typeof TaskOrigin>
+
 export const TaskRecord = z.object({
   task_id: SessionID.zod,
   group_id: z.string().optional(),
@@ -42,6 +48,11 @@ export const TaskRecord = z.object({
   depends_on: z.array(SessionID.zod),
   result_summary: z.string().optional(),
   error_summary: z.string().optional(),
+  write_scope: z.array(z.string()),
+  read_scope: z.array(z.string()),
+  acceptance_checks: z.array(z.string()),
+  priority: TaskPriority,
+  origin: TaskOrigin,
   metadata: z.record(z.string(), z.unknown()).optional(),
   created_at: z.number(),
   started_at: z.number().optional(),
@@ -72,6 +83,11 @@ export const TaskResult = z.object({
   task_kind: TaskKind,
   subagent_type: z.string(),
   description: z.string(),
+  write_scope: z.array(z.string()),
+  read_scope: z.array(z.string()),
+  acceptance_checks: z.array(z.string()),
+  priority: TaskPriority,
+  origin: TaskOrigin,
 })
 export type TaskResult = z.infer<typeof TaskResult>
 
@@ -119,6 +135,11 @@ function resultFromRecord(record: TaskRecord): TaskResult {
     task_kind: record.task_kind,
     subagent_type: record.subagent_type,
     description: record.description,
+    write_scope: record.write_scope,
+    read_scope: record.read_scope,
+    acceptance_checks: record.acceptance_checks,
+    priority: record.priority,
+    origin: record.origin,
   }
 }
 
@@ -128,6 +149,11 @@ function groupState(records: TaskRecord[]) {
   if (records.every((item) => item.status === "completed")) return "completed"
   if (records.some((item) => item.status === "running")) return "running"
   return "pending"
+}
+
+function scopeOverlap(left: string[], right: string[]) {
+  if (left.length === 0 || right.length === 0) return true
+  return left.some((item) => right.some((other) => item === other || item.startsWith(other + "/") || other.startsWith(item + "/")))
 }
 
 export interface Interface {
@@ -141,6 +167,11 @@ export interface Interface {
     description: string
     prompt: string
     dependsOn: SessionID[]
+    writeScope?: string[]
+    readScope?: string[]
+    acceptanceChecks?: string[]
+    priority?: TaskPriority
+    origin?: TaskOrigin
     metadata?: Record<string, unknown>
   }) => Effect.Effect<TaskRecord, Error>
   readonly setRunning: (taskID: SessionID, parentSessionID: SessionID) => Effect.Effect<TaskRecord, Error>
@@ -222,8 +253,20 @@ export const layer = Layer.effect(
         description: input.description,
         prompt_hash: promptHash(input.prompt),
         depends_on: input.dependsOn,
+        write_scope: input.writeScope ?? [],
+        read_scope: input.readScope ?? [],
+        acceptance_checks: input.acceptanceChecks ?? [],
+        priority: input.priority ?? "normal",
+        origin: input.origin ?? "user",
         metadata: input.metadata,
         created_at: now,
+      }
+      const existing = yield* list(input.parentSessionID)
+      const known = new Set(existing.map((item) => item.task_id))
+      for (const dependency of input.dependsOn) {
+        if (!known.has(dependency)) {
+          return yield* Effect.fail(new Error(`Task dependency not found: ${dependency}`))
+        }
       }
       yield* storage.write(taskKey(input.parentSessionID, input.childSessionID), record)
       if (input.groupID) {
@@ -328,9 +371,12 @@ export const layer = Layer.effect(
         return false
       }
       const running = tasks.filter((item) => item.status === "running")
-      const writeClass = input.task.task_kind === "implement"
-      if (!writeClass) return true
-      return !running.some((item) => item.task_kind === "implement")
+      if (input.task.task_kind === "research" || input.task.task_kind === "generic") return true
+      if (input.task.task_kind === "implement") {
+        return !running.some((item) => item.task_kind === "implement" && scopeOverlap(item.write_scope, input.task.write_scope))
+      }
+      if (input.task.task_kind !== "verify") return true
+      return !running.some((item) => item.task_kind === "implement" && scopeOverlap(item.write_scope, input.task.read_scope))
     })
 
     const wait: Interface["wait"] = Effect.fn("TaskRuntime.wait")(function* (input) {

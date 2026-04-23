@@ -5,6 +5,7 @@ import path from "path"
 import DESCRIPTION from "./bash.txt"
 import { Log } from "../util"
 import { Instance } from "../project/instance"
+import { InstanceState } from "@/effect"
 import { lazy } from "@/util/lazy"
 import { Language, type Node } from "web-tree-sitter"
 
@@ -461,12 +462,13 @@ export const BashTool = Tool.define(
     const sandboxBroker = yield* SandboxBroker.Service
     const shellRunner = yield* ShellRunner.Service
     const sandboxPolicy = yield* SandboxPolicy.Service
+    const instance = yield* InstanceState.context
 
     const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
       const handle = yield* spawner
         .spawn(
           ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text], {
-            cwd: Instance.directory,
+            cwd: instance.directory,
             extendEnv: true,
             stdin: "ignore",
             stderr: "ignore",
@@ -556,7 +558,7 @@ export const BashTool = Tool.define(
           for (const arg of pathArgs(command, ps)) {
             const resolved = yield* argPath(arg, cwd, ps, shell)
             log.info("resolved path", { arg, resolved })
-            if (!resolved || Instance.containsPath(resolved)) continue
+            if (!resolved || Instance.containsPath(resolved, instance)) continue
             const dir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
             scan.dirs.add(dir)
           }
@@ -596,7 +598,7 @@ export const BashTool = Tool.define(
     })
 
     return {
-      description: DESCRIPTION.replaceAll("${directory}", Instance.directory)
+      description: DESCRIPTION.replaceAll("${directory}", instance.directory)
         .replaceAll("${os}", process.platform)
         .replaceAll("${shell}", Shell.name(Shell.acceptable()))
         .replaceAll(
@@ -613,7 +615,7 @@ export const BashTool = Tool.define(
           const shell = chooseShell(params.command)
           const name = Shell.name(shell)
           log.info("bash tool using shell", { shell })
-          const cwd = params.workdir ? yield* resolvePath(params.workdir, Instance.directory, shell) : Instance.directory
+          const cwd = params.workdir ? yield* resolvePath(params.workdir, instance.directory, shell) : instance.directory
           if (params.timeout !== undefined && params.timeout < 0) {
             throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
           }
@@ -622,7 +624,7 @@ export const BashTool = Tool.define(
           const ps = PS.has(name)
           const root = yield* parse(params.command, ps)
           const scan = yield* collect(root, cwd, ps, shell)
-          if (!Instance.containsPath(cwd)) scan.dirs.add(cwd)
+          if (!Instance.containsPath(cwd, instance)) scan.dirs.add(cwd)
 
           const security = yield* shellSecurity.analyze({
             command: params.command,

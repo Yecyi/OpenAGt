@@ -31,6 +31,11 @@ const parameters = z.object({
   group_id: z.string().describe("Optional task group identifier for related subtasks").optional(),
   depends_on: z.array(z.string()).describe("Optional task ids that must complete first").optional(),
   task_kind: z.enum(["research", "implement", "verify", "generic"]).optional(),
+  write_scope: z.array(z.string()).describe("Files or directories this task may write").optional(),
+  read_scope: z.array(z.string()).describe("Files or directories this task reads without writing").optional(),
+  acceptance_checks: z.array(z.string()).describe("Checks that determine task completion quality").optional(),
+  priority: z.enum(["high", "normal", "low"]).describe("Scheduling priority for this task").optional(),
+  origin: z.enum(["user", "coordinator", "scheduler", "gateway"]).describe("Origin of the task").optional(),
   return_mode: z.enum(["id", "summary"]).describe("Return task id or immediate summary").optional(),
   metadata: z.record(z.string(), z.unknown()).describe("Optional structured metadata for scheduling").optional(),
   command: z.string().describe("The command that triggered this task").optional(),
@@ -146,6 +151,11 @@ export const TaskTool = Tool.define(
         description: params.description,
         prompt: params.prompt,
         dependsOn,
+        writeScope: params.write_scope,
+        readScope: params.read_scope,
+        acceptanceChecks: params.acceptance_checks,
+        priority: params.priority,
+        origin: params.origin,
         metadata: params.metadata,
       })
 

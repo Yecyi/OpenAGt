@@ -28,6 +28,8 @@ import { EventRoutes } from "./event"
 import { SyncRoutes } from "./sync"
 import { InstanceMiddleware } from "./middleware"
 import { jsonRequest } from "./trace"
+import { CoordinatorRoutes } from "./coordinator"
+import { PersonalRoutes } from "./personal"
 
 export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono => {
   const app = new Hono()
@@ -58,6 +60,8 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono => {
     .route("/permission", PermissionRoutes())
     .route("/question", QuestionRoutes())
     .route("/provider", ProviderRoutes())
+    .route("/coordinator", CoordinatorRoutes())
+    .route("/personal", PersonalRoutes())
     .route("/sync", SyncRoutes())
     .route("/", FileRoutes())
     .route("/", EventRoutes())
