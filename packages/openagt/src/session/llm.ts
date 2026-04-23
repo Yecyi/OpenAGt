@@ -267,8 +267,8 @@ const live: Layer.Layer<
               metadata: typeof result === "object" ? result?.metadata : undefined,
               title: typeof result === "object" ? result?.title : undefined,
             }
-          } catch (e: any) {
-            return { result: "", error: e.message ?? String(e) }
+          } catch (e: unknown) {
+            return { result: "", error: e instanceof Error ? e.message : String(e) }
           }
         }
 
@@ -318,7 +318,8 @@ const live: Layer.Layer<
             for (const name of uniqueNames) approvedToolsForSession.add(name)
             workflowModel.sessionPreapprovedTools = [...(workflowModel.sessionPreapprovedTools ?? []), ...uniqueNames]
             return { approved: true }
-          } catch {
+          } catch (e) {
+            console.error("[llm] permission approval error:", e)
             return { approved: false }
           } finally {
             unsub?.()

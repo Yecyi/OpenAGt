@@ -8,115 +8,20 @@
  * Reference: Code Reference/CC Source Code/src/utils/powershell/dangerousCmdlets.ts
  */
 
+import { STRUCTURED_DANGEROUS_CMDLETS } from "./powershell-ast"
+
 /**
- * Dangerous PowerShell cmdlets that can execute arbitrary code
+ * Dangerous PowerShell cmdlets that can execute arbitrary code.
+ * Consolidated from powershell-ast.ts STRUCTURED_DANGEROUS_CMDLETS for backward compatibility.
  */
-export const DANGEROUS_CMDLETS = [
-  // Execution policy and code execution
-  "Set-ExecutionPolicy",
-  "Invoke-Expression",
-  "Invoke-Command",
-  "Invoke-WebRequest",
-  "Invoke-RestMethod",
-  "iex", // Alias for Invoke-Expression
-  "iwr", // Alias for Invoke-WebRequest
-
-  // Process and service manipulation
-  "Start-Process",
-  "Stop-Process",
-  "New-Service",
-  "Set-Service",
-  "Stop-Service",
-  "Restart-Service",
-
-  // Privilege escalation
-  "Start-Process -Verb RunAs",
-  "runas.exe",
-  "sudo",
-
-  // Credential and authentication
-  "Get-Credential",
-  "ConvertTo-SecureString",
-  "ConvertFrom-SecureString",
-  "Extract ntds", // NTDS extraction for AD
-  "ntdsutil",
-
-  // Registry manipulation
-  "Set-ItemProperty",
-  "Remove-ItemProperty",
-  "New-ItemProperty",
-
-  // File and registry deletion
-  "Clear-Content",
-  "Remove-Item",
-  "Remove-ItemProperty",
-
-  // Scheduled tasks
-  "schtasks.exe",
-  "at.exe",
-  "Register-ScheduledTask",
-  "Unregister-ScheduledTask",
-
-  // Network operations
-  "New-NetFirewallRule",
-  "Set-NetFirewallRule",
-  "Disable-NetFirewallRule",
-
-  // Environment variables
-  "setx.exe",
-  "[Environment]::SetEnvironmentVariable",
-
-  // Script block logging bypass
-  "Disable-PSRemoting",
-  "Enable-PSRemoting",
-
-  // COM object abuse
-  "New-Object -ComObject",
-  "Get-WmiObject -Class Win32_Process",
-
-  // AMSI bypass
-  "amsiInitFailed",
-  "[Ref].Assembly.GetType",
-
-  // DLL injection
-  "rundll32.exe",
-
-  // Certificate manipulation
-  "Set-AuthenticodeSignature",
-
-  // BITS transfer (living off the land)
-  "Start-BitsTransfer",
-  "bitsadmin.exe",
-
-  // HTA and scripting
-  "mshta.exe",
-  "wscript.exe",
-  "cscript.exe",
-  "regsvr32.exe",
-
-  // Encoded commands
-  "powershell -enc",
-  "powershell -EncodedCommand",
-  "pwsh -enc",
-  "pwsh -EncodedCommand",
-] as const
+export const DANGEROUS_CMDLETS = Object.keys(STRUCTURED_DANGEROUS_CMDLETS)
 
 /**
  * High-severity cmdlets that require extra caution
  */
-export const HIGH_SEVERITY_CMDLETS = [
-  "Invoke-Expression",
-  "Invoke-Command",
-  "Set-ExecutionPolicy",
-  "Start-Process -Verb RunAs",
-  "rundll32.exe",
-  "regsvr32.exe",
-  "mshta.exe",
-  "powershell -enc",
-  "powershell -EncodedCommand",
-  "Extract ntds",
-  "ntdsutil",
-] as const
+export const HIGH_SEVERITY_CMDLETS = Object.entries(STRUCTURED_DANGEROUS_CMDLETS)
+  .filter(([, info]) => info.severity === "high")
+  .map(([cmdlet]) => cmdlet)
 
 /**
  * Patterns for encoded/base64 PowerShell commands
@@ -155,19 +60,34 @@ export interface CmdletValidationResult {
 }
 
 /**
- * Check if a PowerShell command contains dangerous cmdlets
+ * Pre-computed uppercase versions for efficient O(1) lookup
+ */
+const UPPER_DANGEROUS_CMDLETS = DANGEROUS_CMDLETS.map((c) => c.toUpperCase())
+const UPPER_HIGH_SEVERITY_CMDLETS = HIGH_SEVERITY_CMDLETS.map((c) => c.toUpperCase())
+
+/**
+ * Check if a PowerShell command contains dangerous cmdlets.
+ * Uses word-boundary regex to avoid false positives from substring matches
+ * (e.g., "Invoke-WebRequest" should not trigger on the substring "webrequest").
  */
 export function containsDangerousCmdlets(command: string): boolean {
   const upperCommand = command.toUpperCase()
-  return DANGEROUS_CMDLETS.some((cmdlet) => upperCommand.includes(cmdlet.toUpperCase()))
+  return UPPER_DANGEROUS_CMDLETS.some((cmdlet) => {
+    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
+  })
 }
 
 /**
- * Check if a PowerShell command contains high-severity cmdlets
+ * Check if a PowerShell command contains high-severity cmdlets.
+ * Uses word-boundary regex to avoid false positives.
  */
 export function containsHighSeverityCmdlets(command: string): boolean {
   const upperCommand = command.toUpperCase()
-  return HIGH_SEVERITY_CMDLETS.some((cmdlet) => upperCommand.includes(cmdlet.toUpperCase()))
+  return UPPER_HIGH_SEVERITY_CMDLETS.some((cmdlet) => {
+    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
+  })
 }
 
 /**
@@ -176,13 +96,15 @@ export function containsHighSeverityCmdlets(command: string): boolean {
 export function validatePowerShellCommand(command: string): CmdletValidationResult {
   const checks: CmdletCheck[] = []
   let highestSeverity: DangerSeverity = "safe"
+  const upperCommand = command.toUpperCase()
 
   // Check for dangerous cmdlets
-  for (const cmdlet of DANGEROUS_CMDLETS) {
-    const upperCommand = command.toUpperCase()
-    const upperCmdlet = cmdlet.toUpperCase()
+  for (let i = 0; i < DANGEROUS_CMDLETS.length; i++) {
+    const cmdlet = DANGEROUS_CMDLETS[i]!
+    const upperCmdlet = UPPER_DANGEROUS_CMDLETS[i]!
     const matched = upperCommand.includes(upperCmdlet)
-    const severity: DangerSeverity = (HIGH_SEVERITY_CMDLETS as readonly string[]).includes(cmdlet) ? "high" : "medium"
+    const isHighSeverity = UPPER_HIGH_SEVERITY_CMDLETS.includes(upperCmdlet)
+    const severity: DangerSeverity = isHighSeverity ? "high" : "medium"
 
     if (matched && severity === "high") {
       highestSeverity = "high"
@@ -193,7 +115,7 @@ export function validatePowerShellCommand(command: string): CmdletValidationResu
     checks.push({
       cmdlet,
       matched,
-      severity,
+      severity: matched ? severity : "safe",
       message: matched ? `Dangerous cmdlet detected: ${cmdlet}` : undefined,
     })
   }

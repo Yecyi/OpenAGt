@@ -824,7 +824,7 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
     convertToModelMessages(
       result.filter((msg) => msg.parts.some((part) => part.type !== "step-start")),
       {
-        //@ts-expect-error (convertToModelMessages expects a ToolSet but only actually needs tools[name]?.toModelOutput)
+        // @ts-expect-error -- convertToModelMessages expects ToolSet but only actually needs tools[name]?.toModelOutput
         tools,
       },
     ),
@@ -1040,7 +1040,9 @@ export function fromError(
             },
           ).toObject()
         }
-      } catch {}
+      } catch (err) {
+        console.error("[message-v2] error formatting structured error:", err)
+      }
       return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
   }
 }

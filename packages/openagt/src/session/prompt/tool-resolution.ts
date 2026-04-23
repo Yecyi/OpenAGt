@@ -107,13 +107,25 @@ export function createToolScheduler() {
         return hasPathConflict(call.input, active.input)
       })
       .map((active) => active.done.catch(() => undefined))
+
+    const entry: RunningToolCall = {
+      safe,
+      paths,
+      done: undefined as unknown as Promise<unknown>,
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      input: call.input,
+    }
+    running.push(entry)
+
     const start = () => Promise.all(blockers).then(() => execute())
     const pending = safe ? start() : unsafeTail.then(start, start)
     if (!safe) unsafeTail = pending.then(() => undefined, () => undefined)
 
-    const done = pending.finally(() => {
+    entry.done = pending.finally(() => {
       running = running.filter((active) => active.toolCallId !== call.toolCallId)
     })
+
     partitionToolCalls([
       ...running.map((active) => ({
         toolCallId: active.toolCallId,
@@ -122,14 +134,6 @@ export function createToolScheduler() {
       })),
       call,
     ])
-    running.push({
-      safe,
-      paths,
-      done,
-      toolCallId: call.toolCallId,
-      toolName: call.toolName,
-      input: call.input,
-    })
 
     return pending
   }

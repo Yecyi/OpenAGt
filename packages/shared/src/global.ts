@@ -21,10 +21,10 @@ export namespace Global {
     Effect.gen(function* () {
       const app = "opencode"
       const home = process.env.OPENCODE_TEST_HOME ?? os.homedir()
-      const data = path.join(xdgData!, app)
-      const cache = path.join(xdgCache!, app)
-      const cfg = path.join(xdgConfig!, app)
-      const state = path.join(xdgState!, app)
+      const data = path.join(xdgData || `${home}/.local/share`, app)
+      const cache = path.join(xdgCache || `${home}/.cache`, app)
+      const cfg = path.join(xdgConfig || `${home}/.config`, app)
+      const state = path.join(xdgState || `${home}/.local/state`, app)
       const bin = path.join(cache, "bin")
       const log = path.join(data, "log")
 

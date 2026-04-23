@@ -78,12 +78,11 @@ export function retryable(error: Err) {
 
   const json = iife(() => {
     try {
-      if (typeof error.data?.message === "string") {
-        const parsed = JSON.parse(error.data.message)
-        return parsed
+      const msg = error.data?.message
+      if (typeof msg === "string") {
+        return JSON.parse(msg)
       }
-
-      return JSON.parse(error.data.message)
+      return undefined
     } catch {
       return undefined
     }

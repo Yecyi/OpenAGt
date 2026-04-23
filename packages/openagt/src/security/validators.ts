@@ -168,7 +168,7 @@ export function validateIncompleteCommands(context: ValidationContext): Validato
   const trimmed = context.originalCommand.trim()
 
   // Check for tab as first character after whitespace (incomplete command)
-  if (/^\s\t/.test(trimmed)) {
+  if (/^\s/.test(trimmed)) {
     return {
       behavior: "ask",
       message: "Command appears incomplete (starts with tab)",
@@ -484,7 +484,7 @@ function hasBackslashEscapedWhitespace(command: string): boolean {
     const char = command[i]!
     updateQuoteState(state, char)
 
-    if (char === "\\" && !state.inSingleQuote) {
+    if (char === "\\" && !state.inSingleQuote && !state.inDoubleQuote) {
       const nextChar = command[i + 1]
       if (nextChar === " " || nextChar === "\t") {
         return true
@@ -521,14 +521,15 @@ function hasBackslashEscapedOperator(command: string): boolean {
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!
 
-    // Handle escape FIRST (before quote toggle)
+    // Handle escape FIRST — backslash in single quotes is literal, so skip there.
+    // Outside quotes we flag escaped operators; inside double quotes the operator
+    // is already literal, so just consume the escaped pair without toggling state.
     if (char === "\\" && !state.inSingleQuote) {
       const nextChar = command[i + 1]
-      if (nextChar && SHELL_OPERATORS.has(nextChar) && !state.inDoubleQuote) {
+      if (!state.inDoubleQuote && nextChar && SHELL_OPERATORS.has(nextChar)) {
         return true
       }
-      // Skip the escaped character
-      i++
+      i++ // skip the escaped character so it can't toggle quote state
       continue
     }
 
@@ -574,18 +575,20 @@ export function validateBraceExpansion(context: ValidationContext): ValidatorRes
   for (let i = 0; i < originalCommand.length; i++) {
     const char = originalCommand[i]!
 
-    if (char === "\\") {
-      i++ // Skip escaped character
+    // POSIX: backslash is literal inside single quotes; everywhere else it
+    // escapes the next character. Consuming the escaped pair here keeps the
+    // quote-toggle logic below simple and avoids an unreliable lookbehind.
+    if (char === "\\" && !state.inSingleQuote) {
+      i++
       continue
     }
 
-    if (char === "'" || char === '"') {
-      // Toggle quote state manually
-      if (char === "'" && !state.inDoubleQuote) {
-        state.inSingleQuote = !state.inSingleQuote
-      } else if (char === '"' && !state.inSingleQuote) {
-        state.inDoubleQuote = !state.inDoubleQuote
-      }
+    if (char === "'" && !state.inDoubleQuote) {
+      state.inSingleQuote = !state.inSingleQuote
+      continue
+    }
+    if (char === '"' && !state.inSingleQuote) {
+      state.inDoubleQuote = !state.inDoubleQuote
       continue
     }
 
@@ -882,37 +885,16 @@ export const mainValidators: Validator[] = [
  * Create a validation context from a command string
  */
 export function createValidationContext(command: string): ValidationContext {
-  // Extract base command (first token)
   const baseCommand = command.trim().split(/\s+/)[0] || ""
-
-  // Create unquoted versions
-  let unquotedContent = ""
-  let fullyUnquotedContent = ""
-  let fullyUnquotedPreStrip = ""
-  let unquotedKeepQuoteChars = ""
-
-  const state = createQuoteState()
-  for (const char of command) {
-    if (state.inSingleQuote || state.inDoubleQuote) {
-      unquotedKeepQuoteChars += char
-    } else {
-      unquotedKeepQuoteChars += char
-    }
-    updateQuoteState(state, char)
-  }
-
-  // Simple stripping of quotes for unquotedContent
-  unquotedContent = command.replace(/['"][^'"]*['"]/g, "")
-  fullyUnquotedContent = unquotedContent
-  fullyUnquotedPreStrip = command
+  const unquotedContent = command.replace(/['"][^'"]*['"]/g, "")
 
   return {
     originalCommand: command,
     baseCommand,
     unquotedContent,
-    fullyUnquotedContent,
-    fullyUnquotedPreStrip,
-    unquotedKeepQuoteChars,
+    fullyUnquotedContent: unquotedContent,
+    fullyUnquotedPreStrip: unquotedContent,
+    unquotedKeepQuoteChars: command,
   }
 }
 
@@ -942,8 +924,18 @@ export function validateCommand(command: string): ValidatorResult {
 }
 
 /**
- * Quick check if command is safe
+ * Quick check if command is safe.
+ * Short-circuit validation for common safe patterns to improve performance.
  */
 export function isCommandSafe(command: string): boolean {
+  // Fast path: empty or whitespace-only commands are safe
+  if (!command.trim()) return true
+
+  // Fast path: common read-only commands that need no validation
+  const lower = command.toLowerCase().trim()
+  if (lower === "ls" || lower === "dir" || lower === "pwd" || lower === "echo" || lower === "cat" || lower === "type") {
+    return true
+  }
+
   return validateCommand(command).behavior === "allow"
 }

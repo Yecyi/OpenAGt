@@ -162,10 +162,6 @@ function snapshot(value: unknown) {
   return JSON.parse(JSON.stringify(value)) as unknown
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
 function merge(defaults: unknown, value: unknown): unknown {
   if (value === undefined) return defaults
   if (value === null) return value

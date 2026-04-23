@@ -47,7 +47,7 @@ function create(opts: { cors?: string[] }) {
   if (Flag.OPENCODE_WORKSPACE_ID) {
     return {
       app: app
-        .use(InstanceMiddleware(Flag.OPENCODE_WORKSPACE_ID ? WorkspaceID.make(Flag.OPENCODE_WORKSPACE_ID) : undefined))
+        .use(InstanceMiddleware(WorkspaceID.make(Flag.OPENCODE_WORKSPACE_ID)))
         .use(FenceMiddleware)
         .route("/", InstanceRoutes(runtime.upgradeWebSocket)),
       runtime,

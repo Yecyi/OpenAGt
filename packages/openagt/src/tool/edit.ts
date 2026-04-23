@@ -182,7 +182,7 @@ export const EditTool = Tool.define(
 export type Replacer = (content: string, find: string) => Generator<string, void, unknown>
 
 // Similarity thresholds for block anchor fallback matching
-const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.0
+const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.5
 const MULTIPLE_CANDIDATES_SIMILARITY_THRESHOLD = 0.3
 
 /**
@@ -646,6 +646,10 @@ export function replace(content: string, oldString: string, newString: string, r
   }
 
   let notFound = true
+  let foundMultiple = false
+
+  // In replaceAll mode, collect all matches first to avoid repeated scanning
+  const matches: string[] = []
 
   for (const replacer of [
     SimpleReplacer,
@@ -659,16 +663,26 @@ export function replace(content: string, oldString: string, newString: string, r
     MultiOccurrenceReplacer,
   ]) {
     for (const search of replacer(content, oldString)) {
-      const index = content.indexOf(search)
-      if (index === -1) continue
-      notFound = false
-      if (replaceAll) {
-        return content.replaceAll(search, newString)
-      }
-      const lastIndex = content.lastIndexOf(search)
-      if (index !== lastIndex) continue
-      return content.substring(0, index) + newString + content.substring(index + search.length)
+      matches.push(search)
     }
+  }
+
+  // Deduplicate matches
+  const uniqueMatches = [...new Set(matches)]
+
+  for (const search of uniqueMatches) {
+    const index = content.indexOf(search)
+    if (index === -1) continue
+    notFound = false
+    if (replaceAll) {
+      return content.replaceAll(search, newString)
+    }
+    const lastIndex = content.lastIndexOf(search)
+    if (index !== lastIndex) {
+      foundMultiple = true
+      continue
+    }
+    return content.substring(0, index) + newString + content.substring(index + search.length)
   }
 
   if (notFound) {

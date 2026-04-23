@@ -33,53 +33,49 @@ function rewrite(request: Request, directory?: string) {
 }
 
 export function createOpencodeClient(config?: Config & { directory?: string }) {
-  if (!config?.fetch) {
+  const effectiveConfig = config ? { ...config } : {}
+  if (!effectiveConfig.fetch) {
     const customFetch: any = (req: any) => {
       // @ts-ignore
       req.timeout = false
       return fetch(req)
     }
-    config = {
-      ...config,
-      fetch: customFetch,
+    effectiveConfig.fetch = customFetch
+  }
+
+  if (effectiveConfig.directory) {
+    effectiveConfig.headers = {
+      ...effectiveConfig.headers,
+      "x-openagt-directory": encodeURIComponent(effectiveConfig.directory),
+      "x-opencode-directory": encodeURIComponent(effectiveConfig.directory),
     }
   }
 
-  if (config?.directory) {
-    config.headers = {
-      ...config.headers,
-      "x-openagt-directory": encodeURIComponent(config.directory),
-      "x-opencode-directory": encodeURIComponent(config.directory),
-    }
-  }
-
-  const client = createClient(config)
-  client.interceptors.request.use((request) => rewrite(request, config?.directory))
+  const client = createClient(effectiveConfig)
+  client.interceptors.request.use((request) => rewrite(request, effectiveConfig?.directory))
   return new OpencodeClient({ client })
 }
 
 export function createOpenagtClient(config?: Config & { directory?: string }) {
-  if (!config?.fetch) {
+  const effectiveConfig = config ? { ...config } : {}
+  if (!effectiveConfig.fetch) {
     const customFetch: any = (req: any) => {
       // @ts-ignore
       req.timeout = false
       return fetch(req)
     }
-    config = {
-      ...config,
-      fetch: customFetch,
+    effectiveConfig.fetch = customFetch
+  }
+
+  if (effectiveConfig.directory) {
+    effectiveConfig.headers = {
+      ...effectiveConfig.headers,
+      "x-openagt-directory": encodeURIComponent(effectiveConfig.directory),
+      "x-opencode-directory": encodeURIComponent(effectiveConfig.directory),
     }
   }
 
-  if (config?.directory) {
-    config.headers = {
-      ...config.headers,
-      "x-openagt-directory": encodeURIComponent(config.directory),
-      "x-opencode-directory": encodeURIComponent(config.directory),
-    }
-  }
-
-  const client = createClient(config)
-  client.interceptors.request.use((request) => rewrite(request, config?.directory))
+  const client = createClient(effectiveConfig)
+  client.interceptors.request.use((request) => rewrite(request, effectiveConfig?.directory))
   return new OpenagtClient({ client })
 }

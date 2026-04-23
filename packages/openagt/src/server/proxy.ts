@@ -113,7 +113,7 @@ export async function http(url: string | URL, extra: HeadersInit | undefined, re
     })
   }
 
-  return fetch(
+    return fetch(
     new Request(url, {
       method: req.method,
       headers: headers(req, extra),
@@ -121,22 +121,30 @@ export async function http(url: string | URL, extra: HeadersInit | undefined, re
       redirect: "manual",
       signal: req.signal,
     }),
-  ).then((res) => {
-    const sync = Fence.parse(res.headers)
-    const next = new Headers(res.headers)
-    next.delete("content-encoding")
-    next.delete("content-length")
+  )
+    .then((res) => {
+      const sync = Fence.parse(res.headers)
+      const next = new Headers(res.headers)
+      next.delete("content-encoding")
+      next.delete("content-length")
 
-    const done = sync ? Fence.wait(workspaceID, sync, req.signal) : Promise.resolve()
+      const done = sync ? Fence.wait(workspaceID, sync, req.signal) : Promise.resolve()
 
-    return done.then(async () => {
-      return new Response(res.body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: next,
+      return done.then(async () => {
+        return new Response(res.body, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: next,
+        })
       })
     })
-  })
+    .catch((e) => {
+      console.error("[proxy] fetch error:", e)
+      return new Response(`proxy error: ${e?.message ?? "unknown"}`, {
+        status: 502,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      })
+    })
 }
 
 export function websocket(

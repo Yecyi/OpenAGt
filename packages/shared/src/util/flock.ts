@@ -5,6 +5,7 @@ import { mkdir, readFile, rm, stat, utimes, writeFile } from "fs/promises"
 import { Hash } from "./hash"
 import { Effect } from "effect"
 
+
 export type FlockGlobal = {
   state: string
 }

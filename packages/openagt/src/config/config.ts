@@ -49,9 +49,10 @@ const log = Log.create({ service: "config" })
 // Custom merge function that concatenates array fields instead of replacing them
 function mergeConfigConcatArrays(target: Info, source: Info): Info {
   const merged = mergeDeep(target, source)
-  if (target.instructions && source.instructions) {
-    merged.instructions = Array.from(new Set([...target.instructions, ...source.instructions]))
-  }
+  merged.instructions = Array.from(new Set([
+    ...(target.instructions ?? []),
+    ...(source.instructions ?? []),
+  ]))
   return merged
 }
 

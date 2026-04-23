@@ -193,7 +193,11 @@ export const layer = Layer.effect(
           Effect.runFork(Queue.offer(updates, last).pipe(Effect.asVoid))
         }
         if (file) {
-          sink?.write(text)
+          try {
+            sink?.write(text)
+          } catch (err) {
+            log.error("failed to write to sink", { error: err })
+          }
           return
         }
         full += text

@@ -34,7 +34,7 @@ import { ConfigMarkdown } from "../config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@openagt/shared/util/error"
 import { SessionProcessor } from "./processor"
-import { PathOverlap, Tool, ToolPartition } from "@/tool"
+import { Tool } from "@/tool"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
@@ -52,56 +52,11 @@ import { EffectBridge } from "@/effect"
 import { scanForInjection, sanitizeContent } from "@/security/injection"
 import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
+import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
+import { createToolScheduler } from "./prompt/tool-resolution"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
-
-// A-P1-3: Reminder/plan-text budget
-const REMINDER_TOKEN_BUDGET = 2000
-const REMINDER_CHARS_PER_TOKEN = 4
-
-interface ReminderEntry {
-  text: string
-  importance: number
-  timestamp: number
-}
-
-const reminderBudget: ReminderEntry[] = []
-
-function addReminder(text: string, importance: number): void {
-  const entry: ReminderEntry = {
-    text,
-    importance,
-    timestamp: Date.now(),
-  }
-  reminderBudget.push(entry)
-  enforceReminderBudget()
-}
-
-function enforceReminderBudget(): void {
-  let totalChars = 0
-  const targetChars = REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
-
-  // Sort by importance (lowest first) then timestamp (oldest first) for FIFO
-  reminderBudget.sort((a, b) => {
-    if (a.importance !== b.importance) return a.importance - b.importance
-    return a.timestamp - b.timestamp
-  })
-
-  // Evict lowest importance reminders until we fit the budget
-  while (reminderBudget.length > 0) {
-    totalChars = reminderBudget.reduce((sum, r) => sum + r.text.length, 0)
-    if (totalChars <= targetChars) break
-    reminderBudget.shift()
-  }
-}
-
-function getReminders(): string[] {
-  // Sort by timestamp to maintain FIFO order for same importance
-  return [...reminderBudget]
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .map((r) => r.text)
-}
 
 async function computeSHA256(text: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -417,71 +372,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return input.messages
     })
 
-    type RunningToolCall = {
-      safe: boolean
-      paths: string[]
-      toolCallId: string
-      toolName: string
-      input: Record<string, unknown>
-      done: Promise<unknown>
-    }
-
     const normalizeToolInput = (value: unknown): Record<string, unknown> =>
       typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
-
-    const hasPathConflict = (left: Record<string, unknown>, right: Record<string, unknown>) =>
-      PathOverlap.detectPathConflicts([
-        { toolName: "left", input: left },
-        { toolName: "right", input: right },
-      ]).length > 0
-
-    const createToolScheduler = () => {
-      let running: RunningToolCall[] = []
-      let unsafeTail = Promise.resolve()
-
-      const schedule = <T>(
-        call: ToolPartition.ToolCallItem,
-        execute: () => Promise<T>,
-      ) => {
-        const safe = ToolPartition.isConcurrencySafe(call.toolName)
-        const paths = PathOverlap.extractPathsFromInput(call.input)
-        const blockers = running
-          .filter((active) => {
-            if (!safe) return true
-            if (!active.safe) return true
-            if (!paths.length || !active.paths.length) return false
-            return hasPathConflict(call.input, active.input)
-          })
-          .map((active) => active.done.catch(() => undefined))
-        const start = () => Promise.all(blockers).then(() => execute())
-        const pending = safe ? start() : unsafeTail.then(start, start)
-        if (!safe) unsafeTail = pending.then(() => undefined, () => undefined)
-
-        const done = pending.finally(() => {
-          running = running.filter((active) => active.toolCallId !== call.toolCallId)
-        })
-        ToolPartition.partitionToolCalls([
-          ...running.map((active) => ({
-            toolCallId: active.toolCallId,
-            toolName: active.toolName,
-            input: active.input,
-          })),
-          call,
-        ])
-        running.push({
-          safe,
-          paths,
-          done,
-          toolCallId: call.toolCallId,
-          toolName: call.toolName,
-          input: call.input,
-        })
-
-        return pending
-      }
-
-      return { schedule }
-    }
 
     const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       agent: Agent.Info
@@ -500,7 +392,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
         sessionID: input.session.id,
-        abort: options.abortSignal!,
+        abort: options.abortSignal ?? (() => { throw new Error("abortSignal is required for tool execution") }),
         messageID: input.processor.message.id,
         callID: options.toolCallId,
         extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
@@ -1247,8 +1139,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 const range = { start: url.searchParams.get("start"), end: url.searchParams.get("end") }
                 if (range.start != null) {
                   const filePathURI = part.url.split("?")[0]
-                  let start = parseInt(range.start)
-                  let end = range.end ? parseInt(range.end) : undefined
+                  let start = parseInt(range.start, 10)
+                  let end = range.end !== undefined ? parseInt(range.end, 10) : undefined
                   if (start === end) {
                     const symbols = yield* lsp.documentSymbol(filePathURI).pipe(Effect.catch(() => Effect.succeed([])))
                     for (const symbol of symbols) {

@@ -1,8 +1,12 @@
 /**
  * Reminder Module
  *
- * Extracted from session/prompt.ts
- * Manages reminder/plan-text budget for prompt injection
+ * Extracted from session/prompt.ts.
+ * Manages reminder/plan-text budget for prompt injection.
+ *
+ * Budgets are keyed by sessionID so reminders accumulated in one session
+ * don't leak into another. Use `installLifecycleHooks(unsubFn)` from a layer
+ * setup so the per-session map is freed on Session.Event.Deleted.
  */
 
 const REMINDER_TOKEN_BUDGET = 2000
@@ -25,12 +29,7 @@ export class ReminderBudget {
    * Add a reminder entry with automatic budget enforcement
    */
   add(text: string, importance: number): void {
-    const entry: ReminderEntry = {
-      text,
-      importance,
-      timestamp: Date.now(),
-    }
-    this.entries.push(entry)
+    this.entries.push({ text, importance, timestamp: Date.now() })
     this.enforce()
   }
 
@@ -82,7 +81,6 @@ export class ReminderBudget {
       return a.timestamp - b.timestamp
     })
 
-    // Evict lowest importance reminders until we fit the budget
     while (this.entries.length > 0) {
       const totalChars = this.entries.reduce((sum, r) => sum + r.text.length, 0)
       if (totalChars <= targetChars) break
@@ -91,18 +89,45 @@ export class ReminderBudget {
   }
 }
 
-// Default global reminder budget instance
+// Per-session budgets keyed by sessionID.
+const budgets = new Map<string, ReminderBudget>()
+
+export function getBudget(sessionID: string): ReminderBudget {
+  const existing = budgets.get(sessionID)
+  if (existing) return existing
+  const fresh = new ReminderBudget()
+  budgets.set(sessionID, fresh)
+  return fresh
+}
+
+export function clearBudget(sessionID: string): void {
+  budgets.delete(sessionID)
+}
+
+export function clearAllBudgets(): void {
+  budgets.clear()
+}
+
+// Default fallback budget for legacy call sites that have no sessionID in scope.
 export const defaultReminderBudget = new ReminderBudget()
 
-// Legacy function wrappers for backward compatibility
-export function addReminder(text: string, importance: number): void {
-  defaultReminderBudget.add(text, importance)
+// Legacy function wrappers. When sessionID is omitted we fall back to the
+// process-wide singleton; new callers should pass a sessionID to keep state
+// scoped to a single session.
+export function addReminder(text: string, importance: number, sessionID?: string): void {
+  const budget = sessionID ? getBudget(sessionID) : defaultReminderBudget
+  budget.add(text, importance)
 }
 
-export function getReminders(): string[] {
-  return defaultReminderBudget.getAll()
+export function getReminders(sessionID?: string): string[] {
+  const budget = sessionID ? getBudget(sessionID) : defaultReminderBudget
+  return budget.getAll()
 }
 
-export function clearReminders(): void {
+export function clearReminders(sessionID?: string): void {
+  if (sessionID) {
+    clearBudget(sessionID)
+    return
+  }
   defaultReminderBudget.clear()
 }

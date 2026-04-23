@@ -24,40 +24,10 @@ import {
 } from "./memory"
 import { SessionID } from "./schema"
 import { Log } from "@/util"
-import os from "os"
-import path from "path"
-import fs from "fs/promises"
+import { Bus } from "@/bus"
+import * as Session from "./session"
 
 const log = Log.create({ service: "SessionMemoryService" })
-
-// ============================================================
-// Snapshot Persistence
-// ============================================================
-
-function getSnapshotPath(sessionID: SessionID): string {
-  const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
-  return path.join(stateHome, "opencode", "sessions", sessionID, "memory-state.json")
-}
-
-async function loadSnapshot(sessionID: SessionID): Promise<MemoryState | null> {
-  const snapshotPath = getSnapshotPath(sessionID)
-  try {
-    const data = await fs.readFile(snapshotPath, "utf8")
-    return JSON.parse(data) as MemoryState
-  } catch {
-    return null
-  }
-}
-
-async function saveSnapshot(state: MemoryState): Promise<void> {
-  const snapshotPath = getSnapshotPath(state.sessionID)
-  try {
-    await fs.mkdir(path.dirname(snapshotPath), { recursive: true })
-    await fs.writeFile(snapshotPath, JSON.stringify(state), "utf8")
-  } catch (err) {
-    log.warn("failed to save memory snapshot", { sessionID: state.sessionID, error: String(err) })
-  }
-}
 
 // ============================================================
 // Types
@@ -104,7 +74,15 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionMemory") {}
 
+const MAX_MEMORY_STATES = 500
 const memoryStates = new Map<string, MemoryState>()
+
+function evictIfNeeded() {
+  while (memoryStates.size >= MAX_MEMORY_STATES) {
+    const firstKey = memoryStates.keys().next().value
+    if (firstKey !== undefined) memoryStates.delete(firstKey)
+  }
+}
 
 export const layer = Layer.effect(
   Service,
@@ -119,15 +97,8 @@ export const layer = Layer.effect(
         return existing
       }
 
-      // Try restoring from snapshot first (crash recovery)
-      const snapshot = yield* Effect.promise(() => loadSnapshot(sessionID))
-      if (snapshot) {
-        memoryStates.set(sessionID, snapshot)
-        log.info("memory restored from snapshot", { sessionID })
-        return snapshot
-      }
-
       const content = yield* Effect.promise(() => loadMemory(sessionID))
+      evictIfNeeded()
       const state: MemoryState = {
         sessionID,
         initialized: true,
@@ -153,8 +124,6 @@ export const layer = Layer.effect(
       if (currentState) {
         currentState.content = result
         currentState.lastUpdated = Date.now()
-        // Persist snapshot asynchronously so it doesn't block the hot path
-        void Effect.promise(() => saveSnapshot(currentState)).pipe(Effect.ignore)
       }
 
       log.debug("memory updated", { sessionID, updates: Object.keys(updates) })
@@ -200,6 +169,7 @@ export const layer = Layer.effect(
             lastUpdated: Date.now(),
             content: SESSION_MEMORY_TEMPLATE,
           }
+          evictIfNeeded()
           memoryStates.set(ctx.sessionID, state)
         }
       }
@@ -212,7 +182,6 @@ export const layer = Layer.effect(
         currentState.lastTokenCount = estimateMessageTokens(ctx.messages)
         currentState.lastToolCallCount = countToolCalls(ctx.messages)
         currentState.lastUpdated = Date.now()
-        void Effect.promise(() => saveSnapshot(currentState)).pipe(Effect.ignore)
       }
 
       return result
@@ -221,11 +190,6 @@ export const layer = Layer.effect(
     const deleteFn = Effect.fn("SessionMemory.delete")(function* (sessionID: SessionID) {
       yield* Effect.promise(() => deleteMemory(sessionID))
       memoryStates.delete(sessionID)
-      // Clean up snapshot file
-      try {
-        const snapshotPath = getSnapshotPath(sessionID)
-        void fs.unlink(snapshotPath)
-      } catch {}
       log.debug("memory deleted", { sessionID })
     })
 
@@ -237,6 +201,11 @@ export const layer = Layer.effect(
     const parseContentFn = (content: string): MemorySections => {
       return parseMemorySections(content)
     }
+
+    const unsubDeleted = Bus.subscribe(Session.Event.Deleted, (evt) => {
+      memoryStates.delete(evt.properties.sessionID)
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => unsubDeleted()))
 
     return Service.of({
       getState,

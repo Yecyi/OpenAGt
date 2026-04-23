@@ -192,7 +192,9 @@ async function killProcessTree(pid: number | undefined, graceMs = 2000) {
   } catch {
     try {
       process.kill(pid, "SIGTERM")
-    } catch {}
+    } catch (err) {
+      log.warn("failed to kill process tree", { pid, error: err })
+    }
   }
   // Force kill after grace period
   setTimeout(() => {

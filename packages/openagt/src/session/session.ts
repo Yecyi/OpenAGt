@@ -538,6 +538,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
         directory,
         workspaceID: original.workspaceID,
         title,
+        parentID: original.id,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()
@@ -724,7 +725,8 @@ export function* list(input?: {
     conditions.push(gte(SessionTable.time_updated, input.start))
   }
   if (input?.search) {
-    conditions.push(like(SessionTable.title, `%${input.search}%`))
+    const safe = input.search.replace(/[%_]/g, "\\$&")
+    conditions.push(like(SessionTable.title, `%${safe}%`))
   }
 
   const limit = input?.limit ?? 100
@@ -767,7 +769,8 @@ export function* listGlobal(input?: {
     conditions.push(lt(SessionTable.time_updated, input.cursor))
   }
   if (input?.search) {
-    conditions.push(like(SessionTable.title, `%${input.search}%`))
+    const safe = input.search.replace(/[%_]/g, "\\$&")
+    conditions.push(like(SessionTable.title, `%${safe}%`))
   }
   if (!input?.archived) {
     conditions.push(isNull(SessionTable.time_archived))
