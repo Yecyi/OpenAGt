@@ -6,6 +6,18 @@ import { Pty } from "../../src/pty"
 import { tmpdir } from "../fixture/fixture"
 import { setTimeout as sleep } from "node:timers/promises"
 
+const echoCommand = () => ({
+  command: process.execPath,
+  args: [
+    "-e",
+    [
+      'process.stdin.setEncoding("utf8")',
+      "process.stdin.resume()",
+      'process.stdin.on("data", (chunk) => process.stdout.write(chunk))',
+    ].join(";"),
+  ],
+})
+
 describe("pty", () => {
   test("does not leak output when websocket objects are reused", async () => {
     await using dir = await tmpdir({ git: true })
@@ -16,8 +28,8 @@ describe("pty", () => {
         AppRuntime.runPromise(
           Effect.gen(function* () {
             const pty = yield* Pty.Service
-            const a = yield* pty.create({ command: "cat", title: "a" })
-            const b = yield* pty.create({ command: "cat", title: "b" })
+            const a = yield* pty.create({ ...echoCommand(), title: "a" })
+            const b = yield* pty.create({ ...echoCommand(), title: "b" })
             try {
               const outA: string[] = []
               const outB: string[] = []
@@ -66,7 +78,7 @@ describe("pty", () => {
         AppRuntime.runPromise(
           Effect.gen(function* () {
             const pty = yield* Pty.Service
-            const a = yield* pty.create({ command: "cat", title: "a" })
+            const a = yield* pty.create({ ...echoCommand(), title: "a" })
             try {
               const outA: string[] = []
               const outB: string[] = []
@@ -111,7 +123,7 @@ describe("pty", () => {
         AppRuntime.runPromise(
           Effect.gen(function* () {
             const pty = yield* Pty.Service
-            const a = yield* pty.create({ command: "cat", title: "a" })
+            const a = yield* pty.create({ ...echoCommand(), title: "a" })
             try {
               const out: string[] = []
 

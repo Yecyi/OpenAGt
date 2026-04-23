@@ -41,6 +41,12 @@ export const ModelsCommand = cmd({
           Effect.gen(function* () {
             const svc = yield* Provider.Service
             const providers = yield* svc.list()
+            const printProviders = () => {
+              for (const providerID of Object.keys(providers).sort((a, b) => a.localeCompare(b))) {
+                process.stdout.write(providerID)
+                process.stdout.write(EOL)
+              }
+            }
 
             const print = (providerID: ProviderID, verbose?: boolean) => {
               const provider = providers[providerID]
@@ -56,6 +62,10 @@ export const ModelsCommand = cmd({
             }
 
             if (args.provider) {
+              if (args.provider === "list") {
+                yield* Effect.sync(printProviders)
+                return
+              }
               const providerID = ProviderID.make(args.provider)
               const provider = providers[providerID]
               if (!provider) {

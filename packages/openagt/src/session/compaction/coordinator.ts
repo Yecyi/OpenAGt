@@ -70,7 +70,7 @@ export interface CompactionCoordinatorConfig {
 export const DEFAULT_COORDINATOR_CONFIG: CompactionCoordinatorConfig = {
   microTimeThresholdMs: MICRO_COMPACT_TIME_THRESHOLD_MS,
   microPreserveRecentN: 3,
-  microCompactableTools: new Set(["read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
+  microCompactableTools: new Set(["bash", "read", "grep", "glob", "webfetch", "codesearch", "websearch"]),
   autoConfig: DEFAULT_AUTO_COMPACT_CONFIG,
   enableThreeLayer: true,
   preferMicroOverAuto: true,

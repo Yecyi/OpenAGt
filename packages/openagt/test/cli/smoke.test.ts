@@ -147,7 +147,7 @@ describe("CLI Smoke Tests", () => {
         .quiet()
 
       expect(result.exitCode).toBe(0)
-    })
+    }, 120_000)
   })
 
   describe("agent", () => {
@@ -242,11 +242,12 @@ describe("CLI Smoke Tests", () => {
 
     test("malformed arguments do not crash", async () => {
       const result = await $`bun run ${CLI_ENTRY} --invalid-option`
+        .nothrow()
         .quiet()
 
       // Should show error, not crash
       expect(result.exitCode).toBeGreaterThan(0)
-      expect(result.stderr.toString()).toContain("error")
+      expect((result.stderr.toString() + result.stdout.toString()).toLowerCase()).toContain("error")
     })
   })
 

@@ -247,17 +247,25 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         return { stdout, stderr, code }
       }, Effect.scoped)
 
+      const usable = Effect.fnUntraced(function* (candidate: string) {
+        const file = yield* fs.isFile(candidate).pipe(Effect.orDie)
+        if (!file) return false
+        const result = yield* run(candidate, ["--version"]).pipe(Effect.exit)
+        if (result._tag === "Failure") return false
+        return result.value.code === 0
+      })
+
       const extract = Effect.fnUntraced(function* (archive: string, config: (typeof PLATFORM)[keyof typeof PLATFORM]) {
-        const dir = yield* fs.makeTempDirectoryScoped({ directory: Global.Path.bin, prefix: "ripgrep-" })
+        const dir = path.join(Global.Path.bin, `ripgrep-${Math.random().toString(36).slice(2, 8)}`)
+        yield* fs.makeDirectory(dir, { recursive: true }).pipe(Effect.orDie)
 
         if (config.extension === "zip") {
           const shell = (yield* Effect.sync(() => which("powershell.exe") ?? which("pwsh.exe"))) ?? "powershell.exe"
+          const quote = (value: string) => value.replaceAll("'", "''")
           const result = yield* run(shell, [
             "-NoProfile",
             "-Command",
-            "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-            archive,
-            dir,
+            `Expand-Archive -LiteralPath '${quote(archive)}' -DestinationPath '${quote(dir)}' -Force`,
           ])
           if (result.code !== 0) {
             return yield* Effect.fail(error(result.stderr || result.stdout, result.code))
@@ -271,16 +279,31 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
           }
         }
 
-        return path.join(dir, `ripgrep-${VERSION}-${config.platform}`, process.platform === "win32" ? "rg.exe" : "rg")
-      }, Effect.scoped)
+        const expected = path.join(
+          dir,
+          `ripgrep-${VERSION}-${config.platform}`,
+          process.platform === "win32" ? "rg.exe" : "rg",
+        )
+        if (yield* fs.existsSafe(expected).pipe(Effect.orDie)) return expected
+        const fallback = yield* fs
+          .glob(`**/${process.platform === "win32" ? "rg.exe" : "rg"}`, {
+            cwd: dir,
+            absolute: true,
+            include: "file",
+            dot: true,
+          })
+          .pipe(Effect.orDie)
+        if (fallback[0]) return fallback[0]
+        return expected
+      })
 
       const filepath = yield* Effect.cached(
         Effect.gen(function* () {
           const system = yield* Effect.sync(() => which("rg"))
-          if (system && (yield* fs.isFile(system).pipe(Effect.orDie))) return system
+          if (system && (yield* usable(system))) return system
 
           const target = path.join(Global.Path.bin, `rg${process.platform === "win32" ? ".exe" : ""}`)
-          if (yield* fs.isFile(target).pipe(Effect.orDie)) return target
+          if (yield* usable(target)) return target
 
           const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
           const config = PLATFORM[platformKey]

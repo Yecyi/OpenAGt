@@ -1,5 +1,6 @@
 import { InstanceState } from "@/effect"
 import { Runner } from "@/effect"
+import { attachWith } from "@/effect/run-service"
 import { Effect, Layer, Scope, Context } from "effect"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
@@ -50,15 +51,18 @@ export const layer = Layer.effect(
       onInterrupt: Effect.Effect<MessageV2.WithParts>,
     ) {
       const data = yield* InstanceState.get(state)
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
+      const attach = <A, E, R>(effect: Effect.Effect<A, E, R>) => attachWith(effect, { instance, workspace })
       const existing = data.runners.get(sessionID)
       if (existing) return existing
       const next = Runner.make<MessageV2.WithParts>(data.scope, {
         onIdle: Effect.gen(function* () {
           data.runners.delete(sessionID)
-          yield* status.set(sessionID, { type: "idle" })
+          yield* attach(status.set(sessionID, { type: "idle" }))
         }),
-        onBusy: status.set(sessionID, { type: "busy" }),
-        onInterrupt,
+        onBusy: attach(status.set(sessionID, { type: "busy" })),
+        onInterrupt: attach(onInterrupt),
         busy: () => {
           throw new Session.BusyError(sessionID)
         },
@@ -88,7 +92,9 @@ export const layer = Layer.effect(
       onInterrupt: Effect.Effect<MessageV2.WithParts>,
       work: Effect.Effect<MessageV2.WithParts>,
     ) {
-      return yield* (yield* runner(sessionID, onInterrupt)).ensureRunning(work)
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
+      return yield* (yield* runner(sessionID, onInterrupt)).ensureRunning(attachWith(work, { instance, workspace }))
     })
 
     const startShell = Effect.fn("SessionRunState.startShell")(function* (
@@ -96,7 +102,9 @@ export const layer = Layer.effect(
       onInterrupt: Effect.Effect<MessageV2.WithParts>,
       work: Effect.Effect<MessageV2.WithParts>,
     ) {
-      return yield* (yield* runner(sessionID, onInterrupt)).startShell(work)
+      const instance = yield* InstanceState.context
+      const workspace = yield* InstanceState.workspaceID
+      return yield* (yield* runner(sessionID, onInterrupt)).startShell(attachWith(work, { instance, workspace }))
     })
 
     return Service.of({ assertNotBusy, cancel, ensureRunning, startShell })

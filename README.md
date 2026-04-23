@@ -35,6 +35,9 @@ That compatibility is part of the current codebase, not just historical trivia, 
 - Provider fallback. Requests can switch providers/models on retryable failures such as rate limits and server errors.
 - Context management. The session layer includes compaction, pruning, summaries, retries, and overflow handling.
 - Headless server plus SDK. The same runtime can be driven locally or via HTTP using the generated JavaScript SDK.
+- Coordinator Runtime v1. Task-graph execution now supports dependency ordering, `write_scope` / `read_scope`, acceptance checks, and execution priority.
+- Personal Agent Core v1. The backend now includes profile/workspace/session memory, inbox items, wakeups, and normalized multi-entry ingestion.
+- Approval & Safety Envelope v1. Shell permission flows now expose structured `shell_safety` metadata with approval kind, boundary details, and policy reasons.
 - Extensible surface area. Agents, commands, skills, plugins, MCP servers, and custom tools can all be added from config and local files.
 - Session memory injection. Prompt assembly loads session memory into the system context. This is inferred from `loadMemory(sessionID)` in `packages/openagt/src/session/prompt.ts`; the user-facing memory workflow is not yet clearly documented.
 
@@ -153,6 +156,13 @@ Plan-specific workflow is partially feature-flagged. The plan agent is always de
 
 ## Installation
 
+Stable release assets are documented in [docs/install/stable.md](./docs/install/stable.md). The `v1.15.0` stable support matrix covers:
+
+- `packages/openagt` CLI / TUI / headless server
+- `packages/sdk/js` JavaScript SDK
+
+Flutter is intentionally excluded from this release line.
+
 ### Prerequisites
 
 - Bun 1.3+
@@ -174,6 +184,35 @@ bun run --cwd packages/sdk/js script/build.ts
 ```
 
 This step is required in a fresh clone because `packages/openagt` imports generated files from `packages/sdk/js/src/v2/gen`.
+
+### Stable Assets
+
+The stable release publishes these first-party assets:
+
+- `openagt-windows-x64.zip`
+- `OpenAGt-Setup-x64.msi`
+- `openagt-linux-x64.tar.gz`
+- `openagt-macos-arm64.tar.gz`
+- `openagt-macos-x64.tar.gz`
+- `SHA256SUMS.txt`
+
+The compatibility alias `opencode` remains available in packaged builds as a wrapper entrypoint.
+
+### Release Validation Status
+
+The current `v1.15.0` release branch has passed these release-critical checks:
+
+- `bun typecheck` in `packages/openagt`
+- `bun run release:verify`
+- focused runtime suites for `session`, `tool`, `agent`, `security`, `cli`, `installation`, `mcp`, `provider`, `pty`, `file`, `snapshot`, and the remaining package-local test groups
+
+Known test gaps on the current branch:
+
+- `tool.bash abort > captures stderr in output` is still skipped
+- `Worktree > createFromInfo > creates and bootstraps git worktree` is still skipped
+- `unicode filenames modification and restore` is still skipped
+
+The single-command whole-package entrypoint `bun test --timeout 30000` is slower than the current outer CI timeout budget on this machine, so release validation is tracked through split package-local suites rather than that single aggregate invocation.
 
 ### Environment Variables
 
@@ -249,6 +288,16 @@ bun run --cwd packages/openagt src/index.ts web --port 4096
 ```bash
 bun run --cwd packages/openagt src/index.ts providers login
 ```
+
+### New Runtime Surfaces
+
+The current stable backend includes these additional public runtime surfaces:
+
+- `coordinator.*`
+- `inbox.*`
+- `scheduler.*`
+- `memory.updated`
+- shell permission metadata with `shell_safety`
 
 ## Usage
 

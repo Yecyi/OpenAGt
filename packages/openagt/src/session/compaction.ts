@@ -117,6 +117,43 @@ export const layer: Layer.Layer<
       log.info("compaction decision", { layer: decision.layer, reason: decision.reason })
 
       if (!decision.shouldCompact) {
+        let legacyCompacted = 0
+        const now = Date.now()
+        for (let index = 0; index < msgs.length; index++) {
+          const msg = msgs[index]
+          const trailingUsers = msgs.slice(index + 1).filter((item) => item.info.role === "user").length
+          if (trailingUsers < 2) continue
+          for (const part of msg.parts) {
+            if (part.type !== "tool") continue
+            if (part.state.status !== "completed") continue
+            if (part.state.time.compacted) continue
+            if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
+            if ((part.state.output?.length ?? 0) < PRUNE_MINIMUM) continue
+
+            const summary = summarizeToolResult(part.state.output ?? "", part.tool)
+            yield* session.updatePart({
+              ...part,
+              state: {
+                ...part.state,
+                output: summary.summary,
+                time: {
+                  ...part.state.time,
+                  compacted: now,
+                },
+                metadata: {
+                  ...part.state.metadata,
+                  legacy_pruned: true,
+                  original_length: summary.originalLength,
+                },
+              },
+            })
+            legacyCompacted++
+          }
+        }
+        if (legacyCompacted > 0) {
+          log.info("legacy prune applied", { compacted: legacyCompacted })
+          return
+        }
         log.info("no compaction needed", { reason: decision.reason })
         return
       }

@@ -9,6 +9,7 @@ import { makeRuntime } from "@/effect/run-service"
 import path from "path"
 import os from "os"
 import fs from "fs/promises"
+import fsSync from "node:fs"
 
 const log = Log.create({ service: "bus" })
 
@@ -48,11 +49,11 @@ class EventBuffer {
     this.maxCapacity = maxCapacity
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     try {
       const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
       const eventsDir = path.join(stateHome, "opencode", "events")
-      await fs.mkdir(eventsDir, { recursive: true })
+      fsSync.mkdirSync(eventsDir, { recursive: true })
       this.bufferPath = path.join(eventsDir, "events.jsonl")
     } catch (error) {
       log.warn("failed to initialize event buffer", { error })
@@ -174,7 +175,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const eventBuffer = new EventBuffer(getEventBufferSize())
-    yield* Effect.promise(() => eventBuffer.initialize())
+    eventBuffer.initialize()
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Bus.state")(function* (ctx) {

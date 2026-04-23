@@ -19,6 +19,7 @@ import { ToolRegistry } from "../../src/tool"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { TaskRuntime } from "../../src/session/task-runtime"
+import { ProviderTest } from "../fake/provider"
 
 afterEach(async () => {
   await Instance.disposeAll()
@@ -34,6 +35,7 @@ const it = testEffect(
     Agent.defaultLayer,
     Config.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
+    ProviderTest.fake().layer,
     Session.defaultLayer,
     TaskRuntime.defaultLayer,
     Truncate.defaultLayer,

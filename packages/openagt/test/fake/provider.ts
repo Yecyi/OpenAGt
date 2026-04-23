@@ -4,8 +4,8 @@ import { ModelID, ProviderID } from "../../src/provider/schema"
 
 export namespace ProviderTest {
   export function model(override: Partial<Provider.Model> = {}): Provider.Model {
-    const id = override.id ?? ModelID.make("gpt-5.2")
-    const providerID = override.providerID ?? ProviderID.make("openai")
+    const id = override.id ?? ModelID.make("test-model")
+    const providerID = override.providerID ?? ProviderID.make("test")
     return {
       id,
       providerID,

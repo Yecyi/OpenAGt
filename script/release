@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
-BUMP_TYPE=${1:-patch}
+VERSION=${1:-1.15.0}
+KIND=${2:-rc}
 
-gh workflow run publish.yml -f bump="$BUMP_TYPE"
+gh workflow run release-stable.yml -f version="$VERSION" -f release_kind="$KIND"

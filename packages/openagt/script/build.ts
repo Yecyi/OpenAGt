@@ -50,8 +50,75 @@ console.log(`Loaded ${migrations.length} migrations`)
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
+const archiveFlag = process.argv.includes("--archive")
+const noUploadFlag = process.argv.includes("--no-upload")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const releaseBuild = Script.release || archiveFlag
+
+function archiveName(input: { os: string; arch: "arm64" | "x64" }) {
+  const os = input.os === "darwin" ? "macos" : input.os === "win32" ? "windows" : input.os
+  return `${pkg.name}-${os}-${input.arch}`
+}
+
+async function builtBinaryPath(name: string) {
+  const candidates = [`dist/${name}/bin/openagt`, `dist/${name}/bin/openagt.exe`]
+  for (const candidate of candidates) {
+    if (await Bun.file(candidate).exists()) return candidate
+  }
+  throw new Error(`Unable to locate built binary for ${name}`)
+}
+
+function releaseReadme(input: { name: string; os: string; arch: "arm64" | "x64" }) {
+  return [
+    `OpenAGt ${Script.version}`,
+    ``,
+    `Package: ${input.name}`,
+    `Platform: ${input.os}`,
+    `Architecture: ${input.arch}`,
+    ``,
+    `Quick start:`,
+    input.os === "win32" ? `  .\\bin\\openagt.cmd --help` : `  ./bin/openagt --help`,
+    input.os === "win32" ? `  .\\bin\\opencode.cmd --help` : `  ./bin/opencode --help`,
+    ``,
+    `This stable release covers the CLI, TUI, and headless server runtime.`,
+    `Flutter is not included in the v1.15.0 support matrix.`,
+  ].join("\n")
+}
+
+async function createReleasePackage(input: {
+  name: string
+  os: string
+  arch: "arm64" | "x64"
+}) {
+  const releaseDir = `dist/${input.name}/release`
+  const binDir = `${releaseDir}/bin`
+  await $`rm -rf ${releaseDir}`
+  await $`mkdir -p ${binDir}`
+  const sourceBinary = await builtBinaryPath(input.name)
+  const binaryName = input.os === "win32" ? "openagt.exe" : "openagt"
+  await fs.promises.copyFile(sourceBinary, path.join(binDir, binaryName))
+  if (input.os === "win32") {
+    await Bun.write(
+      path.join(binDir, "openagt.cmd"),
+      `@echo off\r\nset SCRIPT_DIR=%~dp0\r\n"%SCRIPT_DIR%openagt.exe" %*\r\n`,
+    )
+    await Bun.write(
+      path.join(binDir, "opencode.cmd"),
+      `@echo off\r\nset SCRIPT_DIR=%~dp0\r\n"%SCRIPT_DIR%openagt.exe" %*\r\n`,
+    )
+  } else {
+    await Bun.write(
+      path.join(binDir, "opencode"),
+      `#!/usr/bin/env sh\nDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$DIR/openagt" "$@"\n`,
+    )
+    await $`chmod 755 ${path.join(binDir, "openagt")} ${path.join(binDir, "opencode")}`
+  }
+  await Bun.write(path.join(releaseDir, "README.txt"), releaseReadme(input))
+  await Bun.write(path.join(releaseDir, "VERSION.txt"), `${Script.version}\n`)
+  await Bun.write(path.join(releaseDir, "LICENSE"), await Bun.file("../../LICENSE").text())
+  return releaseDir
+}
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -141,6 +208,15 @@ const allTargets: {
   },
 ]
 
+const releaseTargets = allTargets.filter(
+  (item) =>
+    item.abi === undefined &&
+    item.avx2 !== false &&
+    ((item.os === "linux" && item.arch === "x64") ||
+      (item.os === "darwin" && (item.arch === "x64" || item.arch === "arm64")) ||
+      (item.os === "win32" && item.arch === "x64")),
+)
+
 const targets = singleFlag
   ? allTargets.filter((item) => {
       if (item.os !== process.platform || item.arch !== process.arch) {
@@ -160,14 +236,16 @@ const targets = singleFlag
 
       return true
     })
-  : allTargets
+  : releaseBuild
+    ? releaseTargets
+    : allTargets
 
 await $`rm -rf dist`
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
-  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
-  await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
+  await $`bun add --no-save --exact --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
+  await $`bun add --no-save --exact --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
 }
 for (const item of targets) {
   const name = [
@@ -226,7 +304,7 @@ for (const item of targets) {
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
-    const binaryPath = `dist/${name}/bin/openagt`
+    const binaryPath = await builtBinaryPath(name)
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()
@@ -251,17 +329,35 @@ for (const item of targets) {
     ),
   )
   binaries[name] = Script.version
+  if (releaseBuild) {
+    await createReleasePackage({
+      name,
+      os: item.os,
+      arch: item.arch,
+    })
+  }
 }
 
-if (Script.release) {
+if (releaseBuild) {
   for (const key of Object.keys(binaries)) {
-    if (key.includes("linux")) {
-      await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
-    } else {
-      await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
+    const os = key.includes("windows") ? "win32" : key.includes("darwin") ? "darwin" : "linux"
+    const arch = key.endsWith("arm64") ? "arm64" : "x64"
+    const asset = archiveName({
+      os,
+      arch,
+    })
+    if (os === "win32") {
+      const source = path.resolve(dir, `dist/${key}/release`)
+      const target = path.resolve(dir, `dist/${asset}.zip`)
+      await $`powershell -NoProfile -Command Compress-Archive -Path "${source}\\*" -DestinationPath "${target}" -Force`
+      continue
     }
+    await $`tar -czf ../../${asset}.tar.gz *`.cwd(`dist/${key}/release`)
   }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`
+}
+
+if (Script.release && !noUploadFlag) {
+  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz ./dist/*.msi --clobber --repo ${process.env.GH_REPO}`.nothrow()
 }
 
 export { binaries }

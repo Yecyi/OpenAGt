@@ -11,19 +11,6 @@
 import { STRUCTURED_DANGEROUS_CMDLETS } from "./powershell-ast"
 
 /**
- * Dangerous PowerShell cmdlets that can execute arbitrary code.
- * Consolidated from powershell-ast.ts STRUCTURED_DANGEROUS_CMDLETS for backward compatibility.
- */
-export const DANGEROUS_CMDLETS = Object.keys(STRUCTURED_DANGEROUS_CMDLETS)
-
-/**
- * High-severity cmdlets that require extra caution
- */
-export const HIGH_SEVERITY_CMDLETS = Object.entries(STRUCTURED_DANGEROUS_CMDLETS)
-  .filter(([, info]) => info.severity === "high")
-  .map(([cmdlet]) => cmdlet)
-
-/**
  * Patterns for encoded/base64 PowerShell commands
  */
 export const ENCODED_COMMAND_PATTERNS = [
@@ -59,35 +46,110 @@ export interface CmdletValidationResult {
   checks: CmdletCheck[]
 }
 
+type DangerEntry = {
+  display: string
+  severity: "high" | "medium"
+  message: string
+  pattern: RegExp
+}
+
+const STRUCTURED_DISPLAY_NAMES: Record<string, string> = {
+  "invoke-expression": "Invoke-Expression",
+  iex: "iex",
+  "invoke-command": "Invoke-Command",
+  "invoke-webrequest": "Invoke-WebRequest",
+  iwr: "iwr",
+  "invoke-restmethod": "Invoke-RestMethod",
+  "start-process": "Start-Process",
+  "new-service": "New-Service",
+  "set-service": "Set-Service",
+  "register-scheduledtask": "Register-ScheduledTask",
+  "schtasks.exe": "schtasks.exe",
+  "set-executionpolicy": "Set-ExecutionPolicy",
+  "new-item": "New-Item",
+  "remove-item": "Remove-Item",
+  "convertto-securestring": "ConvertTo-SecureString",
+  "convertfrom-securestring": "ConvertFrom-SecureString",
+  "get-content": "Get-Content",
+  "set-content": "Set-Content",
+  "out-file": "Out-File",
+  "add-type": "Add-Type",
+}
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+const STRUCTURED_ENTRIES = Object.entries(STRUCTURED_DANGEROUS_CMDLETS).map(([cmdlet, info]) => ({
+  display: STRUCTURED_DISPLAY_NAMES[cmdlet] ?? cmdlet,
+  severity: info.severity,
+  message: `Dangerous cmdlet detected: ${STRUCTURED_DISPLAY_NAMES[cmdlet] ?? cmdlet}`,
+  pattern: new RegExp(`\\b${escapeRegex(cmdlet)}\\b`, "i"),
+})) satisfies DangerEntry[]
+
+const SPECIAL_ENTRIES = [
+  {
+    display: "Start-Process -Verb RunAs",
+    severity: "high",
+    message: "Privilege escalation via Start-Process -Verb RunAs",
+    pattern: /\bstart-process\b(?:(?!\bstart-process\b)[\s\S])*\b-verb\s+runas\b/i,
+  },
+  {
+    display: "runas.exe",
+    severity: "high",
+    message: "Privilege escalation via runas.exe",
+    pattern: /\brunas(?:\.exe)?\b/i,
+  },
+  {
+    display: "sudo",
+    severity: "high",
+    message: "Privilege escalation via sudo",
+    pattern: /\bsudo\b/i,
+  },
+  {
+    display: "powershell -enc",
+    severity: "high",
+    message: "Encoded PowerShell command",
+    pattern: /\b(?:powershell|pwsh)(?:\.exe)?\s+-enc\b/i,
+  },
+  {
+    display: "powershell -EncodedCommand",
+    severity: "high",
+    message: "Encoded PowerShell command",
+    pattern: /\b(?:powershell|pwsh)(?:\.exe)?\s+-encodedcommand\b/i,
+  },
+  {
+    display: "Get-WmiObject",
+    severity: "medium",
+    message: "Dangerous cmdlet detected: Get-WmiObject",
+    pattern: /\bget-wmiobject\b/i,
+  },
+] satisfies DangerEntry[]
+
+const DANGEROUS_CMDLET_ENTRIES = [...STRUCTURED_ENTRIES, ...SPECIAL_ENTRIES]
+
 /**
- * Pre-computed uppercase versions for efficient O(1) lookup
+ * Dangerous PowerShell cmdlets and escalation patterns.
  */
-const UPPER_DANGEROUS_CMDLETS = DANGEROUS_CMDLETS.map((c) => c.toUpperCase())
-const UPPER_HIGH_SEVERITY_CMDLETS = HIGH_SEVERITY_CMDLETS.map((c) => c.toUpperCase())
+export const DANGEROUS_CMDLETS = [...new Set(DANGEROUS_CMDLET_ENTRIES.map((entry) => entry.display))]
+
+/**
+ * High-severity cmdlets that require extra caution.
+ */
+export const HIGH_SEVERITY_CMDLETS = [
+  ...new Set(DANGEROUS_CMDLET_ENTRIES.filter((entry) => entry.severity === "high").map((entry) => entry.display)),
+]
 
 /**
  * Check if a PowerShell command contains dangerous cmdlets.
- * Uses word-boundary regex to avoid false positives from substring matches
- * (e.g., "Invoke-WebRequest" should not trigger on the substring "webrequest").
  */
 export function containsDangerousCmdlets(command: string): boolean {
-  const upperCommand = command.toUpperCase()
-  return UPPER_DANGEROUS_CMDLETS.some((cmdlet) => {
-    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
-  })
+  return DANGEROUS_CMDLET_ENTRIES.some((entry) => entry.pattern.test(command))
 }
 
 /**
  * Check if a PowerShell command contains high-severity cmdlets.
- * Uses word-boundary regex to avoid false positives.
  */
 export function containsHighSeverityCmdlets(command: string): boolean {
-  const upperCommand = command.toUpperCase()
-  return UPPER_HIGH_SEVERITY_CMDLETS.some((cmdlet) => {
-    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
-  })
+  return DANGEROUS_CMDLET_ENTRIES.some((entry) => entry.severity === "high" && entry.pattern.test(command))
 }
 
 /**
@@ -96,42 +158,16 @@ export function containsHighSeverityCmdlets(command: string): boolean {
 export function validatePowerShellCommand(command: string): CmdletValidationResult {
   const checks: CmdletCheck[] = []
   let highestSeverity: DangerSeverity = "safe"
-  const upperCommand = command.toUpperCase()
 
-  // Check for dangerous cmdlets
-  for (let i = 0; i < DANGEROUS_CMDLETS.length; i++) {
-    const cmdlet = DANGEROUS_CMDLETS[i]!
-    const upperCmdlet = UPPER_DANGEROUS_CMDLETS[i]!
-    const matched = upperCommand.includes(upperCmdlet)
-    const isHighSeverity = UPPER_HIGH_SEVERITY_CMDLETS.includes(upperCmdlet)
-    const severity: DangerSeverity = isHighSeverity ? "high" : "medium"
-
-    if (matched && severity === "high") {
-      highestSeverity = "high"
-    } else if (matched && highestSeverity !== "high") {
-      highestSeverity = severity
-    }
-
+  for (const entry of DANGEROUS_CMDLET_ENTRIES) {
+    const matched = entry.pattern.test(command)
     checks.push({
-      cmdlet,
+      cmdlet: entry.display,
       matched,
-      severity: matched ? severity : "safe",
-      message: matched ? `Dangerous cmdlet detected: ${cmdlet}` : undefined,
+      severity: matched ? entry.severity : "safe",
+      message: matched ? entry.message : undefined,
     })
-  }
-
-  // Check for encoded commands
-  for (const { pattern, message } of ENCODED_COMMAND_PATTERNS) {
-    const matched = pattern.test(command)
-    if (matched) {
-      highestSeverity = "high"
-    }
-    checks.push({
-      cmdlet: "encoded_command",
-      matched,
-      severity: matched ? "high" : "safe",
-      message: matched ? message : undefined,
-    })
+    if (matched) highestSeverity = highestSeverity === "high" ? "high" : entry.severity
   }
 
   // Check for remote execution

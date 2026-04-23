@@ -133,10 +133,11 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | ChildPro
       )
 
       const getBrewFormula = Effect.fnUntraced(function* () {
-        const formulas = ["openagt", "opencode"]
+        const formulas = ["anomalyco/tap/openagt", "anomalyco/tap/opencode", "openagt", "opencode"]
         for (const formula of formulas) {
           const installed = yield* text(["brew", "list", "--formula", formula])
-          if (installed.includes(formula)) return formula
+          const names = [formula, formula.split("/").at(-1) ?? formula]
+          if (names.some((name) => installed.includes(name))) return formula
         }
         return "openagt"
       })

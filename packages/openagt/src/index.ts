@@ -22,8 +22,6 @@ import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
 import { ExportCommand } from "./cli/cmd/export"
 import { ImportCommand } from "./cli/cmd/import"
-import { AttachCommand } from "./cli/cmd/tui/attach"
-import { TuiThreadCommand } from "./cli/cmd/tui/thread"
 import { AcpCommand } from "./cli/cmd/acp"
 import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
@@ -39,6 +37,7 @@ import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { ensureProcessMetadata } from "./util/opencode-process"
+import { executeFastPath, isFastPathCommand } from "./cli/fast-path"
 
 const processMetadata = ensureProcessMetadata("main")
 
@@ -59,11 +58,11 @@ const args = hideBin(process.argv)
 function show(out: string) {
   const text = out.trimStart()
   if (!text.startsWith("openagt ") && !text.startsWith("opencode ")) {
-    process.stderr.write(UI.logo() + EOL + EOL)
-    process.stderr.write(text)
+    process.stdout.write(UI.logo() + EOL + EOL)
+    process.stdout.write(text)
     return
   }
-  process.stderr.write(out)
+  process.stdout.write(out)
 }
 
 const cli = yargs(args)
@@ -159,8 +158,6 @@ const cli = yargs(args)
   .completion("completion", "generate shell completion script")
   .command(AcpCommand)
   .command(McpCommand)
-  .command(TuiThreadCommand)
-  .command(AttachCommand)
   .command(RunCommand)
   .command(GenerateCommand)
   .command(DebugCommand)
@@ -195,6 +192,50 @@ const cli = yargs(args)
   .strict()
 
 try {
+  if (isFastPathCommand(args)) {
+    const result = executeFastPath(args)
+    if (result.exit) process.exit(result.code)
+  }
+  const needsTuiCommands = (() => {
+    const first = args[0]
+    if (!first) return true
+    if (first === "attach") return true
+    if (first.startsWith("-")) return false
+    return !new Set([
+      "acp",
+      "mcp",
+      "run",
+      "generate",
+      "init",
+      "debug",
+      "account",
+      "providers",
+      "agent",
+      "upgrade",
+      "uninstall",
+      "serve",
+      "web",
+      "models",
+      "stats",
+      "export",
+      "import",
+      "github",
+      "pr",
+      "session",
+      "plug",
+      "db",
+      "completion",
+      "help",
+      "version",
+    ]).has(first)
+  })()
+  if (needsTuiCommands) {
+    const [{ AttachCommand }, { TuiThreadCommand }] = await Promise.all([
+      import("./cli/cmd/tui/attach"),
+      import("./cli/cmd/tui/thread"),
+    ])
+    cli.command(TuiThreadCommand).command(AttachCommand)
+  }
   if (args.includes("-h") || args.includes("--help")) {
     await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err

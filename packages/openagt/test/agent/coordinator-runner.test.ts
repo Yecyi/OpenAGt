@@ -1,5 +1,6 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
+import { Bus } from "../../src/bus"
 import { Coordinator } from "../../src/coordinator/coordinator"
 import { PersonalAgent } from "../../src/personal/personal"
 import { Instance } from "../../src/project/instance"
@@ -69,6 +70,7 @@ function providerCfg(url: string): Partial<Config.Info> {
 
 const it = testEffect(
   Layer.mergeAll(
+    Bus.layer,
     Config.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
     Session.defaultLayer,
@@ -99,7 +101,6 @@ describe("coordinator runner", () => {
             sessionID: parent.id,
             goal: "Run coordinator automatically",
           })
-
           const waited = yield* tasks.wait({
             parentSessionID: parent.id,
             taskIDs: run.task_ids.map((item) => item as never),
@@ -116,6 +117,7 @@ describe("coordinator runner", () => {
           expect(memory.some((item) => item.tags.some((tag) => tag.startsWith("verify_task:")))).toBe(true)
         }),
       {
+        git: true,
         config: providerCfg,
       },
     ),

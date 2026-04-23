@@ -462,13 +462,12 @@ export const BashTool = Tool.define(
     const sandboxBroker = yield* SandboxBroker.Service
     const shellRunner = yield* ShellRunner.Service
     const sandboxPolicy = yield* SandboxPolicy.Service
-    const instance = yield* InstanceState.context
 
-    const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, text: string) {
+    const cygpath = Effect.fn("BashTool.cygpath")(function* (shell: string, cwd: string, text: string) {
       const handle = yield* spawner
         .spawn(
           ChildProcess.make(shell, ["-lc", 'cygpath -w -- "$1"', "_", text], {
-            cwd: instance.directory,
+            cwd,
             extendEnv: true,
             stdin: "ignore",
             stderr: "ignore",
@@ -490,7 +489,7 @@ export const BashTool = Tool.define(
     const resolvePath = Effect.fn("BashTool.resolvePath")(function* (text: string, root: string, shell: string) {
       if (process.platform === "win32") {
         if (Shell.posix(shell) && text.startsWith("/")) {
-          const file = yield* cygpath(shell, text)
+          const file = yield* cygpath(shell, root, text)
           if (file) return file
           if (text === "/tmp" || text.startsWith("/tmp/")) {
             const suffix = text.slice("/tmp".length).replaceAll("/", path.sep)
@@ -512,6 +511,7 @@ export const BashTool = Tool.define(
     })
 
     const collect = Effect.fn("BashTool.collect")(function* (root: Node, cwd: string, ps: boolean, shell: string) {
+      const current = yield* InstanceState.context
       const scan: Scan = {
         dirs: new Set<string>(),
         patterns: new Set<string>(),
@@ -558,7 +558,7 @@ export const BashTool = Tool.define(
           for (const arg of pathArgs(command, ps)) {
             const resolved = yield* argPath(arg, cwd, ps, shell)
             log.info("resolved path", { arg, resolved })
-            if (!resolved || Instance.containsPath(resolved, instance)) continue
+            if (!resolved || Instance.containsPath(resolved, current)) continue
             const dir = (yield* fs.isDir(resolved)) ? resolved : path.dirname(resolved)
             scan.dirs.add(dir)
           }
@@ -598,7 +598,7 @@ export const BashTool = Tool.define(
     })
 
     return {
-      description: DESCRIPTION.replaceAll("${directory}", instance.directory)
+      description: DESCRIPTION.replaceAll("${directory}", "the current working directory")
         .replaceAll("${os}", process.platform)
         .replaceAll("${shell}", Shell.name(Shell.acceptable()))
         .replaceAll(
@@ -612,6 +612,7 @@ export const BashTool = Tool.define(
       parameters: Parameters,
       execute: (params: z.infer<typeof Parameters>, ctx: Tool.Context<BashMetadata>): Effect.Effect<Tool.ExecuteResult<BashMetadata>, never, never> =>
         Effect.gen(function* () {
+          const instance = yield* InstanceState.context
           const shell = chooseShell(params.command)
           const name = Shell.name(shell)
           log.info("bash tool using shell", { shell })

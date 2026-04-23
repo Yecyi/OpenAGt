@@ -5,10 +5,6 @@ import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oa
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
-// Port range for OAuth callback server binding
-const MIN_CALLBACK_PORT = 3000
-const MAX_CALLBACK_PORT = 3010
-
 // Normalize a URI origin (host + port) for comparison: lowercase, strip trailing slash,
 // and resolve localhost/127.0.0.1 to a canonical form.
 function normalizeOrigin(uri: string): string {
@@ -181,10 +177,13 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
   // Parse the redirect URI to get port and path (uses defaults if not provided)
   const { port, path } = parseRedirectUri(redirectUri)
 
-  // Enforce port range security: only allow ports within the configured range
-  if (port < MIN_CALLBACK_PORT || port > MAX_CALLBACK_PORT) {
-    log.error("oauth callback port outside allowed range", { port, min: MIN_CALLBACK_PORT, max: MAX_CALLBACK_PORT })
-    throw new Error(`OAuth callback port ${port} is outside the allowed range (${MIN_CALLBACK_PORT}-${MAX_CALLBACK_PORT}). This is a security restriction to prevent unauthorized callback servers.`)
+  if (redirectUri) {
+    const url = new URL(redirectUri)
+    const host = url.hostname.toLowerCase()
+    if (!["127.0.0.1", "localhost"].includes(host)) {
+      log.error("oauth callback host must be loopback", { host, redirectUri })
+      throw new Error(`OAuth callback host ${host} is not allowed. Use localhost or 127.0.0.1.`)
+    }
   }
 
   // If server is running on a different port/path, stop it first

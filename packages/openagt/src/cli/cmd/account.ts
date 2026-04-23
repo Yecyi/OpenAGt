@@ -229,7 +229,8 @@ export const OpenCommand = cmd({
 })
 
 export const ConsoleCommand = cmd({
-  command: "console",
+  command: "account",
+  aliases: ["console"],
   describe: false,
   builder: (yargs) =>
     yargs

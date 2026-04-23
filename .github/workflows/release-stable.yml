@@ -1,0 +1,156 @@
+name: Release Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version to publish
+        required: true
+        default: "1.15.0"
+      release_kind:
+        description: Release kind
+        required: true
+        default: "rc"
+        type: choice
+        options:
+          - rc
+          - ga
+
+permissions:
+  contents: write
+
+env:
+  OPENAGT_CHANNEL: latest
+  OPENAGT_RELEASE: "1"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAGT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify release baseline
+        run: bun run release:verify
+
+      - name: Generate release notes
+        run: bun run release:notes --version $OPENAGT_VERSION --kind ${{ inputs.release_kind }} --output dist/release-notes.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: dist/release-notes.md
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: macos-13
+          - runner: macos-14
+          - runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    env:
+      OPENAGT_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build SDK
+        run: bun run --cwd packages/sdk/js script/build.ts
+
+      - name: Build platform release asset
+        run: bun run --cwd packages/openagt script/build.ts --single --archive --no-upload --skip-install
+
+      - name: Install WiX
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: dotnet tool install --global wix --version 4.0.4
+
+      - name: Build Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH="$env:USERPROFILE\\.dotnet\\tools;$env:PATH"
+          .\packages\openagt\script\build-windows-installer.ps1 -Version $env:OPENAGT_VERSION
+
+      - name: Sign Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\script\sign-windows.ps1 .\packages\openagt\dist\OpenAGt-Setup-x64.msi
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            packages/openagt/dist/*.zip
+            packages/openagt/dist/*.tar.gz
+            packages/openagt/dist/*.msi
+
+  finalize:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      OPENAGT_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: packages/openagt/dist
+
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: packages/openagt/dist
+
+      - name: Generate checksums
+        run: bun run script/release-checksums.ts --dir packages/openagt/dist --output packages/openagt/dist/SHA256SUMS.txt
+
+      - name: Publish release assets
+        shell: bash
+        run: |
+          TAG="v${OPENAGT_VERSION}"
+          if [ "${{ inputs.release_kind }}" = "rc" ]; then
+            TAG="v${OPENAGT_VERSION}-rc.1"
+          fi
+          PRERELEASE_ARGS=()
+          if [ "${{ inputs.release_kind }}" = "rc" ]; then
+            PRERELEASE_ARGS+=(--prerelease)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft=true "${PRERELEASE_ARGS[@]}"
+          else
+            gh release create "$TAG" --draft --title "$TAG" --notes-file packages/openagt/dist/release-notes.md "${PRERELEASE_ARGS[@]}"
+          fi
+          gh release upload "$TAG" packages/openagt/dist/* --clobber
