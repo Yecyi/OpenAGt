@@ -124,4 +124,22 @@ describe("Tool.define", () => {
     expect(result.metadata.answers[0]).toEqual(["yes", "later"])
     expect(result.metadata.nested.count).toBe(1)
   })
+
+  test("serializes circular metadata values without recursion overflow", () => {
+    const cyclic: Record<string, unknown> = { name: "root" }
+    cyclic["self"] = cyclic
+
+    const result = Tool.toMetadataValue(cyclic)
+    expect(typeof result).toBe("object")
+    if (typeof result === "object" && result !== null && !Array.isArray(result)) {
+      const record = result as Tool.Metadata
+      expect(record["self"]).toBe("[circular]")
+    }
+  })
+
+  test("caps metadata recursion depth", () => {
+    const deep = { v: { v: { v: { v: { v: { v: { v: { v: { v: "leaf" } } } } } } } } }
+    const result = Tool.toMetadataValue(deep)
+    expect(JSON.stringify(result)).toContain("[max-depth]")
+  })
 })

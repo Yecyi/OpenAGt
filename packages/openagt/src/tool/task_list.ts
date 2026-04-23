@@ -6,7 +6,7 @@ import { TaskRuntime } from "@/session/task-runtime"
 const parameters = z.object({})
 
 type TaskListMetadata = {
-  tasks: TaskRuntime.TaskRecord[]
+  tasks: readonly Tool.Metadata[]
 }
 
 export const TaskListTool = Tool.define<typeof parameters, TaskListMetadata, TaskRuntime.Service>(
@@ -29,7 +29,7 @@ export const TaskListTool = Tool.define<typeof parameters, TaskListMetadata, Tas
             title: "Task List",
             output,
             metadata: {
-              tasks: records,
+              tasks: records.map((item) => Tool.toMetadata(item)),
             },
           }
         }).pipe(Effect.orDie),

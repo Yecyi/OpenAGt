@@ -13,14 +13,77 @@ export type MetadataValue =
   | null
   | undefined
   | readonly MetadataValue[]
-  | MetadataValue[]
   | Metadata
-  | Readonly<Record<string, unknown>>
-  | Record<string, unknown>
-  | readonly unknown[]
-  | unknown[]
 export interface Metadata {
   [key: string]: MetadataValue
+}
+
+const METADATA_MAX_DEPTH = 8
+const METADATA_MAX_ARRAY_ITEMS = 256
+const METADATA_CIRCULAR = "[circular]"
+const METADATA_MAX_DEPTH_REACHED = "[max-depth]"
+
+function toMetadataValueInternal(value: unknown, depth: number, seen: WeakSet<object>): MetadataValue {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value
+  }
+
+  if (depth >= METADATA_MAX_DEPTH) return METADATA_MAX_DEPTH_REACHED
+  if (typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") return String(value)
+  if (value instanceof Date) return value.toISOString()
+
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      ...(typeof value.stack === "string" ? { stack: value.stack } : {}),
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, METADATA_MAX_ARRAY_ITEMS).map((item) => toMetadataValueInternal(item, depth + 1, seen))
+  }
+
+  if (typeof value !== "object") return String(value)
+  if (seen.has(value)) return METADATA_CIRCULAR
+
+  seen.add(value)
+  try {
+    if (value instanceof Map) {
+      return Array.from(value.entries())
+        .slice(0, METADATA_MAX_ARRAY_ITEMS)
+        .map(([key, item]) => ({
+          key: toMetadataValueInternal(key, depth + 1, seen),
+          value: toMetadataValueInternal(item, depth + 1, seen),
+        }))
+    }
+    if (value instanceof Set) {
+      return Array.from(value.values())
+        .slice(0, METADATA_MAX_ARRAY_ITEMS)
+        .map((item) => toMetadataValueInternal(item, depth + 1, seen))
+    }
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return String(value)
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, toMetadataValueInternal(item, depth + 1, seen)]),
+    )
+  } finally {
+    seen.delete(value)
+  }
+}
+
+export function toMetadataValue(value: unknown): MetadataValue {
+  return toMetadataValueInternal(value, 0, new WeakSet())
+}
+
+export function toMetadata(value: Record<string, unknown>): Metadata {
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toMetadataValueInternal(item, 1, new WeakSet())]))
 }
 
 // TODO: remove this hack

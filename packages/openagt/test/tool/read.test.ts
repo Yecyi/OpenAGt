@@ -326,6 +326,17 @@ describe("tool.read truncation", () => {
     }),
   )
 
+  it.live("rejects non-positive limit", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      yield* put(path.join(dir, "short.txt"), "line1\nline2")
+
+      const err = yield* fail(dir, { filePath: path.join(dir, "short.txt"), limit: 0 })
+      expect(err.message).toContain("invalid arguments")
+      expect(err.message).toContain("limit")
+    }),
+  )
+
   it.live("allows reading empty file at default offset", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()

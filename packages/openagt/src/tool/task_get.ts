@@ -15,7 +15,7 @@ type TaskGetMetadata =
     }
   | {
       found: true
-      task: TaskRuntime.TaskRecord
+      task: Tool.Metadata
     }
 
 export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskRuntime.Service>(
@@ -44,7 +44,7 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
             output: `${record.value.task_id} ${record.value.status}\n${record.value.result_summary ?? record.value.error_summary ?? ""}`.trim(),
             metadata: {
               found: true as const,
-              task: record.value,
+              task: Tool.toMetadata(record.value),
             } satisfies TaskGetMetadata,
           }
         }).pipe(Effect.orDie),

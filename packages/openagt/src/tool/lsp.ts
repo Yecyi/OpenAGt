@@ -29,7 +29,7 @@ const parameters = z.object({
 })
 
 type Metadata = {
-  result: unknown[]
+  result: readonly Tool.MetadataValue[]
 }
 
 export const LspTool = Tool.define<typeof parameters, Metadata, LSP.Service | AppFileSystem.Service>(
@@ -88,7 +88,7 @@ export const LspTool = Tool.define<typeof parameters, Metadata, LSP.Service | Ap
 
           return {
             title,
-            metadata: { result },
+            metadata: { result: result.map((item) => Tool.toMetadataValue(item)) },
             output: result.length === 0 ? `No results found for ${args.operation}` : JSON.stringify(result, null, 2),
           }
         }),

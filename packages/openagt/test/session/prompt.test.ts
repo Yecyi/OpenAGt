@@ -423,6 +423,27 @@ describe("session.prompt range parsing", () => {
     const range = parseFilePartRange(new URL("file:///tmp/example.ts?start=12"))
     expect(range).toEqual({ start: 12 })
   })
+
+  test("rejects descending ranges", () => {
+    const range = parseFilePartRange(new URL("file:///tmp/example.ts?start=12&end=3"))
+    expect(range).toEqual({
+      error: "Invalid file range: end must be greater than or equal to start",
+    })
+  })
+
+  test("rejects start values lower than 1", () => {
+    const range = parseFilePartRange(new URL("file:///tmp/example.ts?start=0"))
+    expect(range).toEqual({
+      error: "Invalid file range: start must be greater than or equal to 1",
+    })
+  })
+
+  test("rejects end values lower than 1", () => {
+    const range = parseFilePartRange(new URL("file:///tmp/example.ts?start=1&end=0"))
+    expect(range).toEqual({
+      error: "Invalid file range: end must be greater than or equal to 1",
+    })
+  })
 })
 
 describe("session.prompt agent variant", () => {

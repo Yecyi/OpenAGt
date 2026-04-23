@@ -21,8 +21,8 @@ const SAMPLE_BYTES = 4096
 
 const parameters = z.object({
   filePath: z.string().describe("The absolute path to the file or directory to read"),
-  offset: z.coerce.number().describe("The line number to start reading from (1-indexed)").optional(),
-  limit: z.coerce.number().describe("The maximum number of lines to read (defaults to 2000)").optional(),
+  offset: z.coerce.number().int().min(1).describe("The line number to start reading from (1-indexed)").optional(),
+  limit: z.coerce.number().int().positive().describe("The maximum number of lines to read (defaults to 2000)").optional(),
 })
 
 export const ReadTool = Tool.define(
@@ -141,10 +141,6 @@ export const ReadTool = Tool.define(
     }
 
     const run = Effect.fn("ReadTool.execute")(function* (params: z.infer<typeof parameters>, ctx: Tool.Context) {
-      if (params.offset !== undefined && params.offset < 1) {
-        return yield* Effect.fail(new Error("offset must be greater than or equal to 1"))
-      }
-
       let filepath = params.filePath
       if (!path.isAbsolute(filepath)) {
         filepath = path.resolve(Instance.directory, filepath)

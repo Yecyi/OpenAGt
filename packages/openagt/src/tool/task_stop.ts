@@ -10,7 +10,7 @@ const parameters = z.object({
 })
 
 type TaskStopMetadata = {
-  task: TaskRuntime.TaskRecord
+  task: Tool.Metadata
 }
 
 export const TaskStopTool = Tool.define<typeof parameters, TaskStopMetadata, TaskRuntime.Service>(
@@ -32,7 +32,7 @@ export const TaskStopTool = Tool.define<typeof parameters, TaskStopMetadata, Tas
             title: "Task Stopped",
             output: `${record.task_id} cancelled`,
             metadata: {
-              task: record,
+              task: Tool.toMetadata(record),
             },
           }
         }).pipe(Effect.orDie),

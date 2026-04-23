@@ -1,32 +1,48 @@
-const mojibakeSignatures = ["閳", "閴", "懇鈧", "鈥?", "鈫?", "鉁?", "鈿?", "鈼?", "鈹?"]
+const mojibakePatterns = [
+  { label: "mojibake token U+95B3?", pattern: /\u95b3\?/u },
+  { label: "mojibake token U+95B4?", pattern: /\u95b4\?/u },
+  { label: "mojibake token U+61C7U+9227", pattern: /\u61c7\u9227/u },
+  { label: "mojibake token U+9225?", pattern: /\u9225\?/u },
+  { label: "mojibake token U+922B?", pattern: /\u922b\?/u },
+  { label: "mojibake token U+923C?", pattern: /\u923c\?/u },
+  { label: "mojibake token U+9239?", pattern: /\u9239\?/u },
+  { label: "mojibake token U+923F?", pattern: /\u923f\?/u },
+  { label: "mojibake token U+9241?", pattern: /\u9241\?/u },
+  { label: "replacement character U+FFFD", pattern: /\uFFFD/u },
+] as const
 
-const files = Array.from(
-  new Set(
-    (
-      await Promise.all(
-        ["packages/**/src/**/*.ts", "packages/**/src/**/*.tsx", "packages/**/src/**/*.d.ts"].map((pattern) =>
-          Array.fromAsync(new Bun.Glob(pattern).scan()),
-        ),
-      )
-    ).flat(),
-  ),
-).sort()
+const sourceFiles = (
+  await Promise.all(
+    ["packages/**/src/**/*.ts", "packages/**/src/**/*.tsx", "packages/**/src/**/*.d.ts"].map((pattern) =>
+      Array.fromAsync(new Bun.Glob(pattern).scan()),
+    ),
+  )
+).flat()
+
+const scriptFiles = (
+  await Promise.all(
+    ["script/**/*.ts", "script/**/*.tsx", "*.ts"].map((pattern) => Array.fromAsync(new Bun.Glob(pattern).scan())),
+  )
+).flat()
+
+const files = Array.from(new Set([...sourceFiles, ...scriptFiles])).sort()
 
 const findings = (
   await Promise.all(
     files.map(async (filepath) => {
       const text = await Bun.file(filepath).text()
-      const issues = text
-        .split(/\r?\n/)
-        .flatMap((line, index) =>
-          mojibakeSignatures
-            .filter((signature) => line.includes(signature))
-            .map((signature) => ({
+      const issues = text.split(/\r?\n/).flatMap((line, index) =>
+        mojibakePatterns.flatMap((entry) => {
+          if (!entry.pattern.test(line)) return []
+          return [
+            {
               filepath,
               line: index + 1,
-              message: `mojibake signature ${JSON.stringify(signature)}`,
-            })),
-        )
+              message: entry.label,
+            },
+          ]
+        }),
+      )
 
       const trimmed = text.trim()
       if (

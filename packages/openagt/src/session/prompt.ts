@@ -66,15 +66,18 @@ async function computeSHA256(text: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16)
 }
 
-export function parseFilePartRange(url: URL) {
+export function parseFilePartRange(url: URL): {} | { start: number; end?: number } | { error: string } {
   const start = url.searchParams.get("start")
   if (start == null) return {}
   const startLine = Number.parseInt(start, 10)
-  if (Number.isNaN(startLine)) return {}
+  if (Number.isNaN(startLine)) return { error: "Invalid file range: start must be an integer" }
+  if (startLine < 1) return { error: "Invalid file range: start must be greater than or equal to 1" }
   const end = url.searchParams.get("end")
   if (end == null) return { start: startLine }
   const endLine = Number.parseInt(end, 10)
-  if (Number.isNaN(endLine)) return { start: startLine }
+  if (Number.isNaN(endLine)) return { error: "Invalid file range: end must be an integer" }
+  if (endLine < 1) return { error: "Invalid file range: end must be greater than or equal to 1" }
+  if (endLine < startLine) return { error: "Invalid file range: end must be greater than or equal to start" }
   return { start: startLine, end: endLine }
 }
 
@@ -1149,19 +1152,36 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 let offset: number | undefined
                 let limit: number | undefined
                 const range = parseFilePartRange(url)
-                if (range.start !== undefined) {
+                if ("error" in range && range.error !== undefined) {
+                  const message = range.error
+                  yield* bus.publish(Session.Event.Error, {
+                    sessionID: input.sessionID,
+                    error: new NamedError.Unknown({ message }).toObject(),
+                  })
+                  return [
+                    {
+                      messageID: info.id,
+                      sessionID: input.sessionID,
+                      type: "text",
+                      synthetic: true,
+                      text: `Read tool failed to read ${filepath} with the following error: ${message}`,
+                    },
+                  ] satisfies Draft<MessageV2.Part>[]
+                }
+                if ("start" in range && range.start !== undefined) {
                   const filePathURI = part.url.split("?")[0]
                   let start = range.start
                   let end = range.end
                   if (start === end) {
+                    const targetLine = start - 1
                     const symbols = yield* lsp.documentSymbol(filePathURI).pipe(Effect.catch(() => Effect.succeed([])))
                     for (const symbol of symbols) {
                       let r: LSP.Range | undefined
                       if ("range" in symbol) r = symbol.range
                       else if ("location" in symbol) r = symbol.location.range
-                      if (r?.start?.line && r?.start?.line === start) {
-                        start = r.start.line
-                        end = r?.end?.line ?? start
+                      if (r?.start?.line === targetLine) {
+                        start = r.start.line + 1
+                        end = (r?.end?.line ?? r.start.line) + 1
                         break
                       }
                     }

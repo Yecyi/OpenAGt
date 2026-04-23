@@ -260,7 +260,7 @@ export default function BenchDetail() {
                                       "margin-right": "0.25rem",
                                     }}
                                   >
-                                    {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                    {judge.score === 1 ? "PASS" : judge.score === 0 ? "FAIL" : judge.score}
                                   </span>
                                 )}
                               </For>
@@ -294,7 +294,7 @@ export default function BenchDetail() {
                                     "margin-right": "0.25rem",
                                   }}
                                 >
-                                  {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                  {judge.score === 1 ? "PASS" : judge.score === 0 ? "FAIL" : judge.score}
                                 </span>
                               )}
                             </For>
@@ -315,7 +315,7 @@ export default function BenchDetail() {
                                           color: judge.score === 1 ? "green" : judge.score === 0 ? "red" : "inherit",
                                         }}
                                       >
-                                        {judge.score === 1 ? "✓" : judge.score === 0 ? "✗" : judge.score}
+                                        {judge.score === 1 ? "PASS" : judge.score === 0 ? "FAIL" : judge.score}
                                       </span>{" "}
                                       {judge.judge}
                                     </div>
