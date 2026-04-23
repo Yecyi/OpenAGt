@@ -79,8 +79,8 @@ function addReminder(text: string, importance: number): void {
 }
 
 function enforceReminderBudget(): void {
-  let totalChars = 0
   const targetChars = REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+  let totalChars = reminderBudget.reduce((sum, r) => sum + r.text.length, 0)
 
   // Sort by importance (lowest first) then timestamp (oldest first) for FIFO
   reminderBudget.sort((a, b) => {
@@ -89,10 +89,9 @@ function enforceReminderBudget(): void {
   })
 
   // Evict lowest importance reminders until we fit the budget
-  while (reminderBudget.length > 0) {
-    totalChars = reminderBudget.reduce((sum, r) => sum + r.text.length, 0)
-    if (totalChars <= targetChars) break
-    reminderBudget.shift()
+  while (totalChars > targetChars && reminderBudget.length > 0) {
+    const removed = reminderBudget.shift()
+    totalChars -= removed?.text.length ?? 0
   }
 }
 
@@ -101,6 +100,15 @@ function getReminders(): string[] {
   return [...reminderBudget]
     .sort((a, b) => a.timestamp - b.timestamp)
     .map((r) => r.text)
+}
+
+/**
+ * Clear the reminder budget when switching sessions.
+ * This prevents cross-session contamination of reminder state.
+ * TODO: Hook this into session lifecycle management.
+ */
+function clearReminderBudget(): void {
+  reminderBudget.length = 0
 }
 
 async function computeSHA256(text: string): Promise<string> {
@@ -500,7 +508,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
         sessionID: input.session.id,
-        abort: options.abortSignal!,
+        abort: options.abortSignal ?? (() => { throw new Error("abortSignal is required for tool execution") }),
         messageID: input.processor.message.id,
         callID: options.toolCallId,
         extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, promptOps },
@@ -1247,8 +1255,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 const range = { start: url.searchParams.get("start"), end: url.searchParams.get("end") }
                 if (range.start != null) {
                   const filePathURI = part.url.split("?")[0]
-                  let start = parseInt(range.start)
-                  let end = range.end ? parseInt(range.end) : undefined
+                  let start = parseInt(range.start, 10)
+                  let end = range.end !== undefined ? parseInt(range.end, 10) : undefined
                   if (start === end) {
                     const symbols = yield* lsp.documentSymbol(filePathURI).pipe(Effect.catch(() => Effect.succeed([])))
                     for (const symbol of symbols) {

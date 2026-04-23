@@ -13,12 +13,12 @@ import { SAFE_ENV_VARS, BINARY_HIJACK_VARS, ANT_ONLY_SAFE_ENV_VARS } from "./dan
  * Environment variable sanitizer for removing dangerous variables
  */
 export class EnvSanitizer {
-  private readonly env: Record<string, string>
+  private readonly env: Record<string, string | undefined>
   private readonly isAntContext: boolean
 
-  constructor(env: Record<string, string> = process.env as Record<string, string>) {
+  constructor(env: Record<string, string | undefined> = process.env) {
     this.env = env
-    this.isAntContext = process.env.USER_TYPE === "ant"
+    this.isAntContext = process.env?.USER_TYPE === "ant"
   }
 
   /**

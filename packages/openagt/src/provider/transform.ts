@@ -128,7 +128,7 @@ function normalizeMessages(
   if (
     model.providerID === "mistral" ||
     model.api.id.toLowerCase().includes("mistral") ||
-    model.api.id.toLocaleLowerCase().includes("devstral")
+    model.api.id.toLowerCase().includes("devstral")
   ) {
     const scrub = (id: string) => {
       return id
@@ -142,22 +142,24 @@ function normalizeMessages(
       const nextMsg = msgs[i + 1]
 
       if (msg.role === "assistant" && Array.isArray(msg.content)) {
-        msg.content = msg.content.map((part) => {
+        const updatedContent = msg.content.map((part) => {
           if (part.type === "tool-call" || part.type === "tool-result") {
             return { ...part, toolCallId: scrub(part.toolCallId) }
           }
           return part
         })
-      }
-      if (msg.role === "tool" && Array.isArray(msg.content)) {
-        msg.content = msg.content.map((part) => {
+        result.push({ ...msg, content: updatedContent })
+      } else if (msg.role === "tool" && Array.isArray(msg.content)) {
+        const updatedContent = msg.content.map((part) => {
           if (part.type === "tool-result") {
             return { ...part, toolCallId: scrub(part.toolCallId) }
           }
           return part
         })
+        result.push({ ...msg, content: updatedContent })
+      } else {
+        result.push(msg)
       }
-      result.push(msg)
 
       // Fix message sequence: tool messages cannot be followed by user messages
       if (msg.role === "tool" && nextMsg?.role === "user") {
@@ -452,6 +454,15 @@ function anthropicAdaptiveEfforts(apiId: string): string[] | null {
   return null
 }
 
+/**
+ * Get model variants for models with reasoning support.
+ *
+ * Type Safety Note: This function returns `Record<string, Record<string, any>>` which loses type safety.
+ * TODO: Define proper TypeScript interfaces for model variants to improve type safety.
+ * Example:
+ *   type ModelVariant = { reasoning?: { effort: string; budget?: number } }
+ *   const variants: Record<string, ModelVariant> = { ... }
+ */
 export function variants(model: Provider.Model): Record<string, Record<string, any>> {
   if (!model.capabilities.reasoning) return {}
 

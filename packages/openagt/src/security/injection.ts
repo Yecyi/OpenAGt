@@ -70,16 +70,25 @@ export interface ScanResult {
   }>
 }
 
+/**
+ * Pre-compiled regex patterns for scanForInjection.
+ * Compiled once at module load time instead of per-call.
+ */
+const COMPILED_PATTERNS = INJECTION_PATTERNS.map(({ pattern, severity, description }) => ({
+  regex: new RegExp(pattern.source, pattern.flags),
+  severity,
+  description,
+}))
+
 export function scanForInjection(content: string): ScanResult {
   const issues: ScanResult["issues"] = []
 
-  for (const { pattern, severity, description } of INJECTION_PATTERNS) {
+  for (const { regex, severity, description } of COMPILED_PATTERNS) {
     let match: RegExpExecArray | null
-    const regex = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g")
 
     while ((match = regex.exec(content)) !== null) {
       issues.push({
-        pattern: pattern.source,
+        pattern: regex.source,
         severity,
         description,
         match: match[0],

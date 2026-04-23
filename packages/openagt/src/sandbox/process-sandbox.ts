@@ -173,7 +173,9 @@ async function killProcessTree(pid: number | undefined) {
   } catch {
     try {
       process.kill(pid, "SIGTERM")
-    } catch {}
+    } catch (err) {
+      log.warn("failed to kill process tree", { pid, error: err })
+    }
   }
 }
 

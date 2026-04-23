@@ -131,7 +131,8 @@ export function SessionComposerRegion(props: {
     const el = store.body
     if (!el) return
     const update = () => setStore("height", el.getBoundingClientRect().height)
-    createResizeObserver(store.body, update)
+    const disconnect = createResizeObserver(store.body, update)
+    onCleanup(disconnect)
     update()
   })
 

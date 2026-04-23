@@ -128,12 +128,10 @@ export function applyTimeBasedMicroCompact(
   let toolsKept = 0
 
   const result = messages.map(msg => {
-    if (msg.info.role !== "user") return msg
-
     const updatedParts = msg.parts.map(part => {
       if (part.type !== "tool") return part
-      if (!clearSet.has(part.id)) {
-        if (msg.info.role === "assistant" || part.type === "tool") toolsKept++
+      if (!clearSet.has(part.callID ?? part.id)) {
+        toolsKept++
         return part
       }
 

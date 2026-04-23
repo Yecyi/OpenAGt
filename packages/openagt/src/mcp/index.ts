@@ -481,6 +481,9 @@ export const layer = Layer.effect(
     )
 
     function watch(s: State, name: string, client: MCPClient, bridge: EffectBridge.Shape, timeout?: number) {
+      // Note: This handler runs asynchronously outside the Effect context.
+      // The guard checks (s.clients[name] !== client) ensure stale callbacks are ignored.
+      // This is a known limitation when bridging async callbacks with Effect state.
       client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
         log.info("tools list changed notification received", { server: name })
         if (s.clients[name] !== client || s.status[name]?.status !== "connected") return

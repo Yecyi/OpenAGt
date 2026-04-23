@@ -168,7 +168,7 @@ export function validateIncompleteCommands(context: ValidationContext): Validato
   const trimmed = context.originalCommand.trim()
 
   // Check for tab as first character after whitespace (incomplete command)
-  if (/^\s\t/.test(trimmed)) {
+  if (/^\s/.test(trimmed)) {
     return {
       behavior: "ask",
       message: "Command appears incomplete (starts with tab)",
@@ -882,37 +882,16 @@ export const mainValidators: Validator[] = [
  * Create a validation context from a command string
  */
 export function createValidationContext(command: string): ValidationContext {
-  // Extract base command (first token)
   const baseCommand = command.trim().split(/\s+/)[0] || ""
-
-  // Create unquoted versions
-  let unquotedContent = ""
-  let fullyUnquotedContent = ""
-  let fullyUnquotedPreStrip = ""
-  let unquotedKeepQuoteChars = ""
-
-  const state = createQuoteState()
-  for (const char of command) {
-    if (state.inSingleQuote || state.inDoubleQuote) {
-      unquotedKeepQuoteChars += char
-    } else {
-      unquotedKeepQuoteChars += char
-    }
-    updateQuoteState(state, char)
-  }
-
-  // Simple stripping of quotes for unquotedContent
-  unquotedContent = command.replace(/['"][^'"]*['"]/g, "")
-  fullyUnquotedContent = unquotedContent
-  fullyUnquotedPreStrip = command
+  const unquotedContent = command.replace(/['"][^'"]*['"]/g, "")
 
   return {
     originalCommand: command,
     baseCommand,
     unquotedContent,
-    fullyUnquotedContent,
-    fullyUnquotedPreStrip,
-    unquotedKeepQuoteChars,
+    fullyUnquotedContent: unquotedContent,
+    fullyUnquotedPreStrip: unquotedContent,
+    unquotedKeepQuoteChars: command,
   }
 }
 
@@ -942,8 +921,18 @@ export function validateCommand(command: string): ValidatorResult {
 }
 
 /**
- * Quick check if command is safe
+ * Quick check if command is safe.
+ * Short-circuit validation for common safe patterns to improve performance.
  */
 export function isCommandSafe(command: string): boolean {
+  // Fast path: empty or whitespace-only commands are safe
+  if (!command.trim()) return true
+
+  // Fast path: common read-only commands that need no validation
+  const lower = command.toLowerCase().trim()
+  if (lower === "ls" || lower === "dir" || lower === "pwd" || lower === "echo" || lower === "cat" || lower === "type") {
+    return true
+  }
+
   return validateCommand(command).behavior === "allow"
 }

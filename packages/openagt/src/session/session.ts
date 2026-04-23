@@ -724,7 +724,8 @@ export function* list(input?: {
     conditions.push(gte(SessionTable.time_updated, input.start))
   }
   if (input?.search) {
-    conditions.push(like(SessionTable.title, `%${input.search}%`))
+    const safe = input.search.replace(/[%_]/g, "\\$&")
+    conditions.push(like(SessionTable.title, `%${safe}%`))
   }
 
   const limit = input?.limit ?? 100
@@ -767,7 +768,8 @@ export function* listGlobal(input?: {
     conditions.push(lt(SessionTable.time_updated, input.cursor))
   }
   if (input?.search) {
-    conditions.push(like(SessionTable.title, `%${input.search}%`))
+    const safe = input.search.replace(/[%_]/g, "\\$&")
+    conditions.push(like(SessionTable.title, `%${safe}%`))
   }
   if (!input?.archived) {
     conditions.push(isNull(SessionTable.time_archived))

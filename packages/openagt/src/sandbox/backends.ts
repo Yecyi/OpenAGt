@@ -59,13 +59,13 @@ function unavailable(name: SandboxBackendName, reason: string) {
 }
 
 function shellArgs(request: SandboxExecRequest) {
-  if (process.platform === "win32" && request.shell_family === "powershell") {
-    return [request.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", request.command]] as const
-  }
-  if (process.platform === "win32" && request.shell_family === "cmd") {
+  if (process.platform === "win32") {
+    if (request.shell_family === "powershell") {
+      return [request.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", request.command]] as const
+    }
     return [request.shell, ["/d", "/s", "/c", request.command]] as const
   }
-  return [request.command, []] as const
+  return ["/bin/sh", ["-c", request.command]] as const
 }
 
 async function killProcessTree(pid: number | undefined, exited?: () => boolean) {

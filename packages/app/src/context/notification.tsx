@@ -85,7 +85,7 @@ function buildNotificationIndex(list: Notification[]) {
       if (!notification.viewed) {
         const unseen = index.session.unseen[notification.session] ?? []
         index.session.unseen[notification.session] = [...unseen, notification]
-        index.session.unseenCount[notification.session] = unseen.length + 1
+        index.session.unseenCount[notification.session] = unseen.length
         if (notification.type === "error") index.session.unseenHasError[notification.session] = true
       }
     }
@@ -96,7 +96,7 @@ function buildNotificationIndex(list: Notification[]) {
       if (!notification.viewed) {
         const unseen = index.project.unseen[notification.directory] ?? []
         index.project.unseen[notification.directory] = [...unseen, notification]
-        index.project.unseenCount[notification.directory] = unseen.length + 1
+        index.project.unseenCount[notification.directory] = unseen.length
         if (notification.type === "error") index.project.unseenHasError[notification.directory] = true
       }
     }

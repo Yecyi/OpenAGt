@@ -6,8 +6,9 @@ import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
 
+type MetadataValue = string | number | boolean | null | undefined | Metadata
 interface Metadata {
-  [key: string]: any
+  [key: string]: MetadataValue
 }
 
 // TODO: remove this hack

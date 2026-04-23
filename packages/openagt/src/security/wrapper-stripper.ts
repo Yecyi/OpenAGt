@@ -41,6 +41,23 @@ const ENV_DANGEROUS_PATTERN = /^env\s+(-i|--ignore-environment)\b/
 
 const SHELL_METACHAR_PATTERN = /[;&|`$<>{}()\[\]\\!*?"'#%@]/
 
+// Dangerous one-liner patterns for additional detection
+const DANGEROUS_ONELINER_PATTERNS: Array<{ pattern: RegExp; name: string; reason: string }> = [
+  // curl/wget pipe to shell
+  { pattern: /curl\s+.*\|\s*(?:sh|bash|ksh|zsh|fish)/i, name: "curl-pipe-sh", reason: "curl piped to shell execution" },
+  { pattern: /wget\s+.*\|\s*(?:sh|bash|ksh|zsh|fish)/i, name: "wget-pipe-sh", reason: "wget piped to shell execution" },
+  // tar extraction with execution
+  { pattern: /tar\s+.*[-][xc]f\s+.*\|\s*(?:sh|bash|perl|python)/i, name: "tar-pipe-sh", reason: "tar extraction piped to shell" },
+  // dd with execution
+  { pattern: /dd\s+.*\|\s*(?:sh|bash|ksh|zsh)/i, name: "dd-pipe-sh", reason: "dd piped to shell execution" },
+  // cat with execution
+  { pattern: /cat\s+.*\|\s*(?:sh|bash|ksh|zsh)/i, name: "cat-pipe-sh", reason: "cat piped to shell execution" },
+  // python/perl one-liners with -c execution
+  { pattern: /(?:python|perl|ruby|php|node)\s+-[rc]\s+/i, name: "interpreter-c-flag", reason: "Interpreter with -c flag can execute arbitrary code" },
+  // base64 decode and execute
+  { pattern: /base64\s+(-d|--decode).*\|\s*(?:sh|bash|ksh|zsh)/i, name: "base64-pipe-sh", reason: "base64 decode piped to shell" },
+]
+
 /**
  * Wrapper stripper for removing safe command wrappers
  */
@@ -70,7 +87,7 @@ export class WrapperStripper {
         return false
       })
       if (allSafe) {
-        result = envPrefix + envArgs
+        result = result.replace(envMatch[0], "").trim()
       }
     }
 
@@ -160,6 +177,20 @@ export class WrapperStripper {
       /^parted/i,
     ]
     return dangerousPrefixes.some((pattern) => pattern.test(stripped))
+  }
+
+  /**
+   * Detect dangerous one-liner patterns that could be security risks
+   * Returns array of detected dangerous patterns or empty array if safe
+   */
+  detectDangerousOneliners(command: string): Array<{ name: string; reason: string }> {
+    const detected: Array<{ name: string; reason: string }> = []
+    for (const { pattern, name, reason } of DANGEROUS_ONELINER_PATTERNS) {
+      if (pattern.test(command)) {
+        detected.push({ name, reason })
+      }
+    }
+    return detected
   }
 }
 

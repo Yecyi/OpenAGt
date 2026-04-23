@@ -263,10 +263,13 @@ export function applyDirectoryEvent(input: {
         "part",
         props.messageID,
         produce((draft) => {
-          const part = draft[result.index]
-          const field = props.field as keyof typeof part
-          const existing = part[field] as string | undefined
-          ;(part[field] as string) = (existing ?? "") + props.delta
+          const partArray = draft as unknown as Array<{ id: string; [key: string]: unknown }>
+          const part = partArray[result.index]
+          const field = props.field
+          // Validate field is a valid key on the part object and is a string type
+          if (part && typeof part === "object" && field in part && typeof part[field] === "string") {
+            part[field] = (part[field] as string) + props.delta
+          }
         }),
       )
       break
