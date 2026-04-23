@@ -484,7 +484,7 @@ function hasBackslashEscapedWhitespace(command: string): boolean {
     const char = command[i]!
     updateQuoteState(state, char)
 
-    if (char === "\\" && !state.inSingleQuote) {
+    if (char === "\\" && !state.inSingleQuote && !state.inDoubleQuote) {
       const nextChar = command[i + 1]
       if (nextChar === " " || nextChar === "\t") {
         return true
@@ -521,14 +521,15 @@ function hasBackslashEscapedOperator(command: string): boolean {
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!
 
-    // Handle escape FIRST (before quote toggle)
+    // Handle escape FIRST — backslash in single quotes is literal, so skip there.
+    // Outside quotes we flag escaped operators; inside double quotes the operator
+    // is already literal, so just consume the escaped pair without toggling state.
     if (char === "\\" && !state.inSingleQuote) {
       const nextChar = command[i + 1]
-      if (nextChar && SHELL_OPERATORS.has(nextChar) && !state.inDoubleQuote) {
+      if (!state.inDoubleQuote && nextChar && SHELL_OPERATORS.has(nextChar)) {
         return true
       }
-      // Skip the escaped character
-      i++
+      i++ // skip the escaped character so it can't toggle quote state
       continue
     }
 
@@ -574,18 +575,20 @@ export function validateBraceExpansion(context: ValidationContext): ValidatorRes
   for (let i = 0; i < originalCommand.length; i++) {
     const char = originalCommand[i]!
 
-    if (char === "\\") {
-      i++ // Skip escaped character
+    // POSIX: backslash is literal inside single quotes; everywhere else it
+    // escapes the next character. Consuming the escaped pair here keeps the
+    // quote-toggle logic below simple and avoids an unreliable lookbehind.
+    if (char === "\\" && !state.inSingleQuote) {
+      i++
       continue
     }
 
-    if (char === "'" || char === '"') {
-      // Toggle quote state manually
-      if (char === "'" && !state.inDoubleQuote) {
-        state.inSingleQuote = !state.inSingleQuote
-      } else if (char === '"' && !state.inSingleQuote) {
-        state.inDoubleQuote = !state.inDoubleQuote
-      }
+    if (char === "'" && !state.inDoubleQuote) {
+      state.inSingleQuote = !state.inSingleQuote
+      continue
+    }
+    if (char === '"' && !state.inSingleQuote) {
+      state.inDoubleQuote = !state.inDoubleQuote
       continue
     }
 

@@ -248,8 +248,6 @@ export const layer: Layer.Layer<
 
           case "reasoning-end":
             if (!(value.id in ctx.reasoningMap)) return
-            // oxlint-disable-next-line no-self-assign -- reactivity trigger
-            ctx.reasoningMap[value.id].text = ctx.reasoningMap[value.id].text
             ctx.reasoningMap[value.id].time = { ...ctx.reasoningMap[value.id].time, end: Date.now() }
             if (value.providerMetadata) ctx.reasoningMap[value.id].metadata = value.providerMetadata
             yield* session.updatePart(ctx.reasoningMap[value.id])
@@ -431,8 +429,6 @@ export const layer: Layer.Layer<
 
           case "text-end":
             if (!ctx.currentText) return
-            // oxlint-disable-next-line no-self-assign -- reactivity trigger
-            ctx.currentText.text = ctx.currentText.text
             ctx.currentText.text = (yield* plugin.trigger(
               "experimental.text.complete",
               {

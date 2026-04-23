@@ -538,6 +538,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
         directory,
         workspaceID: original.workspaceID,
         title,
+        parentID: original.id,
       })
       const msgs = yield* messages({ sessionID: input.sessionID })
       const idMap = new Map<string, MessageID>()

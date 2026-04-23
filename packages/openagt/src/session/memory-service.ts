@@ -24,6 +24,8 @@ import {
 } from "./memory"
 import { SessionID } from "./schema"
 import { Log } from "@/util"
+import { Bus } from "@/bus"
+import * as Session from "./session"
 
 const log = Log.create({ service: "SessionMemoryService" })
 
@@ -189,6 +191,11 @@ export const layer = Layer.effect(
     const parseContentFn = (content: string): MemorySections => {
       return parseMemorySections(content)
     }
+
+    const unsubDeleted = Bus.subscribe(Session.Event.Deleted, (evt) => {
+      memoryStates.delete(evt.properties.sessionID)
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => unsubDeleted()))
 
     return Service.of({
       getState,

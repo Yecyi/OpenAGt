@@ -318,7 +318,8 @@ const live: Layer.Layer<
             for (const name of uniqueNames) approvedToolsForSession.add(name)
             workflowModel.sessionPreapprovedTools = [...(workflowModel.sessionPreapprovedTools ?? []), ...uniqueNames]
             return { approved: true }
-          } catch {
+          } catch (e) {
+            console.error("[llm] permission approval error:", e)
             return { approved: false }
           } finally {
             unsub?.()

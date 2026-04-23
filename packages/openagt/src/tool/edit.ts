@@ -182,7 +182,7 @@ export const EditTool = Tool.define(
 export type Replacer = (content: string, find: string) => Generator<string, void, unknown>
 
 // Similarity thresholds for block anchor fallback matching
-const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.0
+const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.5
 const MULTIPLE_CANDIDATES_SIMILARITY_THRESHOLD = 0.3
 
 /**

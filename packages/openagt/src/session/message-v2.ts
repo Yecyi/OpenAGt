@@ -1040,7 +1040,9 @@ export function fromError(
             },
           ).toObject()
         }
-      } catch {}
+      } catch (err) {
+        console.error("[message-v2] error formatting structured error:", err)
+      }
       return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
   }
 }

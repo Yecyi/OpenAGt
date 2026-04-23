@@ -40,7 +40,8 @@ export function parse(headers: Headers) {
 
   try {
     data = JSON.parse(raw)
-  } catch {
+  } catch (e) {
+    console.warn("[fence] failed to parse sync state header:", e)
     return
   }
 

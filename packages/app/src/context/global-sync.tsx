@@ -403,7 +403,6 @@ function createGlobalSync() {
       .then(() => {
         queue.refresh()
         setGlobalStore("reload", undefined)
-        queue.refresh()
       })
       .catch((error) => {
         setGlobalStore("reload", undefined)

@@ -635,7 +635,16 @@ export function isDangerous(input: string): boolean {
 }
 
 export function getDangerousReasons(input: string): string[] {
-  return parsePowerShellAst(input).dangerousNodes.map((node) => node.reason)
+  const result = parsePowerShellAst(input)
+  const nodeReasons = result.dangerousNodes.map((node) => node.reason)
+  const obfuscationReasons: string[] = []
+  if (result.obfuscationReport?.overallRisk === "high") {
+    const { aliasesExpanded, indirectCallsDetected, base64Attempts } = result.obfuscationReport
+    obfuscationReasons.push(
+      `High-risk obfuscation: aliases=${aliasesExpanded.length}, indirect=${indirectCallsDetected.length}, base64=${base64Attempts}`,
+    )
+  }
+  return [...nodeReasons, ...obfuscationReasons]
 }
 
 export function getCommandStructure(input: string): CommandInfo[] {

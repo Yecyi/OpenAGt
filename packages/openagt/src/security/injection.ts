@@ -75,7 +75,7 @@ export interface ScanResult {
  * Compiled once at module load time instead of per-call.
  */
 const COMPILED_PATTERNS = INJECTION_PATTERNS.map(({ pattern, severity, description }) => ({
-  regex: new RegExp(pattern.source, pattern.flags),
+  regex: new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g"),
   severity,
   description,
 }))
