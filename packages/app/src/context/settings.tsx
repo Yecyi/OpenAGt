@@ -1,5 +1,5 @@
 import { createStore, reconcile } from "solid-js/store"
-import { createEffect, createMemo } from "solid-js"
+import { createEffect, createMemo, onCleanup } from "solid-js"
 import { createSimpleContext } from "@openagt/ui/context"
 import { persisted } from "@/utils/persist"
 
@@ -142,8 +142,16 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
     createEffect(() => {
       if (typeof document === "undefined") return
       const root = document.documentElement
+      const prevMono = root.style.getPropertyValue("--font-family-mono")
+      const prevSans = root.style.getPropertyValue("--font-family-sans")
       root.style.setProperty("--font-family-mono", monoFontFamily(store.appearance?.mono))
       root.style.setProperty("--font-family-sans", sansFontFamily(store.appearance?.sans))
+      onCleanup(() => {
+        if (prevMono) root.style.setProperty("--font-family-mono", prevMono)
+        else root.style.removeProperty("--font-family-mono")
+        if (prevSans) root.style.setProperty("--font-family-sans", prevSans)
+        else root.style.removeProperty("--font-family-sans")
+      })
     })
 
     return {

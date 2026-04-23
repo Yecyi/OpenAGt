@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto"
 import type { Part, UserMessage } from "./client.js"
 
 export const message = {
@@ -7,9 +8,10 @@ export const message = {
   } {
     const { parts: _parts, ...rest } = input
 
+    const id = randomUUID()
     const info: UserMessage = {
       ...rest,
-      id: "asdasd",
+      id,
       time: {
         created: Date.now(),
       },
@@ -22,7 +24,7 @@ export const message = {
         (part) =>
           ({
             ...part,
-            id: "asdasd",
+            id: randomUUID(),
             messageID: info.id,
             sessionID: info.sessionID,
           }) as Part,

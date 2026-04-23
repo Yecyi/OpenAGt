@@ -626,8 +626,20 @@ export function parsePowerShellAst(input: string): PowerShellAstResult {
   }
 }
 
-export function isDangerous(input: string): boolean {
+// Single-slot memoization cache to avoid redundant parsePowerShellAst calls
+// when isDangerous, getDangerousReasons, and getCommandStructure are called
+// sequentially on the same input.
+let _astCache: { input: string; result: ReturnType<typeof parsePowerShellAst> } | undefined
+
+function _analyze(input: string): ReturnType<typeof parsePowerShellAst> {
+  if (_astCache?.input === input) return _astCache.result
   const result = parsePowerShellAst(input)
+  _astCache = { input, result }
+  return result
+}
+
+export function isDangerous(input: string): boolean {
+  const result = _analyze(input)
   if (result.dangerousNodes.some((node) => node.severity === "high")) return true
   const report = result.obfuscationReport
   if (report && report.overallRisk === "high") return true
@@ -635,7 +647,7 @@ export function isDangerous(input: string): boolean {
 }
 
 export function getDangerousReasons(input: string): string[] {
-  const result = parsePowerShellAst(input)
+  const result = _analyze(input)
   const nodeReasons = result.dangerousNodes.map((node) => node.reason)
   const obfuscationReasons: string[] = []
   if (result.obfuscationReport?.overallRisk === "high") {
@@ -644,11 +656,17 @@ export function getDangerousReasons(input: string): string[] {
       `High-risk obfuscation: aliases=${aliasesExpanded.length}, indirect=${indirectCallsDetected.length}, base64=${base64Attempts}`,
     )
   }
-  return [...nodeReasons, ...obfuscationReasons]
+  const seen = new Set<string>()
+  const unique = [...nodeReasons, ...obfuscationReasons].filter((r) => {
+    if (seen.has(r)) return false
+    seen.add(r)
+    return true
+  })
+  return unique
 }
 
 export function getCommandStructure(input: string): CommandInfo[] {
-  return parsePowerShellAst(input).commands
+  return _analyze(input).commands
 }
 
 export interface Interface {

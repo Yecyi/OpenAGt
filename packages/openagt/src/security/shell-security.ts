@@ -124,7 +124,7 @@ function findingCategory(message: string): ShellFinding["category"] {
 
 function shouldBlock(input: { command: string; risk: ShellRiskLevel; warnings: string[] }) {
   const lower = input.command.toLowerCase()
-    if (/(curl|wget).*\|.*(sh|bash|zsh|pwsh|powershell|cmd)(\s|$)/i.test(lower)) return true
+  if (/(curl|wget).*\|.*(sh|bash|zsh|pwsh|powershell|cmd)(\s|$)/i.test(lower)) return true
   if (input.risk !== "high") return false
   if (/(^|[\s;&|])eval[\s(]/i.test(lower)) return true
   if (/rm\s+-rf\s+(\/|\*|~)/i.test(lower)) return true

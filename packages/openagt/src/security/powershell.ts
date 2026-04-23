@@ -66,19 +66,28 @@ const UPPER_DANGEROUS_CMDLETS = DANGEROUS_CMDLETS.map((c) => c.toUpperCase())
 const UPPER_HIGH_SEVERITY_CMDLETS = HIGH_SEVERITY_CMDLETS.map((c) => c.toUpperCase())
 
 /**
- * Check if a PowerShell command contains dangerous cmdlets
+ * Check if a PowerShell command contains dangerous cmdlets.
+ * Uses word-boundary regex to avoid false positives from substring matches
+ * (e.g., "Invoke-WebRequest" should not trigger on the substring "webrequest").
  */
 export function containsDangerousCmdlets(command: string): boolean {
   const upperCommand = command.toUpperCase()
-  return UPPER_DANGEROUS_CMDLETS.some((cmdlet) => upperCommand.includes(cmdlet))
+  return UPPER_DANGEROUS_CMDLETS.some((cmdlet) => {
+    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
+  })
 }
 
 /**
- * Check if a PowerShell command contains high-severity cmdlets
+ * Check if a PowerShell command contains high-severity cmdlets.
+ * Uses word-boundary regex to avoid false positives.
  */
 export function containsHighSeverityCmdlets(command: string): boolean {
   const upperCommand = command.toUpperCase()
-  return UPPER_HIGH_SEVERITY_CMDLETS.some((cmdlet) => upperCommand.includes(cmdlet))
+  return UPPER_HIGH_SEVERITY_CMDLETS.some((cmdlet) => {
+    const escaped = cmdlet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    return new RegExp(`\\b${escaped}\\b`, "i").test(upperCommand)
+  })
 }
 
 /**

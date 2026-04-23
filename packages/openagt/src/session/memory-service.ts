@@ -74,7 +74,15 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionMemory") {}
 
+const MAX_MEMORY_STATES = 500
 const memoryStates = new Map<string, MemoryState>()
+
+function evictIfNeeded() {
+  while (memoryStates.size >= MAX_MEMORY_STATES) {
+    const firstKey = memoryStates.keys().next().value
+    if (firstKey !== undefined) memoryStates.delete(firstKey)
+  }
+}
 
 export const layer = Layer.effect(
   Service,
@@ -90,6 +98,7 @@ export const layer = Layer.effect(
       }
 
       const content = yield* Effect.promise(() => loadMemory(sessionID))
+      evictIfNeeded()
       const state: MemoryState = {
         sessionID,
         initialized: true,
@@ -160,6 +169,7 @@ export const layer = Layer.effect(
             lastUpdated: Date.now(),
             content: SESSION_MEMORY_TEMPLATE,
           }
+          evictIfNeeded()
           memoryStates.set(ctx.sessionID, state)
         }
       }
