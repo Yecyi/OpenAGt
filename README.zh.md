@@ -30,15 +30,18 @@ OpenAGt 当前围绕四个核心思路构建：
 
 ## OpenCode vs OpenAGt
 
+下面的对比基于 OpenCode 官方开源仓库和 README，而不是只看命名。
+
 | 主题 | OpenCode | OpenAGt |
 | --- | --- | --- |
-| 主身份 | 历史名称 / 兼容入口 | 当前项目与发布名称 |
-| 主 CLI | `opencode` | `openagt` |
-| Windows 安装器命名 | 不再作为首选 | `OpenAGt-Setup-x64.msi` |
-| Windows 便携包 | 不再作为首选 | `openagt-windows-x64.zip` |
-| 配置兼容 | `.opencode/`、`opencode.jsonc`、`OPENCODE_*` | `OPENAGT_*`，同时兼容旧命名 |
-| 运行时方向 | 兼容参考面 | 当前正在演进的 backend-first agentic coding runtime |
-| 稳定版范围 | 迁移兼容面 | CLI、TUI、server、JavaScript SDK |
+| 运行时中心 | 以 client/server coding agent 为基础，并且明显强调 TUI 体验 | 以后端 session runtime 为中心，再向 CLI、TUI、server、SDK 暴露 |
+| Agent loop | 通用编码代理，内置 `build` / `plan` agent，并带有 subagent 能力 | 以 session 为中心的迭代工具循环，并在其上扩展 task runtime、coordinator graph、personal-agent primitives |
+| Provider 策略 | 官方文档明确强调 provider-agnostic，可接 Claude、OpenAI、Google、本地模型 | 多 provider runtime，带 provider fallback、server 暴露和生成式 JavaScript SDK |
+| LSP 集成 | 官方 README 明确强调开箱即用的 LSP 支持 | LSP 作为工具运行时的一部分接入，可与 read/edit/bash/MCP/task 一起进入同一个 session loop |
+| 安全模型 | agent mode 与 permission prompt 是 CLI 体验的重要组成部分 | 结构化审批与安全边界：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
+| 编排重点 | 更偏 terminal-first 的编码流，并保留 client/server 远程驱动潜力 | 更偏 Coordinator Runtime v1、任务图调度、Inbox、Wakeup，以及 profile/workspace/session 持久记忆 |
+| 前端形态 | TUI 优先，官方项目同时提供 desktop app beta | 当前稳定版以 CLI、TUI、headless server、JavaScript SDK 为主，Flutter 延后 |
+| 迁移 / 兼容 | 原生源项目 | 在迁移阶段保留 `opencode` CLI alias 与 `.opencode` 配置兼容 |
 
 ## 发布
 

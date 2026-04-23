@@ -14,6 +14,30 @@ The system is organized around five backend pillars:
 
 This document focuses on the current stable backend and release-facing architecture.
 
+## OpenCode Comparison
+
+The comparison below uses the public OpenCode repository and README as the source baseline, then compares that baseline with the current OpenAGt codebase.
+
+```mermaid
+flowchart LR
+  A["OpenCode"] --> A1["TUI-first client/server coding agent"]
+  A --> A2["Provider-agnostic model surface"]
+  A --> A3["Built-in LSP and agent modes"]
+  B["OpenAGt"] --> B1["Session-centric backend runtime"]
+  B --> B2["Structured safety envelope"]
+  B --> B3["Coordinator + personal-agent backend"]
+```
+
+| Topic | OpenCode | OpenAGt |
+| --- | --- | --- |
+| Architectural emphasis | TUI-first coding agent with explicit client/server architecture | Backend-first runtime where CLI, TUI, server, and SDK are clients of the same session engine |
+| Session model | Interactive coding agent loop with built-in agent modes | Persistent session runtime with prompt assembly, compaction, memory, and tool scheduling in one loop |
+| Tooling emphasis | Official docs emphasize LSP, agent modes, provider choice, and terminal workflows | Local runtime emphasizes tool mediation across file I/O, shell, MCP, LSP, tasking, and safety metadata |
+| Safety / approvals | Permission prompts are part of the user-facing agent flow | Safety is modeled as a first-class backend layer with approval kinds, policy sources, and boundary metadata |
+| Multi-step orchestration | Subagent support is part of the coding workflow | Coordinator Runtime v1 turns work into task graphs with dependency checks, write scopes, verify stages, and dispatch |
+| Long-running agent state | README emphasis is remote-driving and terminal workflows | Personal Agent Core adds durable profile/workspace/session memory, inbox items, scheduled wakeups, and synthesis |
+| Client surfaces | TUI-first, client/server, desktop beta | CLI/TUI, headless server, SSE, generated JS SDK, and deferred Flutter frontend |
+
 ## System Overview
 
 ```mermaid

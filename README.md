@@ -30,15 +30,18 @@ Technical documentation:
 
 ## OpenCode vs OpenAGt
 
+This comparison is based on the public OpenCode repository and README, not branding alone.
+
 | Topic | OpenCode | OpenAGt |
 | --- | --- | --- |
-| Primary identity | Historical / compatibility name | Current project and release name |
-| Main CLI | `opencode` | `openagt` |
-| Windows installer branding | Legacy naming not preferred | `OpenAGt-Setup-x64.msi` |
-| Portable Windows asset | Legacy naming not preferred | `openagt-windows-x64.zip` |
-| Config compatibility | `.opencode/`, `opencode.jsonc`, `OPENCODE_*` | `OPENAGT_*` with compatibility support for old names |
-| Runtime direction | Compatibility reference | Active backend-first agentic coding runtime |
-| Release scope | Legacy transition surface | CLI, TUI, server, JavaScript SDK |
+| Runtime center | Client/server coding agent with a strong TUI emphasis | Backend-first session runtime that can be consumed by CLI, TUI, server, and SDK |
+| Agent loop | General coding agent with built-in `build` and `plan` agents plus subagent support | Session-centric iterative tool loop with task runtime, coordinator graph, and personal-agent primitives |
+| Provider strategy | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK |
+| LSP integration | Official README highlights out-of-the-box LSP support | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools |
+| Safety model | Agent modes and permission prompts are central to the CLI experience | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy |
+| Orchestration focus | Terminal-first coding flow with client/server remote-control potential | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory |
+| Frontend surface | TUI-first, plus desktop app beta in the official project | Stable release currently centers on CLI, TUI, headless server, and JavaScript SDK; Flutter is deferred |
+| Migration / compatibility | Native source project | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration |
 
 ## Release
 
