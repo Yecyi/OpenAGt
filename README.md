@@ -1,4 +1,4 @@
-# OpenAGt
+# OpenAGt (Pre-Release)
 
 OpenAGt is a local-first agentic coding runtime for CLI, server, and web-driven development workflows.
 
