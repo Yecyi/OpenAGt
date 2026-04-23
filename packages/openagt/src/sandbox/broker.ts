@@ -1,12 +1,17 @@
 import { Context, Effect, Layer } from "effect"
 import { createFrameParser, encodeFrame } from "./protocol"
-import { fileURLToPath } from "url"
 import {
   SANDBOX_PROTOCOL_VERSION,
   type SandboxBackendStatus,
   type SandboxExecRequest,
   type SandboxExecResult,
 } from "./types"
+import {
+  OPENCODE_PROCESS_ROLE,
+  OPENCODE_RUN_ID,
+  ensureRunID,
+  sanitizedProcessEnv,
+} from "@/util/opencode-process"
 
 type Pending = {
   onStdout: (chunk: string) => void
@@ -27,17 +32,23 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SandboxBroker") {}
 
-function brokerScript() {
-  return fileURLToPath(new URL("./broker-main.ts", import.meta.url))
+export function brokerCommand(argv = process.argv, execPath = process.execPath, execArgv = process.execArgv) {
+  const script = argv[1]
+  if (!script) return [execPath]
+  if (!/\.(?:[cm]?[jt]s|tsx?|jsx?)$/i.test(script)) return [execPath]
+  return [execPath, ...execArgv, script]
 }
 
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const proc = Bun.spawn({
-      cmd: [process.execPath, brokerScript()],
+      cmd: brokerCommand(),
       cwd: process.cwd(),
-      env: process.env,
+      env: sanitizedProcessEnv({
+        [OPENCODE_PROCESS_ROLE]: "broker",
+        [OPENCODE_RUN_ID]: ensureRunID(),
+      }),
       stderr: "inherit",
       stdout: "pipe",
       stdin: "pipe",

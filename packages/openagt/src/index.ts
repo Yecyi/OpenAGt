@@ -41,6 +41,11 @@ import { executeFastPath, isFastPathCommand } from "./cli/fast-path"
 
 const processMetadata = ensureProcessMetadata("main")
 
+if (processMetadata.processRole === "broker") {
+  await import("./sandbox/broker-main")
+  process.exit(0)
+}
+
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
     e: errorMessage(e),

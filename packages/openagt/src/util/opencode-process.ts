@@ -1,15 +1,17 @@
 export const OPENCODE_RUN_ID = "OPENCODE_RUN_ID"
 export const OPENCODE_PROCESS_ROLE = "OPENCODE_PROCESS_ROLE"
 
+export type OpencodeProcessRole = "main" | "worker" | "broker"
+
 export function ensureRunID() {
   return (process.env[OPENCODE_RUN_ID] ??= crypto.randomUUID())
 }
 
-export function ensureProcessRole(fallback: "main" | "worker") {
+export function ensureProcessRole(fallback: OpencodeProcessRole) {
   return (process.env[OPENCODE_PROCESS_ROLE] ??= fallback)
 }
 
-export function ensureProcessMetadata(fallback: "main" | "worker") {
+export function ensureProcessMetadata(fallback: OpencodeProcessRole) {
   return {
     runID: ensureRunID(),
     processRole: ensureProcessRole(fallback),
