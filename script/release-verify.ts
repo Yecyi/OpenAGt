@@ -32,6 +32,10 @@ const steps = [
     run: () => $`bun run check:integrity`,
   },
   {
+    title: "Build config schemas",
+    run: () => $`bun run script/schema.ts`.cwd("packages/openagt"),
+  },
+  {
     title: "Check audit policy",
     run: () => $`bun run check:audit-policy`,
   },

@@ -95,11 +95,40 @@ export namespace AppFileSystem {
         return JSON.parse(text)
       })
 
-      const writeJson = Effect.fn("FileSystem.writeJson")(function* (path: string, data: unknown, mode?: number) {
+      const writeFileAtomic = Effect.fn("FileSystem.writeFileAtomic")(function* (
+        path: string,
+        content: string | Uint8Array,
+        mode?: number,
+      ) {
         yield* Effect.tryPromise({
-          try: () => atomicWrite(path, JSON.stringify(data, null, 2), mode),
-          catch: (cause) => new FileSystemError({ method: "writeJson", cause }),
+          try: async () => {
+            await NFS.mkdir(dirname(path), { recursive: true })
+            const temp = join(
+              dirname(path),
+              `.${basename(path)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+            )
+            let handle: NFS.FileHandle | undefined
+            try {
+              handle = await NFS.open(temp, "wx", mode ?? 0o666)
+              await handle.writeFile(content)
+              await handle.sync()
+              await handle.close()
+              handle = undefined
+              await NFS.rename(temp, path)
+              if (mode !== undefined) await NFS.chmod(path, mode)
+            } catch (cause) {
+              await handle?.close().catch(() => {})
+              await NFS.rm(temp, { force: true }).catch(() => {})
+              throw cause
+            }
+          },
+          catch: (cause) => new FileSystemError({ method: "writeFileAtomic", cause }),
         })
+      })
+
+      const writeJson = Effect.fn("FileSystem.writeJson")(function* (path: string, data: unknown, mode?: number) {
+        const content = JSON.stringify(data, null, 2)
+        yield* writeFileAtomic(path, content, mode)
       })
 
       const ensureDir = Effect.fn("FileSystem.ensureDir")(function* (path: string) {
@@ -111,10 +140,7 @@ export namespace AppFileSystem {
         content: string | Uint8Array,
         mode?: number,
       ) {
-        yield* Effect.tryPromise({
-          try: () => atomicWrite(path, content, mode),
-          catch: (cause) => new FileSystemError({ method: "writeWithDirs", cause }),
-        })
+        yield* writeFileAtomic(path, content, mode)
       })
 
       const glob = Effect.fn("FileSystem.glob")(function* (pattern: string, options?: Glob.Options) {

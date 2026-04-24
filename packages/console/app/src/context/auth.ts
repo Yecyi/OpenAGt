@@ -42,7 +42,7 @@ export const getActor = async (workspace?: string): Promise<Actor.Info> => {
   const evt = getRequestEvent()
   if (!evt) throw new Error("No request event")
   if (evt.locals.actor) return evt.locals.actor
-  evt.locals.actor = (async () => {
+  const actor: Promise<Actor.Info> = (async () => {
     const auth = await useAuthSession()
     if (!workspace) {
       const account = auth.data.account ?? {}
@@ -104,7 +104,7 @@ export const getActor = async (workspace?: string): Promise<Actor.Info> => {
           properties: {
             userID: user.id,
             workspaceID: user.workspaceID,
-            accountID: user.accountID,
+            accountID: user.accountID ?? "",
             role: user.role,
           },
         }
@@ -112,5 +112,6 @@ export const getActor = async (workspace?: string): Promise<Actor.Info> => {
     }
     throw redirect("/auth/authorize")
   })()
-  return evt.locals.actor
+  evt.locals.actor = actor
+  return actor
 }

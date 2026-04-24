@@ -72,13 +72,14 @@ const auth = Layer.succeed(
   Authorization.of({
     basic: (effect, { credential }) =>
       Effect.gen(function* () {
-        if (!Flag.OPENCODE_SERVER_PASSWORD) return yield* effect
+        const password = Flag.OPENAGT_SERVER_PASSWORD ?? Flag.OPENCODE_SERVER_PASSWORD
+        if (!password) return yield* effect
 
-        const user = Flag.OPENCODE_SERVER_USERNAME ?? Flag.OPENAGT_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+        const user = Flag.OPENAGT_SERVER_USERNAME ?? Flag.OPENCODE_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
         if (!isAllowedServerUsername(credential.username, user)) {
           return yield* new Unauthorized({ message: "Unauthorized" })
         }
-        if (Redacted.value(credential.password) !== Flag.OPENCODE_SERVER_PASSWORD) {
+        if (Redacted.value(credential.password) !== password) {
           return yield* new Unauthorized({ message: "Unauthorized" })
         }
         return yield* effect

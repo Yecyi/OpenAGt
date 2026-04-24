@@ -1,16 +1,7 @@
 import type { APIEvent } from "@solidjs/start/server"
 import { Resource } from "@openagt/console-resource"
 import { cookie, docs, localeFromRequest, tag } from "~/lib/language"
-
-const FORWARDED_HEADERS = [
-  "accept",
-  "accept-encoding",
-  "accept-language",
-  "cache-control",
-  "if-none-match",
-  "if-modified-since",
-  "range",
-] as const
+import { proxyRequestHeaders } from "~/lib/proxy-headers"
 
 async function handler(evt: APIEvent) {
   const req = evt.request.clone()
@@ -19,11 +10,7 @@ async function handler(evt: APIEvent) {
   const host = Resource.App.stage === "production" ? "docs.opencode.ai" : "docs.dev.opencode.ai"
   const targetUrl = `https://${host}${docs(locale, url.pathname)}${url.search}`
 
-  const headers = new Headers()
-  for (const key of FORWARDED_HEADERS) {
-    const value = req.headers.get(key)
-    if (value) headers.set(key, value)
-  }
+  const headers = proxyRequestHeaders(req.headers)
   headers.set("accept-language", tag(locale))
 
   const response = await fetch(targetUrl, {

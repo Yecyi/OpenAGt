@@ -5,33 +5,25 @@ import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oa
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
-// Normalize a URI origin (host + port) for comparison: lowercase, strip trailing slash,
-// and resolve localhost/127.0.0.1 to a canonical form.
-function normalizeOrigin(uri: string): string {
-  try {
-    const url = new URL(uri)
-    const host = url.hostname.toLowerCase()
-    // Normalize localhost variants to "localhost"
-    const normalizedHost = host === "127.0.0.1" ? "localhost" : host
-    const port = url.port || (url.protocol === "https:" ? "443" : "80")
-    return `${normalizedHost}:${port}`
-  } catch {
-    return uri.toLowerCase()
-  }
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 }
 
 function normalizeRedirectTarget(uri: string): string {
-  const url = new URL(uri)
-  return `${normalizeOrigin(url.origin)}${url.pathname}`
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
+  try {
+    const url = new URL(uri)
+    const host = url.hostname.toLowerCase()
+    const normalizedHost = host === "127.0.0.1" ? "localhost" : host
+    const port = url.port || (url.protocol === "https:" ? "443" : "80")
+    return `${normalizedHost}:${port}${url.pathname || "/"}`
+  } catch {
+    return uri.toLowerCase()
+  }
 }
 
 // Callback timeout in milliseconds (5 minutes)
@@ -120,21 +112,21 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
   const error = url.searchParams.get("error")
   const errorDescription = url.searchParams.get("error_description")
 
-  log.info("received oauth callback", { hasCode: !!code, state, error })
+  log.info("received oauth callback", { hasCode: !!code, hasState: !!state, hasError: !!error })
 
   // Enforce state parameter presence
   if (!state) {
     const errorMsg = "Missing required state parameter - potential CSRF attack"
-    log.error("oauth callback missing state parameter", { url: url.toString() })
+    log.error("oauth callback missing state parameter", { path: url.pathname })
     res.writeHead(400, { "Content-Type": "text/html" })
     res.end(HTML_ERROR(errorMsg))
     return
   }
 
-  // Validate state parameter
+  // Validate state before reflecting provider-supplied OAuth errors.
   if (!pendingAuths.has(state)) {
     const errorMsg = "Invalid or expired state parameter - potential CSRF attack"
-    log.error("oauth callback with invalid state", { state, pendingStates: Array.from(pendingAuths.keys()) })
+    log.error("oauth callback with invalid state", { pendingCount: pendingAuths.size })
     res.writeHead(400, { "Content-Type": "text/html" })
     res.end(HTML_ERROR(errorMsg))
     return
@@ -204,7 +196,10 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
     await stop()
   }
 
-  if (server) return
+  if (server) {
+    registeredRedirectUri = redirectUri ?? `http://127.0.0.1:${port}${path}`
+    return
+  }
 
   const running = await isPortInUse(port)
   if (running) {
@@ -214,7 +209,7 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
 
   currentPort = port
   currentPath = path
-  registeredRedirectUri = redirectUri ?? `http://localhost:${port}${path}`
+  registeredRedirectUri = redirectUri ?? `http://127.0.0.1:${port}${path}`
 
   server = createServer(handleRequest)
   await new Promise<void>((resolve, reject) => {

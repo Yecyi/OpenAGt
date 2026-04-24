@@ -46,7 +46,7 @@ export function Titlebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const params = useParams()
-  const releaseChannel = import.meta.env.VITE_OPENCODE_CHANNEL
+  const channel = import.meta.env.VITE_OPENCODE_CHANNEL ?? ""
 
   const mac = createMemo(() => platform.platform === "desktop" && platform.os === "macos")
   const windows = createMemo(() => platform.platform === "desktop" && platform.os === "windows")
@@ -81,7 +81,7 @@ export function Titlebar() {
   const canBack = createMemo(() => history.index > 0)
   const canForward = createMemo(() => history.index < history.stack.length - 1)
   const hasProjects = createMemo(() => layout.projects.list().length > 0)
-  const nav = createMemo(() => releaseChannel !== "beta" || settings.general.showNavigation())
+  const nav = createMemo(() => channel !== "beta" || settings.general.showNavigation())
 
   const back = () => {
     const next = backPath(history)
@@ -289,9 +289,9 @@ export function Titlebar() {
                 </div>
               </Show>
               <div id="opencode-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" />
-              {releaseChannel && ["beta", "dev"].includes(releaseChannel) && (
+              {["beta", "dev"].includes(channel) && (
                 <div class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono">
-                  {releaseChannel.toUpperCase()}
+                  {channel.toUpperCase()}
                 </div>
               )}
             </div>

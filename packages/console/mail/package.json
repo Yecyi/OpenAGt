@@ -2,7 +2,7 @@
   "name": "@openagt/console-mail",
   "version": "1.14.17",
   "dependencies": {
-    "@jsx-email/all": "2.2.3",
+    "@jsx-email/all": "3.0.1",
     "@tsconfig/bun": "1.0.9",
     "@types/react": "18.0.25",
     "react": "18.2.0",

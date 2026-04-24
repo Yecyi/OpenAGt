@@ -1,4 +1,5 @@
 import { withAlpha } from "@openagt/ui/theme/color"
+import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
 import { useTheme } from "@openagt/ui/theme/context"
 import { resolveThemeVariant } from "@openagt/ui/theme/resolve"
 import type { HexColor } from "@openagt/ui/theme/types"
@@ -15,7 +16,6 @@ import { monoFontFamily, useSettings } from "@/context/settings"
 import type { LocalPTY } from "@/context/terminal"
 import { disposeIfDisposable, getHoveredLinkText, setOptionIfSupported } from "@/utils/runtime-adapters"
 import { terminalWriter } from "@/utils/terminal-writer"
-import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
 
 const TOGGLE_TERMINAL_ID = "terminal.toggle"
 const DEFAULT_TOGGLE_TERMINAL_KEYBIND = "ctrl+`"
@@ -514,6 +514,21 @@ export const Terminal = (props: TerminalProps) => {
         }, ms)
       }
 
+      const authHeader = password ? `Basic ${btoa(`${username}:${password}`)}` : undefined
+      const connectTicket = async () => {
+        const ticketUrl = new URL(url + `/pty/${id}/connect-ticket`)
+        ticketUrl.searchParams.set("directory", directory)
+        const response = await (platform.fetch ?? fetch)(ticketUrl, {
+          method: "POST",
+          headers: authHeader ? { Authorization: authHeader } : undefined,
+          credentials: sameOrigin ? "same-origin" : "omit",
+        })
+        if (!response.ok) throw new Error(`PTY ticket request failed: ${response.status}`)
+        const body = (await response.json()) as { token?: unknown }
+        if (typeof body.token !== "string" || !body.token) throw new Error("PTY ticket response was invalid")
+        return body.token
+      }
+
       const open = async () => {
         if (disposed) return
         drop?.()
@@ -522,20 +537,15 @@ export const Terminal = (props: TerminalProps) => {
         next.searchParams.set("directory", directory)
         next.searchParams.set("cursor", String(seek))
         next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
-        if (!sameOrigin && password) {
-          const ticketUrl = serverRoute(`/pty/${id}/connect-ticket`)
-          ticketUrl.searchParams.set("directory", directory)
-          const ticket = await fetch(ticketUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${btoa(`${username}:${password}`)}`,
-            },
-          }).then(async (response) => {
-            if (!response.ok) throw new Error(`PTY ticket request failed: ${response.status}`)
-            return (await response.json()) as { token: string }
-          })
-          next.searchParams.set("ticket", ticket.token)
+        if (!sameOrigin && authHeader) {
+          try {
+            next.searchParams.set("ticket", await connectTicket())
+          } catch (err) {
+            debugTerminal("failed to request websocket ticket, using legacy query auth", err)
+            next.searchParams.set("auth_token", authHeader.slice("Basic ".length))
+          }
         }
+        if (disposed) return
 
         const socket = new WebSocket(next)
         socket.binaryType = "arraybuffer"

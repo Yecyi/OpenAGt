@@ -28,7 +28,7 @@ const CRITICAL_EVENT_TYPES = [
  * Max capacity is configurable via the `OPENCODE_EVENT_BUFFER_SIZE` environment variable.
  */
 const DEFAULT_EVENT_BUFFER_SIZE = 1000
-const DEFAULT_EVENT_BUFFER_FILE_BYTES = 5 * 1024 * 1024
+const DEFAULT_EVENT_BUFFER_BYTES = 1024 * 1024
 
 function getEventBufferSize(): number {
   const env = process.env.OPENCODE_EVENT_BUFFER_SIZE
@@ -40,15 +40,26 @@ function getEventBufferSize(): number {
   return DEFAULT_EVENT_BUFFER_SIZE
 }
 
+function getEventBufferBytes(): number {
+  const env = process.env.OPENCODE_EVENT_BUFFER_BYTES
+  if (env) {
+    const parsed = parseInt(env, 10)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+    log.warn("invalid OPENCODE_EVENT_BUFFER_BYTES, using default", { value: env })
+  }
+  return DEFAULT_EVENT_BUFFER_BYTES
+}
+
 class EventBuffer {
   private events: Array<{ timestamp: number; payload: unknown }> = []
   private maxCapacity: number
-  private maxFileBytes = DEFAULT_EVENT_BUFFER_FILE_BYTES
+  private maxBytes: number
   private bufferPath: string | null = null
   private _droppedCount: number = 0
 
-  constructor(maxCapacity: number = DEFAULT_EVENT_BUFFER_SIZE) {
+  constructor(maxCapacity: number = DEFAULT_EVENT_BUFFER_SIZE, maxBytes: number = DEFAULT_EVENT_BUFFER_BYTES) {
     this.maxCapacity = maxCapacity
+    this.maxBytes = maxBytes
   }
 
   initialize(): void {
@@ -101,16 +112,7 @@ class EventBuffer {
       const lines = this.events.map((e) => JSON.stringify(e)).join("\n") + "\n"
       await fs.appendFile(this.bufferPath, lines, "utf-8")
       this.events = []
-      const info = await fs.stat(this.bufferPath)
-      if (info.size > this.maxFileBytes) {
-        const content = await fs.readFile(this.bufferPath, "utf-8")
-        const trimmed = content
-          .split("\n")
-          .filter((line) => line.trim())
-          .slice(-this.maxCapacity)
-          .join("\n")
-        await fs.writeFile(this.bufferPath, trimmed ? `${trimmed}\n` : "", "utf-8")
-      }
+      await this.compactDisk()
     } catch (error) {
       log.warn("failed to persist events", { error })
     }
@@ -123,11 +125,7 @@ class EventBuffer {
   async replay(callback: (event: { timestamp: number; payload: unknown }) => void): Promise<void> {
     if (!this.bufferPath) return
     try {
-      const content = await fs.readFile(this.bufferPath, "utf-8")
-      const lines = content
-        .split("\n")
-        .filter((line) => line.trim())
-        .slice(-this.maxCapacity)
+      const lines = await this.readDiskWindow()
       for (const line of lines) {
         try {
           const event = JSON.parse(line)
@@ -139,6 +137,30 @@ class EventBuffer {
     } catch (error) {
       log.warn("failed to replay events from disk", { error })
     }
+  }
+
+  private async compactDisk(): Promise<void> {
+    if (!this.bufferPath) return
+    const stat = await fs.stat(this.bufferPath).catch(() => undefined)
+    if (!stat || stat.size <= this.maxBytes) return
+    await fs.writeFile(this.bufferPath, this.formatLines(await this.readDiskWindow()), "utf-8")
+  }
+
+  private async readDiskWindow(): Promise<string[]> {
+    if (!this.bufferPath) return []
+    const content = await fs.readFile(this.bufferPath, "utf-8")
+    const lines = content
+      .split("\n")
+      .filter((line) => line.trim())
+      .slice(-this.maxCapacity)
+    while (lines.length > 1 && Buffer.byteLength(this.formatLines(lines), "utf-8") > this.maxBytes) {
+      lines.shift()
+    }
+    return lines
+  }
+
+  private formatLines(lines: string[]): string {
+    return lines.length ? lines.join("\n") + "\n" : ""
   }
 
   async clear(): Promise<void> {
@@ -189,7 +211,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Bu
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const eventBuffer = new EventBuffer(getEventBufferSize())
+    const eventBuffer = new EventBuffer(getEventBufferSize(), getEventBufferBytes())
     eventBuffer.initialize()
 
     const state = yield* InstanceState.make<State>(

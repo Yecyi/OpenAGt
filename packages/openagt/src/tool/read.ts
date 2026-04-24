@@ -20,6 +20,7 @@ const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
 const SAMPLE_BYTES = 4096
+const EXACT_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
 const parameters = z.object({
   filePath: z.string().describe("The absolute path to the file or directory to read"),
@@ -238,7 +239,11 @@ export const ReadTool = Tool.define(
       }
 
       const file = yield* Effect.promise(() =>
-        lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
+        lines(filepath, {
+          limit: params.limit ?? DEFAULT_READ_LIMIT,
+          offset: params.offset ?? 1,
+          exactTotal: Number(stat.size) <= EXACT_LINE_COUNT_MAX_BYTES,
+        }),
       )
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
@@ -288,7 +293,7 @@ export const ReadTool = Tool.define(
   }),
 )
 
-async function lines(filepath: string, opts: { limit: number; offset: number }) {
+async function lines(filepath: string, opts: { limit: number; offset: number; exactTotal: boolean }) {
   const stream = createReadStream(filepath, { encoding: "utf8" })
   const rl = createInterface({
     input: stream,
@@ -303,6 +308,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
   let count = 0
   let cut = false
   let more = false
+  let exact = true
   try {
     for await (const text of rl) {
       count += 1
@@ -310,7 +316,11 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
 
       if (raw.length >= opts.limit) {
         more = true
-        break
+        if (!opts.exactTotal) {
+          exact = false
+          break
+        }
+        continue
       }
 
       const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
@@ -329,5 +339,5 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
     stream.destroy()
   }
 
-  return { raw, count, cut, more, offset: opts.offset, exact: !more }
+  return { raw, count, cut, more, offset: opts.offset, exact }
 }

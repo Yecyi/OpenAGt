@@ -83,7 +83,7 @@ export const Event = {
 }
 
 const log = Log.create({ service: "file" })
-const MAX_INLINE_BINARY_BYTES = 5 * 1024 * 1024
+const MAX_ENCODE_BYTES = 5 * 1024 * 1024
 
 const binary = new Set([
   "exe",
@@ -521,15 +521,16 @@ export const layer = Layer.effect(
       if (isImageByExtension(file)) {
         const exists = yield* appFs.existsSafe(full)
         if (exists) {
-          const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
-          if (Number(info?.size ?? 0) > MAX_INLINE_BINARY_BYTES) {
-            return { type: "binary" as const, content: "", mimeType: getImageMimeType(file) }
+          const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.void))
+          const mimeType = getImageMimeType(file)
+          if (info?.type === "File" && Number(info.size) > MAX_ENCODE_BYTES) {
+            return { type: "binary" as const, content: "", mimeType }
           }
           const bytes = yield* appFs.readFile(full).pipe(Effect.catch(() => Effect.succeed(new Uint8Array())))
           return {
             type: "text" as const,
             content: Buffer.from(bytes).toString("base64"),
-            mimeType: getImageMimeType(file),
+            mimeType,
             encoding: "base64" as const,
           }
         }
@@ -549,8 +550,8 @@ export const layer = Layer.effect(
       if (encode && !isImage(mimeType)) return { type: "binary" as const, content: "", mimeType }
 
       if (encode) {
-        const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (Number(info?.size ?? 0) > MAX_INLINE_BINARY_BYTES) {
+        const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.void))
+        if (info?.type === "File" && Number(info.size) > MAX_ENCODE_BYTES) {
           return { type: "binary" as const, content: "", mimeType }
         }
         const bytes = yield* appFs.readFile(full).pipe(Effect.catch(() => Effect.succeed(new Uint8Array())))

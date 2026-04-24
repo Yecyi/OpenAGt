@@ -1,16 +1,17 @@
 import { Provider } from "../provider"
 import { NamedError } from "@openagt/shared/util/error"
+import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 import { NotFoundError } from "../storage"
 import { Session } from "../session"
+import crypto from "node:crypto"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import type { ErrorHandler, MiddlewareHandler } from "hono"
 import { HTTPException } from "hono/http-exception"
 import { Log } from "../util"
 import { Flag } from "@/flag/flag"
-import { basicAuth } from "hono/basic-auth"
+import { PtyTicket } from "./pty-ticket"
 import { cors } from "hono/cors"
 import { compress } from "hono/compress"
-import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 
 const log = Log.create({ service: "server" })
 
@@ -41,19 +42,41 @@ export const AuthMiddleware: MiddlewareHandler = (c, next) => {
   // Allow CORS preflight requests to succeed without auth.
   // Browser clients sending Authorization headers will preflight with OPTIONS.
   if (c.req.method === "OPTIONS") return next()
-  const password = Flag.OPENAGT_SERVER_PASSWORD
+  const password = Flag.OPENAGT_SERVER_PASSWORD ?? Flag.OPENCODE_SERVER_PASSWORD
   if (!password) return next()
-  const username = Flag.OPENAGT_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+  const username = Flag.OPENAGT_SERVER_USERNAME ?? Flag.OPENCODE_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+  const ptyID = PtyTicket.matchConnect(c.req.path)
+  if (ptyID && PtyTicket.consume({ token: c.req.query("ticket"), ptyID, directory: c.req.query("directory") })) {
+    return next()
+  }
 
-  if (/^\/pty\/[^/]+\/connect$/.test(c.req.path) && c.req.query("ticket")) return next()
+  const auth = parseBasic(
+    c.req.header("authorization") ?? (ptyID && c.req.query("auth_token") ? `Basic ${c.req.query("auth_token")}` : ""),
+  )
+  if (!auth) throw new HTTPException(401, { message: "Unauthorized" })
+  if (!isAllowedServerUsername(auth.username, username)) {
+    throw new HTTPException(401, { message: "Unauthorized" })
+  }
+  if (!equalSecret(auth.password, password)) throw new HTTPException(401, { message: "Unauthorized" })
+  return next()
+}
 
-  if (c.req.query("auth_token")) c.req.raw.headers.set("authorization", `Basic ${c.req.query("auth_token")}`)
+function parseBasic(header: string | undefined) {
+  if (!header?.startsWith("Basic ")) return
+  const decoded = Buffer.from(header.slice("Basic ".length), "base64").toString("utf8")
+  const index = decoded.indexOf(":")
+  if (index < 0) return
+  return {
+    username: decoded.slice(0, index),
+    password: decoded.slice(index + 1),
+  }
+}
 
-  return basicAuth({
-    username,
-    password,
-    verifyUser: (input, passwordInput) => isAllowedServerUsername(input, username) && passwordInput === password,
-  })(c, next)
+function equalSecret(input: string, expected: string) {
+  const left = Buffer.from(input)
+  const right = Buffer.from(expected)
+  if (left.length !== right.length) return false
+  return crypto.timingSafeEqual(left, right)
 }
 
 export const LoggerMiddleware: MiddlewareHandler = async (c, next) => {

@@ -4,6 +4,22 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }
 
+export type EventProviderFallbackHop = {
+  type: "provider.fallback.hop"
+  properties: {
+    from: {
+      provider: string
+      model: string
+    }
+    to: {
+      provider: string
+      model: string
+    }
+    attempt: number
+    reason?: string
+  }
+}
+
 export type Project = {
   id: string
   worktree: string
@@ -33,13 +49,6 @@ export type EventProjectUpdated = {
   properties: Project
 }
 
-export type EventServerInstanceDisposed = {
-  type: "server.instance.disposed"
-  properties: {
-    directory: string
-  }
-}
-
 export type EventServerConnected = {
   type: "server.connected"
   properties: {
@@ -54,18 +63,10 @@ export type EventGlobalDisposed = {
   }
 }
 
-export type EventFileEdited = {
-  type: "file.edited"
+export type EventServerInstanceDisposed = {
+  type: "server.instance.disposed"
   properties: {
-    file: string
-  }
-}
-
-export type EventFileWatcherUpdated = {
-  type: "file.watcher.updated"
-  properties: {
-    file: string
-    event: "add" | "change" | "unlink"
+    directory: string
   }
 }
 
@@ -81,20 +82,6 @@ export type EventLspUpdated = {
   type: "lsp.updated"
   properties: {
     [key: string]: unknown
-  }
-}
-
-export type EventInstallationUpdated = {
-  type: "installation.updated"
-  properties: {
-    version: string
-  }
-}
-
-export type EventInstallationUpdateAvailable = {
-  type: "installation.update-available"
-  properties: {
-    version: string
   }
 }
 
@@ -230,6 +217,35 @@ export type EventSessionError = {
   }
 }
 
+export type EventInstallationUpdated = {
+  type: "installation.updated"
+  properties: {
+    version: string
+  }
+}
+
+export type EventInstallationUpdateAvailable = {
+  type: "installation.update-available"
+  properties: {
+    version: string
+  }
+}
+
+export type EventFileEdited = {
+  type: "file.edited"
+  properties: {
+    file: string
+  }
+}
+
+export type EventFileWatcherUpdated = {
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
+  }
+}
+
 export type QuestionOption = {
   /**
    * Display text (1-5 words, concise)
@@ -307,6 +323,38 @@ export type EventQuestionRejected = {
   properties: QuestionRejected
 }
 
+export type EventTaskUpdated = {
+  type: "task.updated"
+  properties: {
+    parent_session_id: string
+    result: {
+      task_id: string
+      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      summary: string
+      child_session_id: string
+      usage?: {
+        totalTokens?: number
+        inputTokens?: number
+        outputTokens?: number
+        reasoningTokens?: number
+        toolUses?: number
+        durationMs?: number
+      }
+      result_excerpt?: string
+      error_excerpt?: string
+      group_id?: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      description: string
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }
+  }
+}
+
 export type Todo = {
   /**
    * Brief description of the task
@@ -379,7 +427,6 @@ export type EventTuiCommandExecute = {
     command:
       | "session.list"
       | "session.new"
-      | "session.share"
       | "session.interrupt"
       | "session.compact"
       | "session.page.up"
@@ -503,6 +550,265 @@ export type EventPtyDeleted = {
   type: "pty.deleted"
   properties: {
     id: string
+  }
+}
+
+export type EventCoordinatorCreated = {
+  type: "coordinator.created"
+  properties: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type EventCoordinatorUpdated = {
+  type: "coordinator.updated"
+  properties: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type EventCoordinatorCompleted = {
+  type: "coordinator.completed"
+  properties: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type EventMemoryUpdated = {
+  type: "memory.updated"
+  properties: {
+    id: string
+    scope: "profile" | "workspace" | "session"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+  }
+}
+
+export type EventInboxCreated = {
+  type: "inbox.created"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type EventInboxUpdated = {
+  type: "inbox.updated"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type EventSchedulerScheduled = {
+  type: "scheduler.scheduled"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+  }
+}
+
+export type EventSchedulerFired = {
+  type: "scheduler.fired"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+    inbox_item: {
+      id: string
+      projectID: string
+      sessionID?: string
+      source: "session" | "scheduled" | "webhook"
+      scope: "profile" | "workspace" | "session"
+      goal: string
+      context_refs: Array<string>
+      priority: "high" | "normal" | "low"
+      state: "pending" | "processing" | "completed" | "cancelled"
+      scheduled_for?: number
+      payload?: {
+        [key: string]: unknown
+      }
+      time: {
+        created: number
+        updated: number
+        completed?: number
+      }
+    }
+  }
+}
+
+export type EventSchedulerCompleted = {
+  type: "scheduler.completed"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
   }
 }
 
@@ -942,9 +1248,6 @@ export type Session = {
     files: number
     diffs?: Array<SnapshotFileDiff>
   }
-  share?: {
-    url: string
-  }
   title: string
   version: string
   time: {
@@ -1069,9 +1372,6 @@ export type SyncEventSessionUpdated = {
         files: number
         diffs?: Array<SnapshotFileDiff>
       } | null
-      share?: {
-        url: string | null
-      }
       title: string | null
       version: string | null
       time?: {
@@ -1108,24 +1408,26 @@ export type GlobalEvent = {
   project?: string
   workspace?: string
   payload:
+    | EventProviderFallbackHop
     | EventProjectUpdated
-    | EventServerInstanceDisposed
     | EventServerConnected
     | EventGlobalDisposed
-    | EventFileEdited
-    | EventFileWatcherUpdated
+    | EventServerInstanceDisposed
     | EventLspClientDiagnostics
     | EventLspUpdated
-    | EventInstallationUpdated
-    | EventInstallationUpdateAvailable
     | EventMessagePartDelta
     | EventPermissionAsked
     | EventPermissionReplied
     | EventSessionDiff
     | EventSessionError
+    | EventInstallationUpdated
+    | EventInstallationUpdateAvailable
+    | EventFileEdited
+    | EventFileWatcherUpdated
     | EventQuestionAsked
     | EventQuestionReplied
     | EventQuestionRejected
+    | EventTaskUpdated
     | EventTodoUpdated
     | EventSessionStatus
     | EventSessionIdle
@@ -1144,6 +1446,15 @@ export type GlobalEvent = {
     | EventPtyUpdated
     | EventPtyExited
     | EventPtyDeleted
+    | EventCoordinatorCreated
+    | EventCoordinatorUpdated
+    | EventCoordinatorCompleted
+    | EventMemoryUpdated
+    | EventInboxCreated
+    | EventInboxUpdated
+    | EventSchedulerScheduled
+    | EventSchedulerFired
+    | EventSchedulerCompleted
     | EventWorkspaceReady
     | EventWorkspaceFailed
     | EventWorkspaceRestore
@@ -1170,7 +1481,7 @@ export type GlobalEvent = {
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR"
 
 /**
- * Server configuration for opencode serve and web commands
+ * Server configuration for openagt serve and web commands
  */
 export type ServerConfig = {
   /**
@@ -1212,6 +1523,8 @@ export type PermissionConfig =
       grep?: PermissionRuleConfig
       list?: PermissionRuleConfig
       bash?: PermissionRuleConfig
+      shell_execute?: PermissionRuleConfig
+      shell_network?: PermissionRuleConfig
       task?: PermissionRuleConfig
       external_directory?: PermissionRuleConfig
       todowrite?: PermissionActionConfig
@@ -1302,6 +1615,67 @@ export type ProviderConfig = {
   npm?: string
   whitelist?: Array<string>
   blacklist?: Array<string>
+  /**
+   * Fallback provider configuration for automatic failover
+   */
+  fallback?: {
+    /**
+     * Enable fallback on error
+     */
+    enabled?: boolean
+    /**
+     * Ordered fallback chain: each entry is provider/model to try next
+     */
+    chain?: Array<{
+      provider: string
+      model: string
+    }>
+    /**
+     * Fallback provider ID
+     */
+    provider?: string
+    /**
+     * Fallback model ID
+     */
+    model?: string
+    /**
+     * Fallback on rate limit (default: true)
+     */
+    retryOnRateLimit?: boolean
+    /**
+     * Fallback on 5xx errors (default: true)
+     */
+    retryOnServerError?: boolean
+    /**
+     * Maximum fallback hops for a single request (default: 3)
+     */
+    maxRetries?: number
+    /**
+     * Retry policy: exponential backoff, jitter, and circuit breaker
+     */
+    retryPolicy?: {
+      /**
+       * Initial retry delay in ms (default: 1000)
+       */
+      baseDelayMs?: number
+      /**
+       * Maximum retry delay in ms (default: 30000)
+       */
+      maxDelayMs?: number
+      /**
+       * Random jitter factor 0-1 (default: 0.3)
+       */
+      jitterFactor?: number
+      /**
+       * Consecutive failures before skipping provider (default: 5)
+       */
+      circuitBreakerThreshold?: number
+      /**
+       * Circuit breaker reset time in ms (default: 60000)
+       */
+      circuitBreakerResetMs?: number
+    }
+  }
   options?: {
     apiKey?: string
     baseURL?: string
@@ -1465,6 +1839,35 @@ export type McpRemoteConfig = {
  */
 export type LayoutConfig = "auto" | "stretch"
 
+export type ExecPolicyPatternTokenConfig = string | Array<string>
+
+/**
+ * Policy decision for matching commands. Defaults to allow.
+ */
+export type ExecPolicyDecisionConfig = "allow" | "confirm" | "block"
+
+export type ExecPolicyRuleConfig = {
+  /**
+   * Ordered command prefix tokens. Array entries denote alternatives.
+   */
+  pattern: Array<ExecPolicyPatternTokenConfig>
+  decision?: ExecPolicyDecisionConfig
+  /**
+   * Human-readable rationale or safer alternative.
+   */
+  justification?: string
+}
+
+/**
+ * Prefix-based shell execution policy rules that strengthen shell approvals and blocking.
+ */
+export type ExecPolicyConfig = {
+  /**
+   * Prefix-based shell execution policy rules.
+   */
+  rules: Array<ExecPolicyRuleConfig>
+}
+
 export type Config = {
   /**
    * JSON schema reference for configuration validation
@@ -1473,7 +1876,7 @@ export type Config = {
   logLevel?: LogLevel
   server?: ServerConfig
   /**
-   * Command configuration, see https://github.com/Yecyi/OpenAGt/docs/commands
+   * Command configuration
    */
   command?: {
     [key: string]: {
@@ -1514,14 +1917,6 @@ export type Config = {
       ]
   >
   /**
-   * Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing
-   */
-  share?: "manual" | "auto" | "disabled"
-  /**
-   * @deprecated Use 'share' field instead. Share newly created sessions automatically
-   */
-  autoshare?: boolean
-  /**
    * Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications
    */
   autoupdate?: boolean | "notify"
@@ -1558,7 +1953,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://github.com/Yecyi/OpenAGt/docs/agents
+   * Agent configuration
    */
   agent?: {
     plan?: AgentConfig
@@ -1624,6 +2019,7 @@ export type Config = {
   instructions?: Array<string>
   layout?: LayoutConfig
   permission?: PermissionConfig
+  exec_policy?: ExecPolicyConfig
   tools?: {
     [key: string]: boolean
   }
@@ -1669,6 +2065,82 @@ export type Config = {
      * Timeout in milliseconds for model context protocol (MCP) requests
      */
     mcp_timeout?: number
+    sandbox?: {
+      enabled?: boolean
+      backend?: "auto" | "seatbelt" | "windows_native" | "landlock" | "process"
+      failure_policy?: "closed" | "confirm_downgrade" | "fallback"
+      report_only?: boolean
+      broker_idle_ttl_ms?: number
+    }
+    /**
+     * Session memory configuration
+     */
+    memory?: {
+      /**
+       * Custom memory.md template path
+       */
+      template?: string
+      /**
+       * Max tokens for memory.md (default: 4096)
+       */
+      maxTokens?: number
+      trigger?: {
+        /**
+         * Initialize memory after N tokens (default: 6000)
+         */
+        minimumMessageTokensToInit?: number
+        /**
+         * Update memory after N additional tokens (default: 4000)
+         */
+        minimumTokensBetweenUpdate?: number
+        /**
+         * Update memory after N tool calls (default: 10)
+         */
+        toolCallsBetweenUpdates?: number
+      }
+    }
+    /**
+     * MCP tool quality scoring configuration
+     */
+    toolQuality?: {
+      /**
+       * Quality score weights for each checklist item
+       */
+      weights?: {
+        /**
+         * Score for valid schema (default: 20)
+         */
+        hasValidSchema?: number
+        /**
+         * Score for description (default: 15)
+         */
+        hasDescription?: number
+        /**
+         * Score for parameter descriptions (default: 20)
+         */
+        hasParameterDescriptions?: number
+        /**
+         * Score for return type description (default: 10)
+         */
+        hasReturnTypeDescription?: number
+        /**
+         * Score for examples (default: 10)
+         */
+        hasExamples?: number
+        /**
+         * Score for version (default: 5)
+         */
+        hasVersion?: number
+        /**
+         * Score for consistent naming (default: 10)
+         */
+        isNamingConsistent?: number
+        /**
+         * Score for deprecation warning (default: 10)
+         */
+        hasDeprecationWarning?: number
+      }
+    }
   }
 }
 
@@ -1864,9 +2336,6 @@ export type GlobalSession = {
     files: number
     diffs?: Array<SnapshotFileDiff>
   }
-  share?: {
-    url: string
-  }
   title: string
   version: string
   time: {
@@ -2027,24 +2496,26 @@ export type File = {
 }
 
 export type Event =
+  | EventProviderFallbackHop
   | EventProjectUpdated
-  | EventServerInstanceDisposed
   | EventServerConnected
   | EventGlobalDisposed
-  | EventFileEdited
-  | EventFileWatcherUpdated
+  | EventServerInstanceDisposed
   | EventLspClientDiagnostics
   | EventLspUpdated
-  | EventInstallationUpdated
-  | EventInstallationUpdateAvailable
   | EventMessagePartDelta
   | EventPermissionAsked
   | EventPermissionReplied
   | EventSessionDiff
   | EventSessionError
+  | EventInstallationUpdated
+  | EventInstallationUpdateAvailable
+  | EventFileEdited
+  | EventFileWatcherUpdated
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
+  | EventTaskUpdated
   | EventTodoUpdated
   | EventSessionStatus
   | EventSessionIdle
@@ -2063,6 +2534,15 @@ export type Event =
   | EventPtyUpdated
   | EventPtyExited
   | EventPtyDeleted
+  | EventCoordinatorCreated
+  | EventCoordinatorUpdated
+  | EventCoordinatorCompleted
+  | EventMemoryUpdated
+  | EventInboxCreated
+  | EventInboxUpdated
+  | EventSchedulerScheduled
+  | EventSchedulerFired
+  | EventSchedulerCompleted
   | EventWorkspaceReady
   | EventWorkspaceFailed
   | EventWorkspaceRestore
@@ -2823,6 +3303,39 @@ export type PtyUpdateResponses = {
 }
 
 export type PtyUpdateResponse = PtyUpdateResponses[keyof PtyUpdateResponses]
+
+export type PtyConnectTicketData = {
+  body?: never
+  path: {
+    ptyID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/pty/{ptyID}/connect-ticket"
+}
+
+export type PtyConnectTicketErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type PtyConnectTicketError = PtyConnectTicketErrors[keyof PtyConnectTicketErrors]
+
+export type PtyConnectTicketResponses = {
+  /**
+   * Connection ticket
+   */
+  200: {
+    token: string
+    expires: number
+  }
+}
+
+export type PtyConnectTicketResponse = PtyConnectTicketResponses[keyof PtyConnectTicketResponses]
 
 export type PtyConnectData = {
   body?: never
@@ -3596,74 +4109,6 @@ export type SessionAbortResponses = {
 }
 
 export type SessionAbortResponse = SessionAbortResponses[keyof SessionAbortResponses]
-
-export type SessionUnshareData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/share"
-}
-
-export type SessionUnshareErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type SessionUnshareError = SessionUnshareErrors[keyof SessionUnshareErrors]
-
-export type SessionUnshareResponses = {
-  /**
-   * Successfully unshared session
-   */
-  200: Session
-}
-
-export type SessionUnshareResponse = SessionUnshareResponses[keyof SessionUnshareResponses]
-
-export type SessionShareData = {
-  body?: never
-  path: {
-    sessionID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/session/{sessionID}/share"
-}
-
-export type SessionShareErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type SessionShareError = SessionShareErrors[keyof SessionShareErrors]
-
-export type SessionShareResponses = {
-  /**
-   * Successfully shared session
-   */
-  200: Session
-}
-
-export type SessionShareResponse = SessionShareResponses[keyof SessionShareResponses]
 
 export type SessionDiffData = {
   body?: never
@@ -4503,6 +4948,1018 @@ export type ProviderOauthCallbackResponses = {
 }
 
 export type ProviderOauthCallbackResponse = ProviderOauthCallbackResponses[keyof ProviderOauthCallbackResponses]
+
+export type CoordinatorPlanData = {
+  body?: {
+    goal: string
+    nodes?: Array<{
+      id: string
+      description: string
+      prompt: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      depends_on: Array<string>
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/plan"
+}
+
+export type CoordinatorPlanErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorPlanError = CoordinatorPlanErrors[keyof CoordinatorPlanErrors]
+
+export type CoordinatorPlanResponses = {
+  /**
+   * Coordinator plan
+   */
+  200: {
+    goal: string
+    nodes: Array<{
+      id: string
+      description: string
+      prompt: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      depends_on: Array<string>
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }>
+  }
+}
+
+export type CoordinatorPlanResponse = CoordinatorPlanResponses[keyof CoordinatorPlanResponses]
+
+export type CoordinatorRunData = {
+  body?: {
+    goal: string
+    nodes?: Array<{
+      id: string
+      description: string
+      prompt: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      depends_on: Array<string>
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }>
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{sessionID}"
+}
+
+export type CoordinatorRunErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorRunError = CoordinatorRunErrors[keyof CoordinatorRunErrors]
+
+export type CoordinatorRunResponses = {
+  /**
+   * Coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorRunResponse = CoordinatorRunResponses[keyof CoordinatorRunResponses]
+
+export type CoordinatorGetData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}"
+}
+
+export type CoordinatorGetResponses = {
+  /**
+   * Coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  } | null
+}
+
+export type CoordinatorGetResponse = CoordinatorGetResponses[keyof CoordinatorGetResponses]
+
+export type CoordinatorListData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/session/{sessionID}"
+}
+
+export type CoordinatorListResponses = {
+  /**
+   * Coordinator runs
+   */
+  200: Array<{
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }>
+}
+
+export type CoordinatorListResponse = CoordinatorListResponses[keyof CoordinatorListResponses]
+
+export type CoordinatorSummarizeData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/summarize"
+}
+
+export type CoordinatorSummarizeResponses = {
+  /**
+   * Coordinator summary
+   */
+  200: {
+    summary: string
+  }
+}
+
+export type CoordinatorSummarizeResponse = CoordinatorSummarizeResponses[keyof CoordinatorSummarizeResponses]
+
+export type CoordinatorDispatchData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/dispatch"
+}
+
+export type CoordinatorDispatchResponses = {
+  /**
+   * Coordinator dispatch result
+   */
+  200: {
+    run: {
+      id: string
+      sessionID: string
+      goal: string
+      state: "planned" | "active" | "completed" | "failed" | "cancelled"
+      plan: {
+        goal: string
+        nodes: Array<{
+          id: string
+          description: string
+          prompt: string
+          task_kind: "research" | "implement" | "verify" | "generic"
+          subagent_type: string
+          depends_on: Array<string>
+          write_scope: Array<string>
+          read_scope: Array<string>
+          acceptance_checks: Array<string>
+          priority: "high" | "normal" | "low"
+          origin: "user" | "coordinator" | "scheduler" | "gateway"
+        }>
+      }
+      task_ids: Array<string>
+      summary?: string
+      time: {
+        created: number
+        updated: number
+        finished?: number
+      }
+    }
+    dispatched: number
+  }
+}
+
+export type CoordinatorDispatchResponse = CoordinatorDispatchResponses[keyof CoordinatorDispatchResponses]
+
+export type CoordinatorProjectionData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/projection"
+}
+
+export type CoordinatorProjectionResponses = {
+  /**
+   * Coordinator projection
+   */
+  200: {
+    run: {
+      id: string
+      sessionID: string
+      goal: string
+      state: "planned" | "active" | "completed" | "failed" | "cancelled"
+      plan: {
+        goal: string
+        nodes: Array<{
+          id: string
+          description: string
+          prompt: string
+          task_kind: "research" | "implement" | "verify" | "generic"
+          subagent_type: string
+          depends_on: Array<string>
+          write_scope: Array<string>
+          read_scope: Array<string>
+          acceptance_checks: Array<string>
+          priority: "high" | "normal" | "low"
+          origin: "user" | "coordinator" | "scheduler" | "gateway"
+        }>
+      }
+      task_ids: Array<string>
+      summary?: string
+      time: {
+        created: number
+        updated: number
+        finished?: number
+      }
+    }
+    tasks: Array<{
+      task_id: string
+      group_id?: string
+      parent_session_id: string
+      child_session_id: string
+      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      description: string
+      prompt_hash: string
+      depends_on: Array<string>
+      result_summary?: string
+      error_summary?: string
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+      metadata?: {
+        [key: string]: unknown
+      }
+      created_at: number
+      started_at?: number
+      finished_at?: number
+      usage?: {
+        totalTokens?: number
+        inputTokens?: number
+        outputTokens?: number
+        reasoningTokens?: number
+        toolUses?: number
+        durationMs?: number
+      }
+      stop_reason?: string
+    }>
+    counts: {
+      pending: number
+      running: number
+      completed: number
+      failed: number
+      cancelled: number
+    }
+  }
+}
+
+export type CoordinatorProjectionResponse = CoordinatorProjectionResponses[keyof CoordinatorProjectionResponses]
+
+export type CoordinatorResumeData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/resume"
+}
+
+export type CoordinatorResumeResponses = {
+  /**
+   * Coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorResumeResponse = CoordinatorResumeResponses[keyof CoordinatorResumeResponses]
+
+export type PersonalOverviewData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    now?: number
+  }
+  url: "/personal/overview"
+}
+
+export type PersonalOverviewResponses = {
+  /**
+   * Personal agent overview
+   */
+  200: {
+    inbox: {
+      pending: number
+      processing: number
+      completed: number
+      cancelled: number
+    }
+    wakeups: {
+      due: number
+      pending: number
+      fired: number
+    }
+    memory: {
+      profile: number
+      workspace: number
+      session: number
+      recent: Array<{
+        id: string
+        scope: "profile" | "workspace" | "session"
+        projectID?: string
+        sessionID?: string
+        title: string
+        content: string
+        tags: Array<string>
+        source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+        importance: number
+        pinned: boolean
+        time: {
+          created: number
+          updated: number
+        }
+      }>
+    }
+  }
+}
+
+export type PersonalOverviewResponse = PersonalOverviewResponses[keyof PersonalOverviewResponses]
+
+export type PersonalMemoryListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    scope?: "profile" | "workspace" | "session"
+    sessionID?: string
+  }
+  url: "/personal/memory"
+}
+
+export type PersonalMemoryListResponses = {
+  /**
+   * Memory notes
+   */
+  200: Array<{
+    id: string
+    scope: "profile" | "workspace" | "session"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+  }>
+}
+
+export type PersonalMemoryListResponse = PersonalMemoryListResponses[keyof PersonalMemoryListResponses]
+
+export type PersonalMemoryRememberData = {
+  body?: {
+    scope: "profile" | "workspace" | "session"
+    title: string
+    content: string
+    sessionID?: string
+    tags?: Array<string>
+    source?: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance?: number
+    pinned?: boolean
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/memory/remember"
+}
+
+export type PersonalMemoryRememberErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PersonalMemoryRememberError = PersonalMemoryRememberErrors[keyof PersonalMemoryRememberErrors]
+
+export type PersonalMemoryRememberResponses = {
+  /**
+   * Memory note
+   */
+  200: {
+    id: string
+    scope: "profile" | "workspace" | "session"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+  }
+}
+
+export type PersonalMemoryRememberResponse = PersonalMemoryRememberResponses[keyof PersonalMemoryRememberResponses]
+
+export type PersonalMemorySearchData = {
+  body?: {
+    query: string
+    sessionID?: string
+    scopes?: Array<"profile" | "workspace" | "session">
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/memory/search"
+}
+
+export type PersonalMemorySearchResponses = {
+  /**
+   * Search results
+   */
+  200: Array<{
+    id: string
+    scope: "profile" | "workspace" | "session"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+    score: number
+    match: "fts" | "session" | "recent"
+  }>
+}
+
+export type PersonalMemorySearchResponse = PersonalMemorySearchResponses[keyof PersonalMemorySearchResponses]
+
+export type PersonalMemorySynthesizeData = {
+  body?: {
+    kind: "coordinator_run_completed" | "verify_completed" | "manual_preference" | "follow_up_completed"
+    sessionID?: string
+    title: string
+    content: string
+    tags?: Array<string>
+    importance?: number
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/memory/synthesize"
+}
+
+export type PersonalMemorySynthesizeResponses = {
+  /**
+   * Memory note
+   */
+  200: {
+    id: string
+    scope: "profile" | "workspace" | "session"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    source: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+  }
+}
+
+export type PersonalMemorySynthesizeResponse =
+  PersonalMemorySynthesizeResponses[keyof PersonalMemorySynthesizeResponses]
+
+export type PersonalInboxListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    state?: "pending" | "processing" | "completed" | "cancelled"
+  }
+  url: "/personal/inbox"
+}
+
+export type PersonalInboxListResponses = {
+  /**
+   * Inbox items
+   */
+  200: Array<{
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }>
+}
+
+export type PersonalInboxListResponse = PersonalInboxListResponses[keyof PersonalInboxListResponses]
+
+export type PersonalInboxCreateData = {
+  body?: {
+    source?: "session" | "scheduled" | "webhook"
+    scope?: "profile" | "workspace" | "session"
+    goal: string
+    sessionID?: string
+    contextRefs?: Array<string>
+    priority?: "high" | "normal" | "low"
+    scheduledFor?: number
+    payload?: {
+      [key: string]: unknown
+    }
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/inbox"
+}
+
+export type PersonalInboxCreateResponses = {
+  /**
+   * Inbox item
+   */
+  200: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type PersonalInboxCreateResponse = PersonalInboxCreateResponses[keyof PersonalInboxCreateResponses]
+
+export type PersonalInboxUpdateData = {
+  body?: {
+    state: "pending" | "processing" | "completed" | "cancelled"
+  }
+  path: {
+    inboxID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/inbox/{inboxID}"
+}
+
+export type PersonalInboxUpdateResponses = {
+  /**
+   * Inbox item
+   */
+  200: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type PersonalInboxUpdateResponse = PersonalInboxUpdateResponses[keyof PersonalInboxUpdateResponses]
+
+export type PersonalSchedulerDueData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    now?: number
+  }
+  url: "/personal/scheduler/due"
+}
+
+export type PersonalSchedulerDueResponses = {
+  /**
+   * Due wakeups
+   */
+  200: Array<{
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+  }>
+}
+
+export type PersonalSchedulerDueResponse = PersonalSchedulerDueResponses[keyof PersonalSchedulerDueResponses]
+
+export type PersonalSchedulerCreateData = {
+  body?: {
+    goal: string
+    sessionID?: string
+    contextRefs?: Array<string>
+    priority?: "high" | "normal" | "low"
+    scheduledFor: number
+    payload?: {
+      [key: string]: unknown
+    }
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/scheduler"
+}
+
+export type PersonalSchedulerCreateResponses = {
+  /**
+   * Scheduled wakeup
+   */
+  200: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+  }
+}
+
+export type PersonalSchedulerCreateResponse = PersonalSchedulerCreateResponses[keyof PersonalSchedulerCreateResponses]
+
+export type PersonalSchedulerDispatchData = {
+  body?: {
+    now?: number
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/scheduler/dispatch"
+}
+
+export type PersonalSchedulerDispatchResponses = {
+  /**
+   * Dispatched inbox items
+   */
+  200: Array<{
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }>
+}
+
+export type PersonalSchedulerDispatchResponse =
+  PersonalSchedulerDispatchResponses[keyof PersonalSchedulerDispatchResponses]
+
+export type PersonalSchedulerCompleteData = {
+  body?: never
+  path: {
+    wakeupID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/scheduler/{wakeupID}/complete"
+}
+
+export type PersonalSchedulerCompleteResponses = {
+  /**
+   * Completed wakeup
+   */
+  200: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+  }
+}
+
+export type PersonalSchedulerCompleteResponse =
+  PersonalSchedulerCompleteResponses[keyof PersonalSchedulerCompleteResponses]
+
+export type PersonalGatewayWebhookData = {
+  body?: {
+    goal: string
+    scope?: "profile" | "workspace" | "session"
+    contextRefs?: Array<string>
+    priority?: "high" | "normal" | "low"
+    payload?: {
+      [key: string]: unknown
+    }
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/personal/gateway/webhook"
+}
+
+export type PersonalGatewayWebhookResponses = {
+  /**
+   * Inbox item
+   */
+  200: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "pending" | "processing" | "completed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type PersonalGatewayWebhookResponse = PersonalGatewayWebhookResponses[keyof PersonalGatewayWebhookResponses]
 
 export type SyncStartData = {
   body?: never

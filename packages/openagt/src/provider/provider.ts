@@ -25,6 +25,7 @@ import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { isRecord } from "@/util/record"
 import { withStatics } from "@/util/schema"
+import { withProcessEnv } from "@/util/process-env"
 
 import * as ProviderTransform from "./transform"
 import { ModelID, ProviderID } from "./schema"
@@ -257,12 +258,12 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
 
       const awsAccessKeyId = env["AWS_ACCESS_KEY_ID"]
 
-      const awsBearerToken = process.env.AWS_BEARER_TOKEN_BEDROCK ?? (auth?.type === "api" ? auth.key : undefined)
+      const awsBearerToken = env["AWS_BEARER_TOKEN_BEDROCK"] ?? (auth?.type === "api" ? auth.key : undefined)
 
       const awsWebIdentityTokenFile = env["AWS_WEB_IDENTITY_TOKEN_FILE"]
 
       const containerCreds = Boolean(
-        process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI || process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI,
+        env["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"] || env["AWS_CONTAINER_CREDENTIALS_FULL_URI"],
       )
 
       if (!profile && !awsAccessKeyId && !awsBearerToken && !awsWebIdentityTokenFile && !containerCreds)
@@ -295,11 +296,18 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: true,
         options: providerOptions,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          const load = (id: string) =>
+            auth?.type === "api"
+              ? Effect.runPromise(
+                  withProcessEnv({ AWS_BEARER_TOKEN_BEDROCK: auth.key }, Effect.sync(() => sdk.languageModel(id))),
+                )
+              : sdk.languageModel(id)
+
           // Skip region prefixing if model already has a cross-region inference profile prefix
           // Models from models.dev may already include prefixes like us., eu., global., etc.
           const crossRegionPrefixes = ["global.", "us.", "eu.", "jp.", "apac.", "au."]
           if (crossRegionPrefixes.some((prefix) => modelID.startsWith(prefix))) {
-            return sdk.languageModel(modelID)
+            return load(modelID)
           }
 
           // Region resolution precedence (highest to lowest):
@@ -377,7 +385,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
             }
           }
 
-          return sdk.languageModel(modelID)
+          return load(modelID)
         },
       }
     }),
@@ -478,15 +486,17 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     }),
     "sap-ai-core": Effect.fnUntraced(function* () {
       const auth = yield* dep.auth("sap-ai-core")
-      const envServiceKey = process.env.AICORE_SERVICE_KEY ?? (auth?.type === "api" ? auth.key : undefined)
-      const deploymentId = process.env.AICORE_DEPLOYMENT_ID
-      const resourceGroup = process.env.AICORE_RESOURCE_GROUP
+      const env = yield* dep.env()
+      const envServiceKey = env["AICORE_SERVICE_KEY"] ?? (auth?.type === "api" ? auth.key : undefined)
+      const deploymentId = env["AICORE_DEPLOYMENT_ID"]
+      const resourceGroup = env["AICORE_RESOURCE_GROUP"]
 
       return {
         autoload: !!envServiceKey,
-        options: envServiceKey ? { deploymentId, resourceGroup } : {},
+        options: envServiceKey ? { deploymentId, resourceGroup, serviceKey: envServiceKey } : {},
         async getModel(sdk: any, modelID: string) {
-          return sdk(modelID)
+          if (auth?.type !== "api") return sdk(modelID)
+          return Effect.runPromise(withProcessEnv({ AICORE_SERVICE_KEY: auth.key }, Effect.sync(() => sdk(modelID))))
         },
       }
     }),

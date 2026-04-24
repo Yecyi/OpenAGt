@@ -13,7 +13,7 @@
   "dependencies": {
     "@cloudflare/vite-plugin": "1.33.1",
     "@ibm/plex": "6.4.1",
-    "@jsx-email/render": "1.1.1",
+    "@jsx-email/render": "3.0.1",
     "@kobalte/core": "catalog:",
     "@openauthjs/openauth": "catalog:",
     "@openagt/console-core": "workspace:*",

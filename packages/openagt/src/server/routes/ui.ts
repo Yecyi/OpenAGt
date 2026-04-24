@@ -16,6 +16,27 @@ const DEFAULT_CSP =
 const csp = (hash = "") =>
   `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src 'self' data:`
 
+const ALLOWED_PROXY_HEADERS = new Set([
+  "accept",
+  "accept-language",
+  "cache-control",
+  "if-match",
+  "if-modified-since",
+  "if-none-match",
+  "if-range",
+  "if-unmodified-since",
+  "range",
+  "user-agent",
+])
+
+function proxyHeaders(input: Headers) {
+  const headers = new Headers({ host: "app.opencode.ai" })
+  for (const [key, value] of input) {
+    if (ALLOWED_PROXY_HEADERS.has(key.toLowerCase())) headers.set(key, value)
+  }
+  return headers
+}
+
 export const UIRoutes = (): Hono =>
   new Hono().all("/*", async (c) => {
     const embeddedWebUI = await embeddedUIPromise
@@ -38,10 +59,7 @@ export const UIRoutes = (): Hono =>
     } else {
       const response = await proxy(`https://app.opencode.ai${path}`, {
         raw: c.req.raw,
-        headers: {
-          ...Object.fromEntries(c.req.raw.headers.entries()),
-          host: "app.opencode.ai",
-        },
+        headers: proxyHeaders(c.req.raw.headers),
       })
       const match = response.headers.get("content-type")?.includes("text/html")
         ? (await response.clone().text()).match(

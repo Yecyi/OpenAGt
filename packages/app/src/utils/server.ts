@@ -1,6 +1,6 @@
 import { createOpencodeClient } from "@openagt/sdk/v2/client"
-import type { ServerConnection } from "@/context/server"
 import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
+import type { ServerConnection } from "@/context/server"
 
 export function createSdkForServer({
   server,

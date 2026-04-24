@@ -1,4 +1,5 @@
 import { Button } from "@openagt/ui/button"
+import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
 import { useDialog } from "@openagt/ui/context/dialog"
 import { Dialog } from "@openagt/ui/dialog"
 import { DropdownMenu } from "@openagt/ui/dropdown-menu"
@@ -17,7 +18,7 @@ import { usePlatform } from "@/context/platform"
 import { normalizeServerUrl, ServerConnection, useServer } from "@/context/server"
 import { type ServerHealth, useCheckServerHealth } from "@/utils/server-health"
 
-const DEFAULT_USERNAME = "openAG"
+const DEFAULT_USERNAME = DEFAULT_SERVER_USERNAME
 
 interface ServerFormProps {
   value: string
