@@ -63,7 +63,7 @@ const DECISION_ORDER: Record<ExecPolicyDecision, number> = {
 function basenameToken(raw: string, shellFamily: ShellFamily) {
   const text = raw.trim()
   if (!text) return text
-  const base = path.basename(text)
+  const base = shellFamily === "powershell" || shellFamily === "cmd" ? path.win32.basename(text) : path.basename(text)
   if (shellFamily !== "powershell" && shellFamily !== "cmd") return base
   const lower = base.toLowerCase()
   for (const suffix of [".exe", ".cmd", ".bat", ".com", ".ps1"]) {

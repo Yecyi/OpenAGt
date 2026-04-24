@@ -1,5 +1,4 @@
 import { Context, Effect, Layer } from "effect"
-import { Shell } from "@/shell/shell"
 import { commandClassifier } from "./command-classifier"
 import { WrapperStripper } from "./wrapper-stripper"
 import type {
@@ -152,8 +151,12 @@ export type ShellSafetyInput = {
   matchedRules?: string[]
 }
 
+function shellName(shell: string) {
+  return (shell.replace(/\\/g, "/").split("/").pop() || shell).toLowerCase().replace(/\.(exe|cmd|bat|com|ps1)$/i, "")
+}
+
 function mapShellFamily(shell: string): ShellFamily {
-  const name = Shell.name(shell)
+  const name = shellName(shell)
   if (name === "powershell" || name === "pwsh") return "powershell"
   if (name === "cmd") return "cmd"
   return "posix"
