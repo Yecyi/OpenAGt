@@ -1,6 +1,6 @@
 # OpenAGt Stable Install
 
-OpenAGt `v1.15.0` stable covers:
+OpenAGt `v1.15.1` stable covers:
 
 - CLI / TUI
 - headless server

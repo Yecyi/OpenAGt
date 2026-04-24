@@ -47,7 +47,7 @@ OpenAGt 当前围绕四个核心思路构建：
 
 当前稳定版本：
 
-- [v1.15.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.0)
+- [v1.15.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.1)
 
 当前发布资产：
 

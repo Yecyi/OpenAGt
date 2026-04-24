@@ -18,7 +18,7 @@ const FAST_PATH_COMMANDS = new Set([
 ])
 
 // Version info - hardcoded to avoid importing InstallationVersion
-const VERSION = "1.15.0"
+const VERSION = "1.15.1"
 
 /**
  * Check if the current command should use fast-path

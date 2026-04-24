@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION=${1:-1.15.0}
+VERSION=${1:-1.15.1}
 KIND=${2:-rc}
 
 gh workflow run release-stable.yml -f version="$VERSION" -f release_kind="$KIND"

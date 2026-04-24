@@ -47,7 +47,7 @@ This comparison is based on the public OpenCode repository and README, not brand
 
 Current stable release:
 
-- [v1.15.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.0)
+- [v1.15.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.1)
 
 Published assets:
 
