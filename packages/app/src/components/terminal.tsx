@@ -174,7 +174,15 @@ export const Terminal = (props: TerminalProps) => {
   const auth = server.current?.http
   const username = auth?.username ?? DEFAULT_SERVER_USERNAME
   const password = auth?.password ?? ""
-  const sameOrigin = new URL(url, location.href).origin === location.origin
+  const serverUrl = new URL(url, location.href)
+  const sameOrigin = serverUrl.origin === location.origin
+  const serverRoute = (route: string) => {
+    const next = new URL(serverUrl)
+    next.pathname = `${next.pathname.replace(/\/$/, "")}${route}`
+    next.search = ""
+    next.hash = ""
+    return next
+  }
   let container!: HTMLDivElement
   const [local, others] = splitProps(props, ["pty", "class", "classList", "autoFocus", "onConnect", "onConnectError"])
   const id = local.pty.id
@@ -510,12 +518,14 @@ export const Terminal = (props: TerminalProps) => {
         if (disposed) return
         drop?.()
 
-        const next = new URL(url + `/pty/${id}/connect`)
+        const next = serverRoute(`/pty/${id}/connect`)
         next.searchParams.set("directory", directory)
         next.searchParams.set("cursor", String(seek))
         next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
         if (!sameOrigin && password) {
-          const ticket = await fetch(new URL(url + `/pty/${id}/connect-ticket?directory=${encodeURIComponent(directory)}`), {
+          const ticketUrl = serverRoute(`/pty/${id}/connect-ticket`)
+          ticketUrl.searchParams.set("directory", directory)
+          const ticket = await fetch(ticketUrl, {
             method: "POST",
             headers: {
               Authorization: `Basic ${btoa(`${username}:${password}`)}`,

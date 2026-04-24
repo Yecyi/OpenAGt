@@ -108,15 +108,12 @@ describe("ShareNext", () => {
     ),
   )
 
-  it.live("request uses default URL when no enterprise config", () =>
+  it.live("request fails when public sharing is unavailable and no enterprise config is set", () =>
     provideTmpdirInstance(() =>
       ShareNext.Service.use((svc) =>
         Effect.gen(function* () {
-          const req = yield* svc.request()
-
-          expect(req.baseUrl).toBe("https://opncd.ai")
-          expect(req.api.create).toBe("/api/share")
-          expect(req.headers).toEqual({})
+          const exit = yield* Effect.exit(svc.request())
+          expect(Exit.isFailure(exit)).toBe(true)
         }),
       ).pipe(Effect.provide(live(none))),
     ),
