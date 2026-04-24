@@ -103,7 +103,7 @@ const InfoSchema = Schema.Struct({
     description: "Server configuration for openagt serve and web commands",
   }),
   command: Schema.optional(Schema.Record(Schema.String, ConfigCommand.Info)).annotate({
-      description: "Command configuration, see https://github.com/Yecyi/OpenAGt/tree/dev/packages/web/src/content/docs/commands.mdx",
+      description: "Command configuration",
   }),
   skills: Schema.optional(ConfigSkills.Info).annotate({ description: "Additional skill folder paths" }),
   watcher: Schema.optional(
@@ -172,7 +172,7 @@ const InfoSchema = Schema.Struct({
       }),
       [Schema.Record(Schema.String, AgentRef)],
     ),
-  ).annotate({ description: "Agent configuration, see https://github.com/Yecyi/OpenAGt/tree/dev/packages/web/src/content/docs/agents.mdx" }),
+  ).annotate({ description: "Agent configuration" }),
   provider: Schema.optional(Schema.Record(Schema.String, ConfigProvider.Info)).annotate({
     description: "Custom provider configurations and model overrides",
   }),
@@ -365,6 +365,25 @@ function patchJsonc(input: string, patch: unknown, path: string[] = []): string 
   }, input)
 }
 
+function withProcessEnv<T, E, R>(key: string, value: string, effect: Effect.Effect<T, E, R>) {
+  return Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const previous = process.env[key]
+      process.env[key] = value
+      return previous
+    }),
+    () => effect,
+    (previous) =>
+      Effect.sync(() => {
+        if (previous === undefined) {
+          delete process.env[key]
+          return
+        }
+        process.env[key] = previous
+      }),
+  )
+}
+
 function writable(info: Info) {
   const { plugin_origins: _plugin_origins, ...next } = info
   return next
@@ -414,10 +433,10 @@ export const layer = Layer.effect(
 
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
       if (!data.$schema) {
-        data.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+        data.$schema = "https://opencode.ai/config.json"
         const updated = text.replace(
           /^\s*\{/,
-          '{\n  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",',
+          '{\n  "$schema": "https://opencode.ai/config.json",',
         )
         yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
       }
@@ -446,7 +465,7 @@ export const layer = Layer.effect(
             .then(async (mod) => {
               const { provider, model, ...rest } = mod.default
               if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+              result["$schema"] = "https://opencode.ai/config.json"
               result = mergeDeep(result, rest)
               await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
               await fsNode.unlink(legacy)
@@ -535,24 +554,29 @@ export const layer = Layer.effect(
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
-            process.env[value.key] = value.token
-            log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
-            const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
-            if (!response.ok) {
-              throw new Error(`failed to fetch remote config from ${url}: ${response.status}`)
-            }
-            const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
-            const remoteConfig = wellknown.config ?? {}
-            if (!remoteConfig.$schema) {
-              remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
-            }
-            const source = `${url}/.well-known/opencode`
-            const next = yield* loadConfig(JSON.stringify(remoteConfig), {
-              dir: path.dirname(source),
-              source,
-            })
-            yield* merge(source, next, "global")
-            log.debug("loaded remote config from well-known", { url })
+            yield* withProcessEnv(
+              value.key,
+              value.token,
+              Effect.gen(function* () {
+                log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
+                const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
+                if (!response.ok) {
+                  throw new Error(`failed to fetch remote config from ${url}: ${response.status}`)
+                }
+                const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
+                const remoteConfig = wellknown.config ?? {}
+                if (!remoteConfig.$schema) {
+                  remoteConfig.$schema = "https://opencode.ai/config.json"
+                }
+                const source = `${url}/.well-known/opencode`
+                const next = yield* loadConfig(JSON.stringify(remoteConfig), {
+                  dir: path.dirname(source),
+                  source,
+                })
+                yield* merge(source, next, "global")
+                log.debug("loaded remote config from well-known", { url })
+              }),
+            )
           }
         }
 
@@ -651,7 +675,6 @@ export const layer = Layer.effect(
               { concurrency: 2 },
             )
             if (Option.isSome(tokenOpt)) {
-              process.env["OPENCODE_CONSOLE_TOKEN"] = tokenOpt.value
               yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
             }
 

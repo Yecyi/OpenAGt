@@ -15,6 +15,7 @@ import { ProjectApi, projectHandlers } from "./project"
 import { ProviderApi, providerHandlers } from "./provider"
 import { QuestionApi, questionHandlers } from "./question"
 import { memoMap } from "@/effect/memo-map"
+import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 
 const Query = Schema.Struct({
   directory: Schema.optional(Schema.String),
@@ -73,8 +74,8 @@ const auth = Layer.succeed(
       Effect.gen(function* () {
         if (!Flag.OPENCODE_SERVER_PASSWORD) return yield* effect
 
-        const user = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
-        if (credential.username !== user) {
+        const user = Flag.OPENCODE_SERVER_USERNAME ?? Flag.OPENAGT_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+        if (!isAllowedServerUsername(credential.username, user)) {
           return yield* new Unauthorized({ message: "Unauthorized" })
         }
         if (Redacted.value(credential.password) !== Flag.OPENCODE_SERVER_PASSWORD) {

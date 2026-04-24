@@ -83,6 +83,7 @@ export const Event = {
 }
 
 const log = Log.create({ service: "file" })
+const MAX_INLINE_BINARY_BYTES = 5 * 1024 * 1024
 
 const binary = new Set([
   "exe",
@@ -520,6 +521,10 @@ export const layer = Layer.effect(
       if (isImageByExtension(file)) {
         const exists = yield* appFs.existsSafe(full)
         if (exists) {
+          const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (Number(info?.size ?? 0) > MAX_INLINE_BINARY_BYTES) {
+            return { type: "binary" as const, content: "", mimeType: getImageMimeType(file) }
+          }
           const bytes = yield* appFs.readFile(full).pipe(Effect.catch(() => Effect.succeed(new Uint8Array())))
           return {
             type: "text" as const,
@@ -544,6 +549,10 @@ export const layer = Layer.effect(
       if (encode && !isImage(mimeType)) return { type: "binary" as const, content: "", mimeType }
 
       if (encode) {
+        const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (Number(info?.size ?? 0) > MAX_INLINE_BINARY_BYTES) {
+          return { type: "binary" as const, content: "", mimeType }
+        }
         const bytes = yield* appFs.readFile(full).pipe(Effect.catch(() => Effect.succeed(new Uint8Array())))
         return {
           type: "text" as const,
@@ -553,10 +562,7 @@ export const layer = Layer.effect(
         }
       }
 
-      const content = yield* appFs.readFileString(full).pipe(
-        Effect.map((s) => s.trim()),
-        Effect.catch(() => Effect.succeed("")),
-      )
+      const content = yield* appFs.readFileString(full).pipe(Effect.catch(() => Effect.succeed("")))
 
       if (ctx.project.vcs === "git") {
         let diff = yield* gitText(["-c", "core.fsmonitor=false", "diff", "--", file])

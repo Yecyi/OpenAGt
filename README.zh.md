@@ -239,7 +239,6 @@ Shell 权限请求还会带结构化的 `shell_safety` 元数据。
 | `packages/sdk/js` | 生成式 JavaScript SDK |
 | `packages/openagt_flutter` | Flutter 移动端 MVP |
 | `packages/console/*` | 控制台与 control-plane 包 |
-| `packages/web` | 文档 / 站点包 |
 | `packages/opencode` | 兼容遗留目录，不是主 runtime |
 | `.opencode/` | 本地 agents、commands、plugins、skills、tools、themes 示例 |
 | `docs/` | 发布、安装、技术文档 |
@@ -277,12 +276,6 @@ Web：
 
 ```bash
 bun run --cwd packages/app dev
-```
-
-文档站点：
-
-```bash
-bun run --cwd packages/web dev
 ```
 
 Flutter MVP：

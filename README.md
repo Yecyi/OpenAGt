@@ -237,7 +237,6 @@ Shell permission requests also expose structured `shell_safety` metadata.
 | `packages/sdk/js` | Generated JavaScript SDK |
 | `packages/openagt_flutter` | Flutter mobile MVP |
 | `packages/console/*` | Console and control-plane packages |
-| `packages/web` | Docs/site package |
 | `packages/opencode` | Compatibility leftovers, not the main runtime |
 | `.opencode/` | Local examples for agents, commands, plugins, skills, tools, themes |
 | `docs/` | Release docs, install docs, technical notes |
@@ -275,12 +274,6 @@ Web app:
 
 ```bash
 bun run --cwd packages/app dev
-```
-
-Docs/site:
-
-```bash
-bun run --cwd packages/web dev
 ```
 
 Flutter MVP:

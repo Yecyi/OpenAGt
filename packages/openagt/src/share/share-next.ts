@@ -210,7 +210,8 @@ export const layer = Layer.effect(
       const headers: Record<string, string> = {}
       const active = yield* account.active()
       if (Option.isNone(active) || !active.value.active_org_id) {
-        const baseUrl = (yield* cfg.get()).enterprise?.url ?? "https://opncd.ai"
+        const baseUrl = (yield* cfg.get()).enterprise?.url
+        if (!baseUrl) throw new Error("Public sharing has been removed. Configure enterprise.url to use sharing.")
         return { headers, api: legacyApi, baseUrl } satisfies Req
       }
 

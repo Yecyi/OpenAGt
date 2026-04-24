@@ -1,7 +1,7 @@
-import { chmod, mkdir, readFile, stat as statFile, writeFile } from "fs/promises"
+import { chmod, mkdir, open, readFile, rename, stat as statFile, writeFile } from "fs/promises"
 import { createWriteStream, existsSync, statSync } from "fs"
 import { realpathSync } from "fs"
-import { dirname, join, relative, resolve as pathResolve, win32 } from "path"
+import { basename, dirname, join, relative, resolve as pathResolve, win32 } from "path"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { Glob } from "@openagt/shared/util/glob"
@@ -56,21 +56,35 @@ function isEnoent(e: unknown): e is { code: "ENOENT" } {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "ENOENT"
 }
 
-export async function write(p: string, content: string | Buffer | Uint8Array, mode?: number): Promise<void> {
+async function atomicWrite(p: string, content: string | Buffer | Uint8Array, mode?: number): Promise<void> {
+  const dir = dirname(p)
+  await mkdir(dir, { recursive: true })
+  const tmp = join(dir, `.${basename(p)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`)
+  const handle = await open(tmp, "wx", mode)
   try {
-    if (mode) {
-      await writeFile(p, content, { mode })
-    } else {
-      await writeFile(p, content)
-    }
+    await handle.writeFile(content)
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+  if (mode) await chmod(tmp, mode)
+  await rename(tmp, p)
+  await open(dir, "r")
+    .then((dirHandle) => dirHandle.sync().finally(() => dirHandle.close()))
+    .catch(() => undefined)
+}
+
+export async function write(p: string, content: string | Buffer | Uint8Array, mode?: number): Promise<void> {
+  if (mode) {
+    await atomicWrite(p, content, mode)
+    return
+  }
+  try {
+    await writeFile(p, content)
   } catch (e) {
     if (isEnoent(e)) {
       await mkdir(dirname(p), { recursive: true })
-      if (mode) {
-        await writeFile(p, content, { mode })
-      } else {
-        await writeFile(p, content)
-      }
+      await writeFile(p, content)
       return
     }
     throw e

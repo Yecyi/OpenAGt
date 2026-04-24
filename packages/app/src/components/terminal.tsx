@@ -15,6 +15,7 @@ import { monoFontFamily, useSettings } from "@/context/settings"
 import type { LocalPTY } from "@/context/terminal"
 import { disposeIfDisposable, getHoveredLinkText, setOptionIfSupported } from "@/utils/runtime-adapters"
 import { terminalWriter } from "@/utils/terminal-writer"
+import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
 
 const TOGGLE_TERMINAL_ID = "terminal.toggle"
 const DEFAULT_TOGGLE_TERMINAL_KEYBIND = "ctrl+`"
@@ -171,7 +172,7 @@ export const Terminal = (props: TerminalProps) => {
   const client = sdk.client
   const url = sdk.url
   const auth = server.current?.http
-  const username = auth?.username ?? "openAG"
+  const username = auth?.username ?? DEFAULT_SERVER_USERNAME
   const password = auth?.password ?? ""
   const sameOrigin = new URL(url, location.href).origin === location.origin
   let container!: HTMLDivElement
@@ -501,11 +502,11 @@ export const Terminal = (props: TerminalProps) => {
           }
           if (disposed) return
           tries += 1
-          open()
+          void open().catch(retry)
         }, ms)
       }
 
-      const open = () => {
+      const open = async () => {
         if (disposed) return
         drop?.()
 
@@ -514,7 +515,16 @@ export const Terminal = (props: TerminalProps) => {
         next.searchParams.set("cursor", String(seek))
         next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
         if (!sameOrigin && password) {
-          next.searchParams.set("auth_token", btoa(`${username}:${password}`))
+          const ticket = await fetch(new URL(url + `/pty/${id}/connect-ticket?directory=${encodeURIComponent(directory)}`), {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${btoa(`${username}:${password}`)}`,
+            },
+          }).then(async (response) => {
+            if (!response.ok) throw new Error(`PTY ticket request failed: ${response.status}`)
+            return (await response.json()) as { token: string }
+          })
+          next.searchParams.set("ticket", ticket.token)
           // For same-origin requests, let the browser reuse the page's existing auth.
           next.username = username
           next.password = password
@@ -591,7 +601,7 @@ export const Terminal = (props: TerminalProps) => {
         socket.addEventListener("close", handleClose)
       }
 
-      open()
+      void open().catch(retry)
     }
 
     void run().catch((err) => {

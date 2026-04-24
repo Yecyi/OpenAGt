@@ -10,6 +10,7 @@ import { Flag } from "@/flag/flag"
 import { basicAuth } from "hono/basic-auth"
 import { cors } from "hono/cors"
 import { compress } from "hono/compress"
+import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 
 const log = Log.create({ service: "server" })
 
@@ -42,11 +43,17 @@ export const AuthMiddleware: MiddlewareHandler = (c, next) => {
   if (c.req.method === "OPTIONS") return next()
   const password = Flag.OPENAGT_SERVER_PASSWORD
   if (!password) return next()
-  const username = Flag.OPENAGT_SERVER_USERNAME ?? "openagt"
+  const username = Flag.OPENAGT_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+
+  if (/^\/pty\/[^/]+\/connect$/.test(c.req.path) && c.req.query("ticket")) return next()
 
   if (c.req.query("auth_token")) c.req.raw.headers.set("authorization", `Basic ${c.req.query("auth_token")}`)
 
-  return basicAuth({ username, password })(c, next)
+  return basicAuth({
+    username,
+    password,
+    verifyUser: (input, passwordInput) => isAllowedServerUsername(input, username) && passwordInput === password,
+  })(c, next)
 }
 
 export const LoggerMiddleware: MiddlewareHandler = async (c, next) => {

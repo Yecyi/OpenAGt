@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Check audit policy
+        run: bun run check:audit-policy
+
       - name: Check source integrity
         run: bun run check:integrity
 
@@ -57,4 +60,8 @@ jobs:
 
       - name: Typecheck packages/console/core
         working-directory: packages/console/core
+        run: bun typecheck
+
+      - name: Typecheck packages/function
+        working-directory: packages/function
         run: bun typecheck

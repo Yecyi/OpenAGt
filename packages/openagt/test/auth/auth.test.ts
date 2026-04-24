@@ -10,6 +10,84 @@ const node = CrossSpawnSpawner.defaultLayer
 const it = testEffect(Layer.mergeAll(Auth.defaultLayer, node))
 
 describe("Auth", () => {
+  const withAuthEnv = <T>(content: string | undefined, fn: () => Promise<T>) => {
+    const openagt = process.env.OPENAGT_AUTH_CONTENT
+    const opencode = process.env.OPENCODE_AUTH_CONTENT
+    if (content === undefined) delete process.env.OPENAGT_AUTH_CONTENT
+    else process.env.OPENAGT_AUTH_CONTENT = content
+    delete process.env.OPENCODE_AUTH_CONTENT
+    return fn().finally(() => {
+      if (openagt === undefined) delete process.env.OPENAGT_AUTH_CONTENT
+      else process.env.OPENAGT_AUTH_CONTENT = openagt
+      if (opencode === undefined) delete process.env.OPENCODE_AUTH_CONTENT
+      else process.env.OPENCODE_AUTH_CONTENT = opencode
+    })
+  }
+
+  it.live("validates auth content from environment", () =>
+    provideTmpdirInstance(() =>
+      Effect.promise(() =>
+        withAuthEnv(
+          JSON.stringify({
+            anthropic: {
+              type: "api",
+              key: "sk-test",
+            },
+          }),
+          () =>
+            Effect.runPromise(
+              Effect.gen(function* () {
+                const auth = yield* Auth.Service
+                const data = yield* auth.all()
+                expect(data.anthropic?.type).toBe("api")
+              }).pipe(Effect.provide(Auth.defaultLayer)),
+            ),
+        ),
+      ),
+    ),
+  )
+
+  it.live("fails on malformed auth content from environment", () =>
+    provideTmpdirInstance(() =>
+      Effect.promise(() =>
+        withAuthEnv("{", async () => {
+          await expect(
+            Effect.runPromise(
+              Effect.gen(function* () {
+                const auth = yield* Auth.Service
+                yield* auth.all()
+              }).pipe(Effect.provide(Auth.defaultLayer)),
+            ),
+          ).rejects.toThrow("Failed to parse auth content")
+        }),
+      ),
+    ),
+  )
+
+  it.live("fails on schema-invalid auth content from environment", () =>
+    provideTmpdirInstance(() =>
+      Effect.promise(() =>
+        withAuthEnv(
+          JSON.stringify({
+            anthropic: {
+              type: "api",
+            },
+          }),
+          async () => {
+            await expect(
+              Effect.runPromise(
+                Effect.gen(function* () {
+                  const auth = yield* Auth.Service
+                  yield* auth.all()
+                }).pipe(Effect.provide(Auth.defaultLayer)),
+              ),
+            ).rejects.toThrow("Invalid auth content")
+          },
+        ),
+      ),
+    ),
+  )
+
   it.live("set normalizes trailing slashes in keys", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {

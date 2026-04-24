@@ -17,6 +17,8 @@ const MAX_LINE_LENGTH = 2000
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
 const MAX_BYTES = 50 * 1024
 const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
 const SAMPLE_BYTES = 4096
 
 const parameters = z.object({
@@ -204,6 +206,13 @@ export const ReadTool = Tool.define(
 
       const mime = sniffAttachmentMime(sample, AppFileSystem.mimeType(filepath))
       if (isImageAttachment(mime) || isPdfAttachment(mime)) {
+        if (Number(stat.size) > MAX_ATTACHMENT_BYTES) {
+          return yield* Effect.fail(
+            new Error(
+              `Cannot read ${isPdfAttachment(mime) ? "PDF" : "image"} file larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath} (${Number(stat.size)} bytes)`,
+            ),
+          )
+        }
         const bytes = yield* fs.readFile(filepath)
         const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
         return {
@@ -246,7 +255,9 @@ export const ReadTool = Tool.define(
       if (file.cut) {
         output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`
       } else if (file.more) {
-        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+        output += file.exact
+          ? `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+          : `\n\n(Showing lines ${file.offset}-${last}; file has at least ${file.count} lines. Use offset=${next} to continue.)`
       } else {
         output += `\n\n(End of file - total ${file.count} lines)`
       }
@@ -299,7 +310,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
 
       if (raw.length >= opts.limit) {
         more = true
-        continue
+        break
       }
 
       const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
@@ -318,5 +329,5 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
     stream.destroy()
   }
 
-  return { raw, count, cut, more, offset: opts.offset }
+  return { raw, count, cut, more, offset: opts.offset, exact: !more }
 }

@@ -1,5 +1,5 @@
 import path from "path"
-import { Effect, Layer, Record, Result, Schema, Context } from "effect"
+import { Effect, Layer, Record, Result, Schema, Context, Option } from "effect"
 import { zod } from "@/util/effect-zod"
 import { Global } from "../global"
 import { AppFileSystem } from "@openagt/shared/filesystem"
@@ -58,19 +58,33 @@ export const layer = Layer.effect(
 
     const all = () =>
       Effect.gen(function* () {
-      if (process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT) {
-        try {
-          return JSON.parse(process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT || "{}")
-        } catch (err) {}
-      }
+        const envContent = process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT
+        if (envContent) {
+          const parsed = yield* Effect.try({
+            try: () => JSON.parse(envContent) as unknown,
+            catch: (cause) => new AuthError({ message: "Failed to parse auth content from environment", cause }),
+          })
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            return yield* Effect.fail(new AuthError({ message: "Environment auth content must be an object" }))
+          }
+          const data: Record<string, Info> = {}
+          for (const [key, value] of Object.entries(parsed)) {
+            const decoded = decode(value)
+            if (Option.isNone(decoded)) {
+              return yield* Effect.fail(new AuthError({ message: `Invalid auth content for provider ${key}` }))
+            }
+            data[key] = decoded.value
+          }
+          return data
+        }
 
-      const data = (yield* fsys
-        .readJson(file)
-        .pipe(
-          Effect.catch(() => fsys.readJson(legacyFile)),
-          Effect.orElseSucceed(() => ({})),
-        )) as Record<string, unknown>
-      return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+        const data = (yield* fsys
+          .readJson(file)
+          .pipe(
+            Effect.catch(() => fsys.readJson(legacyFile)),
+            Effect.orElseSucceed(() => ({})),
+          )) as Record<string, unknown>
+        return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
       })
 
     const get = (providerID: string) => Effect.map(all(), (data) => data[providerID])

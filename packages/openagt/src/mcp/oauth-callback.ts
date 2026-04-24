@@ -20,6 +20,20 @@ function normalizeOrigin(uri: string): string {
   }
 }
 
+function normalizeRedirectTarget(uri: string): string {
+  const url = new URL(uri)
+  return `${normalizeOrigin(url.origin)}${url.pathname}`
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
 // Callback timeout in milliseconds (5 minutes)
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
@@ -66,7 +80,7 @@ const HTML_ERROR = (error: string) => `<!DOCTYPE html>
   <div class="container">
     <h1>Authorization Failed</h1>
     <p>An error occurred during authorization.</p>
-    <div class="error">${error}</div>
+    <div class="error">${escapeHtml(error)}</div>
   </div>
 </body>
 </html>`
@@ -117,15 +131,22 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
     return
   }
 
+  // Validate state parameter
+  if (!pendingAuths.has(state)) {
+    const errorMsg = "Invalid or expired state parameter - potential CSRF attack"
+    log.error("oauth callback with invalid state", { state, pendingStates: Array.from(pendingAuths.keys()) })
+    res.writeHead(400, { "Content-Type": "text/html" })
+    res.end(HTML_ERROR(errorMsg))
+    return
+  }
+
   if (error) {
     const errorMsg = errorDescription || error
-    if (pendingAuths.has(state)) {
-      const pending = pendingAuths.get(state)!
-      clearTimeout(pending.timeout)
-      pendingAuths.delete(state)
-      cleanupStateIndex(state)
-      pending.reject(new Error(errorMsg))
-    }
+    const pending = pendingAuths.get(state)!
+    clearTimeout(pending.timeout)
+    pendingAuths.delete(state)
+    cleanupStateIndex(state)
+    pending.reject(new Error(errorMsg))
     res.writeHead(200, { "Content-Type": "text/html" })
     res.end(HTML_ERROR(errorMsg))
     return
@@ -137,24 +158,15 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
     return
   }
 
-  // Validate state parameter
-  if (!pendingAuths.has(state)) {
-    const errorMsg = "Invalid or expired state parameter - potential CSRF attack"
-    log.error("oauth callback with invalid state", { state, pendingStates: Array.from(pendingAuths.keys()) })
-    res.writeHead(400, { "Content-Type": "text/html" })
-    res.end(HTML_ERROR(errorMsg))
-    return
-  }
-
   // Validate redirect_uri if one was registered
   if (registeredRedirectUri) {
-    const callbackOrigin = normalizeOrigin(url.origin)
-    const expectedOrigin = normalizeOrigin(new URL(registeredRedirectUri).origin)
-    if (callbackOrigin !== expectedOrigin) {
+    const callbackTarget = normalizeRedirectTarget(url.toString())
+    const expectedTarget = normalizeRedirectTarget(registeredRedirectUri)
+    if (callbackTarget !== expectedTarget) {
       const errorMsg = "redirect_uri mismatch - potential open redirect attack"
       log.error("oauth callback redirect_uri mismatch", {
-        expected: expectedOrigin,
-        received: callbackOrigin,
+        expected: expectedTarget,
+        received: callbackTarget,
       })
       res.writeHead(400, { "Content-Type": "text/html" })
       res.end(HTML_ERROR(errorMsg))
@@ -197,11 +209,12 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
   const running = await isPortInUse(port)
   if (running) {
     log.info("oauth callback server already running on another instance", { port })
-    return
+    throw new Error(`OAuth callback port ${port} is already in use by another process`)
   }
 
   currentPort = port
   currentPath = path
+  registeredRedirectUri = redirectUri ?? `http://localhost:${port}${path}`
 
   server = createServer(handleRequest)
   await new Promise<void>((resolve, reject) => {

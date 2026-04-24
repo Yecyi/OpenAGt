@@ -9,7 +9,6 @@ import { Resource } from "sst"
 type Env = {
   SYNC_SERVER: DurableObjectNamespace<SyncServer>
   Bucket: R2Bucket
-  WEB_DOMAIN: string
 }
 
 export class SyncServer extends DurableObject<Env> {
@@ -36,9 +35,9 @@ export class SyncServer extends DurableObject<Env> {
     })
   }
 
-  async webSocketMessage(_ws, _message) {}
+  async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {}
 
-  async webSocketClose(ws, code, _reason, _wasClean) {
+  async webSocketClose(ws: WebSocket, code: number, _reason: string, _wasClean: boolean) {
     ws.close(code, "Durable Object is closing WebSocket")
   }
 
@@ -115,92 +114,12 @@ export class SyncServer extends DurableObject<Env> {
 
 export default new Hono<{ Bindings: Env }>()
   .get("/", (c) => c.text("Hello, world!"))
-  .post("/share_create", async (c) => {
-    const body = await c.req.json<{ sessionID: string }>()
-    const sessionID = body.sessionID
-    const short = SyncServer.shortName(sessionID)
-    const id = c.env.SYNC_SERVER.idFromName(short)
-    const stub = c.env.SYNC_SERVER.get(id)
-    const secret = await stub.share(sessionID)
-    return c.json({
-      secret,
-      url: `https://${c.env.WEB_DOMAIN}/s/${short}`,
-    })
-  })
-  .post("/share_delete", async (c) => {
-    const body = await c.req.json<{ sessionID: string; secret: string }>()
-    const sessionID = body.sessionID
-    const secret = body.secret
-    const id = c.env.SYNC_SERVER.idFromName(SyncServer.shortName(sessionID))
-    const stub = c.env.SYNC_SERVER.get(id)
-    await stub.assertSecret(secret)
-    await stub.clear()
-    return c.json({})
-  })
-  .post("/share_delete_admin", async (c) => {
-    const body = await c.req.json<{ sessionShortName: string; adminSecret: string }>()
-    const sessionShortName = body.sessionShortName
-    const adminSecret = body.adminSecret
-    if (adminSecret !== Resource.ADMIN_SECRET.value) throw new Error("Invalid admin secret")
-    const id = c.env.SYNC_SERVER.idFromName(sessionShortName)
-    const stub = c.env.SYNC_SERVER.get(id)
-    await stub.clear()
-    return c.json({})
-  })
-  .post("/share_sync", async (c) => {
-    const body = await c.req.json<{
-      sessionID: string
-      secret: string
-      key: string
-      content: any
-    }>()
-    const name = SyncServer.shortName(body.sessionID)
-    const id = c.env.SYNC_SERVER.idFromName(name)
-    const stub = c.env.SYNC_SERVER.get(id)
-    await stub.assertSecret(body.secret)
-    await stub.publish(body.key, body.content)
-    return c.json({})
-  })
-  .get("/share_poll", async (c) => {
-    const upgradeHeader = c.req.header("Upgrade")
-    if (!upgradeHeader || upgradeHeader !== "websocket") {
-      return c.text("Error: Upgrade header is required", { status: 426 })
-    }
-    const id = c.req.query("id")
-    console.log("share_poll", id)
-    if (!id) return c.text("Error: Share ID is required", { status: 400 })
-    const stub = c.env.SYNC_SERVER.get(c.env.SYNC_SERVER.idFromName(id))
-    return stub.fetch(c.req.raw)
-  })
-  .get("/share_data", async (c) => {
-    const id = c.req.query("id")
-    console.log("share_data", id)
-    if (!id) return c.text("Error: Share ID is required", { status: 400 })
-    const stub = c.env.SYNC_SERVER.get(c.env.SYNC_SERVER.idFromName(id))
-    const data = await stub.getData()
-
-    let info
-    const messages: Record<string, any> = {}
-    data.forEach((d) => {
-      const [root, type] = d.key.split("/")
-      if (root !== "session") return
-      if (type === "info") {
-        info = d.content
-        return
-      }
-      if (type === "message") {
-        messages[d.content.id] = {
-          parts: [],
-          ...d.content,
-        }
-      }
-      if (type === "part") {
-        messages[d.content.messageID].parts.push(d.content)
-      }
-    })
-
-    return c.json({ info, messages })
-  })
+  .all("/share_create", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
+  .all("/share_delete", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
+  .all("/share_delete_admin", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
+  .all("/share_sync", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
+  .all("/share_poll", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
+  .all("/share_data", (c) => c.json({ error: "Public share API has been removed" }, { status: 410 }))
   .post("/feishu", async (c) => {
     const body = (await c.req.json()) as {
       challenge?: string
@@ -269,14 +188,17 @@ export default new Hono<{ Bindings: Env }>()
 
     // verify token
     const JWKS = createRemoteJWKSet(new URL(JWKS_URL))
-    let owner, repo
+    let owner = ""
+    let repo = ""
     try {
       const { payload } = await jwtVerify(token, JWKS, {
         issuer: GITHUB_ISSUER,
         audience: EXPECTED_AUDIENCE,
       })
       const sub = payload.sub // e.g. 'repo:my-org/my-repo:ref:refs/heads/main'
-      const parts = sub.split(":")[1].split("/")
+      if (!sub) throw new Error("Missing OIDC subject")
+      const parts = sub.split(":")[1]?.split("/") ?? []
+      if (!parts[0] || !parts[1]) throw new Error("Invalid OIDC subject")
       owner = parts[0]
       repo = parts[1]
     } catch (err) {
@@ -323,7 +245,7 @@ export default new Hono<{ Bindings: Env }>()
       // Verify permissions
       const userClient = new Octokit({ auth: token })
       const { data: repoData } = await userClient.repos.get({ owner, repo })
-      if (!repoData.permissions.admin && !repoData.permissions.push && !repoData.permissions.maintain)
+      if (!repoData.permissions?.admin && !repoData.permissions?.push && !repoData.permissions?.maintain)
         throw new Error("User does not have write permissions")
 
       // Get installation token
@@ -362,6 +284,7 @@ export default new Hono<{ Bindings: Env }>()
   .get("/get_github_app_installation", async (c) => {
     const owner = c.req.query("owner")
     const repo = c.req.query("repo")
+    if (!owner || !repo) return c.json({ error: "owner and repo are required" }, { status: 400 })
 
     const auth = createAppAuth({
       appId: Resource.GITHUB_APP_ID.value,

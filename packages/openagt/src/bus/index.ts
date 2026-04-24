@@ -28,6 +28,7 @@ const CRITICAL_EVENT_TYPES = [
  * Max capacity is configurable via the `OPENCODE_EVENT_BUFFER_SIZE` environment variable.
  */
 const DEFAULT_EVENT_BUFFER_SIZE = 1000
+const DEFAULT_EVENT_BUFFER_FILE_BYTES = 5 * 1024 * 1024
 
 function getEventBufferSize(): number {
   const env = process.env.OPENCODE_EVENT_BUFFER_SIZE
@@ -42,6 +43,7 @@ function getEventBufferSize(): number {
 class EventBuffer {
   private events: Array<{ timestamp: number; payload: unknown }> = []
   private maxCapacity: number
+  private maxFileBytes = DEFAULT_EVENT_BUFFER_FILE_BYTES
   private bufferPath: string | null = null
   private _droppedCount: number = 0
 
@@ -99,6 +101,16 @@ class EventBuffer {
       const lines = this.events.map((e) => JSON.stringify(e)).join("\n") + "\n"
       await fs.appendFile(this.bufferPath, lines, "utf-8")
       this.events = []
+      const info = await fs.stat(this.bufferPath)
+      if (info.size > this.maxFileBytes) {
+        const content = await fs.readFile(this.bufferPath, "utf-8")
+        const trimmed = content
+          .split("\n")
+          .filter((line) => line.trim())
+          .slice(-this.maxCapacity)
+          .join("\n")
+        await fs.writeFile(this.bufferPath, trimmed ? `${trimmed}\n` : "", "utf-8")
+      }
     } catch (error) {
       log.warn("failed to persist events", { error })
     }
@@ -112,7 +124,10 @@ class EventBuffer {
     if (!this.bufferPath) return
     try {
       const content = await fs.readFile(this.bufferPath, "utf-8")
-      const lines = content.split("\n").filter((line) => line.trim())
+      const lines = content
+        .split("\n")
+        .filter((line) => line.trim())
+        .slice(-this.maxCapacity)
       for (const line of lines) {
         try {
           const event = JSON.parse(line)
