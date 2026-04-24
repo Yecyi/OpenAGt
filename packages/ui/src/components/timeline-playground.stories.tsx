@@ -1617,7 +1617,7 @@ function Playground() {
             onClick={() => setPanels("generators", (v) => !v)}
           >
             Generate Messages
-            <span>{panels.generators ? "鈭? : "+"}</span>
+            <span>{panels.generators ? "-" : "+"}</span>
           </button>
           <Show when={panels.generators}>
             <div style={{ padding: "0 12px 12px", display: "flex", "flex-direction": "column", gap: "6px" }}>

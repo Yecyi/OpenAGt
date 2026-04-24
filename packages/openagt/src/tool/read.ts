@@ -18,6 +18,9 @@ const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
 const MAX_BYTES = 50 * 1024
 const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
 const SAMPLE_BYTES = 4096
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
+const EXACT_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
 const parameters = z.object({
   filePath: z.string().describe("The absolute path to the file or directory to read"),
@@ -204,6 +207,13 @@ export const ReadTool = Tool.define(
 
       const mime = sniffAttachmentMime(sample, AppFileSystem.mimeType(filepath))
       if (isImageAttachment(mime) || isPdfAttachment(mime)) {
+        if (Number(stat.size) > MAX_ATTACHMENT_BYTES) {
+          return yield* Effect.fail(
+            new Error(
+              `Cannot attach ${mime} file larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath} (${Number(stat.size)} bytes)`,
+            ),
+          )
+        }
         const bytes = yield* fs.readFile(filepath)
         const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
         return {
@@ -229,7 +239,11 @@ export const ReadTool = Tool.define(
       }
 
       const file = yield* Effect.promise(() =>
-        lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset ?? 1 }),
+        lines(filepath, {
+          limit: params.limit ?? DEFAULT_READ_LIMIT,
+          offset: params.offset ?? 1,
+          exactTotal: Number(stat.size) <= EXACT_LINE_COUNT_MAX_BYTES,
+        }),
       )
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
@@ -246,7 +260,7 @@ export const ReadTool = Tool.define(
       if (file.cut) {
         output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`
       } else if (file.more) {
-        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.exact ? file.count : `at least ${file.count}`}. Use offset=${next} to continue.)`
       } else {
         output += `\n\n(End of file - total ${file.count} lines)`
       }
@@ -277,7 +291,7 @@ export const ReadTool = Tool.define(
   }),
 )
 
-async function lines(filepath: string, opts: { limit: number; offset: number }) {
+async function lines(filepath: string, opts: { limit: number; offset: number; exactTotal: boolean }) {
   const stream = createReadStream(filepath, { encoding: "utf8" })
   const rl = createInterface({
     input: stream,
@@ -292,6 +306,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
   let count = 0
   let cut = false
   let more = false
+  let exact = true
   try {
     for await (const text of rl) {
       count += 1
@@ -299,6 +314,10 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
 
       if (raw.length >= opts.limit) {
         more = true
+        if (!opts.exactTotal) {
+          exact = false
+          break
+        }
         continue
       }
 
@@ -318,5 +337,5 @@ async function lines(filepath: string, opts: { limit: number; offset: number }) 
     stream.destroy()
   }
 
-  return { raw, count, cut, more, offset: opts.offset }
+  return { raw, count, cut, more, offset: opts.offset, exact }
 }

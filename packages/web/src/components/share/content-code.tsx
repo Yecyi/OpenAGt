@@ -1,6 +1,7 @@
 import { codeToHtml, bundledLanguages } from "shiki"
 import { createResource, Suspense } from "solid-js"
 import style from "./content-code.module.css"
+import { sanitizeHtml } from "./sanitize-html"
 
 interface Props {
   code: string
@@ -13,13 +14,13 @@ export function ContentCode(props: Props) {
     async ([code, lang]) => {
       // TODO: For testing delays
       // await new Promise((resolve) => setTimeout(resolve, 3000))
-      return (await codeToHtml(code || "", {
+      return sanitizeHtml(await codeToHtml(code || "", {
         lang: lang && lang in bundledLanguages ? lang : "text",
         themes: {
           light: "github-light",
           dark: "github-dark",
         },
-      })) as string
+      }))
     },
   )
   return (

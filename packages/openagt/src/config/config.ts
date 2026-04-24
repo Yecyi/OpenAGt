@@ -43,6 +43,7 @@ import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
 import { Npm } from "@/npm"
+import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
 
 const log = Log.create({ service: "config" })
@@ -535,24 +536,28 @@ export const layer = Layer.effect(
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
             const url = key.replace(/\/+$/, "")
-            process.env[value.key] = value.token
-            log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
-            const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
-            if (!response.ok) {
-              throw new Error(`failed to fetch remote config from ${url}: ${response.status}`)
-            }
-            const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
-            const remoteConfig = wellknown.config ?? {}
-            if (!remoteConfig.$schema) {
-              remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
-            }
-            const source = `${url}/.well-known/opencode`
-            const next = yield* loadConfig(JSON.stringify(remoteConfig), {
-              dir: path.dirname(source),
-              source,
-            })
-            yield* merge(source, next, "global")
-            log.debug("loaded remote config from well-known", { url })
+            yield* withProcessEnv(
+              { [value.key]: value.token },
+              Effect.gen(function* () {
+                log.debug("fetching remote config", { url: `${url}/.well-known/opencode` })
+                const response = yield* Effect.promise(() => fetch(`${url}/.well-known/opencode`))
+                if (!response.ok) {
+                  throw new Error(`failed to fetch remote config from ${url}: ${response.status}`)
+                }
+                const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
+                const remoteConfig = wellknown.config ?? {}
+                if (!remoteConfig.$schema) {
+                  remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+                }
+                const source = `${url}/.well-known/opencode`
+                const next = yield* loadConfig(JSON.stringify(remoteConfig), {
+                  dir: path.dirname(source),
+                  source,
+                })
+                yield* merge(source, next, "global")
+                log.debug("loaded remote config from well-known", { url })
+              }),
+            )
           }
         }
 
@@ -650,22 +655,28 @@ export const layer = Layer.effect(
               [accountSvc.config(accountID, orgID), accountSvc.token(accountID)],
               { concurrency: 2 },
             )
-            if (Option.isSome(tokenOpt)) {
-              process.env["OPENCODE_CONSOLE_TOKEN"] = tokenOpt.value
-              yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
-            }
 
-            if (Option.isSome(configOpt)) {
-              const source = `${url}/api/config`
-              const next = yield* loadConfig(JSON.stringify(configOpt.value), {
-                dir: path.dirname(source),
-                source,
-              })
-              for (const providerID of Object.keys(next.provider ?? {})) {
-                consoleManagedProviders.add(providerID)
+            const applyAccountConfig = Effect.gen(function* () {
+              if (Option.isSome(tokenOpt)) yield* env.set("OPENCODE_CONSOLE_TOKEN", tokenOpt.value)
+
+              if (Option.isSome(configOpt)) {
+                const source = `${url}/api/config`
+                const next = yield* loadConfig(JSON.stringify(configOpt.value), {
+                  dir: path.dirname(source),
+                  source,
+                })
+                for (const providerID of Object.keys(next.provider ?? {})) {
+                  consoleManagedProviders.add(providerID)
+                }
+                yield* merge(source, next, "global")
               }
-              yield* merge(source, next, "global")
+            })
+
+            if (Option.isSome(tokenOpt)) {
+              yield* withProcessEnv({ OPENCODE_CONSOLE_TOKEN: tokenOpt.value }, applyAccountConfig)
+              return
             }
+            yield* applyAccountConfig
           }).pipe(
             Effect.withSpan("Config.loadActiveOrgConfig"),
             Effect.catch((err) => {

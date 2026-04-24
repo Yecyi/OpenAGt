@@ -1,5 +1,5 @@
 import path from "path"
-import { Effect, Layer, Record, Result, Schema, Context } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import { zod } from "@/util/effect-zod"
 import { Global } from "../global"
 import { AppFileSystem } from "@openagt/shared/filesystem"
@@ -54,23 +54,31 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const fsys = yield* AppFileSystem.Service
-    const decode = Schema.decodeUnknownOption(Info)
+
+    const decodeAll = (data: unknown) =>
+      Effect.try({
+        try: () => {
+          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Auth data must be an object")
+          return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, Info.zod.parse(value)]))
+        },
+        catch: fail("Invalid auth data"),
+      })
 
     const all = () =>
       Effect.gen(function* () {
-      if (process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT) {
-        try {
-          return JSON.parse(process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT || "{}")
-        } catch (err) {}
-      }
+        const content = process.env.OPENAGT_AUTH_CONTENT || process.env.OPENCODE_AUTH_CONTENT
+        if (content) {
+          const parsed = yield* Effect.try({
+            try: () => JSON.parse(content),
+            catch: fail("Failed to parse auth data from environment"),
+          })
+          return yield* decodeAll(parsed)
+        }
 
-      const data = (yield* fsys
-        .readJson(file)
-        .pipe(
-          Effect.catch(() => fsys.readJson(legacyFile)),
-          Effect.orElseSucceed(() => ({})),
-        )) as Record<string, unknown>
-      return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+        const data = yield* fsys
+          .readJson(file)
+          .pipe(Effect.catch(() => fsys.readJson(legacyFile)), Effect.orElseSucceed(() => ({})))
+        return yield* decodeAll(data)
       })
 
     const get = (providerID: string) => Effect.map(all(), (data) => data[providerID])

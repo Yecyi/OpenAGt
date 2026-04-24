@@ -51,8 +51,8 @@
       "@pierre/diffs": "1.1.0-beta.18",
       "@solid-primitives/storage": "4.3.3",
       "@tailwindcss/vite": "4.1.11",
-      "diff": "8.0.2",
-      "dompurify": "3.3.1",
+      "diff": "8.0.3",
+      "dompurify": "3.4.1",
       "drizzle-kit": "1.0.0-beta.19-d95b7a4",
       "drizzle-orm": "1.0.0-beta.19-d95b7a4",
       "effect": "4.0.0-beta.48",
@@ -126,6 +126,9 @@
     "electron"
   ],
   "overrides": {
+    "dompurify": "3.4.1",
+    "fast-xml-parser": "5.7.1",
+    "protobufjs": "8.0.1",
     "@types/bun": "catalog:",
     "@types/node": "catalog:"
   },

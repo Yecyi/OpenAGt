@@ -1,4 +1,5 @@
 import { withAlpha } from "@openagt/ui/theme/color"
+import { DEFAULT_SERVER_USERNAME } from "@openagt/shared/auth"
 import { useTheme } from "@openagt/ui/theme/context"
 import { resolveThemeVariant } from "@openagt/ui/theme/resolve"
 import type { HexColor } from "@openagt/ui/theme/types"
@@ -171,7 +172,7 @@ export const Terminal = (props: TerminalProps) => {
   const client = sdk.client
   const url = sdk.url
   const auth = server.current?.http
-  const username = auth?.username ?? "openAG"
+  const username = auth?.username ?? DEFAULT_SERVER_USERNAME
   const password = auth?.password ?? ""
   const sameOrigin = new URL(url, location.href).origin === location.origin
   let container!: HTMLDivElement
@@ -501,11 +502,26 @@ export const Terminal = (props: TerminalProps) => {
           }
           if (disposed) return
           tries += 1
-          open()
+          void open()
         }, ms)
       }
 
-      const open = () => {
+      const authHeader = password ? `Basic ${btoa(`${username}:${password}`)}` : undefined
+      const connectTicket = async () => {
+        const ticketUrl = new URL(url + `/pty/${id}/connect-ticket`)
+        ticketUrl.searchParams.set("directory", directory)
+        const response = await (platform.fetch ?? fetch)(ticketUrl, {
+          method: "POST",
+          headers: authHeader ? { Authorization: authHeader } : undefined,
+          credentials: sameOrigin ? "same-origin" : "omit",
+        })
+        if (!response.ok) throw new Error(`PTY ticket request failed: ${response.status}`)
+        const body = (await response.json()) as { token?: unknown }
+        if (typeof body.token !== "string" || !body.token) throw new Error("PTY ticket response was invalid")
+        return body.token
+      }
+
+      const open = async () => {
         if (disposed) return
         drop?.()
 
@@ -513,12 +529,15 @@ export const Terminal = (props: TerminalProps) => {
         next.searchParams.set("directory", directory)
         next.searchParams.set("cursor", String(seek))
         next.protocol = next.protocol === "https:" ? "wss:" : "ws:"
-        if (!sameOrigin && password) {
-          next.searchParams.set("auth_token", btoa(`${username}:${password}`))
-          // For same-origin requests, let the browser reuse the page's existing auth.
-          next.username = username
-          next.password = password
+        if (!sameOrigin && authHeader) {
+          try {
+            next.searchParams.set("ticket", await connectTicket())
+          } catch (err) {
+            debugTerminal("failed to request websocket ticket, using legacy query auth", err)
+            next.searchParams.set("auth_token", authHeader.slice("Basic ".length))
+          }
         }
+        if (disposed) return
 
         const socket = new WebSocket(next)
         socket.binaryType = "arraybuffer"
@@ -591,7 +610,7 @@ export const Terminal = (props: TerminalProps) => {
         socket.addEventListener("close", handleClose)
       }
 
-      open()
+      void open()
     }
 
     void run().catch((err) => {

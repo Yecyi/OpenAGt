@@ -5,13 +5,16 @@ import { createOverflow, useShareMessages } from "./common"
 import { CopyButton } from "./copy-button"
 import { createResource, createSignal } from "solid-js"
 import style from "./content-markdown.module.css"
+import { escapeHtmlAttribute, sanitizeHref, sanitizeHtml } from "./sanitize-html"
 
 const markedWithShiki = marked.use(
   {
     renderer: {
       link({ href, title, text }) {
-        const titleAttr = title ? ` title="${title}"` : ""
-        return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`
+        const safeHref = sanitizeHref(href)
+        const hrefAttr = safeHref ? ` href="${escapeHtmlAttribute(safeHref)}"` : ""
+        const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : ""
+        return `<a${hrefAttr}${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`
       },
     },
   },
@@ -37,7 +40,7 @@ export function ContentMarkdown(props: Props) {
   const [html] = createResource(
     () => strip(props.text),
     async (markdown) => {
-      return markedWithShiki.parse(markdown)
+      return sanitizeHtml(await markedWithShiki.parse(markdown))
     },
   )
   const [expanded, setExpanded] = createSignal(false)

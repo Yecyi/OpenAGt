@@ -71,6 +71,9 @@ export const EditTool = Tool.define(
           yield* Effect.gen(function* () {
             if (params.oldString === "") {
               const existed = yield* afs.existsSafe(filePath)
+              if (existed) {
+                throw new Error("oldString cannot be empty when editing an existing file")
+              }
               contentNew = params.newString
               diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
               yield* ctx.ask({

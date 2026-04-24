@@ -83,4 +83,18 @@ describe("Auth", () => {
       }),
     ),
   )
+
+  it.live("validates OPENAGT_AUTH_CONTENT with the same schema as disk auth", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const previous = process.env.OPENAGT_AUTH_CONTENT
+        process.env.OPENAGT_AUTH_CONTENT = JSON.stringify({ anthropic: { type: "api" } })
+        const auth = yield* Auth.Service
+        const result = yield* Effect.exit(auth.all())
+        if (previous === undefined) delete process.env.OPENAGT_AUTH_CONTENT
+        else process.env.OPENAGT_AUTH_CONTENT = previous
+        expect(result._tag).toBe("Failure")
+      }),
+    ),
+  )
 })

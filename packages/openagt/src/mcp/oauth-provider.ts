@@ -132,7 +132,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    log.info("redirecting to authorization", { mcpName: this.mcpName, url: authorizationUrl.toString() })
+    log.info("redirecting to authorization", { mcpName: this.mcpName, origin: authorizationUrl.origin })
     await this.callbacks.onRedirect(authorizationUrl)
   }
 
