@@ -3,6 +3,8 @@
 import { z } from "zod"
 import { Config } from "../src/config"
 import { TuiConfig } from "../src/cli/cmd/tui/config/tui"
+import path from "node:path"
+import fs from "node:fs/promises"
 
 function generate(schema: z.ZodType) {
   const result = z.toJSONSchema(schema, {
@@ -51,13 +53,15 @@ function generate(schema: z.ZodType) {
   return result
 }
 
-const configFile = process.argv[2]
-const tuiFile = process.argv[3]
+const configFile = process.argv[2] ?? path.join(import.meta.dir, "..", "schema", "config.json")
+const tuiFile = process.argv[3] ?? path.join(import.meta.dir, "..", "schema", "tui.json")
 
 console.log(configFile)
+await fs.mkdir(path.dirname(configFile), { recursive: true })
 await Bun.write(configFile, JSON.stringify(generate(Config.Info), null, 2))
 
 if (tuiFile) {
   console.log(tuiFile)
+  await fs.mkdir(path.dirname(tuiFile), { recursive: true })
   await Bun.write(tuiFile, JSON.stringify(generate(TuiConfig.Info), null, 2))
 }

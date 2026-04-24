@@ -19,6 +19,16 @@ import type {
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
+  CoordinatorDispatchResponses,
+  CoordinatorGetResponses,
+  CoordinatorListResponses,
+  CoordinatorPlanErrors,
+  CoordinatorPlanResponses,
+  CoordinatorProjectionResponses,
+  CoordinatorResumeResponses,
+  CoordinatorRunErrors,
+  CoordinatorRunResponses,
+  CoordinatorSummarizeResponses,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -85,6 +95,20 @@ import type {
   PermissionRespondErrors,
   PermissionRespondResponses,
   PermissionRuleset,
+  PersonalGatewayWebhookResponses,
+  PersonalInboxCreateResponses,
+  PersonalInboxListResponses,
+  PersonalInboxUpdateResponses,
+  PersonalMemoryListResponses,
+  PersonalMemoryRememberErrors,
+  PersonalMemoryRememberResponses,
+  PersonalMemorySearchResponses,
+  PersonalMemorySynthesizeResponses,
+  PersonalOverviewResponses,
+  PersonalSchedulerCompleteResponses,
+  PersonalSchedulerCreateResponses,
+  PersonalSchedulerDispatchResponses,
+  PersonalSchedulerDueResponses,
   ProjectCurrentResponses,
   ProjectInitGitResponses,
   ProjectListResponses,
@@ -98,6 +122,8 @@ import type {
   ProviderOauthCallbackResponses,
   PtyConnectErrors,
   PtyConnectResponses,
+  PtyConnectTicketErrors,
+  PtyConnectTicketResponses,
   PtyCreateErrors,
   PtyCreateResponses,
   PtyGetErrors,
@@ -142,8 +168,6 @@ import type {
   SessionPromptResponses,
   SessionRevertErrors,
   SessionRevertResponses,
-  SessionShareErrors,
-  SessionShareResponses,
   SessionShellErrors,
   SessionShellResponses,
   SessionStatusErrors,
@@ -154,8 +178,6 @@ import type {
   SessionTodoResponses,
   SessionUnrevertErrors,
   SessionUnrevertResponses,
-  SessionUnshareErrors,
-  SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
   SubtaskPartInput,
@@ -453,7 +475,7 @@ export class App extends HeyApiClient {
   /**
    * List agents
    *
-   * Get a list of all available AI agents in the OpenAGt system.
+   * Get a list of all available AI agents in the OpenCode system.
    */
   public agents<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -483,7 +505,7 @@ export class App extends HeyApiClient {
   /**
    * List skills
    *
-   * Get a list of all available skills in the OpenAGt system.
+   * Get a list of all available skills in the OpenCode system.
    */
   public skills<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -800,7 +822,7 @@ export class Console extends HeyApiClient {
   /**
    * Switch active Console org
    *
-   * Persist a new active Console account/org selection for the current local OpenAGt state.
+   * Persist a new active Console account/org selection for the current local OpenCode state.
    */
   public switchOrg<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -841,7 +863,7 @@ export class Session extends HeyApiClient {
   /**
    * List sessions
    *
-   * Get a list of all OpenAGt sessions across projects, sorted by most recently updated. Archived sessions are excluded by default.
+   * Get a list of all OpenCode sessions across projects, sorted by most recently updated. Archived sessions are excluded by default.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -939,7 +961,7 @@ export class Project extends HeyApiClient {
   /**
    * List all projects
    *
-   * Get a list of projects that have been opened with OpenAGt.
+   * Get a list of projects that have been opened with OpenCode.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -969,7 +991,7 @@ export class Project extends HeyApiClient {
   /**
    * Get current project
    *
-   * Retrieve the currently active project that OpenAGt is working with.
+   * Retrieve the currently active project that OpenCode is working with.
    */
   public current<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1083,7 +1105,7 @@ export class Pty extends HeyApiClient {
   /**
    * List PTY sessions
    *
-   * Get a list of all active pseudo-terminal (PTY) sessions managed by OpenAGt.
+   * Get a list of all active pseudo-terminal (PTY) sessions managed by OpenCode.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1266,6 +1288,38 @@ export class Pty extends HeyApiClient {
   }
 
   /**
+   * Create PTY connection ticket
+   *
+   * Create a short-lived one-time ticket for opening a PTY WebSocket connection.
+   */
+  public connectTicket<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PtyConnectTicketResponses, PtyConnectTicketErrors, ThrowOnError>({
+      url: "/pty/{ptyID}/connect-ticket",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Connect to PTY session
    *
    * Establish a WebSocket connection to interact with a pseudo-terminal (PTY) session in real-time.
@@ -1302,7 +1356,7 @@ export class Config2 extends HeyApiClient {
   /**
    * Get configuration
    *
-   * Retrieve the current OpenAGt configuration settings and preferences.
+   * Retrieve the current OpenCode configuration settings and preferences.
    */
   public get<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1332,7 +1386,7 @@ export class Config2 extends HeyApiClient {
   /**
    * Update configuration
    *
-   * Update OpenAGt configuration settings and preferences.
+   * Update OpenCode configuration settings and preferences.
    */
   public update<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1610,7 +1664,7 @@ export class Session2 extends HeyApiClient {
   /**
    * List sessions
    *
-   * Get a list of all OpenAGt sessions, sorted by most recently updated.
+   * Get a list of all OpenCode sessions, sorted by most recently updated.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1648,7 +1702,7 @@ export class Session2 extends HeyApiClient {
   /**
    * Create session
    *
-   * Create a new OpenAGt session for interacting with AI assistants and managing conversations.
+   * Create a new OpenCode session for interacting with AI assistants and managing conversations.
    */
   public create<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1753,7 +1807,7 @@ export class Session2 extends HeyApiClient {
   /**
    * Get session
    *
-   * Retrieve detailed information about a specific OpenAGt session.
+   * Retrieve detailed information about a specific OpenCode session.
    */
   public get<ThrowOnError extends boolean = false>(
     parameters: {
@@ -2000,70 +2054,6 @@ export class Session2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<SessionAbortResponses, SessionAbortErrors, ThrowOnError>({
       url: "/session/{sessionID}/abort",
-      ...options,
-      ...params,
-    })
-  }
-
-  /**
-   * Unshare session
-   *
-   * Remove the shareable link for a session, making it private again.
-   */
-  public unshare<ThrowOnError extends boolean = false>(
-    parameters: {
-      sessionID: string
-      directory?: string
-      workspace?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "sessionID" },
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).delete<SessionUnshareResponses, SessionUnshareErrors, ThrowOnError>({
-      url: "/session/{sessionID}/share",
-      ...options,
-      ...params,
-    })
-  }
-
-  /**
-   * Share session
-   *
-   * Create a shareable link for a session, allowing others to view the conversation.
-   */
-  public share<ThrowOnError extends boolean = false>(
-    parameters: {
-      sessionID: string
-      directory?: string
-      workspace?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "sessionID" },
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<SessionShareResponses, SessionShareErrors, ThrowOnError>({
-      url: "/session/{sessionID}/share",
       ...options,
       ...params,
     })
@@ -3008,6 +2998,759 @@ export class Provider extends HeyApiClient {
   private _oauth?: Oauth
   get oauth(): Oauth {
     return (this._oauth ??= new Oauth({ client: this.client }))
+  }
+}
+
+export class Coordinator extends HeyApiClient {
+  public plan<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      goal?: string
+      nodes?: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "nodes" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorPlanResponses, CoordinatorPlanErrors, ThrowOnError>({
+      url: "/coordinator/plan",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public run<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      goal?: string
+      nodes?: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "nodes" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorRunResponses, CoordinatorRunErrors, ThrowOnError>({
+      url: "/coordinator/run/{sessionID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<CoordinatorGetResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<CoordinatorListResponses, unknown, ThrowOnError>({
+      url: "/coordinator/session/{sessionID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  public summarize<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorSummarizeResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/summarize",
+      ...options,
+      ...params,
+    })
+  }
+
+  public dispatch<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorDispatchResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/dispatch",
+      ...options,
+      ...params,
+    })
+  }
+
+  public projection<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<CoordinatorProjectionResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/projection",
+      ...options,
+      ...params,
+    })
+  }
+
+  public resume<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorResumeResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/resume",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Memory extends HeyApiClient {
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      scope?: "profile" | "workspace" | "session"
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "scope" },
+            { in: "query", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PersonalMemoryListResponses, unknown, ThrowOnError>({
+      url: "/personal/memory",
+      ...options,
+      ...params,
+    })
+  }
+
+  public remember<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      scope?: "profile" | "workspace" | "session"
+      title?: string
+      content?: string
+      sessionID?: string
+      tags?: Array<string>
+      source?: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+      importance?: number
+      pinned?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "title" },
+            { in: "body", key: "content" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "tags" },
+            { in: "body", key: "source" },
+            { in: "body", key: "importance" },
+            { in: "body", key: "pinned" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      PersonalMemoryRememberResponses,
+      PersonalMemoryRememberErrors,
+      ThrowOnError
+    >({
+      url: "/personal/memory/remember",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public search<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      query?: string
+      sessionID?: string
+      scopes?: Array<"profile" | "workspace" | "session">
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "query" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "scopes" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalMemorySearchResponses, unknown, ThrowOnError>({
+      url: "/personal/memory/search",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public synthesize<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      kind?: "coordinator_run_completed" | "verify_completed" | "manual_preference" | "follow_up_completed"
+      sessionID?: string
+      title?: string
+      content?: string
+      tags?: Array<string>
+      importance?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "kind" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "title" },
+            { in: "body", key: "content" },
+            { in: "body", key: "tags" },
+            { in: "body", key: "importance" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalMemorySynthesizeResponses, unknown, ThrowOnError>({
+      url: "/personal/memory/synthesize",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Inbox extends HeyApiClient {
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      state?: "pending" | "processing" | "completed" | "cancelled"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "state" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PersonalInboxListResponses, unknown, ThrowOnError>({
+      url: "/personal/inbox",
+      ...options,
+      ...params,
+    })
+  }
+
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      source?: "session" | "scheduled" | "webhook"
+      scope?: "profile" | "workspace" | "session"
+      goal?: string
+      sessionID?: string
+      contextRefs?: Array<string>
+      priority?: "high" | "normal" | "low"
+      scheduledFor?: number
+      payload?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "source" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "contextRefs" },
+            { in: "body", key: "priority" },
+            { in: "body", key: "scheduledFor" },
+            { in: "body", key: "payload" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalInboxCreateResponses, unknown, ThrowOnError>({
+      url: "/personal/inbox",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      inboxID: string
+      directory?: string
+      workspace?: string
+      state?: "pending" | "processing" | "completed" | "cancelled"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "inboxID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "state" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<PersonalInboxUpdateResponses, unknown, ThrowOnError>({
+      url: "/personal/inbox/{inboxID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Scheduler extends HeyApiClient {
+  public due<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      now?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "now" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PersonalSchedulerDueResponses, unknown, ThrowOnError>({
+      url: "/personal/scheduler/due",
+      ...options,
+      ...params,
+    })
+  }
+
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      goal?: string
+      sessionID?: string
+      contextRefs?: Array<string>
+      priority?: "high" | "normal" | "low"
+      scheduledFor?: number
+      payload?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "sessionID" },
+            { in: "body", key: "contextRefs" },
+            { in: "body", key: "priority" },
+            { in: "body", key: "scheduledFor" },
+            { in: "body", key: "payload" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalSchedulerCreateResponses, unknown, ThrowOnError>({
+      url: "/personal/scheduler",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public dispatch<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      now?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "now" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalSchedulerDispatchResponses, unknown, ThrowOnError>({
+      url: "/personal/scheduler/dispatch",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public complete<ThrowOnError extends boolean = false>(
+    parameters: {
+      wakeupID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "wakeupID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalSchedulerCompleteResponses, unknown, ThrowOnError>({
+      url: "/personal/scheduler/{wakeupID}/complete",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Gateway extends HeyApiClient {
+  public webhook<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      goal?: string
+      scope?: "profile" | "workspace" | "session"
+      contextRefs?: Array<string>
+      priority?: "high" | "normal" | "low"
+      payload?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "scope" },
+            { in: "body", key: "contextRefs" },
+            { in: "body", key: "priority" },
+            { in: "body", key: "payload" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PersonalGatewayWebhookResponses, unknown, ThrowOnError>({
+      url: "/personal/gateway/webhook",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Personal extends HeyApiClient {
+  public overview<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      now?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "now" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<PersonalOverviewResponses, unknown, ThrowOnError>({
+      url: "/personal/overview",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _memory?: Memory
+  get memory(): Memory {
+    return (this._memory ??= new Memory({ client: this.client }))
+  }
+
+  private _inbox?: Inbox
+  get inbox(): Inbox {
+    return (this._inbox ??= new Inbox({ client: this.client }))
+  }
+
+  private _scheduler?: Scheduler
+  get scheduler(): Scheduler {
+    return (this._scheduler ??= new Scheduler({ client: this.client }))
+  }
+
+  private _gateway?: Gateway
+  get gateway(): Gateway {
+    return (this._gateway ??= new Gateway({ client: this.client }))
   }
 }
 
@@ -4102,7 +4845,7 @@ export class Instance extends HeyApiClient {
   /**
    * Dispose instance
    *
-   * Clean up and dispose the current OpenAGt instance, releasing all resources.
+   * Clean up and dispose the current OpenCode instance, releasing all resources.
    */
   public dispose<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -4134,7 +4877,7 @@ export class Path extends HeyApiClient {
   /**
    * Get paths
    *
-   * Retrieve the current working directory and related path information for the OpenAGt instance.
+   * Retrieve the current working directory and related path information for the OpenCode instance.
    */
   public get<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -4230,7 +4973,7 @@ export class Command extends HeyApiClient {
   /**
    * List commands
    *
-   * Get a list of all available commands in the OpenAGt system.
+   * Get a list of all available commands in the OpenCode system.
    */
   public list<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -4398,6 +5141,16 @@ export class OpenagtClient extends HeyApiClient {
   private _provider?: Provider
   get provider(): Provider {
     return (this._provider ??= new Provider({ client: this.client }))
+  }
+
+  private _coordinator?: Coordinator
+  get coordinator(): Coordinator {
+    return (this._coordinator ??= new Coordinator({ client: this.client }))
+  }
+
+  private _personal?: Personal
+  get personal(): Personal {
+    return (this._personal ??= new Personal({ client: this.client }))
   }
 
   private _sync?: Sync

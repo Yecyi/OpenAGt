@@ -1,5 +1,5 @@
 import { NodeFileSystem } from "@effect/platform-node"
-import { dirname, join, relative, resolve as pathResolve } from "path"
+import { basename, dirname, join, relative, resolve as pathResolve } from "path"
 import { realpathSync } from "fs"
 import * as NFS from "fs/promises"
 import { lookup } from "mime-types"
@@ -77,10 +77,40 @@ export namespace AppFileSystem {
         return JSON.parse(text)
       })
 
+      const writeFileAtomic = Effect.fn("FileSystem.writeFileAtomic")(function* (
+        path: string,
+        content: string | Uint8Array,
+        mode?: number,
+      ) {
+        yield* Effect.tryPromise({
+          try: async () => {
+            await NFS.mkdir(dirname(path), { recursive: true })
+            const temp = join(
+              dirname(path),
+              `.${basename(path)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+            )
+            let handle: NFS.FileHandle | undefined
+            try {
+              handle = await NFS.open(temp, "wx", mode ?? 0o666)
+              await handle.writeFile(content)
+              await handle.sync()
+              await handle.close()
+              handle = undefined
+              await NFS.rename(temp, path)
+              if (mode !== undefined) await NFS.chmod(path, mode)
+            } catch (cause) {
+              await handle?.close().catch(() => {})
+              await NFS.rm(temp, { force: true }).catch(() => {})
+              throw cause
+            }
+          },
+          catch: (cause) => new FileSystemError({ method: "writeFileAtomic", cause }),
+        })
+      })
+
       const writeJson = Effect.fn("FileSystem.writeJson")(function* (path: string, data: unknown, mode?: number) {
         const content = JSON.stringify(data, null, 2)
-        yield* fs.writeFileString(path, content)
-        if (mode) yield* fs.chmod(path, mode)
+        yield* writeFileAtomic(path, content, mode)
       })
 
       const ensureDir = Effect.fn("FileSystem.ensureDir")(function* (path: string) {
@@ -92,19 +122,7 @@ export namespace AppFileSystem {
         content: string | Uint8Array,
         mode?: number,
       ) {
-        const write = typeof content === "string" ? fs.writeFileString(path, content) : fs.writeFile(path, content)
-
-        yield* write.pipe(
-          Effect.catchIf(
-            (e) => e.reason._tag === "NotFound",
-            () =>
-              Effect.gen(function* () {
-                yield* fs.makeDirectory(dirname(path), { recursive: true })
-                yield* write
-              }),
-          ),
-        )
-        if (mode) yield* fs.chmod(path, mode)
+        yield* writeFileAtomic(path, content, mode)
       })
 
       const glob = Effect.fn("FileSystem.glob")(function* (pattern: string, options?: Glob.Options) {

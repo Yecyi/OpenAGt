@@ -7,7 +7,6 @@ import { Octokit } from "@octokit/rest"
 import { graphql } from "@octokit/graphql"
 import * as core from "@actions/core"
 import * as github from "@actions/github"
-import type { Context } from "@actions/github/lib/context"
 import type {
   IssueCommentEvent,
   IssuesEvent,
@@ -21,7 +20,6 @@ import { cmd } from "./cmd"
 import { ModelsDev } from "../../provider"
 import { Instance } from "@/project/instance"
 import { bootstrap } from "../bootstrap"
-import { SessionShare } from "@/share"
 import { Session } from "../../session"
 import type { SessionID } from "../../session/schema"
 import { MessageID, PartID } from "../../session/schema"
@@ -34,6 +32,8 @@ import { Git } from "@/git"
 import { setTimeout as sleep } from "node:timers/promises"
 import { Process } from "@/util"
 import { Effect } from "effect"
+
+type Context = typeof github.context
 
 type GitHubAuthor = {
   login: string
@@ -460,7 +460,6 @@ export const GithubRunCommand = cmd({
       const { providerID, modelID } = normalizeModel()
       const variant = process.env["VARIANT"] || undefined
       const runId = normalizeRunId()
-      const share = normalizeShare()
       const oidcBaseUrl = normalizeOidcBaseUrl()
       const { owner, repo } = context.repo
       // For repo events (schedule, workflow_dispatch), payload has no issue/comment data
@@ -481,14 +480,12 @@ export const GithubRunCommand = cmd({
           ? (payload as IssueCommentEvent | IssuesEvent).issue.number
           : (payload as PullRequestEvent | PullRequestReviewCommentEvent).pull_request.number
       const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-      const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://opencode.ai"
 
       let appToken: string
       let octoRest: Octokit
       let octoGraph: typeof graphql
       let gitConfig: string
       let session: { id: SessionID; title: string; version: string }
-      let shareId: string | undefined
       let exitCode = 0
       type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
       const triggerCommentId = isCommentEvent
@@ -551,7 +548,6 @@ export const GithubRunCommand = cmd({
         }
 
         // Setup opencode session
-        const repoData = await fetchRepo()
         session = await AppRuntime.runPromise(
           Session.Service.use((svc) =>
             svc.create({
@@ -566,12 +562,6 @@ export const GithubRunCommand = cmd({
           ),
         )
         subscribeSessionEvents()
-        shareId = await (async () => {
-          if (share === false) return
-          if (!share && repoData.data.private) return
-          await AppRuntime.runPromise(SessionShare.Service.use((svc) => svc.share(session.id)))
-          return session.id.slice(-8)
-        })()
         console.log("opencode session", session.id)
 
         // Handle event types:
@@ -598,10 +588,10 @@ export const GithubRunCommand = cmd({
             await pushToNewBranch(summary, branch, uncommittedChanges, isScheduleEvent)
             const triggerType = isWorkflowDispatchEvent ? "workflow_dispatch" : "scheduled workflow"
             const pr = await createPR(
-              repoData.data.default_branch,
+              await defaultBranch(),
               branch,
               summary,
-              `${response}\n\nTriggered by ${triggerType}${footer({ image: true })}`,
+              `${response}\n\nTriggered by ${triggerType}${footer()}`,
             )
             if (pr) {
               console.log(`Created PR #${pr}`)
@@ -630,8 +620,7 @@ export const GithubRunCommand = cmd({
               const summary = await summarize(response)
               await pushToLocalBranch(summary, uncommittedChanges)
             }
-            const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-            await createComment(`${response}${footer({ image: !hasShared })}`)
+            await createComment(`${response}${footer()}`)
             await removeReaction(commentType)
           }
           // Fork PR
@@ -648,8 +637,7 @@ export const GithubRunCommand = cmd({
               const summary = await summarize(response)
               await pushToForkBranch(summary, prData, uncommittedChanges)
             }
-            const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-            await createComment(`${response}${footer({ image: !hasShared })}`)
+            await createComment(`${response}${footer()}`)
             await removeReaction(commentType)
           }
         }
@@ -664,25 +652,25 @@ export const GithubRunCommand = cmd({
           if (switched) {
             // Agent switched branches (likely created its own branch/PR).
             // Don't push the stale infrastructure branch — just comment.
-            await createComment(`${response}${footer({ image: true })}`)
+            await createComment(`${response}${footer()}`)
             await removeReaction(commentType)
           } else if (dirty) {
             const summary = await summarize(response)
             await pushToNewBranch(summary, branch, uncommittedChanges, false)
             const pr = await createPR(
-              repoData.data.default_branch,
+              await defaultBranch(),
               branch,
               summary,
-              `${response}\n\nCloses #${issueId}${footer({ image: true })}`,
+              `${response}\n\nCloses #${issueId}${footer()}`,
             )
             if (pr) {
-              await createComment(`Created PR #${pr}${footer({ image: true })}`)
+              await createComment(`Created PR #${pr}${footer()}`)
             } else {
-              await createComment(`${response}${footer({ image: true })}`)
+              await createComment(`${response}${footer()}`)
             }
             await removeReaction(commentType)
           } else {
-            await createComment(`${response}${footer({ image: true })}`)
+            await createComment(`${response}${footer()}`)
             await removeReaction(commentType)
           }
         }
@@ -725,14 +713,6 @@ export const GithubRunCommand = cmd({
         const value = process.env["GITHUB_RUN_ID"]
         if (!value) throw new Error(`Environment variable "GITHUB_RUN_ID" is not set`)
         return value
-      }
-
-      function normalizeShare() {
-        const value = process.env["SHARE"]
-        if (!value) return undefined
-        if (value === "true") return true
-        if (value === "false") return false
-        throw new Error(`Invalid share value: ${value}. Share must be a boolean.`)
       }
 
       function normalizeUseGithubToken() {
@@ -1395,22 +1375,12 @@ export const GithubRunCommand = cmd({
         }
       }
 
-      function footer(opts?: { image?: boolean }) {
-        const image = (() => {
-          if (!shareId) return ""
-          if (!opts?.image) return ""
-
-          const titleAlt = encodeURIComponent(session.title.substring(0, 50))
-          const title64 = Buffer.from(session.title.substring(0, 700), "utf8").toString("base64")
-
-          return `<a href="${shareBaseUrl}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
-        })()
-        const shareUrl = shareId ? `[opencode session](${shareBaseUrl}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
-        return `\n\n${image}${shareUrl}[github run](${runUrl})`
+      function footer() {
+        return `\n\n[github run](${runUrl})`
       }
 
-      async function fetchRepo() {
-        return await octoRest.rest.repos.get({ owner, repo })
+      async function defaultBranch() {
+        return await withRetry(() => octoRest.rest.repos.get({ owner, repo })).then((result) => result.data.default_branch)
       }
 
       async function fetchIssue() {

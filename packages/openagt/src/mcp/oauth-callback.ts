@@ -5,16 +5,22 @@ import { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH, parseRedirectUri } from "./oa
 
 const log = Log.create({ service: "mcp.oauth-callback" })
 
-// Normalize a URI origin (host + port) for comparison: lowercase, strip trailing slash,
-// and resolve localhost/127.0.0.1 to a canonical form.
-function normalizeOrigin(uri: string): string {
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function normalizeRedirectTarget(uri: string): string {
   try {
     const url = new URL(uri)
     const host = url.hostname.toLowerCase()
-    // Normalize localhost variants to "localhost"
     const normalizedHost = host === "127.0.0.1" ? "localhost" : host
     const port = url.port || (url.protocol === "https:" ? "443" : "80")
-    return `${normalizedHost}:${port}`
+    return `${normalizedHost}:${port}${url.pathname || "/"}`
   } catch {
     return uri.toLowerCase()
   }
@@ -66,7 +72,7 @@ const HTML_ERROR = (error: string) => `<!DOCTYPE html>
   <div class="container">
     <h1>Authorization Failed</h1>
     <p>An error occurred during authorization.</p>
-    <div class="error">${error}</div>
+    <div class="error">${escapeHtml(error)}</div>
   </div>
 </body>
 </html>`
@@ -106,12 +112,21 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
   const error = url.searchParams.get("error")
   const errorDescription = url.searchParams.get("error_description")
 
-  log.info("received oauth callback", { hasCode: !!code, state, error })
+  log.info("received oauth callback", { hasCode: !!code, hasState: !!state, hasError: !!error })
 
   // Enforce state parameter presence
   if (!state) {
     const errorMsg = "Missing required state parameter - potential CSRF attack"
-    log.error("oauth callback missing state parameter", { url: url.toString() })
+    log.error("oauth callback missing state parameter", { path: url.pathname })
+    res.writeHead(400, { "Content-Type": "text/html" })
+    res.end(HTML_ERROR(errorMsg))
+    return
+  }
+
+  // Validate state before reflecting provider-supplied OAuth errors.
+  if (!pendingAuths.has(state)) {
+    const errorMsg = "Invalid or expired state parameter - potential CSRF attack"
+    log.error("oauth callback with invalid state", { pendingCount: pendingAuths.size })
     res.writeHead(400, { "Content-Type": "text/html" })
     res.end(HTML_ERROR(errorMsg))
     return
@@ -119,13 +134,11 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
 
   if (error) {
     const errorMsg = errorDescription || error
-    if (pendingAuths.has(state)) {
-      const pending = pendingAuths.get(state)!
-      clearTimeout(pending.timeout)
-      pendingAuths.delete(state)
-      cleanupStateIndex(state)
-      pending.reject(new Error(errorMsg))
-    }
+    const pending = pendingAuths.get(state)!
+    clearTimeout(pending.timeout)
+    pendingAuths.delete(state)
+    cleanupStateIndex(state)
+    pending.reject(new Error(errorMsg))
     res.writeHead(200, { "Content-Type": "text/html" })
     res.end(HTML_ERROR(errorMsg))
     return
@@ -137,24 +150,15 @@ function handleRequest(req: import("http").IncomingMessage, res: import("http").
     return
   }
 
-  // Validate state parameter
-  if (!pendingAuths.has(state)) {
-    const errorMsg = "Invalid or expired state parameter - potential CSRF attack"
-    log.error("oauth callback with invalid state", { state, pendingStates: Array.from(pendingAuths.keys()) })
-    res.writeHead(400, { "Content-Type": "text/html" })
-    res.end(HTML_ERROR(errorMsg))
-    return
-  }
-
   // Validate redirect_uri if one was registered
   if (registeredRedirectUri) {
-    const callbackOrigin = normalizeOrigin(url.origin)
-    const expectedOrigin = normalizeOrigin(new URL(registeredRedirectUri).origin)
-    if (callbackOrigin !== expectedOrigin) {
+    const callbackTarget = normalizeRedirectTarget(url.toString())
+    const expectedTarget = normalizeRedirectTarget(registeredRedirectUri)
+    if (callbackTarget !== expectedTarget) {
       const errorMsg = "redirect_uri mismatch - potential open redirect attack"
       log.error("oauth callback redirect_uri mismatch", {
-        expected: expectedOrigin,
-        received: callbackOrigin,
+        expected: expectedTarget,
+        received: callbackTarget,
       })
       res.writeHead(400, { "Content-Type": "text/html" })
       res.end(HTML_ERROR(errorMsg))
@@ -192,16 +196,20 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
     await stop()
   }
 
-  if (server) return
+  if (server) {
+    registeredRedirectUri = redirectUri ?? `http://127.0.0.1:${port}${path}`
+    return
+  }
 
   const running = await isPortInUse(port)
   if (running) {
-    log.info("oauth callback server already running on another instance", { port })
-    return
+    log.error("oauth callback server port is already in use", { port })
+    throw new Error(`OAuth callback port ${port} is already in use`)
   }
 
   currentPort = port
   currentPath = path
+  registeredRedirectUri = redirectUri ?? `http://127.0.0.1:${port}${path}`
 
   server = createServer(handleRequest)
   await new Promise<void>((resolve, reject) => {

@@ -25,7 +25,7 @@ import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import open from "open"
-import { Effect, Exit, Layer, Option, Context, Stream } from "effect"
+import { Effect, Layer, Option, Context, Stream } from "effect"
 import { EffectBridge } from "@/effect"
 import { InstanceState } from "@/effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
@@ -314,18 +314,22 @@ export const layer = Layer.effect(
      * on failure the transport is closed; on success the caller owns it.
      */
     const connectTransport = (transport: Transport, timeout: number) =>
-      Effect.acquireUseRelease(
-        Effect.succeed(transport),
-        (t) =>
-          Effect.tryPromise({
-            try: () => {
-              const client = new Client({ name: "opencode", version: InstallationVersion })
-              return withTimeout(client.connect(t), timeout).then(() => client)
-            },
-            catch: (e) => (e instanceof Error ? e : new Error(String(e))),
-          }),
-        (t, exit) => (Exit.isFailure(exit) ? Effect.tryPromise(() => t.close()).pipe(Effect.ignore) : Effect.void),
-      )
+      Effect.tryPromise({
+        try: async () => {
+          const client = new Client({ name: "opencode", version: InstallationVersion })
+          try {
+            await withTimeout(client.connect(transport), timeout)
+            return client
+          } catch (e) {
+            const err = e instanceof Error ? e : new Error(String(e))
+            if (!(err instanceof UnauthorizedError) && !err.message.includes("OAuth")) {
+              await transport.close().catch(() => {})
+            }
+            throw err
+          }
+        },
+        catch: (e) => (e instanceof Error ? e : new Error(String(e))),
+      })
 
     const DISABLED_RESULT: CreateResult = { status: { status: "disabled" } }
 
@@ -349,34 +353,43 @@ export const layer = Layer.effect(
           },
           {
             onRedirect: async (url) => {
-              log.info("oauth redirect requested", { key, url: url.toString() })
+              log.info("oauth redirect requested", { key, origin: url.origin })
             },
           },
           auth,
         )
       }
 
-      const transports: Array<{ name: string; transport: TransportWithAuth }> = [
+      const transports: Array<{ name: string; create: () => TransportWithAuth }> = [
         {
           name: "StreamableHTTP",
-          transport: new StreamableHTTPClientTransport(new URL(mcp.url), {
-            authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-          }),
+          create: () =>
+            new StreamableHTTPClientTransport(new URL(mcp.url), {
+              authProvider,
+              requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            }),
         },
         {
           name: "SSE",
-          transport: new SSEClientTransport(new URL(mcp.url), {
-            authProvider,
-            requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-          }),
+          create: () =>
+            new SSEClientTransport(new URL(mcp.url), {
+              authProvider,
+              requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
+            }),
         },
       ]
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
+      const deadline = Date.now() + connectTimeout
+      const remaining = () => Math.max(0, deadline - Date.now())
       let lastStatus: Status | undefined
 
-      for (const { name, transport } of transports) {
+      for (const { name, create } of transports) {
+        if (remaining() <= 0) {
+          lastStatus = { status: "failed" as const, error: `Connection timed out after ${connectTimeout}ms` }
+          break
+        }
+
         // Check circuit breaker before attempting
         const now = Date.now()
         const cb = mcpCircuitBreaker[key]
@@ -390,7 +403,14 @@ export const layer = Layer.effect(
         let lastError: Error | undefined
 
         while (attempt < MCP_RETRY_ATTEMPTS) {
-          const result = yield* connectTransport(transport, connectTimeout).pipe(
+          const timeLeft = remaining()
+          if (timeLeft <= 0) {
+            lastError = new Error(`Connection timed out after ${connectTimeout}ms`)
+            break
+          }
+
+          const transport = create()
+          const result = yield* connectTransport(transport, timeLeft).pipe(
             Effect.map((client) => ({ client, transportName: name })),
             Effect.catch((error) => {
               const err = error instanceof Error ? error : new Error(String(error))
@@ -456,8 +476,10 @@ export const layer = Layer.effect(
           attempt++
           if (attempt < MCP_RETRY_ATTEMPTS) {
             const delay = computeBackoff(attempt - 1)
-            log.info("mcp connection retrying", { key, transport: name, attempt, delayMs: delay })
-            yield* Effect.promise(() => sleep(delay))
+            const wait = Math.min(delay, 250, Math.max(0, remaining() - 25))
+            if (wait <= 0) break
+            log.info("mcp connection retrying", { key, transport: name, attempt, delayMs: wait })
+            yield* Effect.promise(() => sleep(wait))
           }
         }
 
@@ -911,7 +933,7 @@ export const layer = Layer.effect(
         return yield* storeClient(s, mcpName, client, listed, mcpConfig.timeout)
       }
 
-      log.info("opening browser for oauth", { mcpName, url: result.authorizationUrl, state: result.oauthState })
+      log.info("opening browser for oauth", { mcpName, hasAuthorizationUrl: !!result.authorizationUrl })
 
       const callbackPromise = McpOAuthCallback.waitForCallback(result.oauthState, mcpName)
 

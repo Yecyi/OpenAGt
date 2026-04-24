@@ -31,4 +31,16 @@ describe("McpOAuthCallback.ensureRunning", () => {
     await McpOAuthCallback.ensureRunning("http://127.0.0.1:18000/custom/callback")
     expect(McpOAuthCallback.isRunning()).toBe(true)
   })
+
+  test("escapes provider error descriptions in callback page", async () => {
+    const redirect = "http://127.0.0.1:18001/custom/callback"
+    await McpOAuthCallback.ensureRunning(redirect)
+    const callback = McpOAuthCallback.waitForCallback("state-xss").catch((error) => error)
+    const response = await fetch(`${redirect}?state=state-xss&error=access_denied&error_description=%3Cimg%20src=x%20onerror=alert(1)%3E`)
+    const html = await response.text()
+    const error = await callback
+    expect(error).toBeInstanceOf(Error)
+    expect(html).not.toContain('<img src=x onerror=alert(1)>')
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;")
+  })
 })

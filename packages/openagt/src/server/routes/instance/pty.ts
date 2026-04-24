@@ -9,6 +9,7 @@ import { PtyID } from "@/pty/schema"
 import { NotFoundError } from "@/storage"
 import { errors } from "../../error"
 import { jsonRequest, runRequest } from "./trace"
+import { PtyTicket } from "@/server/pty-ticket"
 
 export function PtyRoutes(upgradeWebSocket: UpgradeWebSocket) {
   return new Hono()
@@ -145,6 +146,38 @@ export function PtyRoutes(upgradeWebSocket: UpgradeWebSocket) {
           yield* pty.remove(c.req.valid("param").ptyID)
           return true
         }),
+    )
+    .post(
+      "/:ptyID/connect-ticket",
+      describeRoute({
+        summary: "Create PTY connection ticket",
+        description: "Create a short-lived one-time ticket for opening a PTY WebSocket connection.",
+        operationId: "pty.connectTicket",
+        responses: {
+          200: {
+            description: "Connection ticket",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ token: z.string(), expires: z.number() })),
+              },
+            },
+          },
+          ...errors(404),
+        },
+      }),
+      validator("param", z.object({ ptyID: PtyID.zod })),
+      async (c) => {
+        const info = await runRequest(
+          "PtyRoutes.connectTicket",
+          c,
+          Effect.gen(function* () {
+            const pty = yield* Pty.Service
+            return yield* pty.get(c.req.valid("param").ptyID)
+          }),
+        )
+        if (!info) throw new NotFoundError({ message: "Session not found" })
+        return c.json(PtyTicket.issue({ ptyID: c.req.valid("param").ptyID, directory: c.req.query("directory") }))
+      },
     )
     .get(
       "/:ptyID/connect",

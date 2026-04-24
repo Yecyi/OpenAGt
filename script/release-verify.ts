@@ -8,6 +8,10 @@ const steps = [
     command: $`bun run --cwd packages/sdk/js script/build.ts`,
   },
   {
+    title: "Build config schemas",
+    command: $`bun run script/schema.ts`.cwd("packages/openagt"),
+  },
+  {
     title: "Typecheck packages/openagt",
     command: $`bun typecheck`.cwd("packages/openagt"),
   },

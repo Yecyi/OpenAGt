@@ -52,7 +52,7 @@ describe("file/index Filesystem patterns", () => {
       })
     })
 
-    test("trims whitespace from text content", async () => {
+    test("preserves whitespace from text content", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "test.txt")
       await fs.writeFile(filepath, "  content with spaces  \n\n", "utf-8")
@@ -61,7 +61,7 @@ describe("file/index Filesystem patterns", () => {
         directory: tmp.path,
         fn: async () => {
           const result = await read("test.txt")
-          expect(result.content).toBe("content with spaces")
+          expect(result.content).toBe("  content with spaces  \n\n")
         },
       })
     })
@@ -126,6 +126,22 @@ describe("file/index Filesystem patterns", () => {
           const result = await read("binary.so")
           expect(result.type).toBe("binary")
           expect(result.content).toBe("")
+        },
+      })
+    })
+
+    test("does not inline oversized images", async () => {
+      await using tmp = await tmpdir()
+      const filepath = path.join(tmp.path, "huge.png")
+      await fs.writeFile(filepath, Buffer.alloc(5 * 1024 * 1024 + 1, 0))
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const result = await read("huge.png")
+          expect(result.type).toBe("binary")
+          expect(result.content).toBe("")
+          expect(result.mimeType).toBe("image/png")
         },
       })
     })
@@ -844,7 +860,7 @@ describe("file/index Filesystem patterns", () => {
         fn: async () => {
           const result = await read("file.txt")
           expect(result.type).toBe("text")
-          expect(result.content).toBe("modified content")
+          expect(result.content).toBe("modified content\n")
           expect(result.diff).toBeDefined()
           expect(result.diff).toContain("original content")
           expect(result.diff).toContain("modified content")
@@ -885,7 +901,7 @@ describe("file/index Filesystem patterns", () => {
         fn: async () => {
           const result = await read("clean.txt")
           expect(result.type).toBe("text")
-          expect(result.content).toBe("unchanged")
+          expect(result.content).toBe("unchanged\n")
           expect(result.diff).toBeUndefined()
           expect(result.patch).toBeUndefined()
         },

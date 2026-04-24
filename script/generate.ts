@@ -2,8 +2,8 @@
 
 import { $ } from "bun"
 
-await $`bun ./packages/sdk/js/script/build.ts`
+await $`bun dev generate`.cwd("packages/openagt").text().then((value) => Bun.write("packages/sdk/openapi.json", value))
 
-await $`bun dev generate > ../sdk/openapi.json`.cwd("packages/opencode")
+await $`bun ./packages/sdk/js/script/build.ts`
 
 await $`./script/format.ts`
