@@ -95,6 +95,15 @@ function routeCurrent(route: ReturnType<typeof useRoute>): TuiPluginApi["route"]
       },
     }
   }
+  if (route.data.type === "mission") {
+    return {
+      name: "mission",
+      params: {
+        sessionID: route.data.sessionID,
+        runID: route.data.runID,
+      },
+    }
+  }
 
   return {
     name: route.data.id,

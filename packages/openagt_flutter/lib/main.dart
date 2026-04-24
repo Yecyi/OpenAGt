@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:opencode_flutter/src/core/api/opencode_api_client.dart';
 import 'package:opencode_flutter/src/core/sse/sse_client.dart';
-import 'package:opencode_flutter/src/features/chat/chat_screen.dart';
 import 'package:opencode_flutter/src/features/session/session_list_screen.dart';
 import 'package:opencode_flutter/src/shared/theme/openag_theme.dart';
 

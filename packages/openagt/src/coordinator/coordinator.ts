@@ -9,6 +9,7 @@ import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { ModelID, ProviderID } from "@/provider/schema"
+import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
@@ -551,6 +552,7 @@ export interface Interface {
   }) => Effect.Effect<CoordinatorRunType, Error>
   readonly approve: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly cancel: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
+  readonly retry: (input: { id: CoordinatorRunIDType; taskID?: SessionID; nodeID?: string }) => Effect.Effect<CoordinatorRunType, Error>
   readonly get: (id: CoordinatorRunIDType) => Effect.Effect<Option.Option<CoordinatorRunType>, Error>
   readonly list: (sessionID: SessionID) => Effect.Effect<CoordinatorRunType[], Error>
   readonly dispatch: (id: CoordinatorRunIDType) => Effect.Effect<{ run: CoordinatorRunType; dispatched: number }, Error>
@@ -572,6 +574,7 @@ export const layer = Layer.effect(
     const sessions = yield* Session.Service
     const tasks = yield* TaskRuntime.Service
     const agents = yield* Agent.Service
+    const provider = yield* Provider.Service
     const scope = yield* Scope.Scope
 
     const publish = (def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed, run: CoordinatorRunType) =>
@@ -586,6 +589,11 @@ export const layer = Layer.effect(
       const base = input.nodes && input.nodes.length > 0 ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes }) : defaultPlanForIntent(intent)
       const expanded = expandVerifyNodes(base)
       validatePlan(expanded)
+      yield* Effect.forEach(
+        expanded.nodes.flatMap((item) => (item.model ? [item.model] : [])),
+        (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
+        { concurrency: "unbounded", discard: true },
+      )
       return orderPlan(expanded)
     })
 
@@ -697,10 +705,7 @@ export const layer = Layer.effect(
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const run = runOpt.value
       if (run.state !== "active") {
-        return {
-          run,
-          dispatched: 0,
-        }
+        return yield* Effect.fail(new Error(`Coordinator run cannot dispatch from state: ${run.state}`))
       }
       const pending = (yield* relevantTasks(run)).filter((item) => item.status === "pending")
       const ready = (
@@ -952,6 +957,11 @@ export const layer = Layer.effect(
 
     const approve: Interface["approve"] = Effect.fn("Coordinator.approve")(function* (id) {
       yield* ensureSubscribed()
+      const current = yield* get(id)
+      if (Option.isNone(current)) throw new Error(`Coordinator run not found: ${id}`)
+      if (current.value.state !== "awaiting_approval" && current.value.state !== "planned") {
+        return yield* Effect.fail(new Error(`Coordinator run cannot be approved from state: ${current.value.state}`))
+      }
       const activated = yield* activateRun(id)
       if (activated.state === "active") yield* dispatchReady(id)
       const runOpt = yield* get(id)
@@ -963,14 +973,23 @@ export const layer = Layer.effect(
       yield* ensureSubscribed()
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
+      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled") {
+        return yield* Effect.fail(new Error(`Coordinator run cannot be cancelled from state: ${runOpt.value.state}`))
+      }
       const taskList = yield* relevantTasks(runOpt.value)
+      const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
       yield* Effect.forEach(
         taskList.filter((item) => item.status === "pending" || item.status === "running"),
         (item) =>
-          tasks.cancel({
-            taskID: item.task_id,
-            parentSessionID: item.parent_session_id,
-            reason: "Coordinator run cancelled",
+          Effect.gen(function* () {
+            if (item.status === "running" && Option.isSome(prompt)) {
+              yield* prompt.value.cancel(item.child_session_id).pipe(Effect.ignore)
+            }
+            yield* tasks.cancel({
+              taskID: item.task_id,
+              parentSessionID: item.parent_session_id,
+              reason: "Coordinator run cancelled",
+            })
           }),
         {
           concurrency: "unbounded",
@@ -997,8 +1016,64 @@ export const layer = Layer.effect(
       return updated
     })
 
+    const retry: Interface["retry"] = Effect.fn("Coordinator.retry")(function* (input) {
+      yield* ensureSubscribed()
+      const runOpt = yield* get(input.id)
+      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${input.id}`)
+      if (runOpt.value.state === "active" || runOpt.value.state === "awaiting_approval") {
+        return yield* Effect.fail(new Error(`Coordinator run cannot be retried from state: ${runOpt.value.state}`))
+      }
+      const taskList = yield* relevantTasks(runOpt.value)
+      const retryable = taskList
+        .filter((item) => item.status === "failed" || item.status === "cancelled")
+        .filter((item) => {
+          if (input.taskID) return item.task_id === input.taskID
+          if (input.nodeID) return item.metadata?.coordinator_node_id === input.nodeID
+          return true
+        })
+      if (retryable.length === 0) return yield* Effect.fail(new Error("No retryable coordinator tasks matched"))
+      yield* Effect.forEach(
+        retryable,
+        (item) =>
+          tasks.retry({
+            taskID: item.task_id,
+            parentSessionID: item.parent_session_id,
+          }),
+        {
+          concurrency: "unbounded",
+          discard: true,
+        },
+      )
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db.update(CoordinatorRunTable)
+            .set({
+              state: "active",
+              summary: "Coordinator run retrying",
+              time_updated: now(),
+              time_finished: null,
+            })
+            .where(eq(CoordinatorRunTable.id, input.id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, input.id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      yield* dispatchReady(input.id).pipe(Effect.ignore)
+      const refreshed = yield* get(input.id)
+      if (Option.isNone(refreshed)) throw new Error(`Coordinator run not found: ${input.id}`)
+      return refreshed.value
+    })
+
     const resume: Interface["resume"] = Effect.fn("Coordinator.resume")(function* (id) {
       yield* ensureSubscribed()
+      const current = yield* get(id)
+      if (Option.isNone(current)) throw new Error(`Coordinator run not found: ${id}`)
+      if (current.value.state !== "blocked" && current.value.state !== "active") {
+        return yield* Effect.fail(new Error(`Coordinator run cannot be resumed from state: ${current.value.state}`))
+      }
       const activated = yield* activateRun(id)
       if (activated.state !== "active") return activated
       yield* dispatchReady(id).pipe(Effect.ignore)
@@ -1013,6 +1088,7 @@ export const layer = Layer.effect(
       run,
       approve,
       cancel,
+      retry,
       get,
       list,
       dispatch: dispatchReady,
@@ -1028,6 +1104,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(TaskRuntime.defaultLayer),
   Layer.provide(Session.defaultLayer),
   Layer.provide(Agent.defaultLayer),
+  Layer.provide(Provider.defaultLayer),
 )
 
 export * as Coordinator from "./coordinator"

@@ -9,12 +9,14 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final OpenCodeApiClient apiClient;
   final SSEClient sseClient;
+  final bool disposeSseClient;
 
   const ChatScreen({
     super.key,
     required this.sessionId,
     required this.apiClient,
     required this.sseClient,
+    this.disposeSseClient = false,
   });
 
   @override
@@ -41,6 +43,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     _sseSubscription?.cancel();
+    if (widget.disposeSseClient) {
+      widget.sseClient.dispose();
+    }
     super.dispose();
   }
 

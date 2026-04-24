@@ -32,6 +32,7 @@ import type {
   CoordinatorPlanResponses,
   CoordinatorProjectionResponses,
   CoordinatorResumeResponses,
+  CoordinatorRetryResponses,
   CoordinatorRunErrors,
   CoordinatorRunResponses,
   CoordinatorSummarizeResponses,
@@ -3594,6 +3595,42 @@ export class Coordinator extends HeyApiClient {
       url: "/coordinator/run/{runID}/resume",
       ...options,
       ...params,
+    })
+  }
+
+  public retry<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+      task_id?: string
+      node_id?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "task_id" },
+            { in: "body", key: "node_id" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorRetryResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/retry",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

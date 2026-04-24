@@ -20,6 +20,11 @@ const intentPayload = z.object({
   goal: z.string(),
 })
 
+const retryPayload = z.object({
+  task_id: SessionID.zod.optional(),
+  node_id: z.string().optional(),
+}).optional()
+
 const projection = z.object({
   run: CoordinatorRun,
   tasks: z.array(TaskRuntime.TaskRecord),
@@ -222,6 +227,35 @@ export const CoordinatorRoutes = () =>
         jsonRequest("CoordinatorRoutes.cancel", c, function* () {
           const svc = yield* Coordinator.Service
           return yield* svc.cancel(c.req.valid("param").runID)
+        }),
+    )
+    .post(
+      "/run/:runID/retry",
+      describeRoute({
+        operationId: "coordinator.retry",
+        responses: {
+          200: {
+            description: "Retried coordinator run",
+            content: {
+              "application/json": {
+                schema: resolver(CoordinatorRun),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("param", z.object({ runID: CoordinatorRunID.zod })),
+      validator("json", retryPayload),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.retry", c, function* () {
+          const svc = yield* Coordinator.Service
+          const body = c.req.valid("json")
+          return yield* svc.retry({
+            id: c.req.valid("param").runID,
+            taskID: body?.task_id,
+            nodeID: body?.node_id,
+          })
         }),
     )
     .post(

@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:opencode_flutter/src/features/coordinator/coordinator_models.dart';
 
 class OpenCodeApiClient {
   final Dio _dio;
@@ -126,5 +126,73 @@ class OpenCodeApiClient {
   Future<Map<String, dynamic>> getVcsDiff() async {
     final response = await _dio.get('/vcs/diff');
     return Map<String, dynamic>.from(response.data);
+  }
+
+  // Coordinator endpoints
+  Future<CoordinatorIntent> settleCoordinatorIntent(String goal) async {
+    final response = await _dio.post('/coordinator/intent/settle', data: {
+      'goal': goal,
+    });
+    return CoordinatorIntent.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<CoordinatorPlan> generateCoordinatorPlan({
+    required String goal,
+    CoordinatorIntent? intent,
+    String? mode,
+    List<CoordinatorNode>? nodes,
+  }) async {
+    final response = await _dio.post('/coordinator/plan/generate', data: {
+      'goal': goal,
+      if (intent != null) 'intent': intent.toJson(),
+      if (mode != null) 'mode': mode,
+      if (nodes != null) 'nodes': nodes.map((node) => node.toJson()).toList(),
+    });
+    return CoordinatorPlan.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<CoordinatorRun> runCoordinator({
+    required String sessionId,
+    required String goal,
+    CoordinatorIntent? intent,
+    String? mode,
+    bool? approved,
+    List<CoordinatorNode>? nodes,
+  }) async {
+    final response = await _dio.post('/coordinator/run/$sessionId', data: {
+      'goal': goal,
+      if (intent != null) 'intent': intent.toJson(),
+      if (mode != null) 'mode': mode,
+      if (approved != null) 'approved': approved,
+      if (nodes != null) 'nodes': nodes.map((node) => node.toJson()).toList(),
+    });
+    return CoordinatorRun.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<List<CoordinatorRun>> listCoordinatorRuns(String sessionId) async {
+    final response = await _dio.get('/coordinator/session/$sessionId');
+    return List<Map<String, dynamic>>.from(response.data)
+        .map(CoordinatorRun.fromJson)
+        .toList();
+  }
+
+  Future<CoordinatorProjection> getCoordinatorProjection(String runId) async {
+    final response = await _dio.get('/coordinator/run/$runId/projection');
+    return CoordinatorProjection.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<CoordinatorRun> approveCoordinatorRun(String runId) async {
+    final response = await _dio.post('/coordinator/run/$runId/approve');
+    return CoordinatorRun.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<CoordinatorRun> cancelCoordinatorRun(String runId) async {
+    final response = await _dio.post('/coordinator/run/$runId/cancel');
+    return CoordinatorRun.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  Future<CoordinatorRun> resumeCoordinatorRun(String runId) async {
+    final response = await _dio.post('/coordinator/run/$runId/resume');
+    return CoordinatorRun.fromJson(Map<String, dynamic>.from(response.data));
   }
 }

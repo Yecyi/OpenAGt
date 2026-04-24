@@ -28,6 +28,7 @@ import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
+import { MissionCommand } from "./cli/cmd/mission"
 import path from "path"
 import { Global } from "./global"
 import { JsonMigration } from "./storage"
@@ -182,6 +183,7 @@ const cli = yargs(args)
   .command(SessionCommand)
   .command(PluginCommand)
   .command(DbCommand)
+  .command(MissionCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
@@ -229,6 +231,7 @@ try {
       "session",
       "plug",
       "db",
+      "mission",
       "completion",
       "help",
       "version",

@@ -8240,3 +8240,132 @@ export type FormatterStatusResponses = {
 }
 
 export type FormatterStatusResponse = FormatterStatusResponses[keyof FormatterStatusResponses]
+
+export type CoordinatorRetryData = {
+  body?: {
+    task_id?: string
+    node_id?: string
+  }
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/retry"
+}
+
+export type CoordinatorRetryResponses = {
+  /**
+   * Retried coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorRetryResponse = CoordinatorRetryResponses[keyof CoordinatorRetryResponses]

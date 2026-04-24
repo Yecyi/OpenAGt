@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -12,6 +13,10 @@ enum SSEEventType {
   messagePartRemoved,
   permissionAsked,
   questionAsked,
+  coordinatorCreated,
+  coordinatorUpdated,
+  coordinatorCompleted,
+  taskUpdated,
   unknown,
 }
 
@@ -75,6 +80,14 @@ class SSEEvent {
         return SSEEventType.permissionAsked;
       case 'question.asked':
         return SSEEventType.questionAsked;
+      case 'coordinator.created':
+        return SSEEventType.coordinatorCreated;
+      case 'coordinator.updated':
+        return SSEEventType.coordinatorUpdated;
+      case 'coordinator.completed':
+        return SSEEventType.coordinatorCompleted;
+      case 'task.updated':
+        return SSEEventType.taskUpdated;
       default:
         return SSEEventType.unknown;
     }
@@ -178,18 +191,21 @@ class SSEClient {
     } catch (e) {
       _controller?.addError(e);
     } finally {
-      await _controller?.close();
+      if (_controller?.isClosed == false) {
+        await _controller?.close();
+      }
     }
   }
 
   void disconnect() {
     _cancelToken?.cancel('Client disconnected');
-    _controller?.close();
+    if (_controller?.isClosed == false) {
+      _controller?.close();
+    }
   }
 
   void dispose() {
     disconnect();
-    _controller?.dispose();
   }
 }
 

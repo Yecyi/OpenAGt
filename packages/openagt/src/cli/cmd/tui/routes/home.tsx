@@ -5,11 +5,15 @@ import { useProject } from "../context/project"
 import { useSync } from "../context/sync"
 import { Toast } from "../ui/toast"
 import { useArgs } from "../context/args"
-import { useRouteData } from "@tui/context/route"
+import { useRoute, useRouteData } from "@tui/context/route"
 import { usePromptRef } from "../context/prompt"
 import { useLocal } from "../context/local"
 import { TuiPluginRuntime } from "../plugin"
 import { useTheme } from "../context/theme"
+import { useCommandDialog } from "../component/dialog-command"
+import { DialogPrompt } from "../ui/dialog-prompt"
+import { useSDK } from "../context/sdk"
+import { useToast } from "../ui/toast"
 
 let once = false
 const HOME_WIDTH = 75
@@ -44,12 +48,60 @@ export function Home() {
   const sync = useSync()
   const project = useProject()
   const route = useRouteData("home")
+  const router = useRoute()
   const promptRef = usePromptRef()
   const [ref, setRef] = createSignal<PromptRef | undefined>()
   const args = useArgs()
   const local = useLocal()
   const { theme } = useTheme()
+  const command = useCommandDialog()
+  const sdk = useSDK()
+  const toast = useToast()
   let sent = false
+
+  command.register(() => [
+    {
+      title: "Create mission",
+      value: "mission.create",
+      description: "Analyze a goal and start a coordinator mission",
+      slash: {
+        name: "mission",
+      },
+      onSelect: async (dialog) => {
+        const goal = await DialogPrompt.show(dialog, "New mission", {
+          placeholder: "Describe the outcome you want",
+        })
+        const text = goal?.trim()
+        if (!text) return
+        try {
+          const session = (await sdk.client.session.create({ title: text.slice(0, 80) || "Mission" }, { throwOnError: true })).data
+          const intent = (await sdk.client.coordinator.intent.settle({ goal: text }, { throwOnError: true })).data
+          const plan = (await sdk.client.coordinator.plan2.generate({ goal: text, intent }, { throwOnError: true })).data
+          const mode = intent.risk_level === "high" ? "assisted" : "autonomous"
+          const run = (
+            await sdk.client.coordinator.run(
+              {
+                sessionID: session.id,
+                goal: text,
+                intent,
+                mode,
+                nodes: plan.nodes,
+              },
+              { throwOnError: true },
+            )
+          ).data
+          router.navigate({
+            type: "mission",
+            sessionID: session.id,
+            runID: run.id,
+          })
+        } catch (error) {
+          toast.error(error)
+        }
+      },
+      category: "Mission",
+    },
+  ])
 
   const bind = (r: PromptRef | undefined) => {
     setRef(r)

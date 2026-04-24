@@ -123,19 +123,81 @@ describe("coordinator runtime", () => {
         })
 
         const summary = yield* coordinator.summarize(run.id)
-        const resumed = yield* coordinator.resume(run.id)
         const projection = yield* coordinator.projection(run.id)
+        const resumeError = yield* Effect.flip(coordinator.resume(run.id))
         yield* Effect.sleep("10 millis")
         const memory = yield* personal.listMemory({ projectID: parent.projectID })
 
         expect(summary).toContain("3/3 completed")
-        expect(resumed.state).toBe("completed")
+        expect(resumeError.message).toContain("cannot be resumed from state: completed")
         expect(projection.counts.completed).toBe(3)
         expect(projection.tasks).toHaveLength(3)
         expect(memory.some((item) => item.tags.includes(`coordinator_run:${run.id}`))).toBe(true)
         expect(seen).toContain("coordinator.created")
         expect(seen).toContain("coordinator.completed")
         unsub()
+      }),
+    ),
+  )
+
+  it.live("requires approval for high-risk runs and retries failed coordinator tasks", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Coordinator approval parent" })
+
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "automate production cleanup and delete stale credentials",
+        })
+        expect(run.state).toBe("awaiting_approval")
+
+        const dispatchError = yield* Effect.flip(coordinator.dispatch(run.id))
+        expect(dispatchError.message).toContain("cannot dispatch from state: awaiting_approval")
+
+        const approved = yield* coordinator.approve(run.id)
+        expect(approved.state).toBe("active")
+
+        const first = (yield* tasks.list(parent.id)).find((item) => item.status === "pending")
+        if (!first) throw new Error("Expected a pending coordinator task")
+
+        yield* tasks.fail({
+          taskID: first.task_id,
+          parentSessionID: parent.id,
+          error: "verification failed",
+        })
+        yield* coordinator.summarize(run.id)
+        expect((yield* coordinator.projection(run.id)).run.state).toBe("failed")
+
+        const retried = yield* coordinator.retry({
+          id: run.id,
+          taskID: first.task_id,
+        })
+        const retriedTask = (yield* coordinator.projection(run.id)).tasks.find((item) => item.task_id === first.task_id)
+
+        expect(retried.state).toBe("active")
+        expect(retriedTask?.status).toBe("pending")
+      }),
+    ),
+  )
+
+  it.live("cancels pending coordinator tasks from an approval gate", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator cancel parent" })
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "delete production credentials",
+        })
+        const cancelled = yield* coordinator.cancel(run.id)
+        const projection = yield* coordinator.projection(run.id)
+
+        expect(cancelled.state).toBe("cancelled")
+        expect(projection.counts.cancelled).toBe(run.task_ids.length)
       }),
     ),
   )

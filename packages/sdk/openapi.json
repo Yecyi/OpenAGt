@@ -13315,6 +13315,361 @@
           }
         ]
       }
+    },
+    "/coordinator/run/{runID}/retry": {
+      "post": {
+        "operationId": "coordinator.retry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "runID",
+            "schema": {
+              "type": "string",
+              "pattern": "^cor.*"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retried coordinator run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^cor.*"
+                    },
+                    "sessionID": {
+                      "type": "string"
+                    },
+                    "goal": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "object",
+                      "properties": {
+                        "goal": {
+                          "type": "string"
+                        },
+                        "task_type": {
+                          "type": "string",
+                          "enum": [
+                            "coding",
+                            "review",
+                            "debugging",
+                            "research",
+                            "documentation",
+                            "environment-audit",
+                            "automation",
+                            "file-data-organization",
+                            "general-operations"
+                          ]
+                        },
+                        "success_criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "risk_level": {
+                          "type": "string",
+                          "enum": ["low", "medium", "high"]
+                        },
+                        "needs_user_clarification": {
+                          "type": "boolean"
+                        },
+                        "clarification_questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "workflow": {
+                          "type": "string",
+                          "enum": [
+                            "coding",
+                            "review",
+                            "debugging",
+                            "research",
+                            "documentation",
+                            "environment-audit",
+                            "automation",
+                            "file-data-organization",
+                            "general-operations"
+                          ]
+                        },
+                        "expected_output": {
+                          "type": "string"
+                        },
+                        "permission_expectations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "goal",
+                        "task_type",
+                        "success_criteria",
+                        "risk_level",
+                        "needs_user_clarification",
+                        "clarification_questions",
+                        "workflow",
+                        "expected_output",
+                        "permission_expectations"
+                      ]
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["manual", "assisted", "autonomous"]
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "enum": [
+                        "coding",
+                        "review",
+                        "debugging",
+                        "research",
+                        "documentation",
+                        "environment-audit",
+                        "automation",
+                        "file-data-organization",
+                        "general-operations"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "settling_intent",
+                        "awaiting_approval",
+                        "planned",
+                        "active",
+                        "blocked",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "goal": {
+                          "type": "string"
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "prompt": {
+                                "type": "string"
+                              },
+                              "task_kind": {
+                                "type": "string",
+                                "enum": ["research", "implement", "verify", "generic"]
+                              },
+                              "subagent_type": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "default": "coordinator",
+                                "type": "string",
+                                "enum": [
+                                  "coordinator",
+                                  "researcher",
+                                  "implementer",
+                                  "verifier",
+                                  "reviewer",
+                                  "debugger",
+                                  "writer",
+                                  "environment-auditor",
+                                  "memory-curator",
+                                  "automation-planner"
+                                ]
+                              },
+                              "model": {
+                                "type": "object",
+                                "properties": {
+                                  "providerID": {
+                                    "type": "string"
+                                  },
+                                  "modelID": {
+                                    "type": "string"
+                                  },
+                                  "variant": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["providerID", "modelID"]
+                              },
+                              "risk": {
+                                "default": "medium",
+                                "type": "string",
+                                "enum": ["low", "medium", "high"]
+                              },
+                              "depends_on": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "write_scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "read_scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "acceptance_checks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "output_schema": {
+                                "default": "summary",
+                                "type": "string",
+                                "enum": [
+                                  "research",
+                                  "implementation",
+                                  "verification",
+                                  "review",
+                                  "debug",
+                                  "document",
+                                  "environment-diagnosis",
+                                  "automation-plan",
+                                  "memory",
+                                  "summary"
+                                ]
+                              },
+                              "requires_user_input": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": ["high", "normal", "low"]
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": ["user", "coordinator", "scheduler", "gateway"]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "description",
+                              "prompt",
+                              "task_kind",
+                              "subagent_type",
+                              "depends_on",
+                              "write_scope",
+                              "read_scope",
+                              "acceptance_checks",
+                              "priority",
+                              "origin"
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["goal", "nodes"]
+                    },
+                    "task_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "number"
+                        },
+                        "updated": {
+                          "type": "number"
+                        },
+                        "finished": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["created", "updated"]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sessionID",
+                    "goal",
+                    "intent",
+                    "mode",
+                    "workflow",
+                    "state",
+                    "plan",
+                    "task_ids",
+                    "time"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@openagt/sdk\n\nconst client = createOpencodeClient()\nawait client.coordinator.resume({\n  ...\n})"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "task_id": {
+                    "type": "string"
+                  },
+                  "node_id": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:opencode_flutter/src/core/api/opencode_api_client.dart';
 import 'package:opencode_flutter/src/core/sse/sse_client.dart';
 import 'package:opencode_flutter/src/features/chat/chat_screen.dart';
+import 'package:opencode_flutter/src/features/coordinator/task_setup_screen.dart';
 import 'package:opencode_flutter/src/shared/theme/openag_theme.dart';
 
 class SessionListScreen extends ConsumerStatefulWidget {
@@ -43,25 +44,18 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     }
   }
 
-  Future<void> _createSession() async {
-    try {
-      final session = await widget.apiClient.createSession();
-      final sessionId = session['id'] as String?;
-      if (sessionId != null && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              sessionId: sessionId,
-              apiClient: widget.apiClient,
-              sseClient: widget.sseClient,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Failed to create session: $e');
-    }
+  void _createMission() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TaskSetupScreen(
+          apiClient: widget.apiClient,
+          sseClient: widget.sseClient,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _loadSessions();
+    });
   }
 
   String _formatTimestamp(DateTime? timestamp) {
@@ -94,8 +88,8 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
               ? _buildEmptyState()
               : _buildSessionList(),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createSession,
-        child: const Icon(Icons.add),
+        onPressed: _createMission,
+        child: const Icon(Icons.account_tree_outlined),
       ),
     );
   }

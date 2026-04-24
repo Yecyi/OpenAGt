@@ -191,6 +191,10 @@ export interface Interface {
     parentSessionID: SessionID
     reason?: string
   }) => Effect.Effect<TaskRecord, Error>
+  readonly retry: (input: {
+    taskID: SessionID
+    parentSessionID: SessionID
+  }) => Effect.Effect<TaskRecord, Error>
   readonly get: (input: { taskID: SessionID; parentSessionID: SessionID }) => Effect.Effect<Option.Option<TaskRecord>, Error>
   readonly list: (parentSessionID: SessionID) => Effect.Effect<TaskRecord[], Error>
   readonly wait: (input: {
@@ -352,6 +356,23 @@ export const layer = Layer.effect(
       })
     })
 
+    const retry: Interface["retry"] = Effect.fn("TaskRuntime.retry")(function* (input) {
+      const current = yield* get({ taskID: input.taskID, parentSessionID: input.parentSessionID })
+      if (Option.isNone(current)) return yield* Effect.fail(new Error(`Task not found: ${input.taskID}`))
+      if (current.value.status !== "failed" && current.value.status !== "cancelled") {
+        return yield* Effect.fail(new Error(`Task cannot be retried from state: ${current.value.status}`))
+      }
+      return yield* update(input.parentSessionID, input.taskID, (draft) => {
+        draft.status = "pending"
+        draft.started_at = undefined
+        draft.finished_at = undefined
+        draft.result_summary = undefined
+        draft.error_summary = undefined
+        draft.stop_reason = undefined
+        draft.usage = undefined
+      })
+    })
+
     const list: Interface["list"] = Effect.fn("TaskRuntime.list")(function* (parentSessionID) {
       const keys = yield* storage.list(["task", parentSessionID])
       const items = yield* Effect.all(
@@ -426,6 +447,7 @@ export const layer = Layer.effect(
       list,
       wait,
       canRun,
+      retry,
     })
   }),
 )
