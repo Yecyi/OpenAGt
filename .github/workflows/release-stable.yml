@@ -66,6 +66,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       OPENAGT_VERSION: ${{ inputs.version }}
+      AZURE_TRUSTED_SIGNING_CONFIGURED: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID != '' && secrets.AZURE_TRUSTED_SIGNING_TENANT_ID != '' && secrets.AZURE_TRUSTED_SIGNING_SUBSCRIPTION_ID != '' && secrets.AZURE_TRUSTED_SIGNING_ENDPOINT != '' && secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME != '' && secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -95,7 +96,7 @@ jobs:
           .\packages\openagt\script\build-windows-installer.ps1 -Version $env:OPENAGT_VERSION
 
       - name: Azure login for Trusted Signing
-        if: runner.os == 'Windows' && inputs.release_kind == 'ga'
+        if: runner.os == 'Windows' && inputs.release_kind == 'ga' && env.AZURE_TRUSTED_SIGNING_CONFIGURED == 'true'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
         with:
           client-id: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID }}
@@ -106,7 +107,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          OPENAGT_REQUIRE_WINDOWS_SIGNING: ${{ inputs.release_kind == 'ga' && '1' || '0' }}
+          OPENAGT_REQUIRE_WINDOWS_SIGNING: ${{ inputs.release_kind == 'ga' && env.AZURE_TRUSTED_SIGNING_CONFIGURED == 'true' && '1' || '0' }}
           AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME }}
@@ -115,7 +116,7 @@ jobs:
             .\packages\openagt\dist\openagt-windows-x64\release\bin\openagt.exe `
             .\packages\openagt\dist\OpenAGt-Setup-x64.msi
 
-      - name: Repack signed Windows ZIP
+      - name: Repack Windows ZIP
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
