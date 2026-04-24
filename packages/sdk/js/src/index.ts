@@ -1,6 +1,7 @@
 export * from "./client.js"
 export * from "./server.js"
 export * from "./v2/shell-safety.js"
+export * from "./v2/runtime-helpers.js"
 export type { PermissionRequest as Permission } from "./gen/types.gen.js"
 
 import { createOpencodeClient } from "./client.js"

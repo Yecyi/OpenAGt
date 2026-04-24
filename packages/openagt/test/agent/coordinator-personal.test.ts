@@ -212,7 +212,7 @@ describe("personal agent core", () => {
         })
         yield* personal.updateInboxState({
           id: webhookItem.id,
-          state: "completed",
+          state: "done",
         })
         const completedWakeup = yield* personal.completeWakeup(wakeup.id)
         const inbox = yield* personal.listInboxItems({ projectID })
@@ -226,8 +226,8 @@ describe("personal agent core", () => {
         expect(completedWakeup.state).toBe("completed")
         expect(inbox.map((item) => item.source).toSorted()).toEqual(["scheduled", "session", "webhook"])
         expect(memory.some((item) => item.tags.includes(`follow_up:${wakeup.id}`))).toBe(true)
-        expect(overview.inbox.pending).toBe(2)
-        expect(overview.inbox.completed).toBe(1)
+        expect(overview.inbox.queued).toBe(2)
+        expect(overview.inbox.done).toBe(1)
         expect(overview.wakeups.pending).toBe(0)
         expect(seen).toContain("memory.updated")
         expect(seen).toContain("inbox.created")

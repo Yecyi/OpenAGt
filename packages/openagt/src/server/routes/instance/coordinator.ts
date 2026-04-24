@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import { describeRoute, resolver, validator } from "hono-openapi"
 import z from "zod"
 import { Coordinator } from "@/coordinator/coordinator"
-import { CoordinatorNode, CoordinatorPlan, CoordinatorRun, CoordinatorRunID } from "@/coordinator/schema"
+import { CoordinatorMode, CoordinatorNode, CoordinatorPlan, CoordinatorRun, CoordinatorRunID, IntentProfile } from "@/coordinator/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { SessionID } from "@/session/schema"
 import { errors } from "../../error"
@@ -11,6 +11,13 @@ import { jsonRequest } from "./trace"
 const runPayload = z.object({
   goal: z.string(),
   nodes: z.array(CoordinatorNode).optional(),
+  intent: IntentProfile.optional(),
+  mode: CoordinatorMode.optional(),
+  approved: z.boolean().optional(),
+})
+
+const intentPayload = z.object({
+  goal: z.string(),
 })
 
 const projection = z.object({
@@ -27,6 +34,52 @@ const projection = z.object({
 
 export const CoordinatorRoutes = () =>
   new Hono()
+    .post(
+      "/intent/settle",
+      describeRoute({
+        operationId: "coordinator.intent.settle",
+        responses: {
+          200: {
+            description: "Settled coordinator intent",
+            content: {
+              "application/json": {
+                schema: resolver(IntentProfile),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", intentPayload),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.intent.settle", c, function* () {
+          const svc = yield* Coordinator.Service
+          return yield* svc.settleIntent(c.req.valid("json"))
+        }),
+    )
+    .post(
+      "/plan/generate",
+      describeRoute({
+        operationId: "coordinator.plan.generate",
+        responses: {
+          200: {
+            description: "Generated coordinator plan",
+            content: {
+              "application/json": {
+                schema: resolver(CoordinatorPlan),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", runPayload),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.plan.generate", c, function* () {
+          const svc = yield* Coordinator.Service
+          return yield* svc.plan(c.req.valid("json"))
+        }),
+    )
     .post(
       "/plan",
       describeRoute({
@@ -76,6 +129,9 @@ export const CoordinatorRoutes = () =>
             sessionID: c.req.valid("param").sessionID,
             goal: body.goal,
             nodes: body.nodes,
+            intent: body.intent,
+            mode: body.mode,
+            approved: body.approved,
           })
         }),
     )
@@ -122,6 +178,50 @@ export const CoordinatorRoutes = () =>
         jsonRequest("CoordinatorRoutes.list", c, function* () {
           const svc = yield* Coordinator.Service
           return yield* svc.list(c.req.valid("param").sessionID)
+        }),
+    )
+    .post(
+      "/run/:runID/approve",
+      describeRoute({
+        operationId: "coordinator.approve",
+        responses: {
+          200: {
+            description: "Approved coordinator run",
+            content: {
+              "application/json": {
+                schema: resolver(CoordinatorRun),
+              },
+            },
+          },
+        },
+      }),
+      validator("param", z.object({ runID: CoordinatorRunID.zod })),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.approve", c, function* () {
+          const svc = yield* Coordinator.Service
+          return yield* svc.approve(c.req.valid("param").runID)
+        }),
+    )
+    .post(
+      "/run/:runID/cancel",
+      describeRoute({
+        operationId: "coordinator.cancel",
+        responses: {
+          200: {
+            description: "Cancelled coordinator run",
+            content: {
+              "application/json": {
+                schema: resolver(CoordinatorRun),
+              },
+            },
+          },
+        },
+      }),
+      validator("param", z.object({ runID: CoordinatorRunID.zod })),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.cancel", c, function* () {
+          const svc = yield* Coordinator.Service
+          return yield* svc.cancel(c.req.valid("param").runID)
         }),
     )
     .post(

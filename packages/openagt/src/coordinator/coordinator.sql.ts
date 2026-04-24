@@ -13,6 +13,9 @@ export const CoordinatorRunTable = sqliteTable(
       .notNull()
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     goal: text().notNull(),
+    intent: text({ mode: "json" }).notNull(),
+    mode: text().notNull(),
+    workflow: text().notNull(),
     state: text().notNull(),
     plan: text({ mode: "json" }).notNull(),
     task_ids: text({ mode: "json" }).notNull().$type<SessionID[]>(),

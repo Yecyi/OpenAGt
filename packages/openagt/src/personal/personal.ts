@@ -40,6 +40,13 @@ const scopeWeight = {
   profile: 10,
 } as const satisfies Record<MemoryScopeType, number>
 
+function normalizeInboxState(state: string): InboxStateType {
+  if (state === "pending") return "queued"
+  if (state === "processing") return "active"
+  if (state === "completed") return "done"
+  return InboxState.parse(state)
+}
+
 function now() {
   return Date.now()
 }
@@ -101,7 +108,7 @@ function inboxFromRow(row: typeof InboxItemTable.$inferSelect) {
     goal: row.goal,
     context_refs: row.context_refs,
     priority: row.priority,
-    state: row.state,
+    state: normalizeInboxState(row.state),
     scheduled_for: row.scheduled_for ?? undefined,
     payload: row.payload ?? undefined,
     time: {
@@ -444,7 +451,7 @@ export const layer = Layer.effect(
               goal: input.goal,
               context_refs: input.contextRefs ?? [],
               priority: input.priority ?? "normal",
-              state: "pending",
+              state: "queued",
               scheduled_for: input.scheduledFor,
               payload: input.payload,
               time_created: timestamp,
@@ -469,7 +476,7 @@ export const layer = Layer.effect(
             .where(eq(InboxItemTable.project_id, input.projectID))
             .orderBy(desc(InboxItemTable.time_updated))
             .all()
-            .filter((row) => !input.state || row.state === input.state),
+            .filter((row) => !input.state || normalizeInboxState(row.state) === input.state),
         ),
       )
       return rows.map(inboxFromRow)
@@ -483,7 +490,7 @@ export const layer = Layer.effect(
             .set({
               state: input.state,
               time_updated: timestamp,
-              time_completed: input.state === "completed" ? timestamp : null,
+              time_completed: input.state === "done" ? timestamp : null,
             })
             .where(eq(InboxItemTable.id, input.id))
             .run(),
@@ -634,9 +641,11 @@ export const layer = Layer.effect(
       )
       return {
         inbox: {
-          pending: inbox.filter((item) => item.state === "pending").length,
-          processing: inbox.filter((item) => item.state === "processing").length,
-          completed: inbox.filter((item) => item.state === "completed").length,
+          queued: inbox.filter((item) => item.state === "queued").length,
+          active: inbox.filter((item) => item.state === "active").length,
+          blocked: inbox.filter((item) => item.state === "blocked").length,
+          done: inbox.filter((item) => item.state === "done").length,
+          failed: inbox.filter((item) => item.state === "failed").length,
           cancelled: inbox.filter((item) => item.state === "cancelled").length,
         },
         wakeups: {

@@ -655,7 +655,54 @@ export const BashTool = Tool.define(
             cwd,
             externalPaths,
           })
-          const capabilities = yield* sandboxBroker.capabilities()
+          if (preliminaryDecision === "block") {
+            const matchedRules = policyDecision.matchedRules.map((item) => item.pattern.join(" "))
+            const shellSafety = formatShellSafety({
+              decision: "block",
+              riskLevel: security.risk_level,
+              reason: preliminaryReason,
+              approvalKind: "dangerous_command",
+              approvalRequired: true,
+              policySource: policyDecision.matchedRules.length > 0 ? "exec_policy" : "shell_security",
+              backendPreference: preliminaryPolicy.backend_preference,
+              enforcement: preliminaryPolicy.enforcement,
+              filesystemPolicy: preliminaryPolicy.filesystem_policy,
+              networkPolicy: preliminaryPolicy.network_policy,
+              backendAvailability: "not_checked",
+              policyReason: preliminaryReason,
+              matchedRules,
+            })
+            return {
+              title: "Bash Command Blocked",
+              metadata: {
+                output: shellSafety.summary,
+                exit: null as number | null,
+                description: params.description ?? "",
+                truncated: false,
+                findings: security.findings,
+                riskLevel: security.risk_level,
+                decision: "block",
+                reviewApiVersion: security.review_api_version,
+                reviewMode: security.review_mode,
+                reviewStatus: security.review_status,
+                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
+                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
+                ...(matchedRules.length > 0 ? { matchedRules } : {}),
+                shell_safety: shellSafety,
+                safetySummary: shellSafety.summary,
+                safetyDetails: shellSafety.details,
+              } satisfies BashMetadata,
+              output: shellSafety.summary,
+            }
+          }
+          const capabilities = yield* sandboxBroker.capabilities().pipe(
+            Effect.catchCause((cause) =>
+              Effect.sync(() => {
+                log.warn("sandbox capabilities unavailable", { cause })
+                return [] satisfies SandboxBackendStatus[]
+              }),
+            ),
+          )
           const privilegeEscalation = isPrivilegeEscalationCommand(security.normalized_command || params.command)
           const escalationReason = sandboxEscalationReason({
             decision: preliminaryDecision,

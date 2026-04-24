@@ -1,4 +1,5 @@
 import { Context, Effect, Layer } from "effect"
+import { fileURLToPath } from "url"
 import { createFrameParser, encodeFrame } from "./protocol"
 import {
   SANDBOX_PROTOCOL_VERSION,
@@ -34,6 +35,11 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Sa
 
 export function brokerCommand(argv = process.argv, execPath = process.execPath, execArgv = process.execArgv) {
   const script = argv[1]
+  const sourceEntry = fileURLToPath(new URL("../index.ts", import.meta.url))
+  if (execPath.toLowerCase().includes("bun") && (!script || script === "test")) return [execPath, sourceEntry]
+  if (execPath.toLowerCase().includes("bun") && script && /\.test\.[cm]?[jt]sx?$/i.test(script)) {
+    return [execPath, sourceEntry]
+  }
   if (!script) return [execPath]
   if (!/\.(?:[cm]?[jt]s|tsx?|jsx?)$/i.test(script)) return [execPath]
   return [execPath, ...execArgv, script]

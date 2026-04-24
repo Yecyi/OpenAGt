@@ -74,6 +74,17 @@ OpenAGt 当前围绕四个核心思路构建：
 - 无头 server 与生成式 JavaScript SDK
 - 跨平台打包与 Windows MSI 分发
 
+## 验证矩阵
+
+| 能力 | 状态 |
+| --- | --- |
+| Session runtime 和工具循环 | 稳定 |
+| Approval and Safety Envelope | 稳定，并带版本化 `shell_safety` |
+| Coordinator Runtime | 已实现，v1.16 继续收口 |
+| Personal Agent Core | 已实现，v1.16 继续收口 |
+| Debug doctor / repro bundle | v1.16 诊断能力 |
+| Flutter 前端 | 路线图；先稳定后端契约 |
+
 ## 关键能力
 
 - 持久化 session 驱动的 agent loop

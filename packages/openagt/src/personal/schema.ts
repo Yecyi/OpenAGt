@@ -52,7 +52,7 @@ export type MemorySource = z.infer<typeof MemorySource>
 export const InboxSource = z.enum(["session", "scheduled", "webhook"])
 export type InboxSource = z.infer<typeof InboxSource>
 
-export const InboxState = z.enum(["pending", "processing", "completed", "cancelled"])
+export const InboxState = z.enum(["queued", "active", "blocked", "done", "failed", "cancelled"])
 export type InboxState = z.infer<typeof InboxState>
 
 export const WakeupState = z.enum(["pending", "fired", "completed", "cancelled"])

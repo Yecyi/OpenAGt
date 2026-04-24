@@ -170,6 +170,24 @@ const capture = (requests: Array<Omit<Permission.Request, "id" | "sessionID" | "
     }),
 })
 
+const stopAfterPermission = (
+  requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">>,
+  permission: Omit<Permission.Request, "id" | "sessionID" | "tool">["permission"],
+) => {
+  const err = new Error(`stop after ${permission}`)
+  return {
+    err,
+    ctx: {
+      ...ctx,
+      ask: (req: Omit<Permission.Request, "id" | "sessionID" | "tool">) =>
+        Effect.sync(() => {
+          requests.push(req)
+          if (req.permission === permission) throw err
+        }),
+    },
+  }
+}
+
 const mustTruncate = (result: {
   metadata: { truncated?: boolean; exit?: number | null } & Record<string, unknown>
   output: string
@@ -253,6 +271,7 @@ describe("tool.bash permissions", () => {
         expect(result.metadata.decision).toBe("block")
         expect(result.metadata.reviewMode).toBe("disabled")
         expect(result.metadata.reviewStatus).toBe("not_requested")
+        expect(result.metadata.shell_safety?.version).toBe(1)
         expect(result.metadata.shell_safety?.approval.kind).toBe("dangerous_command")
         expect(requests).toHaveLength(0)
       },
@@ -305,15 +324,18 @@ describe("tool.bash permissions", () => {
         )
         const bash = await initBash(configWithPolicy)
         const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-        await Effect.runPromise(
-          bash.execute(
-            {
-              command: "curl https://example.com",
-              description: "Download remote content",
-            },
-            capture(requests),
+        const stop = stopAfterPermission(requests, "shell_execute")
+        await expect(
+          Effect.runPromise(
+            bash.execute(
+              {
+                command: "curl https://example.com",
+                description: "Download remote content",
+              },
+              stop.ctx,
+            ),
           ),
-        )
+        ).rejects.toThrow(stop.err.message)
         const confirm = requests.find((item) => item.permission === "shell_execute")
         expect(confirm?.metadata).toMatchObject({
           decision: "confirm",
@@ -345,15 +367,18 @@ describe("tool.bash permissions", () => {
       fn: async () => {
         const bash = await initBash()
         const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-        await Effect.runPromise(
-          bash.execute(
-            {
-              command: "git -c core.pager=cat status",
-              description: "Run git with inline config",
-            },
-            capture(requests),
+        const stop = stopAfterPermission(requests, "shell_execute")
+        await expect(
+          Effect.runPromise(
+            bash.execute(
+              {
+                command: "git -c core.pager=cat status",
+                description: "Run git with inline config",
+              },
+              stop.ctx,
+            ),
           ),
-        )
+        ).rejects.toThrow(stop.err.message)
         const confirm = requests.find((item) => item.permission === "shell_execute")
         expect(confirm?.metadata).toMatchObject({
           decision: "confirm",
@@ -386,15 +411,18 @@ describe("tool.bash permissions", () => {
       fn: async () => {
         const bash = await initBash()
         const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-        await Effect.runPromise(
-          bash.execute(
-            {
-              command: "curl https://example.com",
-              description: "Fetch remote content",
-            },
-            capture(requests),
+        const stop = stopAfterPermission(requests, "shell_network")
+        await expect(
+          Effect.runPromise(
+            bash.execute(
+              {
+                command: "curl https://example.com",
+                description: "Fetch remote content",
+              },
+              stop.ctx,
+            ),
           ),
-        )
+        ).rejects.toThrow(stop.err.message)
         const network = requests.find((item) => item.permission === "shell_network")
         expect(network?.metadata).toMatchObject({
           decision: "confirm",
@@ -421,15 +449,18 @@ describe("tool.bash permissions", () => {
       fn: async () => {
         const bash = await initBash()
         const requests: Array<Omit<Permission.Request, "id" | "sessionID" | "tool">> = []
-        await Effect.runPromise(
-          bash.execute(
-            {
-              command: "sudo npm install",
-              description: "Install package with sudo",
-            },
-            capture(requests),
+        const stop = stopAfterPermission(requests, "shell_execute")
+        await expect(
+          Effect.runPromise(
+            bash.execute(
+              {
+                command: "sudo npm install",
+                description: "Install package with sudo",
+              },
+              stop.ctx,
+            ),
           ),
-        )
+        ).rejects.toThrow(stop.err.message)
         const confirm = requests.find((item) => item.permission === "shell_execute")
         expect(confirm?.metadata?.shell_safety).toMatchObject({
           approval: {

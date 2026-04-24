@@ -49,6 +49,13 @@ export type EventProjectUpdated = {
   properties: Project
 }
 
+export type EventServerInstanceDisposed = {
+  type: "server.instance.disposed"
+  properties: {
+    directory: string
+  }
+}
+
 export type EventServerConnected = {
   type: "server.connected"
   properties: {
@@ -63,10 +70,18 @@ export type EventGlobalDisposed = {
   }
 }
 
-export type EventServerInstanceDisposed = {
-  type: "server.instance.disposed"
+export type EventFileEdited = {
+  type: "file.edited"
   properties: {
-    directory: string
+    file: string
+  }
+}
+
+export type EventFileWatcherUpdated = {
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
   }
 }
 
@@ -82,6 +97,20 @@ export type EventLspUpdated = {
   type: "lsp.updated"
   properties: {
     [key: string]: unknown
+  }
+}
+
+export type EventInstallationUpdated = {
+  type: "installation.updated"
+  properties: {
+    version: string
+  }
+}
+
+export type EventInstallationUpdateAvailable = {
+  type: "installation.update-available"
+  properties: {
+    version: string
   }
 }
 
@@ -214,35 +243,6 @@ export type EventSessionError = {
       | StructuredOutputError
       | ContextOverflowError
       | ApiError
-  }
-}
-
-export type EventInstallationUpdated = {
-  type: "installation.updated"
-  properties: {
-    version: string
-  }
-}
-
-export type EventInstallationUpdateAvailable = {
-  type: "installation.update-available"
-  properties: {
-    version: string
-  }
-}
-
-export type EventFileEdited = {
-  type: "file.edited"
-  properties: {
-    file: string
-  }
-}
-
-export type EventFileWatcherUpdated = {
-  type: "file.watcher.updated"
-  properties: {
-    file: string
-    event: "add" | "change" | "unlink"
   }
 }
 
@@ -559,7 +559,55 @@ export type EventCoordinatorCreated = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -568,10 +616,39 @@ export type EventCoordinatorCreated = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -592,7 +669,55 @@ export type EventCoordinatorUpdated = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -601,10 +726,39 @@ export type EventCoordinatorUpdated = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -625,7 +779,55 @@ export type EventCoordinatorCompleted = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -634,10 +836,39 @@ export type EventCoordinatorCompleted = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -683,7 +914,7 @@ export type EventInboxCreated = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -707,7 +938,7 @@ export type EventInboxUpdated = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -774,7 +1005,7 @@ export type EventSchedulerFired = {
       goal: string
       context_refs: Array<string>
       priority: "high" | "normal" | "low"
-      state: "pending" | "processing" | "completed" | "cancelled"
+      state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
       scheduled_for?: number
       payload?: {
         [key: string]: unknown
@@ -1410,20 +1641,20 @@ export type GlobalEvent = {
   payload:
     | EventProviderFallbackHop
     | EventProjectUpdated
+    | EventServerInstanceDisposed
     | EventServerConnected
     | EventGlobalDisposed
-    | EventServerInstanceDisposed
+    | EventFileEdited
+    | EventFileWatcherUpdated
     | EventLspClientDiagnostics
     | EventLspUpdated
+    | EventInstallationUpdated
+    | EventInstallationUpdateAvailable
     | EventMessagePartDelta
     | EventPermissionAsked
     | EventPermissionReplied
     | EventSessionDiff
     | EventSessionError
-    | EventInstallationUpdated
-    | EventInstallationUpdateAvailable
-    | EventFileEdited
-    | EventFileWatcherUpdated
     | EventQuestionAsked
     | EventQuestionReplied
     | EventQuestionRejected
@@ -2498,20 +2729,20 @@ export type File = {
 export type Event =
   | EventProviderFallbackHop
   | EventProjectUpdated
+  | EventServerInstanceDisposed
   | EventServerConnected
   | EventGlobalDisposed
-  | EventServerInstanceDisposed
+  | EventFileEdited
+  | EventFileWatcherUpdated
   | EventLspClientDiagnostics
   | EventLspUpdated
+  | EventInstallationUpdated
+  | EventInstallationUpdateAvailable
   | EventMessagePartDelta
   | EventPermissionAsked
   | EventPermissionReplied
   | EventSessionDiff
   | EventSessionError
-  | EventInstallationUpdated
-  | EventInstallationUpdateAvailable
-  | EventFileEdited
-  | EventFileWatcherUpdated
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -3208,6 +3439,39 @@ export type PtyCreateResponses = {
 
 export type PtyCreateResponse = PtyCreateResponses[keyof PtyCreateResponses]
 
+export type PtyConnectTicketData = {
+  body?: never
+  path: {
+    ptyID: string
+  }
+  query: {
+    directory: string
+    workspace?: string
+  }
+  url: "/pty/{ptyID}/connect-ticket"
+}
+
+export type PtyConnectTicketErrors = {
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type PtyConnectTicketError = PtyConnectTicketErrors[keyof PtyConnectTicketErrors]
+
+export type PtyConnectTicketResponses = {
+  /**
+   * Connection ticket
+   */
+  200: {
+    token: string
+    expires: number
+  }
+}
+
+export type PtyConnectTicketResponse = PtyConnectTicketResponses[keyof PtyConnectTicketResponses]
+
 export type PtyRemoveData = {
   body?: never
   path: {
@@ -3303,39 +3567,6 @@ export type PtyUpdateResponses = {
 }
 
 export type PtyUpdateResponse = PtyUpdateResponses[keyof PtyUpdateResponses]
-
-export type PtyConnectTicketData = {
-  body?: never
-  path: {
-    ptyID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/pty/{ptyID}/connect-ticket"
-}
-
-export type PtyConnectTicketErrors = {
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type PtyConnectTicketError = PtyConnectTicketErrors[keyof PtyConnectTicketErrors]
-
-export type PtyConnectTicketResponses = {
-  /**
-   * Connection ticket
-   */
-  200: {
-    token: string
-    expires: number
-  }
-}
-
-export type PtyConnectTicketResponse = PtyConnectTicketResponses[keyof PtyConnectTicketResponses]
 
 export type PtyConnectData = {
   body?: never
@@ -4949,6 +5180,211 @@ export type ProviderOauthCallbackResponses = {
 
 export type ProviderOauthCallbackResponse = ProviderOauthCallbackResponses[keyof ProviderOauthCallbackResponses]
 
+export type CoordinatorIntentSettleData = {
+  body?: {
+    goal: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/intent/settle"
+}
+
+export type CoordinatorIntentSettleErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorIntentSettleError = CoordinatorIntentSettleErrors[keyof CoordinatorIntentSettleErrors]
+
+export type CoordinatorIntentSettleResponses = {
+  /**
+   * Settled coordinator intent
+   */
+  200: {
+    goal: string
+    task_type:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    success_criteria: Array<string>
+    risk_level: "low" | "medium" | "high"
+    needs_user_clarification: boolean
+    clarification_questions: Array<string>
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    expected_output: string
+    permission_expectations: Array<string>
+  }
+}
+
+export type CoordinatorIntentSettleResponse = CoordinatorIntentSettleResponses[keyof CoordinatorIntentSettleResponses]
+
+export type CoordinatorPlanGenerateData = {
+  body?: {
+    goal: string
+    nodes?: Array<{
+      id: string
+      description: string
+      prompt: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      role?:
+        | "coordinator"
+        | "researcher"
+        | "implementer"
+        | "verifier"
+        | "reviewer"
+        | "debugger"
+        | "writer"
+        | "environment-auditor"
+        | "memory-curator"
+        | "automation-planner"
+      model?: {
+        providerID: string
+        modelID: string
+        variant?: string
+      }
+      risk?: "low" | "medium" | "high"
+      depends_on: Array<string>
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      output_schema?:
+        | "research"
+        | "implementation"
+        | "verification"
+        | "review"
+        | "debug"
+        | "document"
+        | "environment-diagnosis"
+        | "automation-plan"
+        | "memory"
+        | "summary"
+      requires_user_input?: boolean
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }>
+    intent?: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode?: "manual" | "assisted" | "autonomous"
+    approved?: boolean
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/plan/generate"
+}
+
+export type CoordinatorPlanGenerateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorPlanGenerateError = CoordinatorPlanGenerateErrors[keyof CoordinatorPlanGenerateErrors]
+
+export type CoordinatorPlanGenerateResponses = {
+  /**
+   * Generated coordinator plan
+   */
+  200: {
+    goal: string
+    nodes: Array<{
+      id: string
+      description: string
+      prompt: string
+      task_kind: "research" | "implement" | "verify" | "generic"
+      subagent_type: string
+      role?:
+        | "coordinator"
+        | "researcher"
+        | "implementer"
+        | "verifier"
+        | "reviewer"
+        | "debugger"
+        | "writer"
+        | "environment-auditor"
+        | "memory-curator"
+        | "automation-planner"
+      model?: {
+        providerID: string
+        modelID: string
+        variant?: string
+      }
+      risk?: "low" | "medium" | "high"
+      depends_on: Array<string>
+      write_scope: Array<string>
+      read_scope: Array<string>
+      acceptance_checks: Array<string>
+      output_schema?:
+        | "research"
+        | "implementation"
+        | "verification"
+        | "review"
+        | "debug"
+        | "document"
+        | "environment-diagnosis"
+        | "automation-plan"
+        | "memory"
+        | "summary"
+      requires_user_input?: boolean
+      priority: "high" | "normal" | "low"
+      origin: "user" | "coordinator" | "scheduler" | "gateway"
+    }>
+  }
+}
+
+export type CoordinatorPlanGenerateResponse = CoordinatorPlanGenerateResponses[keyof CoordinatorPlanGenerateResponses]
+
 export type CoordinatorPlanData = {
   body?: {
     goal: string
@@ -4958,13 +5394,73 @@ export type CoordinatorPlanData = {
       prompt: string
       task_kind: "research" | "implement" | "verify" | "generic"
       subagent_type: string
+      role?:
+        | "coordinator"
+        | "researcher"
+        | "implementer"
+        | "verifier"
+        | "reviewer"
+        | "debugger"
+        | "writer"
+        | "environment-auditor"
+        | "memory-curator"
+        | "automation-planner"
+      model?: {
+        providerID: string
+        modelID: string
+        variant?: string
+      }
+      risk?: "low" | "medium" | "high"
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
       acceptance_checks: Array<string>
+      output_schema?:
+        | "research"
+        | "implementation"
+        | "verification"
+        | "review"
+        | "debug"
+        | "document"
+        | "environment-diagnosis"
+        | "automation-plan"
+        | "memory"
+        | "summary"
+      requires_user_input?: boolean
       priority: "high" | "normal" | "low"
       origin: "user" | "coordinator" | "scheduler" | "gateway"
     }>
+    intent?: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode?: "manual" | "assisted" | "autonomous"
+    approved?: boolean
   }
   path?: never
   query?: {
@@ -4995,10 +5491,39 @@ export type CoordinatorPlanResponses = {
       prompt: string
       task_kind: "research" | "implement" | "verify" | "generic"
       subagent_type: string
+      role?:
+        | "coordinator"
+        | "researcher"
+        | "implementer"
+        | "verifier"
+        | "reviewer"
+        | "debugger"
+        | "writer"
+        | "environment-auditor"
+        | "memory-curator"
+        | "automation-planner"
+      model?: {
+        providerID: string
+        modelID: string
+        variant?: string
+      }
+      risk?: "low" | "medium" | "high"
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
       acceptance_checks: Array<string>
+      output_schema?:
+        | "research"
+        | "implementation"
+        | "verification"
+        | "review"
+        | "debug"
+        | "document"
+        | "environment-diagnosis"
+        | "automation-plan"
+        | "memory"
+        | "summary"
+      requires_user_input?: boolean
       priority: "high" | "normal" | "low"
       origin: "user" | "coordinator" | "scheduler" | "gateway"
     }>
@@ -5016,13 +5541,73 @@ export type CoordinatorRunData = {
       prompt: string
       task_kind: "research" | "implement" | "verify" | "generic"
       subagent_type: string
+      role?:
+        | "coordinator"
+        | "researcher"
+        | "implementer"
+        | "verifier"
+        | "reviewer"
+        | "debugger"
+        | "writer"
+        | "environment-auditor"
+        | "memory-curator"
+        | "automation-planner"
+      model?: {
+        providerID: string
+        modelID: string
+        variant?: string
+      }
+      risk?: "low" | "medium" | "high"
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
       acceptance_checks: Array<string>
+      output_schema?:
+        | "research"
+        | "implementation"
+        | "verification"
+        | "review"
+        | "debug"
+        | "document"
+        | "environment-diagnosis"
+        | "automation-plan"
+        | "memory"
+        | "summary"
+      requires_user_input?: boolean
       priority: "high" | "normal" | "low"
       origin: "user" | "coordinator" | "scheduler" | "gateway"
     }>
+    intent?: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode?: "manual" | "assisted" | "autonomous"
+    approved?: boolean
   }
   path: {
     sessionID: string
@@ -5051,7 +5636,55 @@ export type CoordinatorRunResponses = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -5060,10 +5693,39 @@ export type CoordinatorRunResponses = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -5100,7 +5762,55 @@ export type CoordinatorGetResponses = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -5109,10 +5819,39 @@ export type CoordinatorGetResponses = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -5149,7 +5888,55 @@ export type CoordinatorListResponses = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -5158,10 +5945,39 @@ export type CoordinatorListResponses = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -5177,6 +5993,258 @@ export type CoordinatorListResponses = {
 }
 
 export type CoordinatorListResponse = CoordinatorListResponses[keyof CoordinatorListResponses]
+
+export type CoordinatorApproveData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/approve"
+}
+
+export type CoordinatorApproveResponses = {
+  /**
+   * Approved coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorApproveResponse = CoordinatorApproveResponses[keyof CoordinatorApproveResponses]
+
+export type CoordinatorCancelData = {
+  body?: never
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/cancel"
+}
+
+export type CoordinatorCancelResponses = {
+  /**
+   * Cancelled coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorCancelResponse = CoordinatorCancelResponses[keyof CoordinatorCancelResponses]
 
 export type CoordinatorSummarizeData = {
   body?: never
@@ -5222,7 +6290,55 @@ export type CoordinatorDispatchResponses = {
       id: string
       sessionID: string
       goal: string
-      state: "planned" | "active" | "completed" | "failed" | "cancelled"
+      intent: {
+        goal: string
+        task_type:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        success_criteria: Array<string>
+        risk_level: "low" | "medium" | "high"
+        needs_user_clarification: boolean
+        clarification_questions: Array<string>
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        expected_output: string
+        permission_expectations: Array<string>
+      }
+      mode: "manual" | "assisted" | "autonomous"
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      state:
+        | "settling_intent"
+        | "awaiting_approval"
+        | "planned"
+        | "active"
+        | "blocked"
+        | "completed"
+        | "failed"
+        | "cancelled"
       plan: {
         goal: string
         nodes: Array<{
@@ -5231,10 +6347,39 @@ export type CoordinatorDispatchResponses = {
           prompt: string
           task_kind: "research" | "implement" | "verify" | "generic"
           subagent_type: string
+          role?:
+            | "coordinator"
+            | "researcher"
+            | "implementer"
+            | "verifier"
+            | "reviewer"
+            | "debugger"
+            | "writer"
+            | "environment-auditor"
+            | "memory-curator"
+            | "automation-planner"
+          model?: {
+            providerID: string
+            modelID: string
+            variant?: string
+          }
+          risk?: "low" | "medium" | "high"
           depends_on: Array<string>
           write_scope: Array<string>
           read_scope: Array<string>
           acceptance_checks: Array<string>
+          output_schema?:
+            | "research"
+            | "implementation"
+            | "verification"
+            | "review"
+            | "debug"
+            | "document"
+            | "environment-diagnosis"
+            | "automation-plan"
+            | "memory"
+            | "summary"
+          requires_user_input?: boolean
           priority: "high" | "normal" | "low"
           origin: "user" | "coordinator" | "scheduler" | "gateway"
         }>
@@ -5274,7 +6419,55 @@ export type CoordinatorProjectionResponses = {
       id: string
       sessionID: string
       goal: string
-      state: "planned" | "active" | "completed" | "failed" | "cancelled"
+      intent: {
+        goal: string
+        task_type:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        success_criteria: Array<string>
+        risk_level: "low" | "medium" | "high"
+        needs_user_clarification: boolean
+        clarification_questions: Array<string>
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        expected_output: string
+        permission_expectations: Array<string>
+      }
+      mode: "manual" | "assisted" | "autonomous"
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      state:
+        | "settling_intent"
+        | "awaiting_approval"
+        | "planned"
+        | "active"
+        | "blocked"
+        | "completed"
+        | "failed"
+        | "cancelled"
       plan: {
         goal: string
         nodes: Array<{
@@ -5283,10 +6476,39 @@ export type CoordinatorProjectionResponses = {
           prompt: string
           task_kind: "research" | "implement" | "verify" | "generic"
           subagent_type: string
+          role?:
+            | "coordinator"
+            | "researcher"
+            | "implementer"
+            | "verifier"
+            | "reviewer"
+            | "debugger"
+            | "writer"
+            | "environment-auditor"
+            | "memory-curator"
+            | "automation-planner"
+          model?: {
+            providerID: string
+            modelID: string
+            variant?: string
+          }
+          risk?: "low" | "medium" | "high"
           depends_on: Array<string>
           write_scope: Array<string>
           read_scope: Array<string>
           acceptance_checks: Array<string>
+          output_schema?:
+            | "research"
+            | "implementation"
+            | "verification"
+            | "review"
+            | "debug"
+            | "document"
+            | "environment-diagnosis"
+            | "automation-plan"
+            | "memory"
+            | "summary"
+          requires_user_input?: boolean
           priority: "high" | "normal" | "low"
           origin: "user" | "coordinator" | "scheduler" | "gateway"
         }>
@@ -5365,7 +6587,55 @@ export type CoordinatorResumeResponses = {
     id: string
     sessionID: string
     goal: string
-    state: "planned" | "active" | "completed" | "failed" | "cancelled"
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     plan: {
       goal: string
       nodes: Array<{
@@ -5374,10 +6644,39 @@ export type CoordinatorResumeResponses = {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
@@ -5411,9 +6710,11 @@ export type PersonalOverviewResponses = {
    */
   200: {
     inbox: {
-      pending: number
-      processing: number
-      completed: number
+      queued: number
+      active: number
+      blocked: number
+      done: number
+      failed: number
       cancelled: number
     }
     wakeups: {
@@ -5623,7 +6924,7 @@ export type PersonalInboxListData = {
   query?: {
     directory?: string
     workspace?: string
-    state?: "pending" | "processing" | "completed" | "cancelled"
+    state?: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
   }
   url: "/personal/inbox"
 }
@@ -5641,7 +6942,7 @@ export type PersonalInboxListResponses = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -5690,7 +6991,7 @@ export type PersonalInboxCreateResponses = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -5707,7 +7008,7 @@ export type PersonalInboxCreateResponse = PersonalInboxCreateResponses[keyof Per
 
 export type PersonalInboxUpdateData = {
   body?: {
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
   }
   path: {
     inboxID: string
@@ -5732,7 +7033,7 @@ export type PersonalInboxUpdateResponses = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -5858,7 +7159,7 @@ export type PersonalSchedulerDispatchResponses = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown
@@ -5946,7 +7247,7 @@ export type PersonalGatewayWebhookResponses = {
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
-    state: "pending" | "processing" | "completed" | "cancelled"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     scheduled_for?: number
     payload?: {
       [key: string]: unknown

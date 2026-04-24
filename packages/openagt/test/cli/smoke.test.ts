@@ -201,6 +201,22 @@ describe("CLI Smoke Tests", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("config")
     })
+
+    test("debug doctor --help shows usage", async () => {
+      const result = await $`bun run ${CLI_ENTRY} debug doctor --help`
+        .quiet()
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.toString()).toContain("doctor")
+    })
+
+    test("debug bundle --help shows usage", async () => {
+      const result = await $`bun run ${CLI_ENTRY} debug bundle --help`
+        .quiet()
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.toString()).toContain("bundle")
+    })
   })
 
   describe("mcp", () => {

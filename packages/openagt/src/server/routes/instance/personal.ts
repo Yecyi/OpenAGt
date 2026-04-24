@@ -20,9 +20,11 @@ import { jsonRequest } from "./trace"
 
 const overview = z.object({
   inbox: z.object({
-    pending: z.number().int(),
-    processing: z.number().int(),
-    completed: z.number().int(),
+    queued: z.number().int(),
+    active: z.number().int(),
+    blocked: z.number().int(),
+    done: z.number().int(),
+    failed: z.number().int(),
     cancelled: z.number().int(),
   }),
   wakeups: z.object({

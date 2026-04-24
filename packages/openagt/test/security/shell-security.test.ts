@@ -149,6 +149,7 @@ describe("ShellSecurity.Service", () => {
     expect(result.decision).toBe("allow")
     expect(result.safetySummary).toBe("Allowed: No risky shell features detected.")
     expect(result.safetyDetails).toContain("Risk: safe")
+    expect(result.shell_safety.version).toBe(1)
     expect(result.shell_safety.summary).toBe("Allowed: No risky shell features detected.")
     expect(result.shell_safety.details).toEqual(result.safetyDetails)
     expect(result.shell_safety.approval.required).toBe(false)
@@ -176,6 +177,7 @@ describe("shell safety formatting", () => {
       matchedRules: ["curl"],
     })
 
+    expect(result.version).toBe(1)
     expect(result.details).toEqual([
       "Risk: medium",
       "Approval: exec_policy_rule",

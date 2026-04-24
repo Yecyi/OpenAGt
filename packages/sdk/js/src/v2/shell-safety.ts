@@ -6,6 +6,7 @@ export type ShellApprovalKind =
   | "dangerous_command"
 
 export type ShellSafety = {
+  version: 1
   summary: string
   details: string[]
   decision: "allow" | "confirm" | "block"
@@ -60,6 +61,7 @@ function isPolicySource(value: unknown): value is ShellSafety["policy"]["source"
 export function getShellSafety(metadata: Record<string, unknown> | null | undefined) {
   const candidate = metadata?.["shell_safety"]
   if (!isRecord(candidate)) return
+  if (candidate.version !== 1) return
   if (typeof candidate.summary !== "string") return
   if (!Array.isArray(candidate.details) || candidate.details.some((item) => typeof item !== "string")) return
   if (!isDecision(candidate.decision)) return

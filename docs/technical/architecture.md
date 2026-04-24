@@ -243,6 +243,19 @@ Primary implementation areas:
 - `packages/openagt/src/server`
 - `packages/sdk/js`
 
+## Verification Matrix
+
+| Capability | Status |
+| --- | --- |
+| Session runtime and tool loop | stable in v1.16 |
+| Approval and Safety Envelope with `shell_safety.version` | stable in v1.16 |
+| Windows signed-GA release policy | stable in v1.16 when signing secrets are configured |
+| Packaged binary smoke tests | stable in v1.16 |
+| `openagt debug doctor` and `debug bundle` | stable in v1.16 |
+| Coordinator Runtime projection and dispatch | implemented; hardening continues in v1.16 |
+| Personal Agent inbox and memory primitives | implemented; state-machine hardening continues in v1.16 |
+| Flutter control panel | roadmap; backend contracts only in v1.16 |
+
 ## Repository Map
 
 | Path | Role |

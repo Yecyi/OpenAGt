@@ -7,6 +7,11 @@
  * Inspired by Claude Code's fast-path implementation.
  */
 
+import pkg from "../../package.json"
+
+declare const OPENAGT_VERSION: string
+declare const OPENCODE_VERSION: string
+
 // Fast-path: zero-import command handlers
 const FAST_PATH_COMMANDS = new Set([
   "--version",
@@ -17,8 +22,8 @@ const FAST_PATH_COMMANDS = new Set([
   "help",
 ])
 
-// Version info - hardcoded to avoid importing InstallationVersion
-const VERSION = "1.15.1"
+const VERSION =
+  typeof OPENAGT_VERSION === "string" ? OPENAGT_VERSION : typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : pkg.version
 
 /**
  * Check if the current command should use fast-path

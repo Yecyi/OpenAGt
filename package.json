@@ -16,6 +16,7 @@
     "check:integrity": "bun run script/check-source-integrity.ts",
     "check:audit-policy": "bun run script/audit-policy.ts",
     "release:notes": "bun run script/release-notes.ts",
+    "release:smoke": "bun run script/release-smoke.ts",
     "release:verify": "bun run script/release-verify.ts",
     "release:stable": "bun run script/release-stable.ts",
     "typecheck": "bun turbo typecheck",

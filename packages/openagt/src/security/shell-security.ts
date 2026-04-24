@@ -110,6 +110,7 @@ export type ShellApprovalKind =
   | "dangerous_command"
 
 export type ShellSafety = {
+  version: 1
   summary: string
   details: string[]
   decision: ShellDecision
@@ -294,6 +295,7 @@ export function formatShellSafety(input: ShellSafetyInput): ShellSafety {
     ...(input.matchedRules?.length ? [`Matched rules: ${input.matchedRules.join(", ")}`] : []),
   ]
   return {
+    version: 1,
     summary,
     details,
     decision: input.decision,

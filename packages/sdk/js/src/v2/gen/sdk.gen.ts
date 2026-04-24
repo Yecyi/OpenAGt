@@ -19,10 +19,16 @@ import type {
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
+  CoordinatorApproveResponses,
+  CoordinatorCancelResponses,
   CoordinatorDispatchResponses,
   CoordinatorGetResponses,
+  CoordinatorIntentSettleErrors,
+  CoordinatorIntentSettleResponses,
   CoordinatorListResponses,
   CoordinatorPlanErrors,
+  CoordinatorPlanGenerateErrors,
+  CoordinatorPlanGenerateResponses,
   CoordinatorPlanResponses,
   CoordinatorProjectionResponses,
   CoordinatorResumeResponses,
@@ -1180,6 +1186,38 @@ export class Pty extends HeyApiClient {
   }
 
   /**
+   * Create PTY connection ticket
+   *
+   * Create a short-lived one-time ticket for opening a PTY WebSocket connection.
+   */
+  public connectTicket<ThrowOnError extends boolean = false>(
+    parameters: {
+      ptyID: string
+      directory: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "ptyID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PtyConnectTicketResponses, PtyConnectTicketErrors, ThrowOnError>({
+      url: "/pty/{ptyID}/connect-ticket",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Remove PTY session
    *
    * Remove and terminate a specific pseudo-terminal (PTY) session.
@@ -1284,38 +1322,6 @@ export class Pty extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
-    })
-  }
-
-  /**
-   * Create PTY connection ticket
-   *
-   * Create a short-lived one-time ticket for opening a PTY WebSocket connection.
-   */
-  public connectTicket<ThrowOnError extends boolean = false>(
-    parameters: {
-      ptyID: string
-      directory?: string
-      workspace?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "ptyID" },
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<PtyConnectTicketResponses, PtyConnectTicketErrors, ThrowOnError>({
-      url: "/pty/{ptyID}/connect-ticket",
-      ...options,
-      ...params,
     })
   }
 
@@ -3001,8 +3007,46 @@ export class Provider extends HeyApiClient {
   }
 }
 
-export class Coordinator extends HeyApiClient {
-  public plan<ThrowOnError extends boolean = false>(
+export class Intent extends HeyApiClient {
+  public settle<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      goal?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      CoordinatorIntentSettleResponses,
+      CoordinatorIntentSettleErrors,
+      ThrowOnError
+    >({
+      url: "/coordinator/intent/settle",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Plan extends HeyApiClient {
+  public generate<ThrowOnError extends boolean = false>(
     parameters?: {
       directory?: string
       workspace?: string
@@ -3013,13 +3057,73 @@ export class Coordinator extends HeyApiClient {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      intent?: {
+        goal: string
+        task_type:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        success_criteria: Array<string>
+        risk_level: "low" | "medium" | "high"
+        needs_user_clarification: boolean
+        clarification_questions: Array<string>
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        expected_output: string
+        permission_expectations: Array<string>
+      }
+      mode?: "manual" | "assisted" | "autonomous"
+      approved?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3032,6 +3136,124 @@ export class Coordinator extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "goal" },
             { in: "body", key: "nodes" },
+            { in: "body", key: "intent" },
+            { in: "body", key: "mode" },
+            { in: "body", key: "approved" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      CoordinatorPlanGenerateResponses,
+      CoordinatorPlanGenerateErrors,
+      ThrowOnError
+    >({
+      url: "/coordinator/plan/generate",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Coordinator extends HeyApiClient {
+  public plan<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      goal?: string
+      nodes?: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+      intent?: {
+        goal: string
+        task_type:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        success_criteria: Array<string>
+        risk_level: "low" | "medium" | "high"
+        needs_user_clarification: boolean
+        clarification_questions: Array<string>
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        expected_output: string
+        permission_expectations: Array<string>
+      }
+      mode?: "manual" | "assisted" | "autonomous"
+      approved?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "goal" },
+            { in: "body", key: "nodes" },
+            { in: "body", key: "intent" },
+            { in: "body", key: "mode" },
+            { in: "body", key: "approved" },
           ],
         },
       ],
@@ -3060,13 +3282,73 @@ export class Coordinator extends HeyApiClient {
         prompt: string
         task_kind: "research" | "implement" | "verify" | "generic"
         subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
         acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "summary"
+        requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      intent?: {
+        goal: string
+        task_type:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        success_criteria: Array<string>
+        risk_level: "low" | "medium" | "high"
+        needs_user_clarification: boolean
+        clarification_questions: Array<string>
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        expected_output: string
+        permission_expectations: Array<string>
+      }
+      mode?: "manual" | "assisted" | "autonomous"
+      approved?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3080,6 +3362,9 @@ export class Coordinator extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "goal" },
             { in: "body", key: "nodes" },
+            { in: "body", key: "intent" },
+            { in: "body", key: "mode" },
+            { in: "body", key: "approved" },
           ],
         },
       ],
@@ -3145,6 +3430,60 @@ export class Coordinator extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<CoordinatorListResponses, unknown, ThrowOnError>({
       url: "/coordinator/session/{sessionID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  public approve<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorApproveResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/approve",
+      ...options,
+      ...params,
+    })
+  }
+
+  public cancel<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorCancelResponses, unknown, ThrowOnError>({
+      url: "/coordinator/run/{runID}/cancel",
       ...options,
       ...params,
     })
@@ -3256,6 +3595,16 @@ export class Coordinator extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _intent?: Intent
+  get intent(): Intent {
+    return (this._intent ??= new Intent({ client: this.client }))
+  }
+
+  private _plan?: Plan
+  get plan2(): Plan {
+    return (this._plan ??= new Plan({ client: this.client }))
   }
 }
 
@@ -3423,7 +3772,7 @@ export class Inbox extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      state?: "pending" | "processing" | "completed" | "cancelled"
+      state?: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3499,7 +3848,7 @@ export class Inbox extends HeyApiClient {
       inboxID: string
       directory?: string
       workspace?: string
-      state?: "pending" | "processing" | "completed" | "cancelled"
+      state?: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
     },
     options?: Options<never, ThrowOnError>,
   ) {

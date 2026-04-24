@@ -8,6 +8,7 @@ import { SessionPrompt } from "@/session/prompt"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
+import { ModelID, ProviderID } from "@/provider/schema"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
@@ -16,59 +17,421 @@ import {
   CoordinatorPlan,
   CoordinatorRun,
   CoordinatorRunID,
+  CoordinatorMode,
+  IntentProfile,
+  TaskType,
   type CoordinatorNode as CoordinatorNodeType,
+  type CoordinatorNodeInput,
+  type CoordinatorMode as CoordinatorModeType,
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
   type CoordinatorRunID as CoordinatorRunIDType,
+  type IntentProfile as IntentProfileType,
+  type TaskType as TaskTypeType,
 } from "./schema"
 
 function now() {
   return Date.now()
 }
 
-function defaultPlan(goal: string): CoordinatorPlanType {
+function hasAny(value: string, terms: string[]) {
+  return terms.some((item) => value.includes(item))
+}
+
+function taskTypeForGoal(goal: string): TaskTypeType {
+  const normalized = goal.toLowerCase()
+  if (hasAny(normalized, ["review", "code review", "pull request", "pr "])) return "review"
+  if (hasAny(normalized, ["debug", "bug", "error", "fail", "failing", "fix"])) return "debugging"
+  if (hasAny(normalized, ["research", "investigate", "analysis", "analyze"])) return "research"
+  if (hasAny(normalized, ["doc", "readme", "documentation", "writing"])) return "documentation"
+  if (hasAny(normalized, ["environment", "audit", "install", "path", "powershell", "python"])) return "environment-audit"
+  if (hasAny(normalized, ["automation", "automate", "schedule", "cron"])) return "automation"
+  if (hasAny(normalized, ["organize", "file", "data", "csv", "xlsx"])) return "file-data-organization"
+  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"])) return "coding"
+  return "general-operations"
+}
+
+function riskForGoal(goal: string, taskType: TaskTypeType) {
+  const normalized = goal.toLowerCase()
+  if (hasAny(normalized, ["delete", "drop", "reset", "wipe", "production", "deploy", "payment", "credential"])) return "high"
+  if (taskType === "coding" || taskType === "debugging" || taskType === "automation" || taskType === "environment-audit") return "medium"
+  return "low"
+}
+
+function successCriteria(taskType: TaskTypeType) {
+  if (taskType === "coding") return ["Relevant context is gathered", "Requested changes are implemented", "Acceptance checks are verified", "Independent review is completed"]
+  if (taskType === "debugging") return ["Failure context is reproduced or explained", "Root cause is identified", "Minimal fix path is applied", "Verification passes"]
+  if (taskType === "review") return ["Findings are grounded in source references", "Risks are prioritized", "Residual test gaps are reported"]
+  if (taskType === "research") return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
+  if (taskType === "documentation") return ["Context is gathered", "Document is updated or produced", "Output is reviewed for accuracy"]
+  if (taskType === "environment-audit") return ["Toolchain state is inspected", "Real blockers are identified", "Verification commands are reported"]
+  if (taskType === "automation") return ["Repeatable workflow is identified", "Automation plan is generated", "Risk and trigger conditions are verified"]
+  if (taskType === "file-data-organization") return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
+  return ["Goal is clarified enough to execute", "Work is completed", "Result is summarized"]
+}
+
+function expectedOutput(taskType: TaskTypeType) {
+  if (taskType === "coding") return "code changes, verification results, and review notes"
+  if (taskType === "debugging") return "root cause, fix, and verification evidence"
+  if (taskType === "review") return "prioritized findings with file references and residual risks"
+  if (taskType === "research") return "research report with actionable synthesis"
+  if (taskType === "documentation") return "updated documentation or a written artifact"
+  if (taskType === "environment-audit") return "environment diagnosis with blockers and next actions"
+  if (taskType === "automation") return "automation plan or configured automation"
+  if (taskType === "file-data-organization") return "organized files/data and a change summary"
+  return "completed work summary with evidence"
+}
+
+function permissionExpectations(taskType: TaskTypeType, riskLevel: IntentProfileType["risk_level"]) {
+  const base = taskType === "research" || taskType === "review" ? ["read workspace context"] : ["read workspace context", "run verification commands"]
+  const write = taskType === "coding" || taskType === "debugging" || taskType === "documentation" || taskType === "file-data-organization"
+    ? ["write scoped workspace files"]
+    : []
+  const approval = riskLevel === "high" ? ["request approval before high-risk actions"] : []
+  return [...base, ...write, ...approval]
+}
+
+export function settleIntentProfile(input: { goal: string }) {
+  const task_type = taskTypeForGoal(input.goal)
+  const risk_level = riskForGoal(input.goal, task_type)
+  const needs_user_clarification = input.goal.trim().length < 12
+  return IntentProfile.parse({
+    goal: input.goal,
+    task_type,
+    success_criteria: successCriteria(task_type),
+    risk_level,
+    needs_user_clarification,
+    clarification_questions: needs_user_clarification
+      ? ["What concrete output should this task produce?"]
+      : [],
+    workflow: task_type,
+    expected_output: expectedOutput(task_type),
+    permission_expectations: permissionExpectations(task_type, risk_level),
+  })
+}
+
+function node(input: Omit<CoordinatorNodeType, "priority" | "origin"> & Partial<Pick<CoordinatorNodeType, "priority" | "origin">>) {
+  return CoordinatorNode.parse({
+    priority: "normal",
+    origin: "coordinator",
+    ...input,
+  })
+}
+
+function researcher(goal: string) {
+  return node({
+    id: "research",
+    description: "Research context",
+    prompt: `Understand the goal and gather the minimum context needed.\n\nGoal: ${goal}`,
+    task_kind: "research",
+    subagent_type: "explore",
+    role: "researcher",
+    risk: "low",
+    depends_on: [],
+    write_scope: [],
+    read_scope: [],
+    acceptance_checks: ["Relevant context identified"],
+    output_schema: "research",
+    requires_user_input: false,
+    priority: "high",
+  })
+}
+
+export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
+  const goal = intent.goal
   return CoordinatorPlan.parse({
     goal,
-    nodes: [
-      {
-        id: "research",
-        description: "Research context",
-        prompt: `Understand the goal and gather the minimum code context needed.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "explore",
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Relevant files identified"],
-        priority: "high",
-        origin: "coordinator",
-      },
-      {
+    nodes: intent.workflow === "coding" ? [
+      researcher(goal),
+      node({
         id: "implement",
         description: "Implement change",
         prompt: `Implement the requested change.\n\nGoal: ${goal}`,
         task_kind: "implement",
         subagent_type: "general",
+        role: "implementer",
+        risk: intent.risk_level,
         depends_on: ["research"],
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Requested change implemented"],
+        output_schema: "implementation",
+        requires_user_input: false,
         priority: "high",
-        origin: "coordinator",
-      },
-      {
+      }),
+      node({
         id: "verify",
         description: "Verify result",
         prompt: `Verify the completed result and summarize residual issues.\n\nGoal: ${goal}`,
         task_kind: "verify",
         subagent_type: "general",
+        role: "verifier",
+        risk: "low",
         depends_on: ["implement"],
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Verification completed"],
+        output_schema: "verification",
+        requires_user_input: false,
         priority: "normal",
-        origin: "coordinator",
-      },
+      }),
+      node({
+        id: "review",
+        description: "Review result",
+        prompt: `Independently review the result for defects, missing tests, and remaining risks.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "reviewer",
+        risk: "low",
+        depends_on: ["verify"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Review completed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "debugging" ? [
+      researcher(goal),
+      node({
+        id: "debug",
+        description: "Diagnose failure",
+        prompt: `Diagnose the failure and propose the smallest fix path.\n\nGoal: ${goal}`,
+        task_kind: "research",
+        subagent_type: "general",
+        role: "debugger",
+        risk: "medium",
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Root cause identified"],
+        output_schema: "debug",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "implement",
+        description: "Apply minimal fix",
+        prompt: `Apply the smallest safe fix for the diagnosed issue.\n\nGoal: ${goal}`,
+        task_kind: "implement",
+        subagent_type: "general",
+        role: "implementer",
+        risk: intent.risk_level,
+        depends_on: ["debug"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Fix applied"],
+        output_schema: "implementation",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "verify",
+        description: "Verify fix",
+        prompt: `Verify the fix and report residual failures.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "verifier",
+        risk: "low",
+        depends_on: ["implement"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Fix verified"],
+        output_schema: "verification",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "review" ? [
+      researcher(goal),
+      node({
+        id: "review",
+        description: "Review work",
+        prompt: `Review the requested target and return prioritized findings only when they are actionable.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "reviewer",
+        risk: "low",
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Review findings are grounded in evidence"],
+        output_schema: "review",
+        requires_user_input: false,
+        priority: "high",
+      }),
+    ] : intent.workflow === "research" ? [
+      researcher(goal),
+      node({
+        id: "synthesize",
+        description: "Synthesize research",
+        prompt: `Synthesize the research into actionable conclusions.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "writer",
+        risk: "low",
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Research report produced"],
+        output_schema: "document",
+        requires_user_input: false,
+      }),
+      node({
+        id: "review",
+        description: "Review synthesis",
+        prompt: `Review the synthesis for unsupported claims and missing caveats.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "reviewer",
+        risk: "low",
+        depends_on: ["synthesize"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Synthesis reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "environment-audit" ? [
+      node({
+        id: "audit",
+        description: "Audit environment",
+        prompt: `Inspect the local environment, dependency state, and toolchain blockers.\n\nGoal: ${goal}`,
+        task_kind: "research",
+        subagent_type: "general",
+        role: "environment-auditor",
+        risk: intent.risk_level,
+        depends_on: [],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Environment blockers identified"],
+        output_schema: "environment-diagnosis",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "verify",
+        description: "Verify environment findings",
+        prompt: `Verify the audit findings with concrete checks where possible.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "verifier",
+        risk: "low",
+        depends_on: ["audit"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Findings verified"],
+        output_schema: "verification",
+        requires_user_input: false,
+      }),
+      node({
+        id: "report",
+        description: "Write environment report",
+        prompt: `Write a concise environment diagnosis with blockers and next actions.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "writer",
+        risk: "low",
+        depends_on: ["verify"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Diagnosis report produced"],
+        output_schema: "document",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "documentation" ? [
+      researcher(goal),
+      node({
+        id: "write",
+        description: "Write documentation",
+        prompt: `Write or update the requested documentation.\n\nGoal: ${goal}`,
+        task_kind: "implement",
+        subagent_type: "general",
+        role: "writer",
+        risk: intent.risk_level,
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Documentation produced"],
+        output_schema: "document",
+        requires_user_input: false,
+      }),
+      node({
+        id: "review",
+        description: "Review documentation",
+        prompt: `Review the documentation for accuracy and missing caveats.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "reviewer",
+        risk: "low",
+        depends_on: ["write"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Documentation reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "automation" ? [
+      researcher(goal),
+      node({
+        id: "automation_plan",
+        description: "Plan automation",
+        prompt: `Turn the repeatable work into an automation plan with trigger, scope, and safety checks.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "automation-planner",
+        risk: intent.risk_level,
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Automation plan produced"],
+        output_schema: "automation-plan",
+        requires_user_input: intent.risk_level === "high",
+      }),
+      node({
+        id: "verify",
+        description: "Verify automation plan",
+        prompt: `Verify the automation plan for safety, permissions, and failure modes.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "verifier",
+        risk: "low",
+        depends_on: ["automation_plan"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Automation safety reviewed"],
+        output_schema: "verification",
+        requires_user_input: false,
+      }),
+    ] : [
+      researcher(goal),
+      node({
+        id: "execute",
+        description: "Execute general task",
+        prompt: `Complete the requested work and produce the expected output.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: intent.workflow === "file-data-organization" ? "implementer" : "writer",
+        risk: intent.risk_level,
+        depends_on: ["research"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Requested work completed"],
+        output_schema: "summary",
+        requires_user_input: intent.risk_level === "high",
+      }),
+      node({
+        id: "review",
+        description: "Review result",
+        prompt: `Review the result against the goal and report residual risks.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "reviewer",
+        risk: "low",
+        depends_on: ["execute"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Result reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
     ],
   })
 }
@@ -88,10 +451,14 @@ function expandVerifyNodes(plan: CoordinatorPlanType) {
         prompt: `Verify the implementation and report remaining issues.\n\nAcceptance checks:\n${item.acceptance_checks.join("\n")}`,
         task_kind: "verify",
         subagent_type: "general",
+        role: "verifier",
+        risk: "low",
         depends_on: [item.id],
         write_scope: [],
         read_scope: [...item.write_scope],
         acceptance_checks: item.acceptance_checks.length > 0 ? item.acceptance_checks : ["Verification completed"],
+        output_schema: "verification",
+        requires_user_input: false,
         priority: item.priority,
         origin: "coordinator",
       }),
@@ -142,10 +509,17 @@ function orderPlan(plan: CoordinatorPlanType) {
 }
 
 function runFromRow(row: typeof CoordinatorRunTable.$inferSelect) {
+  const intent = IntentProfile.safeParse(row.intent)
+  const mode = CoordinatorMode.safeParse(row.mode)
+  const workflow = TaskType.safeParse(row.workflow)
+  const fallback = settleIntentProfile({ goal: row.goal })
   return CoordinatorRun.parse({
     id: row.id,
     sessionID: row.session_id,
     goal: row.goal,
+    intent: intent.success ? intent.data : fallback,
+    mode: mode.success ? mode.data : "autonomous",
+    workflow: workflow.success ? workflow.data : fallback.workflow,
     state: row.state,
     plan: row.plan,
     task_ids: row.task_ids,
@@ -165,8 +539,18 @@ export const Event = {
 }
 
 export interface Interface {
-  readonly plan: (input: { goal: string; nodes?: CoordinatorNodeType[] }) => Effect.Effect<CoordinatorPlanType, Error>
-  readonly run: (input: { sessionID: SessionID; goal: string; nodes?: CoordinatorNodeType[] }) => Effect.Effect<CoordinatorRunType, Error>
+  readonly settleIntent: (input: { goal: string }) => Effect.Effect<IntentProfileType, Error>
+  readonly plan: (input: { goal: string; nodes?: CoordinatorNodeInput[]; intent?: IntentProfileType }) => Effect.Effect<CoordinatorPlanType, Error>
+  readonly run: (input: {
+    sessionID: SessionID
+    goal: string
+    nodes?: CoordinatorNodeInput[]
+    intent?: IntentProfileType
+    mode?: CoordinatorModeType
+    approved?: boolean
+  }) => Effect.Effect<CoordinatorRunType, Error>
+  readonly approve: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
+  readonly cancel: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly get: (id: CoordinatorRunIDType) => Effect.Effect<Option.Option<CoordinatorRunType>, Error>
   readonly list: (sessionID: SessionID) => Effect.Effect<CoordinatorRunType[], Error>
   readonly dispatch: (id: CoordinatorRunIDType) => Effect.Effect<{ run: CoordinatorRunType; dispatched: number }, Error>
@@ -193,8 +577,13 @@ export const layer = Layer.effect(
     const publish = (def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed, run: CoordinatorRunType) =>
       bus.publish(def, run)
 
+    const settleIntent: Interface["settleIntent"] = Effect.fn("Coordinator.settleIntent")(function* (input) {
+      return settleIntentProfile(input)
+    })
+
     const plan: Interface["plan"] = Effect.fn("Coordinator.plan")(function* (input) {
-      const base = input.nodes && input.nodes.length > 0 ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes }) : defaultPlan(input.goal)
+      const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
+      const base = input.nodes && input.nodes.length > 0 ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes }) : defaultPlanForIntent(intent)
       const expanded = expandVerifyNodes(base)
       validatePlan(expanded)
       return orderPlan(expanded)
@@ -216,10 +605,31 @@ export const layer = Layer.effect(
     const taskPrompt = (record: TaskRuntime.TaskRecord) => {
       const metadata = record.metadata ?? {}
       const promptText = typeof metadata.prompt === "string" ? metadata.prompt : record.description
+      const role = typeof metadata.role === "string" ? `\n\nRole: ${metadata.role}` : ""
+      const risk = typeof metadata.risk === "string" ? `\nRisk: ${metadata.risk}` : ""
+      const output = typeof metadata.output_schema === "string" ? `\nOutput schema: ${metadata.output_schema}` : ""
       const checks = record.acceptance_checks.length
         ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
         : ""
-      return `${promptText}${checks}`
+      return `${promptText}${role}${risk}${output}${checks}\n\nReturn a concise structured result that the coordinator can consume.`
+    }
+
+    const taskModel = (metadata: Record<string, unknown>) => {
+      const value = metadata.model
+      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+      const model = value as Record<string, unknown>
+      if (typeof model.providerID !== "string" || typeof model.modelID !== "string") return undefined
+      return {
+        providerID: ProviderID.make(model.providerID),
+        modelID: ModelID.make(model.modelID),
+      }
+    }
+
+    const taskVariant = (metadata: Record<string, unknown>) => {
+      const value = metadata.model
+      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+      const model = value as Record<string, unknown>
+      return typeof model.variant === "string" ? model.variant : undefined
     }
 
     const relevantTasks = Effect.fn("Coordinator.relevantTasks")(function* (run: CoordinatorRunType) {
@@ -243,6 +653,8 @@ export const layer = Layer.effect(
         .prompt({
           sessionID: record.child_session_id,
           agent: record.subagent_type,
+          model: taskModel(record.metadata ?? {}),
+          variant: taskVariant(record.metadata ?? {}),
           parts: [
             {
               type: "text",
@@ -284,6 +696,12 @@ export const layer = Layer.effect(
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const run = runOpt.value
+      if (run.state !== "active") {
+        return {
+          run,
+          dispatched: 0,
+        }
+      }
       const pending = (yield* relevantTasks(run)).filter((item) => item.status === "pending")
       const ready = (
         yield* Effect.forEach(
@@ -346,7 +764,12 @@ export const layer = Layer.effect(
 
     const run: Interface["run"] = Effect.fn("Coordinator.run")(function* (input) {
       yield* ensureSubscribed()
-      const planned = yield* plan(input)
+      const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
+      const planned = yield* plan({ goal: input.goal, nodes: input.nodes, intent })
+      const mode = input.mode ?? (intent.risk_level === "high" ? "assisted" : "autonomous")
+      const state = input.approved || (mode === "autonomous" && !intent.needs_user_clarification && intent.risk_level !== "high")
+        ? "active"
+        : "awaiting_approval"
       const runID = CoordinatorRunID.ascending()
       const nodeTaskIDs = new Map<string, SessionID>()
       for (const node of planned.nodes) {
@@ -378,6 +801,14 @@ export const layer = Layer.effect(
             origin: node.origin,
             coordinator_node_id: node.id,
             coordinator_run_id: runID,
+            role: node.role,
+            model: node.model,
+            risk: node.risk,
+            output_schema: node.output_schema,
+            requires_user_input: node.requires_user_input,
+            intent,
+            mode,
+            workflow: intent.workflow,
           },
           writeScope: node.write_scope,
           readScope: node.read_scope,
@@ -394,7 +825,10 @@ export const layer = Layer.effect(
               id: runID,
               session_id: input.sessionID,
               goal: input.goal,
-              state: "active",
+              intent,
+              mode,
+              workflow: intent.workflow,
+              state,
               plan: planned,
               task_ids: [...nodeTaskIDs.values()],
               time_created: timestamp,
@@ -407,7 +841,7 @@ export const layer = Layer.effect(
         Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, runID)).get()),
       ).pipe(Effect.map((row) => runFromRow(row!)))
       yield* publish(Event.Created, created)
-      yield* dispatchReady(created.id)
+      if (created.state === "active") yield* dispatchReady(created.id)
       return created
     })
 
@@ -451,6 +885,7 @@ export const layer = Layer.effect(
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const info = runOpt.value
+      if (info.state === "cancelled") return info.summary ?? "Run cancelled"
       const taskIDs = info.task_ids.map((item) => SessionID.make(item))
       const all = yield* tasks.list(SessionID.make(info.sessionID))
       const relevant = all.filter((item: (typeof all)[number]) => taskIDs.includes(item.task_id))
@@ -458,10 +893,19 @@ export const layer = Layer.effect(
       const failed = relevant.filter((item) => item.status === "failed").length
       const running = relevant.filter((item) => item.status === "running").length
       const pending = relevant.filter((item) => item.status === "pending").length
-      const summary = `${completed}/${relevant.length} completed, ${running} running, ${pending} pending, ${failed} failed`
+      const cancelled = relevant.filter((item) => item.status === "cancelled").length
+      const summary = `${completed}/${relevant.length} completed, ${running} running, ${pending} pending, ${failed} failed, ${cancelled} cancelled`
       const state =
-        failed > 0 ? "failed" : completed === relevant.length && relevant.length > 0 ? "completed" : "active"
-      const finished = state === "completed" || state === "failed" ? now() : null
+        failed > 0
+          ? "failed"
+          : cancelled > 0 && completed + cancelled === relevant.length
+            ? "cancelled"
+            : completed === relevant.length && relevant.length > 0
+              ? "completed"
+              : running === 0 && pending > 0
+                ? "blocked"
+                : "active"
+      const finished = state === "completed" || state === "failed" || state === "cancelled" ? now() : null
       yield* Effect.sync(() =>
         Database.use((db) =>
           db.update(CoordinatorRunTable)
@@ -482,8 +926,81 @@ export const layer = Layer.effect(
       return summary
     })
 
+    const activateRun = Effect.fn("Coordinator.activateRun")(function* (id: CoordinatorRunIDType) {
+      const runOpt = yield* get(id)
+      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
+      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled") return runOpt.value
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db.update(CoordinatorRunTable)
+            .set({
+              state: "active",
+              summary: "Coordinator run active",
+              time_updated: now(),
+              time_finished: null,
+            })
+            .where(eq(CoordinatorRunTable.id, id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      return updated
+    })
+
+    const approve: Interface["approve"] = Effect.fn("Coordinator.approve")(function* (id) {
+      yield* ensureSubscribed()
+      const activated = yield* activateRun(id)
+      if (activated.state === "active") yield* dispatchReady(id)
+      const runOpt = yield* get(id)
+      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
+      return runOpt.value
+    })
+
+    const cancel: Interface["cancel"] = Effect.fn("Coordinator.cancel")(function* (id) {
+      yield* ensureSubscribed()
+      const runOpt = yield* get(id)
+      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
+      const taskList = yield* relevantTasks(runOpt.value)
+      yield* Effect.forEach(
+        taskList.filter((item) => item.status === "pending" || item.status === "running"),
+        (item) =>
+          tasks.cancel({
+            taskID: item.task_id,
+            parentSessionID: item.parent_session_id,
+            reason: "Coordinator run cancelled",
+          }),
+        {
+          concurrency: "unbounded",
+          discard: true,
+        },
+      )
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db.update(CoordinatorRunTable)
+            .set({
+              state: "cancelled",
+              summary: "Coordinator run cancelled",
+              time_updated: now(),
+              time_finished: now(),
+            })
+            .where(eq(CoordinatorRunTable.id, id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      return updated
+    })
+
     const resume: Interface["resume"] = Effect.fn("Coordinator.resume")(function* (id) {
       yield* ensureSubscribed()
+      const activated = yield* activateRun(id)
+      if (activated.state !== "active") return activated
       yield* dispatchReady(id).pipe(Effect.ignore)
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
@@ -491,8 +1008,11 @@ export const layer = Layer.effect(
     })
 
     return Service.of({
+      settleIntent,
       plan,
       run,
+      approve,
+      cancel,
       get,
       list,
       dispatch: dispatchReady,

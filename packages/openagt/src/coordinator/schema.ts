@@ -23,20 +23,93 @@ export type NodePriority = z.infer<typeof NodePriority>
 export const TaskOrigin = z.enum(["user", "coordinator", "scheduler", "gateway"])
 export type TaskOrigin = z.infer<typeof TaskOrigin>
 
+export const TaskType = z.enum([
+  "coding",
+  "review",
+  "debugging",
+  "research",
+  "documentation",
+  "environment-audit",
+  "automation",
+  "file-data-organization",
+  "general-operations",
+])
+export type TaskType = z.infer<typeof TaskType>
+
+export const RiskLevel = z.enum(["low", "medium", "high"])
+export type RiskLevel = z.infer<typeof RiskLevel>
+
+export const CoordinatorMode = z.enum(["manual", "assisted", "autonomous"])
+export type CoordinatorMode = z.infer<typeof CoordinatorMode>
+
+export const CoordinatorNodeRole = z.enum([
+  "coordinator",
+  "researcher",
+  "implementer",
+  "verifier",
+  "reviewer",
+  "debugger",
+  "writer",
+  "environment-auditor",
+  "memory-curator",
+  "automation-planner",
+])
+export type CoordinatorNodeRole = z.infer<typeof CoordinatorNodeRole>
+
+export const CoordinatorOutputSchema = z.enum([
+  "research",
+  "implementation",
+  "verification",
+  "review",
+  "debug",
+  "document",
+  "environment-diagnosis",
+  "automation-plan",
+  "memory",
+  "summary",
+])
+export type CoordinatorOutputSchema = z.infer<typeof CoordinatorOutputSchema>
+
+export const CoordinatorModel = z.object({
+  providerID: z.string(),
+  modelID: z.string(),
+  variant: z.string().optional(),
+})
+export type CoordinatorModel = z.infer<typeof CoordinatorModel>
+
+export const IntentProfile = z.object({
+  goal: z.string(),
+  task_type: TaskType,
+  success_criteria: z.array(z.string()),
+  risk_level: RiskLevel,
+  needs_user_clarification: z.boolean(),
+  clarification_questions: z.array(z.string()),
+  workflow: TaskType,
+  expected_output: z.string(),
+  permission_expectations: z.array(z.string()),
+})
+export type IntentProfile = z.infer<typeof IntentProfile>
+
 export const CoordinatorNode = z.object({
   id: z.string(),
   description: z.string(),
   prompt: z.string(),
   task_kind: z.enum(["research", "implement", "verify", "generic"]),
   subagent_type: z.string(),
+  role: CoordinatorNodeRole.default("coordinator"),
+  model: CoordinatorModel.optional(),
+  risk: RiskLevel.default("medium"),
   depends_on: z.array(z.string()),
   write_scope: z.array(z.string()),
   read_scope: z.array(z.string()),
   acceptance_checks: z.array(z.string()),
+  output_schema: CoordinatorOutputSchema.default("summary"),
+  requires_user_input: z.boolean().default(false),
   priority: NodePriority,
   origin: TaskOrigin,
 })
 export type CoordinatorNode = z.infer<typeof CoordinatorNode>
+export type CoordinatorNodeInput = z.input<typeof CoordinatorNode>
 
 export const CoordinatorPlan = z.object({
   goal: z.string(),
@@ -44,13 +117,25 @@ export const CoordinatorPlan = z.object({
 })
 export type CoordinatorPlan = z.infer<typeof CoordinatorPlan>
 
-export const CoordinatorRunState = z.enum(["planned", "active", "completed", "failed", "cancelled"])
+export const CoordinatorRunState = z.enum([
+  "settling_intent",
+  "awaiting_approval",
+  "planned",
+  "active",
+  "blocked",
+  "completed",
+  "failed",
+  "cancelled",
+])
 export type CoordinatorRunState = z.infer<typeof CoordinatorRunState>
 
 export const CoordinatorRun = z.object({
   id: CoordinatorRunID.zod,
   sessionID: z.string(),
   goal: z.string(),
+  intent: IntentProfile,
+  mode: CoordinatorMode,
+  workflow: TaskType,
   state: CoordinatorRunState,
   plan: CoordinatorPlan,
   task_ids: z.array(z.string()),

@@ -72,6 +72,17 @@ The current stable runtime is centered around these backend capabilities:
 - headless server plus generated JavaScript SDK
 - cross-platform release packaging with Windows MSI and portable archives
 
+## Verification Matrix
+
+| Capability | Status |
+| --- | --- |
+| Session runtime and tool loop | stable |
+| Approval and Safety Envelope | stable with versioned `shell_safety` |
+| Coordinator Runtime | implemented; hardening in v1.16 |
+| Personal Agent Core | implemented; hardening in v1.16 |
+| Debug doctor / repro bundle | v1.16 diagnostics surface |
+| Flutter frontend | roadmap; backend contracts first |
+
 ## Key Features
 
 - Iterative agent loop with persistent sessions
