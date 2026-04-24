@@ -269,7 +269,7 @@ Packaging and release behavior:
 - `SHA256SUMS.txt` is published with assets
 - Windows signing is a separate release concern, not part of the runtime model itself
 
-Windows signing details are documented separately in [C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md).
+Windows signing details are documented separately in [Windows Signing](../release/windows-signing.md).
 
 ## Current Limitations
 
