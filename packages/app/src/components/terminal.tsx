@@ -525,9 +525,6 @@ export const Terminal = (props: TerminalProps) => {
             return (await response.json()) as { token: string }
           })
           next.searchParams.set("ticket", ticket.token)
-          // For same-origin requests, let the browser reuse the page's existing auth.
-          next.username = username
-          next.password = password
         }
 
         const socket = new WebSocket(next)

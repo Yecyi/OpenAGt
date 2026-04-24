@@ -297,6 +297,7 @@ export const layer = Layer.effect(
     const MCP_RETRY_ATTEMPTS = 3
     const MCP_RETRY_BASE_DELAY_MS = 1000
     const MCP_RETRY_MAX_DELAY_MS = 30_000
+    const MCP_RETRY_MIN_ATTEMPT_MS = 250
     const MCP_RETRY_JITTER = 0.3
 
     function computeBackoff(attempt: number): number {
@@ -313,18 +314,29 @@ export const layer = Layer.effect(
      * Connect a client via the given transport with resource safety:
      * on failure the transport is closed; on success the caller owns it.
      */
-    const connectTransport = (transport: Transport, timeout: number) =>
+    const connectTransport = (
+      transport: Transport,
+      timeout: number,
+      options?: { preserveOnFailure?: (error: Error) => boolean },
+    ) =>
       Effect.acquireUseRelease(
-        Effect.succeed(transport),
-        (t) =>
+        Effect.sync(() => ({ transport, preserve: false })),
+        (state) =>
           Effect.tryPromise({
             try: () => {
               const client = new Client({ name: "opencode", version: InstallationVersion })
-              return withTimeout(client.connect(t), timeout).then(() => client)
+              return withTimeout(client.connect(state.transport), timeout).then(() => client)
             },
-            catch: (e) => (e instanceof Error ? e : new Error(String(e))),
+            catch: (e) => {
+              const error = e instanceof Error ? e : new Error(String(e))
+              state.preserve = Boolean(options?.preserveOnFailure?.(error))
+              return error
+            },
           }),
-        (t, exit) => (Exit.isFailure(exit) ? Effect.tryPromise(() => t.close()).pipe(Effect.ignore) : Effect.void),
+        (state, exit) =>
+          Exit.isFailure(exit) && !state.preserve
+            ? Effect.tryPromise(() => state.transport.close()).pipe(Effect.ignore)
+            : Effect.void,
       )
 
     const DISABLED_RESULT: CreateResult = { status: { status: "disabled" } }
@@ -356,27 +368,39 @@ export const layer = Layer.effect(
         )
       }
 
-      const transports: Array<{ name: string; transport: TransportWithAuth }> = [
+      const transports: Array<{ name: string; create: () => TransportWithAuth }> = [
         {
           name: "StreamableHTTP",
-          transport: new StreamableHTTPClientTransport(new URL(mcp.url), {
+          create: () => new StreamableHTTPClientTransport(new URL(mcp.url), {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
           }),
         },
         {
           name: "SSE",
-          transport: new SSEClientTransport(new URL(mcp.url), {
+          create: () => new SSEClientTransport(new URL(mcp.url), {
             authProvider,
             requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
           }),
         },
       ]
 
-      const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
+      const connectBudget = mcp.timeout ?? DEFAULT_TIMEOUT
+      const deadline = Date.now() + connectBudget
+      const remaining = () => Math.max(0, deadline - Date.now())
+      const timedOut = () =>
+        ({ status: "failed" as const, error: `MCP connection timed out after ${connectBudget}ms` }) satisfies Status
+      const isAuthError = (error: Error) =>
+        error instanceof UnauthorizedError || Boolean(authProvider && error.message.includes("OAuth"))
+      const needsRegistration = (error: Error) =>
+        error.message.includes("registration") || error.message.includes("client_id")
       let lastStatus: Status | undefined
 
-      for (const { name, transport } of transports) {
+      for (const { name, create } of transports) {
+        if (remaining() <= 0) {
+          lastStatus = timedOut()
+          break
+        }
         // Check circuit breaker before attempting
         const now = Date.now()
         const cb = mcpCircuitBreaker[key]
@@ -390,17 +414,23 @@ export const layer = Layer.effect(
         let lastError: Error | undefined
 
         while (attempt < MCP_RETRY_ATTEMPTS) {
-          const result = yield* connectTransport(transport, connectTimeout).pipe(
+          const timeLeft = remaining()
+          if (timeLeft <= 0) {
+            lastStatus = timedOut()
+            break
+          }
+          const transport = create()
+          const result = yield* connectTransport(transport, timeLeft, {
+            preserveOnFailure: (error) => isAuthError(error) && !needsRegistration(error),
+          }).pipe(
             Effect.map((client) => ({ client, transportName: name })),
             Effect.catch((error) => {
               const err = error instanceof Error ? error : new Error(String(error))
-              const isAuthError =
-                error instanceof UnauthorizedError || (authProvider && err.message.includes("OAuth"))
 
-              if (isAuthError) {
+              if (isAuthError(err)) {
                 log.info("mcp server requires authentication", { key, transport: name })
 
-                if (err.message.includes("registration") || err.message.includes("client_id")) {
+                if (needsRegistration(err)) {
                   lastStatus = {
                     status: "needs_client_registration" as const,
                     error: "Server does not support dynamic client registration. Please provide clientId in config.",
@@ -414,6 +444,8 @@ export const layer = Layer.effect(
                     })
                     .pipe(Effect.ignore, Effect.as(undefined))
                 } else {
+                  const previous = pendingOAuthTransports.get(key)
+                  if (previous && previous !== transport && "close" in previous) void previous.close().catch(() => undefined)
                   pendingOAuthTransports.set(key, transport)
                   lastStatus = { status: "needs_auth" as const }
                   return bus
@@ -456,6 +488,9 @@ export const layer = Layer.effect(
           attempt++
           if (attempt < MCP_RETRY_ATTEMPTS) {
             const delay = computeBackoff(attempt - 1)
+            if (remaining() <= delay + MCP_RETRY_MIN_ATTEMPT_MS) {
+              break
+            }
             log.info("mcp connection retrying", { key, transport: name, attempt, delayMs: delay })
             yield* Effect.promise(() => sleep(delay))
           }
