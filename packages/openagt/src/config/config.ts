@@ -104,7 +104,7 @@ const InfoSchema = Schema.Struct({
     description: "Server configuration for openagt serve and web commands",
   }),
   command: Schema.optional(Schema.Record(Schema.String, ConfigCommand.Info)).annotate({
-      description: "Command configuration, see https://github.com/Yecyi/OpenAGt/tree/dev/packages/web/src/content/docs/commands.mdx",
+    description: "Command configuration",
   }),
   skills: Schema.optional(ConfigSkills.Info).annotate({ description: "Additional skill folder paths" }),
   watcher: Schema.optional(
@@ -118,13 +118,6 @@ const InfoSchema = Schema.Struct({
   }),
   // User-facing plugin config is stored as Specs; provenance gets attached later while configs are merged.
   plugin: Schema.optional(Schema.mutable(Schema.Array(ConfigPlugin.Spec))),
-  share: Schema.optional(Schema.Literals(["manual", "auto", "disabled"])).annotate({
-    description:
-      "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing",
-  }),
-  autoshare: Schema.optional(Schema.Boolean).annotate({
-    description: "@deprecated Use 'share' field instead. Share newly created sessions automatically",
-  }),
   autoupdate: Schema.optional(Schema.Union([Schema.Boolean, Schema.Literal("notify")])).annotate({
     description:
       "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications",
@@ -173,7 +166,7 @@ const InfoSchema = Schema.Struct({
       }),
       [Schema.Record(Schema.String, AgentRef)],
     ),
-  ).annotate({ description: "Agent configuration, see https://github.com/Yecyi/OpenAGt/tree/dev/packages/web/src/content/docs/agents.mdx" }),
+  ).annotate({ description: "Agent configuration" }),
   provider: Schema.optional(Schema.Record(Schema.String, ConfigProvider.Info)).annotate({
     description: "Custom provider configurations and model overrides",
   }),
@@ -415,10 +408,10 @@ export const layer = Layer.effect(
 
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
       if (!data.$schema) {
-        data.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+        data.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
         const updated = text.replace(
           /^\s*\{/,
-          '{\n  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json",',
+          '{\n  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json",',
         )
         yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
       }
@@ -447,7 +440,7 @@ export const layer = Layer.effect(
             .then(async (mod) => {
               const { provider, model, ...rest } = mod.default
               if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+              result["$schema"] = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
               result = mergeDeep(result, rest)
               await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
               await fsNode.unlink(legacy)
@@ -547,7 +540,7 @@ export const layer = Layer.effect(
                 const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
                 const remoteConfig = wellknown.config ?? {}
                 if (!remoteConfig.$schema) {
-                  remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/web/dist/config.json"
+                  remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
                 }
                 const source = `${url}/.well-known/opencode`
                 const next = yield* loadConfig(JSON.stringify(remoteConfig), {
@@ -735,10 +728,6 @@ export const layer = Layer.effect(
         }
 
         if (!result.username) result.username = os.userInfo().username
-
-        if (result.autoshare === true && !result.share) {
-          result.share = "auto"
-        }
 
         if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
           result.compaction = { ...result.compaction, auto: false }

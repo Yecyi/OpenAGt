@@ -252,7 +252,6 @@ Primary implementation areas:
 | `packages/sdk/js` | Generated JavaScript SDK |
 | `packages/openagt_flutter` | Flutter MVP |
 | `packages/console/*` | Control-plane packages |
-| `packages/web` | Docs/site package |
 
 ## Release Architecture
 

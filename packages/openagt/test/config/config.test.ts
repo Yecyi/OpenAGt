@@ -587,28 +587,6 @@ test("handles command configuration", async () => {
   })
 })
 
-test("migrates autoshare to share field", async () => {
-  await using tmp = await tmpdir({
-    init: async (dir) => {
-      await Filesystem.write(
-        path.join(dir, "opencode.json"),
-        JSON.stringify({
-          $schema: "https://opencode.ai/config.json",
-          autoshare: true,
-        }),
-      )
-    },
-  })
-  await Instance.provide({
-    directory: tmp.path,
-    fn: async () => {
-      const config = await load()
-      expect(config.share).toBe("auto")
-      expect(config.autoshare).toBe(true)
-    },
-  })
-})
-
 test("migrates mode field to agent field", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
@@ -1328,7 +1306,6 @@ test("managed settings override user settings", async () => {
       await writeConfig(dir, {
         $schema: "https://opencode.ai/config.json",
         model: "user/model",
-        share: "auto",
         username: "testuser",
       })
     },
@@ -1337,7 +1314,6 @@ test("managed settings override user settings", async () => {
   await writeManagedSettings({
     $schema: "https://opencode.ai/config.json",
     model: "managed/model",
-    share: "disabled",
   })
 
   await Instance.provide({
@@ -1345,7 +1321,6 @@ test("managed settings override user settings", async () => {
     fn: async () => {
       const config = await load()
       expect(config.model).toBe("managed/model")
-      expect(config.share).toBe("disabled")
       expect(config.username).toBe("testuser")
     },
   })
@@ -2288,7 +2263,6 @@ test("parseManagedPlist strips MDM metadata keys", async () => {
           PayloadUUID: "AAAA-BBBB-CCCC",
           PayloadVersion: 1,
           _manualProfile: true,
-          share: "disabled",
           model: "mdm/model",
         }),
       ),
@@ -2296,7 +2270,6 @@ test("parseManagedPlist strips MDM metadata keys", async () => {
     ),
     "test:mobileconfig",
   )
-  expect(config.share).toBe("disabled")
   expect(config.model).toBe("mdm/model")
   // MDM keys must not leak into the parsed config
   expect((config as any).PayloadUUID).toBeUndefined()

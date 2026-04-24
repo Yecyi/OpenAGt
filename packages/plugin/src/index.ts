@@ -70,6 +70,9 @@ export type PluginOptions = Record<string, unknown>
 
 export type Config = Omit<SDKConfig, "plugin"> & {
   plugin?: Array<string | [string, PluginOptions]>
+  theme?: string
+  keybinds?: Record<string, string | undefined>
+  tui?: Record<string, unknown>
 }
 
 export type Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>

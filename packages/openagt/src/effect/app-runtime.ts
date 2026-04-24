@@ -45,8 +45,6 @@ import { Vcs } from "@/project"
 import { Worktree } from "@/worktree"
 import { Pty } from "@/pty"
 import { Installation } from "@/installation"
-import { ShareNext } from "@/share"
-import { SessionShare } from "@/share"
 import { Npm } from "@/npm"
 import { Coordinator } from "@/coordinator/coordinator"
 import { PersonalAgent } from "@/personal/personal"
@@ -97,8 +95,6 @@ export const AppLayer = Layer.mergeAll(
   Worktree.defaultLayer,
   Pty.defaultLayer,
   Installation.defaultLayer,
-  ShareNext.defaultLayer,
-  SessionShare.defaultLayer,
   Coordinator.defaultLayer,
   PersonalAgent.defaultLayer,
 ).pipe(Layer.provideMerge(Observability.layer))

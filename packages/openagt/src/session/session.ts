@@ -56,7 +56,6 @@ export function fromRow(row: SessionRow): Info {
           diffs: row.summary_diffs ?? undefined,
         }
       : undefined
-  const share = row.share_url ? { url: row.share_url } : undefined
   const revert = row.revert ?? undefined
   return {
     id: row.id,
@@ -68,7 +67,6 @@ export function fromRow(row: SessionRow): Info {
     title: row.title,
     version: row.version,
     summary,
-    share,
     revert,
     permission: row.permission ?? undefined,
     time: {
@@ -90,7 +88,6 @@ export function toRow(info: Info) {
     directory: info.directory,
     title: info.title,
     version: info.version,
-    share_url: info.share?.url,
     summary_additions: info.summary?.additions,
     summary_deletions: info.summary?.deletions,
     summary_files: info.summary?.files,
@@ -128,11 +125,6 @@ export const Info = z
         deletions: z.number(),
         files: z.number(),
         diffs: Snapshot.FileDiff.array().optional(),
-      })
-      .optional(),
-    share: z
-      .object({
-        url: z.string(),
       })
       .optional(),
     title: z.string(),
@@ -217,7 +209,6 @@ export const Event = {
     schema: z.object({
       sessionID: SessionID.zod,
       info: updateSchema(Info).extend({
-        share: updateSchema(Info.shape.share.unwrap()).optional(),
         time: updateSchema(Info.shape.time).optional(),
       }),
     }),
