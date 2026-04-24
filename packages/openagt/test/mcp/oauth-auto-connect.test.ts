@@ -20,6 +20,7 @@ const transportCalls: Array<{
 // auth flow (which calls provider.state()) or a simple UnauthorizedError.
 let simulateAuthFlow = true
 let connectSucceedsImmediately = false
+let streamableCloseCount = 0
 
 // Mock the transport constructors to simulate OAuth auto-auth on 401
 void mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
@@ -63,6 +64,9 @@ void mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
       throw new MockUnauthorizedError()
     }
     async finishAuth(_code: string) {}
+    async close() {
+      streamableCloseCount++
+    }
   },
 }))
 
@@ -107,6 +111,7 @@ beforeEach(() => {
   transportCalls.length = 0
   simulateAuthFlow = true
   connectSucceedsImmediately = false
+  streamableCloseCount = 0
 })
 
 // Import modules after mocking
@@ -268,8 +273,10 @@ test("authenticate() stores a connected client when auth completes without redir
             simulateAuthFlow = false
             connectSucceedsImmediately = true
 
+            const closeCountBeforeAuth = streamableCloseCount
             const result = yield* mcp.authenticate("test-oauth-connect")
             expect(result.status).toBe("connected")
+            expect(streamableCloseCount).toBeGreaterThan(closeCountBeforeAuth)
 
             const after = yield* mcp.status()
             expect(after["test-oauth-connect"]?.status).toBe("connected")

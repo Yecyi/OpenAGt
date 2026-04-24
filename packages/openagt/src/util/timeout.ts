@@ -1,9 +1,8 @@
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timeout: NodeJS.Timeout
+  let timeout: ReturnType<typeof setTimeout> | undefined
   return Promise.race([
-    promise.then((result) => {
-      clearTimeout(timeout)
-      return result
+    promise.finally(() => {
+      if (timeout) clearTimeout(timeout)
     }),
     new Promise<never>((_, reject) => {
       timeout = setTimeout(() => {
