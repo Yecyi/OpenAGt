@@ -17,9 +17,9 @@ const MAX_LINE_LENGTH = 2000
 const MAX_LINE_SUFFIX = `... (line truncated to ${MAX_LINE_LENGTH} chars)`
 const MAX_BYTES = 50 * 1024
 const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
-const SAMPLE_BYTES = 4096
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
+const SAMPLE_BYTES = 4096
 const EXACT_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
 const parameters = z.object({
@@ -210,7 +210,7 @@ export const ReadTool = Tool.define(
         if (Number(stat.size) > MAX_ATTACHMENT_BYTES) {
           return yield* Effect.fail(
             new Error(
-              `Cannot attach ${mime} file larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath} (${Number(stat.size)} bytes)`,
+              `Cannot read ${isPdfAttachment(mime) ? "PDF" : "image"} file larger than ${MAX_ATTACHMENT_BYTES_LABEL}: ${filepath} (${Number(stat.size)} bytes)`,
             ),
           )
         }
@@ -260,7 +260,9 @@ export const ReadTool = Tool.define(
       if (file.cut) {
         output += `\n\n(Output capped at ${MAX_BYTES_LABEL}. Showing lines ${file.offset}-${last}. Use offset=${next} to continue.)`
       } else if (file.more) {
-        output += `\n\n(Showing lines ${file.offset}-${last} of ${file.exact ? file.count : `at least ${file.count}`}. Use offset=${next} to continue.)`
+        output += file.exact
+          ? `\n\n(Showing lines ${file.offset}-${last} of ${file.count}. Use offset=${next} to continue.)`
+          : `\n\n(Showing lines ${file.offset}-${last}; file has at least ${file.count} lines. Use offset=${next} to continue.)`
       } else {
         output += `\n\n(End of file - total ${file.count} lines)`
       }

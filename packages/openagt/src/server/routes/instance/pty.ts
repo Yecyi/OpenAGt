@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import type { UpgradeWebSocket } from "hono/ws"
 import { Effect } from "effect"
+import { randomUUID } from "node:crypto"
 import z from "zod"
 import { AppRuntime } from "@/effect/app-runtime"
 import { Pty } from "@/pty"
@@ -10,6 +11,25 @@ import { NotFoundError } from "@/storage"
 import { errors } from "../../error"
 import { jsonRequest, runRequest } from "./trace"
 import { PtyTicket } from "@/server/pty-ticket"
+
+const PTY_TICKET_TTL_MS = 60_000
+const ptyTickets = new Map<string, { ptyID: string; directory: string; expires: number }>()
+
+function createPtyTicket(ptyID: string, directory: string) {
+  const token = randomUUID()
+  const expires = Date.now() + PTY_TICKET_TTL_MS
+  ptyTickets.set(token, { ptyID, directory, expires })
+  return { token, expires }
+}
+
+function consumePtyTicket(token: string | undefined, ptyID: string, directory: string) {
+  if (!token) return false
+  const ticket = ptyTickets.get(token)
+  ptyTickets.delete(token)
+  if (!ticket) return false
+  if (ticket.expires < Date.now()) return false
+  return ticket.ptyID === ptyID && ticket.directory === directory
+}
 
 export function PtyRoutes(upgradeWebSocket: UpgradeWebSocket) {
   return new Hono()
@@ -60,6 +80,39 @@ export function PtyRoutes(upgradeWebSocket: UpgradeWebSocket) {
           const pty = yield* Pty.Service
           return yield* pty.create(c.req.valid("json"))
         }),
+    )
+    .post(
+      "/:ptyID/connect-ticket",
+      describeRoute({
+        summary: "Create PTY connection ticket",
+        description: "Create a short-lived one-time ticket for a PTY WebSocket connection.",
+        operationId: "pty.connectTicket",
+        responses: {
+          200: {
+            description: "Connection ticket",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ token: z.string(), expires: z.number() })),
+              },
+            },
+          },
+          ...errors(404),
+        },
+      }),
+      validator("param", z.object({ ptyID: PtyID.zod })),
+      validator("query", z.object({ directory: z.string() })),
+      async (c) => {
+        const info = await runRequest(
+          "PtyRoutes.connectTicket",
+          c,
+          Effect.gen(function* () {
+            const pty = yield* Pty.Service
+            return yield* pty.get(c.req.valid("param").ptyID)
+          }),
+        )
+        if (!info) throw new NotFoundError({ message: "Session not found" })
+        return c.json(createPtyTicket(c.req.valid("param").ptyID, c.req.valid("query").directory))
+      },
     )
     .get(
       "/:ptyID",
@@ -205,6 +258,10 @@ export function PtyRoutes(upgradeWebSocket: UpgradeWebSocket) {
         }
 
         const id = PtyID.zod.parse(c.req.param("ptyID"))
+        const directory = c.req.query("directory") ?? ""
+        if (c.req.query("ticket") && !consumePtyTicket(c.req.query("ticket"), id, directory)) {
+          throw new Error("Invalid or expired PTY connection ticket")
+        }
         const cursor = (() => {
           const value = c.req.query("cursor")
           if (!value) return

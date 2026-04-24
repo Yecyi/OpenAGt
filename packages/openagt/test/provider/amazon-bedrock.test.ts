@@ -134,6 +134,8 @@ test("Bedrock: loads when bearer token from auth.json is present", async () => {
         const providers = await list()
         expect(providers[ProviderID.amazonBedrock]).toBeDefined()
         expect(providers[ProviderID.amazonBedrock].options?.region).toBe("eu-west-1")
+        expect(providers[ProviderID.amazonBedrock].options?.apiKey).toBe("test-bearer-token")
+        expect(providers[ProviderID.amazonBedrock].options?.credentialProvider).toBeUndefined()
       },
     })
   } finally {

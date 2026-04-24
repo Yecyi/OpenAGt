@@ -1,5 +1,4 @@
 import { Effect, Layer, Redacted, Schema } from "effect"
-import { serverUsernames } from "@openagt/shared/auth"
 import { HttpApiBuilder, HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi"
 import { HttpRouter, HttpServer, HttpServerRequest } from "effect/unstable/http"
 import { AppRuntime } from "@/effect/app-runtime"
@@ -16,6 +15,7 @@ import { ProjectApi, projectHandlers } from "./project"
 import { ProviderApi, providerHandlers } from "./provider"
 import { QuestionApi, questionHandlers } from "./question"
 import { memoMap } from "@/effect/memo-map"
+import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 
 const Query = Schema.Struct({
   directory: Schema.optional(Schema.String),
@@ -72,10 +72,11 @@ const auth = Layer.succeed(
   Authorization.of({
     basic: (effect, { credential }) =>
       Effect.gen(function* () {
-        const password = Flag.OPENCODE_SERVER_PASSWORD ?? Flag.OPENAGT_SERVER_PASSWORD
+        const password = Flag.OPENAGT_SERVER_PASSWORD ?? Flag.OPENCODE_SERVER_PASSWORD
         if (!password) return yield* effect
 
-        if (!serverUsernames(Flag.OPENCODE_SERVER_USERNAME ?? Flag.OPENAGT_SERVER_USERNAME).includes(credential.username)) {
+        const user = Flag.OPENAGT_SERVER_USERNAME ?? Flag.OPENCODE_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
+        if (!isAllowedServerUsername(credential.username, user)) {
           return yield* new Unauthorized({ message: "Unauthorized" })
         }
         if (Redacted.value(credential.password) !== password) {

@@ -1,6 +1,6 @@
 import { Provider } from "../provider"
 import { NamedError } from "@openagt/shared/util/error"
-import { DEFAULT_SERVER_USERNAME, serverUsernames } from "@openagt/shared/auth"
+import { DEFAULT_SERVER_USERNAME, isAllowedServerUsername } from "@openagt/shared/auth"
 import { NotFoundError } from "../storage"
 import { Session } from "../session"
 import crypto from "node:crypto"
@@ -44,6 +44,7 @@ export const AuthMiddleware: MiddlewareHandler = (c, next) => {
   if (c.req.method === "OPTIONS") return next()
   const password = Flag.OPENAGT_SERVER_PASSWORD ?? Flag.OPENCODE_SERVER_PASSWORD
   if (!password) return next()
+  const username = Flag.OPENAGT_SERVER_USERNAME ?? Flag.OPENCODE_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME
   const ptyID = PtyTicket.matchConnect(c.req.path)
   if (ptyID && PtyTicket.consume({ token: c.req.query("ticket"), ptyID, directory: c.req.query("directory") })) {
     return next()
@@ -53,7 +54,7 @@ export const AuthMiddleware: MiddlewareHandler = (c, next) => {
     c.req.header("authorization") ?? (ptyID && c.req.query("auth_token") ? `Basic ${c.req.query("auth_token")}` : ""),
   )
   if (!auth) throw new HTTPException(401, { message: "Unauthorized" })
-  if (!serverUsernames(Flag.OPENAGT_SERVER_USERNAME ?? Flag.OPENCODE_SERVER_USERNAME ?? DEFAULT_SERVER_USERNAME).includes(auth.username)) {
+  if (!isAllowedServerUsername(auth.username, username)) {
     throw new HTTPException(401, { message: "Unauthorized" })
   }
   if (!equalSecret(auth.password, password)) throw new HTTPException(401, { message: "Unauthorized" })

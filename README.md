@@ -25,8 +25,8 @@ Not in the current stable line:
 
 Technical documentation:
 
-- [Technical Architecture](C:\Users\Administrator\Desktop\OpenAG\docs\technical\architecture.md)
-- [Windows Signing](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md)
+- [Technical Architecture](docs/technical/architecture.md)
+- [Windows Signing](docs/release/windows-signing.md)
 
 ## OpenCode vs OpenAGt
 
@@ -58,7 +58,7 @@ Published assets:
 - `openagt-macos-x64.tar.gz`
 - `SHA256SUMS.txt`
 
-Install details are also documented in [C:\Users\Administrator\Desktop\OpenAG\docs\install\stable.md](C:\Users\Administrator\Desktop\OpenAG\docs\install\stable.md).
+Install details are also documented in [Stable Install](docs/install/stable.md).
 
 ## Core Technologies
 
@@ -115,7 +115,7 @@ flowchart LR
   F --> I["Server + SSE Events"]
 ```
 
-For a fuller architecture breakdown, see [Technical Architecture](C:\Users\Administrator\Desktop\OpenAG\docs\technical\architecture.md).
+For a fuller architecture breakdown, see [Technical Architecture](docs/technical/architecture.md).
 
 ## Installation
 
@@ -147,7 +147,7 @@ Important:
 
 - current Windows assets are **not code-signed**
 - Windows SmartScreen may show `Unknown publisher`
-- technical signing workflow is documented separately in [Windows Signing](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md)
+- technical signing workflow is documented separately in [Windows Signing](docs/release/windows-signing.md)
 
 ### macOS / Linux
 
@@ -375,4 +375,4 @@ bun run --cwd packages/openagt src/index.ts providers list
 
 ## License
 
-MIT. See [C:\Users\Administrator\Desktop\OpenAG\LICENSE](C:\Users\Administrator\Desktop\OpenAG\LICENSE).
+MIT. See [LICENSE](LICENSE).

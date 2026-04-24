@@ -10,6 +10,8 @@ node_modules
 playground
 tmp
 dist
+!packages/solid-start/dist/
+!packages/solid-start/dist/**
 ts-dist
 .turbo
 **/.serena

@@ -59,6 +59,7 @@
     "**/sdk.gen.ts",
     "Code Reference/**",
     ".opencode/**",
+    "packages/opencode/**",
     "packages/sdk/js/src/gen/**",
     "packages/sdk/js/src/v2/gen/**"
   ]

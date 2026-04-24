@@ -11,8 +11,10 @@
     "dev:web": "bun --cwd packages/app dev",
     "dev:console": "ulimit -n 10240 2>/dev/null; bun run --cwd packages/console/app dev",
     "dev:storybook": "bun --cwd packages/storybook storybook",
-    "lint": "oxlint",
+    "lint": "bun run script/lint.ts",
+    "lint:warnings": "oxlint",
     "check:integrity": "bun run script/check-source-integrity.ts",
+    "check:audit-policy": "bun run script/audit-policy.ts",
     "release:notes": "bun run script/release-notes.ts",
     "release:verify": "bun run script/release-verify.ts",
     "release:stable": "bun run script/release-stable.ts",
@@ -78,8 +80,8 @@
       "vite": "7.3.2",
       "@solidjs/meta": "0.29.4",
       "@solidjs/router": "0.15.4",
-      "@solidjs/start": "https://pkg.pr.new/@solidjs/start@dfb2020",
-      "solid-js": "1.9.12",
+      "@solidjs/start": "workspace:*",
+      "solid-js": "1.9.10",
       "vite-plugin-solid": "2.11.10",
       "@lydell/node-pty": "1.2.0-beta.10"
     }
@@ -126,6 +128,9 @@
     "electron"
   ],
   "overrides": {
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@hono/node-server": "1.19.14",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@remix-run/router": "1.23.2",
     "diff": "8.0.3",
@@ -134,8 +139,8 @@
     "fast-xml-parser": "5.7.1",
     "file-type": "22.0.1",
     "h3": "2.0.1-rc.20",
-    "h3@2.0.1-rc.4": "2.0.1-rc.20",
     "hono": "4.12.14",
+    "minimatch": "10.2.5",
     "protobufjs": "8.0.1",
     "react-router": "6.30.3",
     "react-router-dom": "6.30.3",
@@ -144,9 +149,7 @@
     "undici": "7.25.0",
     "uuid": "14.0.0",
     "vite": "7.3.2",
-    "wrangler": "4.84.1",
-    "@types/bun": "catalog:",
-    "@types/node": "catalog:"
+    "wrangler": "4.84.1"
   },
   "patchedDependencies": {
     "@standard-community/standard-openapi@0.2.9": "patches/@standard-community%2Fstandard-openapi@0.2.9.patch",

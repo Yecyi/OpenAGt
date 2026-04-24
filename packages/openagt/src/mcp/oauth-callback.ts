@@ -203,8 +203,8 @@ export async function ensureRunning(redirectUri?: string): Promise<void> {
 
   const running = await isPortInUse(port)
   if (running) {
-    log.error("oauth callback server port is already in use", { port })
-    throw new Error(`OAuth callback port ${port} is already in use`)
+    log.info("oauth callback server already running on another instance", { port })
+    throw new Error(`OAuth callback port ${port} is already in use by another process`)
   }
 
   currentPort = port

@@ -132,8 +132,10 @@ describe("file/index Filesystem patterns", () => {
 
     test("does not inline oversized images", async () => {
       await using tmp = await tmpdir()
-      const filepath = path.join(tmp.path, "huge.png")
-      await fs.writeFile(filepath, Buffer.alloc(5 * 1024 * 1024 + 1, 0))
+      await fs.writeFile(
+        path.join(tmp.path, "huge.png"),
+        Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(5 * 1024 * 1024)]),
+      )
 
       await Instance.provide({
         directory: tmp.path,

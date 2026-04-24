@@ -2,33 +2,62 @@
 
 import { $ } from "bun"
 
+const typecheckPackages = [
+  "packages/openagt",
+  "packages/app",
+  "packages/shared",
+  "packages/ui",
+  "packages/plugin",
+  "packages/enterprise",
+  "packages/console/app",
+  "packages/console/core",
+  "packages/function",
+  "packages/sdk/js",
+]
+
+const runtimeTests = [
+  "test/session/task-runtime-agentic.test.ts",
+  "test/agent/coordinator-personal.test.ts",
+  "test/security/exec-policy.test.ts",
+  "test/security/shell-security.test.ts",
+]
+
 const steps = [
   {
     title: "Build SDK",
-    command: $`bun run --cwd packages/sdk/js script/build.ts`,
+    run: () => $`bun run --cwd packages/sdk/js script/build.ts`,
+  },
+  {
+    title: "Check source integrity",
+    run: () => $`bun run check:integrity`,
   },
   {
     title: "Build config schemas",
-    command: $`bun run script/schema.ts`.cwd("packages/openagt"),
+    run: () => $`bun run script/schema.ts`.cwd("packages/openagt"),
   },
   {
-    title: "Typecheck packages/openagt",
-    command: $`bun typecheck`.cwd("packages/openagt"),
+    title: "Check audit policy",
+    run: () => $`bun run check:audit-policy`,
   },
   {
-    title: "Typecheck packages/sdk/js",
-    command: $`bun typecheck`.cwd("packages/sdk/js"),
+    title: "Audit dependencies",
+    run: () => $`bun audit --json`,
   },
   {
-    title: "Focused runtime tests",
-    command:
-      $`bun test test/session/task-runtime-agentic.test.ts test/agent/coordinator-personal.test.ts test/security/exec-policy.test.ts test/security/shell-security.test.ts test/tool/bash.test.ts`.cwd(
-        "packages/openagt",
-      ),
+    title: "Lint",
+    run: () => $`bun run lint`,
+  },
+  {
+    title: "Typecheck packages",
+    run: () => Promise.all(typecheckPackages.map((pkg) => $`bun typecheck`.cwd(pkg))),
+  },
+  {
+    title: "Focused runtime and security tests",
+    run: () => $`bun test ${runtimeTests}`.cwd("packages/openagt"),
   },
 ]
 
 for (const step of steps) {
   console.log(`\n=== ${step.title} ===\n`)
-  await step.command
+  await step.run()
 }

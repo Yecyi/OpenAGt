@@ -119,6 +119,24 @@ export type Status = z.infer<typeof Status>
 type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
 const pendingOAuthTransports = new Map<string, TransportWithAuth>()
 
+type ClosableTransport = { close: () => void | Promise<void> }
+
+function isClosableTransport(transport: unknown): transport is ClosableTransport {
+  return (
+    !!transport &&
+    typeof transport === "object" &&
+    "close" in transport &&
+    typeof transport.close === "function"
+  )
+}
+
+function closeTransportIfSupported(transport: unknown) {
+  if (!isClosableTransport(transport)) return Effect.void
+  return Effect.tryPromise(async () => {
+    await transport.close()
+  }).pipe(Effect.ignore)
+}
+
 // Prompt cache types
 type PromptInfo = Awaited<ReturnType<MCPClient["listPrompts"]>>["prompts"][number]
 type ResourceInfo = Awaited<ReturnType<MCPClient["listResources"]>>["resources"][number]
@@ -297,7 +315,19 @@ export const layer = Layer.effect(
     const MCP_RETRY_ATTEMPTS = 3
     const MCP_RETRY_BASE_DELAY_MS = 1000
     const MCP_RETRY_MAX_DELAY_MS = 30_000
+    const MCP_RETRY_MIN_ATTEMPT_MS = 250
     const MCP_RETRY_JITTER = 0.3
+
+    const closePendingOAuthTransport = (mcpName: string, except?: TransportWithAuth) => {
+      const transport = pendingOAuthTransports.get(mcpName)
+      if (!transport || transport === except) return Effect.void
+      return closeTransportIfSupported(transport)
+    }
+    const clearPendingOAuthTransport = (mcpName: string) =>
+      Effect.gen(function* () {
+        yield* closePendingOAuthTransport(mcpName)
+        pendingOAuthTransports.delete(mcpName)
+      })
 
     function computeBackoff(attempt: number): number {
       const exponential = Math.min(MCP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt), MCP_RETRY_MAX_DELAY_MS)
@@ -382,14 +412,19 @@ export const layer = Layer.effect(
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       const deadline = Date.now() + connectTimeout
       const remaining = () => Math.max(0, deadline - Date.now())
+      const timedOut = () =>
+        ({ status: "failed" as const, error: `MCP connection timed out after ${connectTimeout}ms` }) satisfies Status
+      const isAuthError = (error: Error) =>
+        error instanceof UnauthorizedError || Boolean(authProvider && error.message.includes("OAuth"))
+      const needsRegistration = (error: Error) =>
+        error.message.includes("registration") || error.message.includes("client_id")
       let lastStatus: Status | undefined
 
       for (const { name, create } of transports) {
         if (remaining() <= 0) {
-          lastStatus = { status: "failed" as const, error: `Connection timed out after ${connectTimeout}ms` }
+          lastStatus = timedOut()
           break
         }
-
         // Check circuit breaker before attempting
         const now = Date.now()
         const cb = mcpCircuitBreaker[key]
@@ -405,7 +440,7 @@ export const layer = Layer.effect(
         while (attempt < MCP_RETRY_ATTEMPTS) {
           const timeLeft = remaining()
           if (timeLeft <= 0) {
-            lastError = new Error(`Connection timed out after ${connectTimeout}ms`)
+            lastStatus = timedOut()
             break
           }
 
@@ -414,13 +449,11 @@ export const layer = Layer.effect(
             Effect.map((client) => ({ client, transportName: name })),
             Effect.catch((error) => {
               const err = error instanceof Error ? error : new Error(String(error))
-              const isAuthError =
-                error instanceof UnauthorizedError || (authProvider && err.message.includes("OAuth"))
 
-              if (isAuthError) {
+              if (isAuthError(err)) {
                 log.info("mcp server requires authentication", { key, transport: name })
 
-                if (err.message.includes("registration") || err.message.includes("client_id")) {
+                if (needsRegistration(err)) {
                   lastStatus = {
                     status: "needs_client_registration" as const,
                     error: "Server does not support dynamic client registration. Please provide clientId in config.",
@@ -434,16 +467,19 @@ export const layer = Layer.effect(
                     })
                     .pipe(Effect.ignore, Effect.as(undefined))
                 } else {
-                  pendingOAuthTransports.set(key, transport)
-                  lastStatus = { status: "needs_auth" as const }
-                  return bus
-                    .publish(TuiEvent.ToastShow, {
-                      title: "MCP Authentication Required",
-                      message: `Server "${key}" requires authentication. Run: opencode mcp auth ${key}`,
-                      variant: "warning",
-                      duration: 8000,
-                    })
-                    .pipe(Effect.ignore, Effect.as(undefined))
+                  return Effect.gen(function* () {
+                    yield* closePendingOAuthTransport(key, transport)
+                    pendingOAuthTransports.set(key, transport)
+                    lastStatus = { status: "needs_auth" as const }
+                    yield* bus
+                      .publish(TuiEvent.ToastShow, {
+                        title: "MCP Authentication Required",
+                        message: `Server "${key}" requires authentication. Run: opencode mcp auth ${key}`,
+                        variant: "warning",
+                        duration: 8000,
+                      })
+                      .pipe(Effect.ignore)
+                  })
                 }
               }
 
@@ -665,6 +701,9 @@ export const layer = Layer.effect(
                 }),
               { concurrency: "unbounded" },
             )
+            yield* Effect.forEach(Array.from(pendingOAuthTransports.values()), closeTransportIfSupported, {
+              concurrency: "unbounded",
+            })
             pendingOAuthTransports.clear()
           }),
         )
@@ -904,8 +943,12 @@ export const layer = Layer.effect(
       }).pipe(
         Effect.catch((error) => {
           if (error instanceof UnauthorizedError && capturedUrl) {
-            pendingOAuthTransports.set(mcpName, transport)
-            return Effect.succeed({ authorizationUrl: capturedUrl.toString(), oauthState } satisfies AuthResult)
+            const authorizationUrl = capturedUrl.toString()
+            return Effect.gen(function* () {
+              yield* closePendingOAuthTransport(mcpName, transport)
+              pendingOAuthTransports.set(mcpName, transport)
+              return { authorizationUrl, oauthState } satisfies AuthResult
+            })
           }
           return Effect.die(error)
         }),
@@ -919,17 +962,20 @@ export const layer = Layer.effect(
         const mcpConfig = yield* getMcpConfig(mcpName)
         if (!mcpConfig) {
           yield* Effect.tryPromise(() => client?.close() ?? Promise.resolve()).pipe(Effect.ignore)
+          yield* clearPendingOAuthTransport(mcpName)
           return { status: "failed", error: "MCP config not found after auth" } as Status
         }
 
         const listed = client ? yield* defs(mcpName, client, mcpConfig.timeout) : undefined
         if (!client || !listed) {
           yield* Effect.tryPromise(() => client?.close() ?? Promise.resolve()).pipe(Effect.ignore)
+          yield* clearPendingOAuthTransport(mcpName)
           return { status: "failed", error: "Failed to get tools" } as Status
         }
 
         const s = yield* InstanceState.get(state)
         yield* auth.clearOAuthState(mcpName)
+        yield* clearPendingOAuthTransport(mcpName)
         return yield* storeClient(s, mcpName, client, listed, mcpConfig.timeout)
       }
 
@@ -987,7 +1033,7 @@ export const layer = Layer.effect(
       }
 
       yield* auth.clearCodeVerifier(mcpName)
-      pendingOAuthTransports.delete(mcpName)
+      yield* clearPendingOAuthTransport(mcpName)
 
       const mcpConfig = yield* getMcpConfig(mcpName)
       if (!mcpConfig) return { status: "failed", error: "MCP config not found after auth" } as Status
@@ -998,7 +1044,7 @@ export const layer = Layer.effect(
     const removeAuth = Effect.fn("MCP.removeAuth")(function* (mcpName: string) {
       yield* auth.remove(mcpName)
       McpOAuthCallback.cancelPending(mcpName)
-      pendingOAuthTransports.delete(mcpName)
+      yield* clearPendingOAuthTransport(mcpName)
       log.info("removed oauth credentials", { mcpName })
     })
 

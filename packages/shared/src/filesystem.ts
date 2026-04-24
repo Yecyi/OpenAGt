@@ -38,6 +38,24 @@ export namespace AppFileSystem {
 
   export class Service extends Context.Service<Service, Interface>()("@opencode/FileSystem") {}
 
+  async function atomicWrite(path: string, content: string | Uint8Array, mode?: number) {
+    const dir = dirname(path)
+    await NFS.mkdir(dir, { recursive: true })
+    const tmp = join(dir, `.${basename(path)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`)
+    const handle = await NFS.open(tmp, "wx", mode)
+    try {
+      await handle.writeFile(content)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    if (mode) await NFS.chmod(tmp, mode)
+    await NFS.rename(tmp, path)
+    await NFS.open(dir, "r")
+      .then((dirHandle) => dirHandle.sync().finally(() => dirHandle.close()))
+      .catch(() => undefined)
+  }
+
   export const layer = Layer.effect(
     Service,
     Effect.gen(function* () {

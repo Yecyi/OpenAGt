@@ -25,8 +25,8 @@ OpenAGt 当前围绕四个核心思路构建：
 
 技术文档：
 
-- [技术架构](C:\Users\Administrator\Desktop\OpenAG\docs\technical\architecture.md)
-- [Windows 签名说明](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md)
+- [技术架构](docs/technical/architecture.md)
+- [Windows 签名说明](docs/release/windows-signing.md)
 
 ## OpenCode vs OpenAGt
 
@@ -60,7 +60,7 @@ OpenAGt 当前围绕四个核心思路构建：
 
 安装细节见：
 
-- [C:\Users\Administrator\Desktop\OpenAG\docs\install\stable.md](C:\Users\Administrator\Desktop\OpenAG\docs\install\stable.md)
+- [稳定版安装说明](docs/install/stable.md)
 
 ## 核心技术
 
@@ -118,7 +118,7 @@ flowchart LR
 
 完整技术拆解见：
 
-- [技术架构](C:\Users\Administrator\Desktop\OpenAG\docs\technical\architecture.md)
+- [技术架构](docs/technical/architecture.md)
 
 ## 安装
 
@@ -149,7 +149,7 @@ opencode
 
 - 当前 Windows 资产**未签名**
 - Windows SmartScreen 可能显示 `Unknown publisher`
-- 签名相关技术细节单独放在 [Windows 签名说明](C:\Users\Administrator\Desktop\OpenAG\docs\release\windows-signing.md)
+- 签名相关技术细节单独放在 [Windows 签名说明](docs/release/windows-signing.md)
 
 ### macOS / Linux
 
@@ -278,7 +278,6 @@ Web：
 bun run --cwd packages/app dev
 ```
 
-
 Flutter MVP：
 
 ```bash
@@ -378,4 +377,4 @@ bun run --cwd packages/openagt src/index.ts providers list
 
 ## License
 
-MIT。见 [C:\Users\Administrator\Desktop\OpenAG\LICENSE](C:\Users\Administrator\Desktop\OpenAG\LICENSE)。
+MIT。见 [LICENSE](LICENSE)。
