@@ -3061,14 +3061,40 @@ export class Plan extends HeyApiClient {
         subagent_type: string
         role?:
           | "coordinator"
+          | "planner"
           | "researcher"
           | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
           | "debugger"
+          | "reviser"
           | "writer"
+          | "analyst"
+          | "style-editor"
+          | "factuality-checker"
+          | "citation-auditor"
+          | "contradiction-checker"
+          | "constraint-checker"
+          | "alternative-planner"
+          | "risk-reviewer"
+          | "inbox-classifier"
+          | "priority-sorter"
+          | "scheduler"
+          | "privacy-reviewer"
+          | "follow-up-planner"
+          | "trigger-designer"
+          | "dry-run-verifier"
+          | "rollback-planner"
+          | "doc-researcher"
+          | "structure-writer"
           | "environment-auditor"
+          | "blocker-classifier"
+          | "remediation-planner"
+          | "inventory-agent"
+          | "organizer"
+          | "safety-verifier"
+          | "executor"
           | "memory-curator"
           | "automation-planner"
         model?: {
@@ -3087,20 +3113,49 @@ export class Plan extends HeyApiClient {
         conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
+          | "plan"
           | "research"
           | "implementation"
           | "verification"
           | "review"
+          | "revise"
           | "debug"
           | "document"
+          | "analysis"
+          | "outline"
+          | "draft"
           | "environment-diagnosis"
           | "automation-plan"
+          | "organization-plan"
           | "memory"
           | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
+        expert_id?: string
+        expert_role?: string
+        workflow?:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        artifact_type?: string
+        artifact_id?: string
+        revision_of?: string
+        quality_gate_id?: string
+        memory_namespace?: string
+        confidence?: "low" | "medium" | "high"
+        revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
       intent?: {
         goal: string
@@ -3109,6 +3164,10 @@ export class Plan extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
@@ -3123,14 +3182,49 @@ export class Plan extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
           | "file-data-organization"
           | "general-operations"
+        workflow_confidence?: "low" | "medium" | "high"
+        secondary_workflows?: Array<
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        >
         expected_output: string
         permission_expectations: Array<string>
       }
+      effort?: "low" | "medium" | "high" | "deep"
+      workflow?:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
       parallel_policy?: {
@@ -3155,6 +3249,8 @@ export class Plan extends HeyApiClient {
             { in: "body", key: "goal" },
             { in: "body", key: "nodes" },
             { in: "body", key: "intent" },
+            { in: "body", key: "effort" },
+            { in: "body", key: "workflow" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
@@ -3193,14 +3289,40 @@ export class Coordinator extends HeyApiClient {
         subagent_type: string
         role?:
           | "coordinator"
+          | "planner"
           | "researcher"
           | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
           | "debugger"
+          | "reviser"
           | "writer"
+          | "analyst"
+          | "style-editor"
+          | "factuality-checker"
+          | "citation-auditor"
+          | "contradiction-checker"
+          | "constraint-checker"
+          | "alternative-planner"
+          | "risk-reviewer"
+          | "inbox-classifier"
+          | "priority-sorter"
+          | "scheduler"
+          | "privacy-reviewer"
+          | "follow-up-planner"
+          | "trigger-designer"
+          | "dry-run-verifier"
+          | "rollback-planner"
+          | "doc-researcher"
+          | "structure-writer"
           | "environment-auditor"
+          | "blocker-classifier"
+          | "remediation-planner"
+          | "inventory-agent"
+          | "organizer"
+          | "safety-verifier"
+          | "executor"
           | "memory-curator"
           | "automation-planner"
         model?: {
@@ -3219,20 +3341,49 @@ export class Coordinator extends HeyApiClient {
         conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
+          | "plan"
           | "research"
           | "implementation"
           | "verification"
           | "review"
+          | "revise"
           | "debug"
           | "document"
+          | "analysis"
+          | "outline"
+          | "draft"
           | "environment-diagnosis"
           | "automation-plan"
+          | "organization-plan"
           | "memory"
           | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
+        expert_id?: string
+        expert_role?: string
+        workflow?:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        artifact_type?: string
+        artifact_id?: string
+        revision_of?: string
+        quality_gate_id?: string
+        memory_namespace?: string
+        confidence?: "low" | "medium" | "high"
+        revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
       intent?: {
         goal: string
@@ -3241,6 +3392,10 @@ export class Coordinator extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
@@ -3255,14 +3410,49 @@ export class Coordinator extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
           | "file-data-organization"
           | "general-operations"
+        workflow_confidence?: "low" | "medium" | "high"
+        secondary_workflows?: Array<
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        >
         expected_output: string
         permission_expectations: Array<string>
       }
+      effort?: "low" | "medium" | "high" | "deep"
+      workflow?:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
       parallel_policy?: {
@@ -3287,6 +3477,8 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "goal" },
             { in: "body", key: "nodes" },
             { in: "body", key: "intent" },
+            { in: "body", key: "effort" },
+            { in: "body", key: "workflow" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
@@ -3320,14 +3512,40 @@ export class Coordinator extends HeyApiClient {
         subagent_type: string
         role?:
           | "coordinator"
+          | "planner"
           | "researcher"
           | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
           | "debugger"
+          | "reviser"
           | "writer"
+          | "analyst"
+          | "style-editor"
+          | "factuality-checker"
+          | "citation-auditor"
+          | "contradiction-checker"
+          | "constraint-checker"
+          | "alternative-planner"
+          | "risk-reviewer"
+          | "inbox-classifier"
+          | "priority-sorter"
+          | "scheduler"
+          | "privacy-reviewer"
+          | "follow-up-planner"
+          | "trigger-designer"
+          | "dry-run-verifier"
+          | "rollback-planner"
+          | "doc-researcher"
+          | "structure-writer"
           | "environment-auditor"
+          | "blocker-classifier"
+          | "remediation-planner"
+          | "inventory-agent"
+          | "organizer"
+          | "safety-verifier"
+          | "executor"
           | "memory-curator"
           | "automation-planner"
         model?: {
@@ -3346,20 +3564,49 @@ export class Coordinator extends HeyApiClient {
         conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
+          | "plan"
           | "research"
           | "implementation"
           | "verification"
           | "review"
+          | "revise"
           | "debug"
           | "document"
+          | "analysis"
+          | "outline"
+          | "draft"
           | "environment-diagnosis"
           | "automation-plan"
+          | "organization-plan"
           | "memory"
           | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
+        expert_id?: string
+        expert_role?: string
+        workflow?:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        artifact_type?: string
+        artifact_id?: string
+        revision_of?: string
+        quality_gate_id?: string
+        memory_namespace?: string
+        confidence?: "low" | "medium" | "high"
+        revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
       intent?: {
         goal: string
@@ -3368,6 +3615,10 @@ export class Coordinator extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
@@ -3382,14 +3633,49 @@ export class Coordinator extends HeyApiClient {
           | "review"
           | "debugging"
           | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
           | "documentation"
           | "environment-audit"
           | "automation"
           | "file-data-organization"
           | "general-operations"
+        workflow_confidence?: "low" | "medium" | "high"
+        secondary_workflows?: Array<
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        >
         expected_output: string
         permission_expectations: Array<string>
       }
+      effort?: "low" | "medium" | "high" | "deep"
+      workflow?:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
       parallel_policy?: {
@@ -3415,6 +3701,8 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "goal" },
             { in: "body", key: "nodes" },
             { in: "body", key: "intent" },
+            { in: "body", key: "effort" },
+            { in: "body", key: "workflow" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
@@ -3736,7 +4024,19 @@ export class Memory extends HeyApiClient {
       content?: string
       sessionID?: string
       tags?: Array<string>
-      source?: "manual" | "coordinator" | "verify" | "scheduler" | "gateway"
+      metadata?: {
+        [key: string]: unknown
+      }
+      source?:
+        | "manual"
+        | "coordinator"
+        | "verify"
+        | "scheduler"
+        | "gateway"
+        | "expert"
+        | "reviser"
+        | "verifier"
+        | "reducer"
       importance?: number
       pinned?: boolean
     },
@@ -3754,6 +4054,7 @@ export class Memory extends HeyApiClient {
             { in: "body", key: "content" },
             { in: "body", key: "sessionID" },
             { in: "body", key: "tags" },
+            { in: "body", key: "metadata" },
             { in: "body", key: "source" },
             { in: "body", key: "importance" },
             { in: "body", key: "pinned" },
@@ -3784,6 +4085,11 @@ export class Memory extends HeyApiClient {
       query?: string
       sessionID?: string
       scopes?: Array<"profile" | "workspace" | "session">
+      workflow?: string
+      expertID?: string
+      role?: string
+      artifactType?: string
+      includeFailurePatterns?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3797,6 +4103,11 @@ export class Memory extends HeyApiClient {
             { in: "body", key: "query" },
             { in: "body", key: "sessionID" },
             { in: "body", key: "scopes" },
+            { in: "body", key: "workflow" },
+            { in: "body", key: "expertID" },
+            { in: "body", key: "role" },
+            { in: "body", key: "artifactType" },
+            { in: "body", key: "includeFailurePatterns" },
           ],
         },
       ],
@@ -3817,11 +4128,22 @@ export class Memory extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      kind?: "coordinator_run_completed" | "verify_completed" | "manual_preference" | "follow_up_completed"
+      kind?:
+        | "coordinator_run_completed"
+        | "verify_completed"
+        | "manual_preference"
+        | "follow_up_completed"
+        | "expert_output"
+        | "reviser_pattern"
+        | "reducer_summary"
+        | "verifier_rule"
       sessionID?: string
       title?: string
       content?: string
       tags?: Array<string>
+      metadata?: {
+        [key: string]: unknown
+      }
       importance?: number
     },
     options?: Options<never, ThrowOnError>,
@@ -3838,6 +4160,7 @@ export class Memory extends HeyApiClient {
             { in: "body", key: "title" },
             { in: "body", key: "content" },
             { in: "body", key: "tags" },
+            { in: "body", key: "metadata" },
             { in: "body", key: "importance" },
           ],
         },

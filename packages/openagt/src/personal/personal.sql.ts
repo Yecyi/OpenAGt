@@ -16,6 +16,7 @@ export const PersonalMemoryNoteTable = sqliteTable(
     title: text().notNull(),
     content: text().notNull(),
     tags: text({ mode: "json" }).$type<string[]>().notNull(),
+    metadata: text({ mode: "json" }).$type<Record<string, unknown>>().notNull(),
     source: text().notNull(),
     importance: integer().notNull().default(0),
     pinned: integer().notNull().default(0),

@@ -11,7 +11,7 @@ const parameters = z.object({
 })
 
 type TaskWaitMetadata = {
-  tasks: TaskRuntime.TaskResult[]
+  tasks: Tool.MetadataValue
 }
 
 export const TaskWaitTool = Tool.define(
@@ -34,7 +34,7 @@ export const TaskWaitTool = Tool.define(
             title: "Task Wait",
             output: result.map((item) => `${item.task_id} ${item.status} ${item.summary}`).join("\n"),
             metadata: {
-              tasks: result,
+              tasks: Tool.toMetadataValue(result),
             },
           }
         }).pipe(Effect.orDie),

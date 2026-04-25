@@ -28,6 +28,10 @@ export const TaskType = z.enum([
   "review",
   "debugging",
   "research",
+  "writing",
+  "data-analysis",
+  "planning",
+  "personal-admin",
   "documentation",
   "environment-audit",
   "automation",
@@ -45,6 +49,27 @@ export type CoordinatorMode = z.infer<typeof CoordinatorMode>
 export const CoordinatorParallelMode = z.enum(["off", "safe", "aggressive"])
 export type CoordinatorParallelMode = z.infer<typeof CoordinatorParallelMode>
 
+export const EffortLevel = z.enum(["low", "medium", "high", "deep"])
+export type EffortLevel = z.infer<typeof EffortLevel>
+
+export const ConfidenceLevel = z.enum(["low", "medium", "high"])
+export type ConfidenceLevel = z.infer<typeof ConfidenceLevel>
+
+export const RevisePolicy = z.enum(["none", "critical_only", "all_artifacts"])
+export type RevisePolicy = z.infer<typeof RevisePolicy>
+
+export const ReviseKind = z.enum([
+  "plan_revise",
+  "input_revise",
+  "output_revise",
+  "handoff_revise",
+  "reducer_revise",
+  "verifier_revise",
+  "debugger_revise",
+  "final_revise",
+])
+export type ReviseKind = z.infer<typeof ReviseKind>
+
 export const ParallelExecutionPolicy = z.object({
   mode: CoordinatorParallelMode.default("safe"),
   max_parallel_agents: z.number().int().min(1).max(16).default(4),
@@ -58,28 +83,60 @@ export type ParallelExecutionPolicy = z.infer<typeof ParallelExecutionPolicy>
 
 export const CoordinatorNodeRole = z.enum([
   "coordinator",
+  "planner",
   "researcher",
   "reducer",
   "implementer",
   "verifier",
   "reviewer",
   "debugger",
+  "reviser",
   "writer",
+  "analyst",
+  "style-editor",
+  "factuality-checker",
+  "citation-auditor",
+  "contradiction-checker",
+  "constraint-checker",
+  "alternative-planner",
+  "risk-reviewer",
+  "inbox-classifier",
+  "priority-sorter",
+  "scheduler",
+  "privacy-reviewer",
+  "follow-up-planner",
+  "trigger-designer",
+  "dry-run-verifier",
+  "rollback-planner",
+  "doc-researcher",
+  "structure-writer",
   "environment-auditor",
+  "blocker-classifier",
+  "remediation-planner",
+  "inventory-agent",
+  "organizer",
+  "safety-verifier",
+  "executor",
   "memory-curator",
   "automation-planner",
 ])
 export type CoordinatorNodeRole = z.infer<typeof CoordinatorNodeRole>
 
 export const CoordinatorOutputSchema = z.enum([
+  "plan",
   "research",
   "implementation",
   "verification",
   "review",
+  "revise",
   "debug",
   "document",
+  "analysis",
+  "outline",
+  "draft",
   "environment-diagnosis",
   "automation-plan",
+  "organization-plan",
   "memory",
   "research-synthesis",
   "summary",
@@ -93,6 +150,36 @@ export const CoordinatorModel = z.object({
 })
 export type CoordinatorModel = z.infer<typeof CoordinatorModel>
 
+export const EffortProfile = z.object({
+  planning_rounds: z.number().int().min(1).max(8),
+  expert_count_min: z.number().int().min(1).max(16),
+  expert_count_max: z.number().int().min(1).max(16),
+  verifier_count_min: z.number().int().min(0).max(8),
+  reducer_enabled: z.boolean(),
+  reviewer_enabled: z.boolean(),
+  debugger_enabled: z.boolean(),
+  revise_policy: RevisePolicy,
+  max_revise_nodes: z.number().int().min(0).max(64),
+  max_revision_per_artifact: z.number().int().min(0).max(8),
+  reasoning_effort: z.enum(["low", "medium", "high"]).optional(),
+  timeout_multiplier: z.number().min(0.25).max(10),
+})
+export type EffortProfile = z.infer<typeof EffortProfile>
+
+export const defaultEffortProfile = {
+  planning_rounds: 1,
+  expert_count_min: 1,
+  expert_count_max: 2,
+  verifier_count_min: 1,
+  reducer_enabled: false,
+  reviewer_enabled: false,
+  debugger_enabled: false,
+  revise_policy: "none",
+  max_revise_nodes: 0,
+  max_revision_per_artifact: 0,
+  timeout_multiplier: 1,
+} as const satisfies EffortProfile
+
 export const IntentProfile = z.object({
   goal: z.string(),
   task_type: TaskType,
@@ -101,10 +188,53 @@ export const IntentProfile = z.object({
   needs_user_clarification: z.boolean(),
   clarification_questions: z.array(z.string()),
   workflow: TaskType,
+  workflow_confidence: ConfidenceLevel.default("medium"),
+  secondary_workflows: z.array(TaskType).default([]),
   expected_output: z.string(),
   permission_expectations: z.array(z.string()),
 })
 export type IntentProfile = z.infer<typeof IntentProfile>
+
+export const ExpertLane = z.object({
+  id: z.string(),
+  workflow: TaskType,
+  role: CoordinatorNodeRole,
+  expert_id: z.string(),
+  node_ids: z.array(z.string()),
+  memory_namespace: z.string(),
+})
+export type ExpertLane = z.infer<typeof ExpertLane>
+
+export const QualityGate = z.object({
+  id: z.string(),
+  kind: ReviseKind,
+  node_id: z.string().optional(),
+  artifact_id: z.string().optional(),
+  status: z.enum(["pending", "running", "passed", "failed", "skipped"]).default("pending"),
+  required: z.boolean().default(true),
+  confidence: ConfidenceLevel.optional(),
+  issues: z.array(z.string()).default([]),
+})
+export type QualityGate = z.infer<typeof QualityGate>
+
+export const RevisePoint = z.object({
+  id: z.string(),
+  kind: ReviseKind,
+  target_node_id: z.string().optional(),
+  artifact_id: z.string().optional(),
+  required: z.boolean().default(true),
+  node_id: z.string().optional(),
+  status: z.enum(["pending", "running", "passed", "failed", "skipped"]).default("pending"),
+})
+export type RevisePoint = z.infer<typeof RevisePoint>
+
+export const MemoryContext = z.object({
+  scopes: z.array(z.enum(["profile", "workspace", "session"])).default(["profile", "workspace"]),
+  workflow_tags: z.array(z.string()).default([]),
+  expert_tags: z.array(z.string()).default([]),
+  note_ids: z.array(z.string()).default([]),
+})
+export type MemoryContext = z.infer<typeof MemoryContext>
 
 export const CoordinatorNode = z.object({
   id: z.string(),
@@ -128,6 +258,16 @@ export const CoordinatorNode = z.object({
   requires_user_input: z.boolean().default(false),
   priority: NodePriority,
   origin: TaskOrigin,
+  expert_id: z.string().optional(),
+  expert_role: z.string().optional(),
+  workflow: TaskType.optional(),
+  artifact_type: z.string().optional(),
+  artifact_id: z.string().optional(),
+  revision_of: z.string().optional(),
+  quality_gate_id: z.string().optional(),
+  memory_namespace: z.string().optional(),
+  confidence: ConfidenceLevel.optional(),
+  revise_policy: RevisePolicy.optional(),
 })
 export type CoordinatorNode = z.infer<typeof CoordinatorNode>
 export type CoordinatorNodeInput = z.input<typeof CoordinatorNode>
@@ -135,6 +275,9 @@ export type CoordinatorNodeInput = z.input<typeof CoordinatorNode>
 export const CoordinatorPlan = z.object({
   goal: z.string(),
   nodes: z.array(CoordinatorNode),
+  effort: EffortLevel.default("medium"),
+  workflow: TaskType.default("general-operations"),
+  effort_profile: EffortProfile.default(defaultEffortProfile),
   parallel_policy: ParallelExecutionPolicy.default({
     mode: "safe",
     max_parallel_agents: 4,
@@ -144,6 +287,17 @@ export const CoordinatorPlan = z.object({
     merge_strategy: "research-synthesis",
     conflict_resolution_strategy: "targeted-research",
   }),
+  expert_lanes: z.array(ExpertLane).default([]),
+  quality_gates: z.array(QualityGate).default([]),
+  revise_points: z.array(RevisePoint).default([]),
+  memory_context: MemoryContext.default({
+    scopes: ["profile", "workspace"],
+    workflow_tags: [],
+    expert_tags: [],
+    note_ids: [],
+  }),
+  budget_limited: z.boolean().default(false),
+  specialization_fallback: z.boolean().default(false),
 })
 export type CoordinatorPlan = z.infer<typeof CoordinatorPlan>
 
@@ -166,6 +320,8 @@ export const CoordinatorRun = z.object({
   intent: IntentProfile,
   mode: CoordinatorMode,
   workflow: TaskType,
+  effort: EffortLevel,
+  effort_profile: EffortProfile,
   state: CoordinatorRunState,
   plan: CoordinatorPlan,
   task_ids: z.array(z.string()),

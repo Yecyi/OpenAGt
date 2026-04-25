@@ -2,7 +2,22 @@ import { Hono } from "hono"
 import { describeRoute, resolver, validator } from "hono-openapi"
 import z from "zod"
 import { Coordinator } from "@/coordinator/coordinator"
-import { CoordinatorMode, CoordinatorNode, CoordinatorPlan, CoordinatorRun, CoordinatorRunID, IntentProfile, ParallelExecutionPolicy } from "@/coordinator/schema"
+import {
+  CoordinatorMode,
+  CoordinatorNode,
+  CoordinatorPlan,
+  CoordinatorRun,
+  CoordinatorRunID,
+  EffortLevel,
+  EffortProfile,
+  IntentProfile,
+  MemoryContext,
+  ParallelExecutionPolicy,
+  QualityGate,
+  RevisePoint,
+  ExpertLane,
+  TaskType,
+} from "@/coordinator/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { SessionID } from "@/session/schema"
 import { errors } from "../../error"
@@ -12,6 +27,8 @@ const runPayload = z.object({
   goal: z.string(),
   nodes: z.array(CoordinatorNode).optional(),
   intent: IntentProfile.optional(),
+  effort: EffortLevel.optional(),
+  workflow: TaskType.optional(),
   mode: CoordinatorMode.optional(),
   approved: z.boolean().optional(),
   parallel_policy: ParallelExecutionPolicy.partial().optional(),
@@ -47,6 +64,13 @@ const projection = z.object({
     started_at: z.number().optional(),
     completed_at: z.number().optional(),
   })),
+  expert_lanes: z.array(ExpertLane),
+  quality_gates: z.array(QualityGate),
+  revise_points: z.array(RevisePoint),
+  memory_context: MemoryContext,
+  effort_profile: EffortProfile,
+  budget_limited: z.boolean(),
+  specialization_fallback: z.boolean(),
 })
 
 export const CoordinatorRoutes = () =>
@@ -147,6 +171,8 @@ export const CoordinatorRoutes = () =>
             goal: body.goal,
             nodes: body.nodes,
             intent: body.intent,
+            effort: body.effort,
+            workflow: body.workflow,
             mode: body.mode,
             approved: body.approved,
             parallel_policy: body.parallel_policy,

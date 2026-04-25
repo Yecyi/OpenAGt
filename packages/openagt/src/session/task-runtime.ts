@@ -88,6 +88,7 @@ export const TaskResult = z.object({
   acceptance_checks: z.array(z.string()),
   priority: TaskPriority,
   origin: TaskOrigin,
+  metadata: z.record(z.string(), z.unknown()).optional(),
 })
 export type TaskResult = z.infer<typeof TaskResult>
 
@@ -127,6 +128,28 @@ function promptHash(prompt: string) {
 }
 
 function resultFromRecord(record: TaskRecord): TaskResult {
+  const metadata = record.metadata
+    ? Object.fromEntries(
+        [
+          "coordinator_node_id",
+          "coordinator_run_id",
+          "role",
+          "expert_id",
+          "expert_role",
+          "workflow",
+          "effort",
+          "artifact_type",
+          "artifact_id",
+          "revision_of",
+          "quality_gate_id",
+          "memory_namespace",
+          "confidence",
+          "revise_policy",
+          "output_schema",
+          "parallel_group",
+        ].flatMap((key) => key in record.metadata! ? [[key, record.metadata![key]] as const] : []),
+      )
+    : undefined
   return {
     task_id: record.task_id,
     status: record.status,
@@ -144,6 +167,7 @@ function resultFromRecord(record: TaskRecord): TaskResult {
     acceptance_checks: record.acceptance_checks,
     priority: record.priority,
     origin: record.origin,
+    metadata,
   }
 }
 

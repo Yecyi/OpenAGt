@@ -12,6 +12,7 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
+import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import {
   CoordinatorNode,
@@ -19,11 +20,18 @@ import {
   CoordinatorRun,
   CoordinatorRunID,
   CoordinatorMode,
+  EffortLevel,
+  EffortProfile,
+  ExpertLane,
+  QualityGate,
   ParallelExecutionPolicy,
+  RevisePoint,
   IntentProfile,
   TaskType,
   type CoordinatorNode as CoordinatorNodeType,
   type CoordinatorNodeInput,
+  type EffortLevel as EffortLevelType,
+  type EffortProfile as EffortProfileType,
   type CoordinatorMode as CoordinatorModeType,
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
@@ -41,16 +49,82 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
+  return EffortProfile.parse(effort === "low"
+    ? {
+        planning_rounds: 1,
+        expert_count_min: 1,
+        expert_count_max: 1,
+        verifier_count_min: 0,
+        reducer_enabled: false,
+        reviewer_enabled: false,
+        debugger_enabled: false,
+        revise_policy: "none",
+        max_revise_nodes: 0,
+        max_revision_per_artifact: 0,
+        reasoning_effort: "low",
+        timeout_multiplier: 0.75,
+      }
+    : effort === "high"
+      ? {
+          planning_rounds: 2,
+          expert_count_min: 2,
+          expert_count_max: 4,
+          verifier_count_min: 1,
+          reducer_enabled: true,
+          reviewer_enabled: true,
+          debugger_enabled: false,
+          revise_policy: "critical_only",
+          max_revise_nodes: 6,
+          max_revision_per_artifact: 1,
+          reasoning_effort: "high",
+          timeout_multiplier: 1.5,
+        }
+      : effort === "deep"
+        ? {
+            planning_rounds: 3,
+            expert_count_min: 3,
+            expert_count_max: 6,
+            verifier_count_min: 2,
+            reducer_enabled: true,
+            reviewer_enabled: true,
+            debugger_enabled: true,
+            revise_policy: "all_artifacts",
+            max_revise_nodes: 24,
+            max_revision_per_artifact: 2,
+            reasoning_effort: "high",
+            timeout_multiplier: 3,
+          }
+        : {
+            planning_rounds: 1,
+            expert_count_min: 1,
+            expert_count_max: 2,
+            verifier_count_min: 1,
+            reducer_enabled: false,
+            reviewer_enabled: false,
+            debugger_enabled: false,
+            revise_policy: "none",
+            max_revise_nodes: 0,
+            max_revision_per_artifact: 0,
+            reasoning_effort: "medium",
+            timeout_multiplier: 1,
+          })
+}
+
 function taskTypeForGoal(goal: string): TaskTypeType {
   const normalized = goal.toLowerCase()
   if (hasAny(normalized, ["review", "code review", "pull request", "pr "])) return "review"
   if (hasAny(normalized, ["debug", "bug", "error", "fail", "failing", "fix"])) return "debugging"
+  if (hasAny(normalized, ["write", "draft", "essay", "article", "copy", "story"])) return "writing"
+  if (hasAny(normalized, ["data analysis", "analyze dataset", "spreadsheet", "statistics", "stats", "chart"])) return "data-analysis"
+  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"])) return "coding"
+  if (hasAny(normalized, ["plan", "roadmap", "strategy", "timeline", "milestone"])) return "planning"
+  if (hasAny(normalized, ["calendar", "email", "inbox", "personal admin", "follow up", "follow-up"])) return "personal-admin"
   if (hasAny(normalized, ["research", "investigate", "analysis", "analyze"])) return "research"
   if (hasAny(normalized, ["doc", "readme", "documentation", "writing"])) return "documentation"
   if (hasAny(normalized, ["environment", "audit", "install", "path", "powershell", "python"])) return "environment-audit"
   if (hasAny(normalized, ["automation", "automate", "schedule", "cron"])) return "automation"
   if (hasAny(normalized, ["organize", "file", "data", "csv", "xlsx"])) return "file-data-organization"
-  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"])) return "coding"
   return "general-operations"
 }
 
@@ -66,6 +140,10 @@ function successCriteria(taskType: TaskTypeType) {
   if (taskType === "debugging") return ["Failure context is reproduced or explained", "Root cause is identified", "Minimal fix path is applied", "Verification passes"]
   if (taskType === "review") return ["Findings are grounded in source references", "Risks are prioritized", "Residual test gaps are reported"]
   if (taskType === "research") return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
+  if (taskType === "writing") return ["Audience and purpose are identified", "Draft is produced", "Style and factuality are reviewed"]
+  if (taskType === "data-analysis") return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
+  if (taskType === "planning") return ["Goal is decomposed", "Constraints and alternatives are checked", "Risks are reviewed"]
+  if (taskType === "personal-admin") return ["Work items are classified", "Priorities and schedule are proposed", "Privacy risks are reviewed"]
   if (taskType === "documentation") return ["Context is gathered", "Document is updated or produced", "Output is reviewed for accuracy"]
   if (taskType === "environment-audit") return ["Toolchain state is inspected", "Real blockers are identified", "Verification commands are reported"]
   if (taskType === "automation") return ["Repeatable workflow is identified", "Automation plan is generated", "Risk and trigger conditions are verified"]
@@ -78,6 +156,10 @@ function expectedOutput(taskType: TaskTypeType) {
   if (taskType === "debugging") return "root cause, fix, and verification evidence"
   if (taskType === "review") return "prioritized findings with file references and residual risks"
   if (taskType === "research") return "research report with actionable synthesis"
+  if (taskType === "writing") return "structured written draft with style and factuality review"
+  if (taskType === "data-analysis") return "analysis summary with data caveats, checks, and anomalies"
+  if (taskType === "planning") return "execution plan with constraints, alternatives, and risks"
+  if (taskType === "personal-admin") return "prioritized personal admin actions with privacy review"
   if (taskType === "documentation") return "updated documentation or a written artifact"
   if (taskType === "environment-audit") return "environment diagnosis with blockers and next actions"
   if (taskType === "automation") return "automation plan or configured automation"
@@ -87,7 +169,7 @@ function expectedOutput(taskType: TaskTypeType) {
 
 function permissionExpectations(taskType: TaskTypeType, riskLevel: IntentProfileType["risk_level"]) {
   const base = taskType === "research" || taskType === "review" ? ["read workspace context"] : ["read workspace context", "run verification commands"]
-  const write = taskType === "coding" || taskType === "debugging" || taskType === "documentation" || taskType === "file-data-organization"
+  const write = taskType === "coding" || taskType === "debugging" || taskType === "documentation" || taskType === "file-data-organization" || taskType === "writing" || taskType === "data-analysis"
     ? ["write scoped workspace files"]
     : []
   const approval = riskLevel === "high" ? ["request approval before high-risk actions"] : []
@@ -108,6 +190,8 @@ export function settleIntentProfile(input: { goal: string }) {
       ? ["What concrete output should this task produce?"]
       : [],
     workflow: task_type,
+    workflow_confidence: input.goal.trim().length < 12 ? "low" : "medium",
+    secondary_workflows: [],
     expected_output: expectedOutput(task_type),
     permission_expectations: permissionExpectations(task_type, risk_level),
   })
@@ -302,7 +386,381 @@ function parallelVerificationStage(goal: string, dependsOn: string[]) {
   ]
 }
 
-export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
+function expertID(workflow: TaskTypeType, role: CoordinatorNodeType["role"]) {
+  return `${workflow}.${role}`.replace(/[^a-z0-9.-]/gi, "-").toLowerCase()
+}
+
+function artifactType(node: CoordinatorNodeType) {
+  if (node.role === "reviser") return "revise"
+  if (node.role === "reducer") return "reducer-output"
+  if (node.task_kind === "verify") return "verification"
+  if (node.task_kind === "implement") return "implementation"
+  if (node.task_kind === "research") return "research"
+  return node.output_schema
+}
+
+function withExpertHarness(node: CoordinatorNodeType, input: {
+  workflow: TaskTypeType
+  effort: EffortLevelType
+  profile: EffortProfileType
+}) {
+  const role = node.expert_role ?? node.role
+  return CoordinatorNode.parse({
+    ...node,
+    workflow: node.workflow ?? input.workflow,
+    expert_id: node.expert_id ?? expertID(input.workflow, node.role),
+    expert_role: role,
+    artifact_type: node.artifact_type ?? artifactType(node),
+    artifact_id: node.artifact_id ?? `${node.id}:output`,
+    memory_namespace: node.memory_namespace ?? `${input.workflow}:${role}`,
+    revise_policy: node.revise_policy ?? input.profile.revise_policy,
+  })
+}
+
+function plannerNode(input: { id: string; round: number; goal: string; workflow: TaskTypeType; effort: EffortLevelType }) {
+  return node({
+    id: input.id,
+    description: `Planning round ${input.round}`,
+    prompt: [
+      `Create or refine the execution plan for this mission.`,
+      ``,
+      `Goal: ${input.goal}`,
+      `Workflow: ${input.workflow}`,
+      `Effort: ${input.effort}`,
+      ``,
+      `Return summary, assumptions, missing context, risks, confidence, and next step.`,
+    ].join("\n"),
+    task_kind: "generic",
+    subagent_type: "general",
+    role: "planner",
+    risk: "low",
+    depends_on: input.round === 1 ? [] : [`planning_round_${input.round - 1}`],
+    write_scope: [],
+    read_scope: [],
+    acceptance_checks: ["Plan refined without unsupported assumptions"],
+    output_schema: "plan",
+    requires_user_input: false,
+    priority: "high",
+    expert_id: expertID(input.workflow, "planner"),
+    expert_role: "planner",
+    workflow: input.workflow,
+    artifact_type: "plan",
+    artifact_id: `${input.id}:output`,
+    memory_namespace: `${input.workflow}:planner`,
+  })
+}
+
+function reviseNode(input: {
+  id: string
+  kind: z.infer<typeof RevisePoint>["kind"]
+  target?: CoordinatorNodeType
+  dependsOn: string[]
+  goal: string
+  workflow: TaskTypeType
+  effort: EffortLevelType
+  required?: boolean
+}) {
+  const artifactID = input.target?.artifact_id ?? `${input.target?.id ?? input.id}:artifact`
+  return node({
+    id: input.id,
+    description: `${input.kind.replaceAll("_", " ")}${input.target ? ` for ${input.target.id}` : ""}`,
+    prompt: [
+      `Revise the target artifact quality without exposing chain-of-thought.`,
+      ``,
+      `Goal: ${input.goal}`,
+      `Workflow: ${input.workflow}`,
+      `Effort: ${input.effort}`,
+      input.target ? `Target node: ${input.target.id}` : undefined,
+      `Revise kind: ${input.kind}`,
+      ``,
+      `Return JSON-like fields: pass, issues, missing_context, required_changes, confidence, action.`,
+    ].filter((item): item is string => Boolean(item)).join("\n"),
+    task_kind: "verify",
+    subagent_type: "general",
+    role: "reviser",
+    risk: "low",
+    depends_on: input.dependsOn,
+    write_scope: [],
+    read_scope: input.target?.read_scope ?? [],
+    acceptance_checks: ["Artifact quality checked", "Required changes or pass/fail decision returned"],
+    output_schema: "revise",
+    requires_user_input: false,
+    priority: input.required === false ? "low" : "normal",
+    expert_id: expertID(input.workflow, "reviser"),
+    expert_role: "reviser",
+    workflow: input.workflow,
+    artifact_type: "revise",
+    artifact_id: `${input.id}:output`,
+    revision_of: artifactID,
+    quality_gate_id: input.id,
+    memory_namespace: `${input.workflow}:reviser`,
+  })
+}
+
+function rewriteDeps(nodes: CoordinatorNodeType[], replacements: Map<string, string>) {
+  return nodes.map((item) =>
+    CoordinatorNode.parse({
+      ...item,
+      depends_on: item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
+    }),
+  )
+}
+
+function sinkIDs(nodes: CoordinatorNodeType[]) {
+  const dependencies = new Set(nodes.flatMap((item) => item.depends_on))
+  return nodes.map((item) => item.id).filter((id) => !dependencies.has(id))
+}
+
+function lowEffortNodes(nodes: CoordinatorNodeType[]) {
+  const seenGroups = new Set<string>()
+  const kept = nodes
+    .filter((item) => {
+      if (!item.parallel_group) return true
+      if (seenGroups.has(item.parallel_group)) return false
+      seenGroups.add(item.parallel_group)
+      return true
+    })
+    .filter((item) => item.role !== "reviewer" && item.role !== "reducer")
+  const firstResearch = kept.find((item) => item.task_kind === "research")?.id
+  const keptIDs = new Set(kept.map((item) => item.id))
+  return kept
+    .map((item) =>
+      CoordinatorNode.parse({
+        ...item,
+        depends_on: item.depends_on.flatMap((dependency) => {
+          if (keptIDs.has(dependency)) return [dependency]
+          if (dependency.includes("research_synthesis") && firstResearch && firstResearch !== item.id) return [firstResearch]
+          return []
+        }),
+      }),
+    )
+}
+
+function effortPlanMetadata(input: {
+  nodes: CoordinatorNodeType[]
+  workflow: TaskTypeType
+  effort: EffortLevelType
+  profile: EffortProfileType
+  reviseNodes: CoordinatorNodeType[]
+  budgetLimited: boolean
+}) {
+  const expert_lanes = ExpertLane.array().parse(
+    Object.values(
+      input.nodes.reduce<Record<string, { id: string; workflow: TaskTypeType; role: CoordinatorNodeType["role"]; expert_id: string; node_ids: string[]; memory_namespace: string }>>((acc, item) => {
+        if (!item.expert_id || !item.expert_role) return acc
+        const id = `${item.workflow ?? input.workflow}:${item.expert_id}`
+        return {
+          ...acc,
+          [id]: {
+            id,
+            workflow: item.workflow ?? input.workflow,
+            role: item.role,
+            expert_id: item.expert_id,
+            node_ids: [...(acc[id]?.node_ids ?? []), item.id],
+            memory_namespace: item.memory_namespace ?? `${input.workflow}:${item.expert_role}`,
+          },
+        }
+      }, {}),
+    ),
+  )
+  const revise_points = RevisePoint.array().parse(
+    input.reviseNodes.map((item) => ({
+      id: item.quality_gate_id ?? item.id,
+      kind: item.id.includes("input_revise")
+        ? "input_revise"
+        : item.id.includes("output_revise")
+          ? "output_revise"
+          : item.id.includes("handoff_revise")
+            ? "handoff_revise"
+            : item.id.includes("verifier_revise")
+              ? "verifier_revise"
+              : item.id.includes("reducer_revise")
+                ? "reducer_revise"
+                : item.id.includes("final_revise")
+                  ? "final_revise"
+                  : "plan_revise",
+      target_node_id: typeof item.revision_of === "string" ? item.revision_of.split(":")[0] : undefined,
+      artifact_id: item.revision_of,
+      required: item.priority !== "low",
+      node_id: item.id,
+      status: "pending",
+    })),
+  )
+  return {
+    expert_lanes,
+    revise_points,
+    quality_gates: QualityGate.array().parse(revise_points.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      node_id: item.node_id,
+      artifact_id: item.artifact_id,
+      status: item.status,
+      required: item.required,
+      issues: [],
+    }))),
+    memory_context: {
+      scopes: ["profile", "workspace"],
+      workflow_tags: [`workflow:${input.workflow}`],
+      expert_tags: expert_lanes.map((item) => `expert:${item.expert_id}`),
+      note_ids: [],
+    },
+    budget_limited: input.budgetLimited,
+  }
+}
+
+function applyEffortGovernance(plan: CoordinatorPlanType, intent: IntentProfileType, effort: EffortLevelType) {
+  const profile = effortProfileFor(effort)
+  const workflow = intent.workflow
+  const baseNodes = (effort === "low" ? lowEffortNodes(plan.nodes) : plan.nodes).map((item) =>
+    withExpertHarness(item, { workflow, effort, profile }),
+  )
+  const planning = effort === "high" || effort === "deep"
+    ? Array.from({ length: profile.planning_rounds }, (_, index) =>
+        withExpertHarness(plannerNode({
+          id: `planning_round_${index + 1}`,
+          round: index + 1,
+          goal: plan.goal,
+          workflow,
+          effort,
+        }), { workflow, effort, profile }),
+      )
+    : []
+  const planRevise = planning.length
+    ? [reviseNode({
+        id: "plan_revise_final",
+        kind: "plan_revise",
+        target: planning.at(-1),
+        dependsOn: [planning.at(-1)!.id],
+        goal: plan.goal,
+        workflow,
+        effort,
+      })]
+    : []
+  const rootGate = planRevise[0]?.id
+  const gatedBase = rootGate
+    ? baseNodes.map((item) =>
+        item.depends_on.length === 0
+          ? CoordinatorNode.parse({ ...item, depends_on: [rootGate] })
+          : item,
+      )
+    : baseNodes
+  const reviseNodes: CoordinatorNodeType[] = [...planRevise]
+  const budgetLimited = { value: false }
+  const addRevise = (item: CoordinatorNodeType) => {
+    if (reviseNodes.length >= profile.max_revise_nodes) {
+      budgetLimited.value = true
+      return
+    }
+    reviseNodes.push(item)
+  }
+
+  if (effort === "high") {
+    const critical = gatedBase.filter((item) => item.role === "reducer" || item.role === "verifier")
+    const replacements = new Map<string, string>()
+    for (const item of critical) {
+      const kind = item.role === "reducer" ? "reducer_revise" : "verifier_revise"
+      const id = `${item.id}_${kind}`
+      addRevise(reviseNode({ id, kind, target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }))
+      if (!budgetLimited.value) replacements.set(item.id, id)
+    }
+    const rewritten = rewriteDeps(gatedBase, replacements)
+    const finalDependsOn = sinkIDs(rewritten).map((item) => replacements.get(item) ?? item)
+    addRevise(reviseNode({
+      id: "final_revise",
+      kind: "final_revise",
+      dependsOn: finalDependsOn,
+      goal: plan.goal,
+      workflow,
+      effort,
+    }))
+    const allNodes = [...planning, ...rewriteDeps(rewritten, replacements), ...reviseNodes].map((item) =>
+      withExpertHarness(item, { workflow, effort, profile }),
+    )
+    return CoordinatorPlan.parse({
+      ...plan,
+      effort,
+      workflow,
+      effort_profile: profile,
+      nodes: allNodes,
+      specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
+      ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes, budgetLimited: budgetLimited.value }),
+    })
+  }
+
+  if (effort === "deep") {
+    const dependents = new Set(gatedBase.flatMap((item) => item.depends_on))
+    const replacements = new Map<string, string>()
+    const inputReviseByNode = new Map<string, string>()
+    for (const item of gatedBase) {
+      if (reviseNodes.length >= profile.max_revise_nodes) {
+        budgetLimited.value = true
+        continue
+      }
+      const inputID = `${item.id}_input_revise`
+      addRevise(reviseNode({ id: inputID, kind: "input_revise", target: item, dependsOn: item.depends_on, goal: plan.goal, workflow, effort }))
+      inputReviseByNode.set(item.id, inputID)
+      if (reviseNodes.length >= profile.max_revise_nodes) {
+        budgetLimited.value = true
+        continue
+      }
+      const outputID = `${item.id}_output_revise`
+      addRevise(reviseNode({ id: outputID, kind: "output_revise", target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }))
+      const handoffID = `${item.id}_handoff_revise`
+      if (dependents.has(item.id) && reviseNodes.length < profile.max_revise_nodes) {
+        addRevise(reviseNode({ id: handoffID, kind: "handoff_revise", target: item, dependsOn: [outputID], goal: plan.goal, workflow, effort, required: false }))
+        replacements.set(item.id, handoffID)
+      } else {
+        replacements.set(item.id, outputID)
+      }
+    }
+    const rewritten = gatedBase.map((item) =>
+      CoordinatorNode.parse({
+        ...item,
+        depends_on: [inputReviseByNode.get(item.id) ?? item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency)[0]]
+          .filter((dependency): dependency is string => Boolean(dependency)),
+      }),
+    )
+    addRevise(reviseNode({
+      id: "final_revise",
+      kind: "final_revise",
+      dependsOn: sinkIDs(rewritten).map((item) => replacements.get(item) ?? item),
+      goal: plan.goal,
+      workflow,
+      effort,
+    }))
+    const rewrittenRevise = reviseNodes.map((item) =>
+      CoordinatorNode.parse({
+        ...item,
+        depends_on: item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
+      }),
+    )
+    const allNodes = [...planning, ...rewritten, ...rewrittenRevise].map((item) =>
+      withExpertHarness(item, { workflow, effort, profile }),
+    )
+    return CoordinatorPlan.parse({
+      ...plan,
+      effort,
+      workflow,
+      effort_profile: profile,
+      nodes: allNodes,
+      specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
+      ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes: rewrittenRevise, budgetLimited: budgetLimited.value }),
+    })
+  }
+
+  const allNodes = [...planning, ...gatedBase, ...reviseNodes].map((item) => withExpertHarness(item, { workflow, effort, profile }))
+  return CoordinatorPlan.parse({
+    ...plan,
+    effort,
+    workflow,
+    effort_profile: profile,
+    nodes: allNodes,
+    specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
+    ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes, budgetLimited: budgetLimited.value }),
+  })
+}
+
+function basePlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
   const goal = intent.goal
   const researchStage = parallelResearchStage(goal)
   const researchDependsOn = ["research_synthesis"]
@@ -489,6 +947,194 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         output_schema: "document",
         requires_user_input: false,
       }),
+    ] : intent.workflow === "writing" ? [
+      node({
+        id: "outline",
+        description: "Plan writing structure",
+        prompt: `Create a concise outline with audience, purpose, claims, and constraints.\n\nGoal: ${goal}`,
+        task_kind: "research",
+        subagent_type: "general",
+        role: "planner",
+        risk: "low",
+        depends_on: [],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Audience and structure identified"],
+        output_schema: "outline",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "draft",
+        description: "Write draft",
+        prompt: `Write the requested artifact from the outline. Preserve caveats and user constraints.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "writer",
+        risk: intent.risk_level,
+        depends_on: ["outline"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Draft produced"],
+        output_schema: "draft",
+        requires_user_input: false,
+      }),
+      node({
+        id: "style_review",
+        description: "Review style and factuality",
+        prompt: `Review the draft for style fit, unsupported claims, and missing caveats.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "style-editor",
+        risk: "low",
+        depends_on: ["draft"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Style and factuality reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "data-analysis" ? [
+      node({
+        id: "profile_data",
+        description: "Profile data shape",
+        prompt: `Inspect the available data shape, schema, quality limits, and analysis constraints.\n\nGoal: ${goal}`,
+        task_kind: "research",
+        subagent_type: "general",
+        role: "analyst",
+        risk: "low",
+        depends_on: [],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Data schema and limits profiled"],
+        output_schema: "analysis",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "analyze_data",
+        description: "Analyze data",
+        prompt: `Run the requested analysis using the profiled constraints and report caveats.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "analyst",
+        risk: intent.risk_level,
+        depends_on: ["profile_data"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Analysis completed with caveats"],
+        output_schema: "analysis",
+        requires_user_input: false,
+      }),
+      node({
+        id: "verify_stats",
+        description: "Verify statistics and anomalies",
+        prompt: `Verify calculations, statistical assumptions, anomaly handling, and unsupported conclusions.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "verifier",
+        risk: "low",
+        depends_on: ["analyze_data"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Statistics and anomalies verified"],
+        output_schema: "verification",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "planning" ? [
+      node({
+        id: "decompose_goal",
+        description: "Decompose goal",
+        prompt: `Break down the goal into milestones, dependencies, risks, and decision points.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "planner",
+        risk: "low",
+        depends_on: [],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Goal decomposed into actionable plan"],
+        output_schema: "plan",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "check_constraints",
+        description: "Check constraints and alternatives",
+        prompt: `Check constraints, assumptions, alternatives, and failure modes in the plan.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "constraint-checker",
+        risk: "low",
+        depends_on: ["decompose_goal"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Constraints and alternatives checked"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+      node({
+        id: "risk_review",
+        description: "Review plan risks",
+        prompt: `Review the plan for risk, sequencing, missing owners, and unclear acceptance criteria.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "risk-reviewer",
+        risk: "low",
+        depends_on: ["check_constraints"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Plan risks reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
+    ] : intent.workflow === "personal-admin" ? [
+      node({
+        id: "classify_inbox",
+        description: "Classify personal admin work",
+        prompt: `Classify the requested personal admin work into actions, priorities, and privacy constraints.\n\nGoal: ${goal}`,
+        task_kind: "research",
+        subagent_type: "general",
+        role: "inbox-classifier",
+        risk: "low",
+        depends_on: [],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Admin work classified"],
+        output_schema: "summary",
+        requires_user_input: false,
+        priority: "high",
+      }),
+      node({
+        id: "schedule_actions",
+        description: "Prioritize and schedule actions",
+        prompt: `Prioritize the actions and propose a safe schedule with follow-up points.\n\nGoal: ${goal}`,
+        task_kind: "generic",
+        subagent_type: "general",
+        role: "scheduler",
+        risk: intent.risk_level,
+        depends_on: ["classify_inbox"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Actions prioritized and scheduled"],
+        output_schema: "plan",
+        requires_user_input: false,
+      }),
+      node({
+        id: "privacy_review",
+        description: "Review privacy risk",
+        prompt: `Review the proposed personal admin actions for privacy, overreach, and missing user approval.\n\nGoal: ${goal}`,
+        task_kind: "verify",
+        subagent_type: "general",
+        role: "privacy-reviewer",
+        risk: "low",
+        depends_on: ["schedule_actions"],
+        write_scope: [],
+        read_scope: [],
+        acceptance_checks: ["Privacy risk reviewed"],
+        output_schema: "review",
+        requires_user_input: false,
+      }),
     ] : intent.workflow === "documentation" ? [
       researcher(goal),
       node({
@@ -589,6 +1235,17 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
   })
 }
 
+export function defaultPlanForIntent(intent: IntentProfileType, input?: { effort?: EffortLevelType; workflow?: TaskTypeType }): CoordinatorPlanType {
+  const workflow = input?.workflow ?? intent.workflow
+  const effort = input?.effort ?? "medium"
+  const effectiveIntent = IntentProfile.parse({
+    ...intent,
+    workflow,
+    task_type: workflow,
+  })
+  return applyEffortGovernance(basePlanForIntent(effectiveIntent), effectiveIntent, effort)
+}
+
 function expandVerifyNodes(plan: CoordinatorPlanType) {
   const seen = new Set(plan.nodes.map((item) => item.id))
   const generated = plan.nodes.flatMap((item) => {
@@ -618,9 +1275,8 @@ function expandVerifyNodes(plan: CoordinatorPlanType) {
     ]
   })
   return CoordinatorPlan.parse({
-    goal: plan.goal,
+    ...plan,
     nodes: [...plan.nodes, ...generated],
-    parallel_policy: plan.parallel_policy,
   })
 }
 
@@ -659,9 +1315,8 @@ function orderPlan(plan: CoordinatorPlanType) {
   }
   for (const node of plan.nodes) visit(node.id)
   return CoordinatorPlan.parse({
-    goal: plan.goal,
+    ...plan,
     nodes: ordered,
-    parallel_policy: plan.parallel_policy,
   })
 }
 
@@ -669,6 +1324,7 @@ function runFromRow(row: typeof CoordinatorRunTable.$inferSelect) {
   const intent = IntentProfile.safeParse(row.intent)
   const mode = CoordinatorMode.safeParse(row.mode)
   const workflow = TaskType.safeParse(row.workflow)
+  const plan = CoordinatorPlan.parse(row.plan)
   const fallback = settleIntentProfile({ goal: row.goal })
   return CoordinatorRun.parse({
     id: row.id,
@@ -677,8 +1333,10 @@ function runFromRow(row: typeof CoordinatorRunTable.$inferSelect) {
     intent: intent.success ? intent.data : fallback,
     mode: mode.success ? mode.data : "autonomous",
     workflow: workflow.success ? workflow.data : fallback.workflow,
+    effort: plan.effort,
+    effort_profile: plan.effort_profile,
     state: row.state,
-    plan: row.plan,
+    plan,
     task_ids: row.task_ids,
     summary: row.summary ?? undefined,
     time: {
@@ -701,6 +1359,8 @@ export interface Interface {
     goal: string
     nodes?: CoordinatorNodeInput[]
     intent?: IntentProfileType
+    effort?: EffortLevelType
+    workflow?: TaskTypeType
     parallel_policy?: Partial<ParallelExecutionPolicyType>
   }) => Effect.Effect<CoordinatorPlanType, Error>
   readonly run: (input: {
@@ -708,6 +1368,8 @@ export interface Interface {
     goal: string
     nodes?: CoordinatorNodeInput[]
     intent?: IntentProfileType
+    effort?: EffortLevelType
+    workflow?: TaskTypeType
     mode?: CoordinatorModeType
     approved?: boolean
     parallel_policy?: Partial<ParallelExecutionPolicyType>
@@ -733,6 +1395,13 @@ export interface Interface {
       started_at?: number
       completed_at?: number
     }>
+    expert_lanes: CoordinatorPlanType["expert_lanes"]
+    quality_gates: CoordinatorPlanType["quality_gates"]
+    revise_points: CoordinatorPlanType["revise_points"]
+    memory_context: CoordinatorPlanType["memory_context"]
+    effort_profile: EffortProfileType
+    budget_limited: boolean
+    specialization_fallback: boolean
   }, Error>
   readonly resume: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly summarize: (id: CoordinatorRunIDType) => Effect.Effect<string, Error>
@@ -758,22 +1427,37 @@ export const layer = Layer.effect(
     })
 
     const plan: Interface["plan"] = Effect.fn("Coordinator.plan")(function* (input) {
-      const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
+      const settled = input.intent ?? settleIntentProfile({ goal: input.goal })
+      const workflow = input.workflow ?? settled.workflow
+      const effort = input.effort ?? "medium"
+      const intent = IntentProfile.parse({
+        ...settled,
+        workflow,
+        task_type: workflow,
+      })
       const parallel_policy = ParallelExecutionPolicy.parse(input.parallel_policy ?? {})
       const base = input.nodes && input.nodes.length > 0
-        ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes, parallel_policy })
-        : CoordinatorPlan.parse({ ...defaultPlanForIntent(intent), parallel_policy })
+        ? CoordinatorPlan.parse({
+            goal: input.goal,
+            nodes: input.nodes,
+            parallel_policy,
+            effort,
+            workflow,
+            effort_profile: effortProfileFor(effort),
+          })
+        : CoordinatorPlan.parse({ ...basePlanForIntent(intent), parallel_policy })
       const expanded = expandVerifyNodes(base)
+      const governed = applyEffortGovernance(expanded, intent, effort)
       yield* Effect.try({
-        try: () => validatePlan(expanded),
+        try: () => validatePlan(governed),
         catch: (error) => error instanceof Error ? error : new Error(String(error)),
       })
       yield* Effect.forEach(
-        expanded.nodes.flatMap((item) => (item.model ? [item.model] : [])),
+        governed.nodes.flatMap((item) => (item.model ? [item.model] : [])),
         (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
         { concurrency: "unbounded", discard: true },
       )
-      return orderPlan(expanded)
+      return orderPlan(governed)
     })
 
     const createTaskSession = Effect.fn("Coordinator.createTaskSession")(function* (input: {
@@ -795,6 +1479,11 @@ export const layer = Layer.effect(
       const role = typeof metadata.role === "string" ? `\n\nRole: ${metadata.role}` : ""
       const risk = typeof metadata.risk === "string" ? `\nRisk: ${metadata.risk}` : ""
       const output = typeof metadata.output_schema === "string" ? `\nOutput schema: ${metadata.output_schema}` : ""
+      const workflow = typeof metadata.workflow === "string" ? `\nWorkflow: ${metadata.workflow}` : ""
+      const effort = typeof metadata.effort === "string" ? `\nEffort: ${metadata.effort}` : ""
+      const expert = typeof metadata.expert_id === "string" ? `\nExpert: ${metadata.expert_id}` : ""
+      const memoryNamespace = typeof metadata.memory_namespace === "string" ? `\nMemory namespace: ${metadata.memory_namespace}` : ""
+      const revisePolicy = typeof metadata.revise_policy === "string" ? `\nRevise policy: ${metadata.revise_policy}` : ""
       const parallelGroup = typeof metadata.parallel_group === "string" ? `\nParallel group: ${metadata.parallel_group}` : ""
       const assignedScope = Array.isArray(metadata.assigned_scope) && metadata.assigned_scope.length
         ? `\nAssigned scope:\n${metadata.assigned_scope.map((item) => `- ${String(item)}`).join("\n")}`
@@ -808,7 +1497,7 @@ export const layer = Layer.effect(
       const checks = record.acceptance_checks.length
         ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
         : ""
-      return `${promptText}${role}${risk}${output}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nReturn a concise structured result with summary, evidence, confidence, unknowns, conflicts, and recommended next step.`
+      return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
     }
 
     const taskModel = (metadata: Record<string, unknown>) => {
@@ -985,8 +1674,21 @@ export const layer = Layer.effect(
 
     const run: Interface["run"] = Effect.fn("Coordinator.run")(function* (input) {
       yield* ensureSubscribed()
-      const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
-      const planned = yield* plan({ goal: input.goal, nodes: input.nodes, intent, parallel_policy: input.parallel_policy })
+      const settled = input.intent ?? settleIntentProfile({ goal: input.goal })
+      const workflow = input.workflow ?? settled.workflow
+      const intent = IntentProfile.parse({
+        ...settled,
+        workflow,
+        task_type: workflow,
+      })
+      const planned = yield* plan({
+        goal: input.goal,
+        nodes: input.nodes,
+        intent,
+        effort: input.effort,
+        workflow,
+        parallel_policy: input.parallel_policy,
+      })
       const mode = input.mode ?? (intent.risk_level === "high" ? "assisted" : "autonomous")
       const state = input.approved || (mode === "autonomous" && !intent.needs_user_clarification && intent.risk_level !== "high")
         ? "active"
@@ -1032,9 +1734,20 @@ export const layer = Layer.effect(
             conflicts: node.conflicts,
             output_schema: node.output_schema,
             requires_user_input: node.requires_user_input,
+            effort: planned.effort,
+            effort_profile: planned.effort_profile,
+            expert_id: node.expert_id,
+            expert_role: node.expert_role,
+            workflow: node.workflow ?? planned.workflow,
+            artifact_type: node.artifact_type,
+            artifact_id: node.artifact_id,
+            revision_of: node.revision_of,
+            quality_gate_id: node.quality_gate_id,
+            memory_namespace: node.memory_namespace,
+            confidence: node.confidence,
+            revise_policy: node.revise_policy,
             intent,
             mode,
-            workflow: intent.workflow,
           },
           writeScope: node.write_scope,
           readScope: node.read_scope,
@@ -1141,6 +1854,22 @@ export const layer = Layer.effect(
           completed_at: groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
         }
       })
+      const gateStatus = (nodeID?: string) => {
+        const task = nodeID ? taskByNode.get(nodeID) : undefined
+        if (!task) return "pending" as const
+        if (task.status === "completed") return "passed" as const
+        if (task.status === "failed") return "failed" as const
+        if (task.status === "cancelled") return "skipped" as const
+        return task.status
+      }
+      const revise_points = run.plan.revise_points.map((item) => ({
+        ...item,
+        status: gateStatus(item.node_id),
+      }))
+      const quality_gates = run.plan.quality_gates.map((item) => ({
+        ...item,
+        status: gateStatus(item.node_id),
+      }))
       return {
         run,
         tasks: taskList,
@@ -1152,6 +1881,13 @@ export const layer = Layer.effect(
           cancelled: taskList.filter((item) => item.status === "cancelled").length,
         },
         groups,
+        expert_lanes: run.plan.expert_lanes,
+        quality_gates,
+        revise_points,
+        memory_context: run.plan.memory_context,
+        effort_profile: run.plan.effort_profile,
+        budget_limited: run.plan.budget_limited,
+        specialization_fallback: run.plan.specialization_fallback,
       }
     })
 

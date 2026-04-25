@@ -364,6 +364,27 @@ describe("personal agent core", () => {
           importance: 8,
           pinned: true,
         })
+        const expert = yield* personal.remember({
+          scope: "workspace",
+          projectID,
+          title: "Verifier pattern",
+          content: "When validating coordinator plans, check revise gates and expert lanes together",
+          source: "expert",
+          tags: [
+            "workflow:coding",
+            "expert:coding.verifier",
+            "role:verifier",
+            "artifact:verification",
+            "failure-pattern",
+          ],
+          metadata: {
+            workflow: "coding",
+            expert_id: "coding.verifier",
+            role: "verifier",
+            artifact_type: "verification",
+          },
+          importance: 8,
+        })
 
         const search = yield* personal.searchMemory({
           query: "lint verify",
@@ -372,6 +393,17 @@ describe("personal agent core", () => {
         })
         expect(search[0]?.id).toBe(workspace.id)
         expect(search[0]?.match).toBe("fts")
+        const expertSearch = yield* personal.searchMemory({
+          query: "coordinator revise gates",
+          projectID,
+          workflow: "coding",
+          expertID: "coding.verifier",
+          role: "verifier",
+          artifactType: "verification",
+          includeFailurePatterns: true,
+        })
+        expect(expertSearch[0]?.id).toBe(expert.id)
+        expect(expertSearch[0]?.metadata.expert_id).toBe("coding.verifier")
 
         const sessionItem = yield* personal.ingestSession({
           projectID,

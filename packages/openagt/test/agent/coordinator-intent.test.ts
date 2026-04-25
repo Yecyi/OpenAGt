@@ -54,4 +54,58 @@ describe("coordinator intent planning", () => {
     expect(intent.risk_level).toBe("high")
     expect(plan.nodes.find((item) => item.role === "automation-planner")?.requires_user_input).toBe(true)
   })
+
+  test("high effort enables multi-round planning, multi-expert lanes, reducer, reviewer, and critical revise", () => {
+    const intent = settleIntentProfile({ goal: "implement mission control backend API" })
+    const plan = defaultPlanForIntent(intent, { effort: "high" })
+
+    expect(plan.effort).toBe("high")
+    expect(plan.effort_profile.planning_rounds).toBe(2)
+    expect(plan.effort_profile.revise_policy).toBe("critical_only")
+    expect(plan.nodes.filter((item) => item.role === "planner")).toHaveLength(2)
+    expect(plan.nodes.some((item) => item.role === "reducer")).toBe(true)
+    expect(plan.nodes.some((item) => item.role === "reviewer")).toBe(true)
+    expect(plan.expert_lanes.length).toBeGreaterThanOrEqual(2)
+    expect(plan.revise_points.map((item) => item.kind)).toEqual(expect.arrayContaining([
+      "plan_revise",
+      "reducer_revise",
+      "verifier_revise",
+      "final_revise",
+    ]))
+    expect(plan.revise_points).toHaveLength(plan.quality_gates.length)
+  })
+
+  test("deep effort adds full artifact revise gates without write scope", () => {
+    const intent = settleIntentProfile({ goal: "research OpenAGt coordinator architecture" })
+    const plan = defaultPlanForIntent(intent, { effort: "deep" })
+
+    expect(plan.effort).toBe("deep")
+    expect(plan.effort_profile.revise_policy).toBe("all_artifacts")
+    expect(plan.nodes.filter((item) => item.role === "planner")).toHaveLength(3)
+    expect(plan.revise_points.map((item) => item.kind)).toEqual(expect.arrayContaining([
+      "plan_revise",
+      "input_revise",
+      "output_revise",
+      "handoff_revise",
+      "final_revise",
+    ]))
+    expect(plan.nodes.filter((item) => item.role === "reviser").every((item) => item.write_scope.length === 0)).toBe(true)
+    expect(plan.revise_points.length).toBeLessThanOrEqual(plan.effort_profile.max_revise_nodes)
+  })
+
+  test("routes non-coding workflows to specialized expert adapters", () => {
+    const writing = defaultPlanForIntent(settleIntentProfile({ goal: "write a product announcement article" }))
+    const data = defaultPlanForIntent(settleIntentProfile({ goal: "analyze dataset statistics and anomalies" }))
+    const planning = defaultPlanForIntent(settleIntentProfile({ goal: "plan a v1.16 roadmap with milestones" }))
+    const admin = defaultPlanForIntent(settleIntentProfile({ goal: "prioritize inbox follow-up calendar tasks" }))
+
+    expect(writing.workflow).toBe("writing")
+    expect(writing.nodes.map((item) => item.role)).toEqual(["planner", "writer", "style-editor"])
+    expect(data.workflow).toBe("data-analysis")
+    expect(data.nodes.map((item) => item.id)).toEqual(["profile_data", "analyze_data", "verify_stats"])
+    expect(planning.workflow).toBe("planning")
+    expect(planning.nodes.map((item) => item.role)).toEqual(["planner", "constraint-checker", "risk-reviewer"])
+    expect(admin.workflow).toBe("personal-admin")
+    expect(admin.nodes.map((item) => item.role)).toEqual(["inbox-classifier", "scheduler", "privacy-reviewer"])
+  })
 })

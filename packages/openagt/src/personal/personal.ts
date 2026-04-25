@@ -88,6 +88,7 @@ function memoryFromRow(row: typeof PersonalMemoryNoteTable.$inferSelect) {
     title: row.title,
     content: row.content,
     tags: row.tags,
+    metadata: row.metadata ?? {},
     source: row.source,
     importance: row.importance,
     pinned: Boolean(row.pinned),
@@ -140,6 +141,50 @@ function wakeupFromRow(row: typeof ScheduledWakeupTable.$inferSelect) {
   })
 }
 
+function memoryTags(input: {
+  tags?: string[]
+  workflow?: string
+  expertID?: string
+  role?: string
+  artifactType?: string
+  sourceTaskID?: string
+}) {
+  return [
+    ...(input.tags ?? []),
+    input.workflow ? `workflow:${input.workflow}` : undefined,
+    input.expertID ? `expert:${input.expertID}` : undefined,
+    input.role ? `role:${input.role}` : undefined,
+    input.artifactType ? `artifact:${input.artifactType}` : undefined,
+    input.sourceTaskID ? `source_task:${input.sourceTaskID}` : undefined,
+  ].filter((item): item is string => Boolean(item))
+}
+
+function privacySafeContent(content: string) {
+  return ![
+    /api[_-]?key\s*[:=]/i,
+    /secret\s*[:=]/i,
+    /token\s*[:=]/i,
+    /password\s*[:=]/i,
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  ].some((pattern) => pattern.test(content))
+}
+
+function tagScore(tags: string[], input: {
+  workflow?: string
+  expertID?: string
+  role?: string
+  artifactType?: string
+  includeFailurePatterns?: boolean
+}) {
+  return (
+    (input.expertID && tags.includes(`expert:${input.expertID}`) ? 40 : 0) +
+    (input.workflow && tags.includes(`workflow:${input.workflow}`) ? 30 : 0) +
+    (input.role && tags.includes(`role:${input.role}`) ? 20 : 0) +
+    (input.artifactType && tags.includes(`artifact:${input.artifactType}`) ? 15 : 0) +
+    (input.includeFailurePatterns && tags.includes("failure-pattern") ? 12 : 0)
+  )
+}
+
 export const Event = {
   MemoryUpdated: BusEvent.define("memory.updated", MemoryNote),
   InboxCreated: BusEvent.define("inbox.created", InboxItem),
@@ -162,6 +207,7 @@ export interface Interface {
     projectID?: ProjectID
     sessionID?: SessionID
     tags?: string[]
+    metadata?: Record<string, unknown>
     source: z.infer<typeof MemorySource>
     importance?: number
     pinned?: boolean
@@ -176,14 +222,28 @@ export interface Interface {
     projectID?: ProjectID
     sessionID?: SessionID
     scopes?: MemoryScopeType[]
+    workflow?: string
+    expertID?: string
+    role?: string
+    artifactType?: string
+    includeFailurePatterns?: boolean
   }) => Effect.Effect<MemorySearchResultType[], Error>
   readonly synthesize: (input: {
-    kind: "coordinator_run_completed" | "verify_completed" | "manual_preference" | "follow_up_completed"
+    kind:
+      | "coordinator_run_completed"
+      | "verify_completed"
+      | "manual_preference"
+      | "follow_up_completed"
+      | "expert_output"
+      | "reviser_pattern"
+      | "reducer_summary"
+      | "verifier_rule"
     projectID?: ProjectID
     sessionID?: SessionID
     title: string
     content: string
     tags?: string[]
+    metadata?: Record<string, unknown>
     importance?: number
   }) => Effect.Effect<MemoryNoteType, Error>
   readonly createInboxItem: (input: {
@@ -251,6 +311,7 @@ export const layer = Layer.effect(
     const sessions = yield* Session.Service
 
     const remember: Interface["remember"] = Effect.fn("PersonalAgent.remember")(function* (input) {
+      if (!privacySafeContent(input.content)) return yield* Effect.fail(new Error("Memory content failed privacy filter"))
       const id = MemoryNoteID.ascending()
       const timestamp = now()
       yield* Effect.sync(() =>
@@ -264,6 +325,7 @@ export const layer = Layer.effect(
               title: input.title,
               content: input.content,
               tags: input.tags ?? [],
+              metadata: input.metadata ?? {},
               source: input.source,
               importance: input.importance ?? 5,
               pinned: input.pinned ? 1 : 0,
@@ -361,6 +423,11 @@ export const layer = Layer.effect(
               (row) =>
                 scopes.includes(row.scope as MemoryScopeType) &&
                 (!input.projectID || row.project_id === input.projectID) &&
+                (!input.workflow || row.tags.includes(`workflow:${input.workflow}`)) &&
+                (!input.expertID || row.tags.includes(`expert:${input.expertID}`)) &&
+                (!input.role || row.tags.includes(`role:${input.role}`)) &&
+                (!input.artifactType || row.tags.includes(`artifact:${input.artifactType}`)) &&
+                (input.includeFailurePatterns || !row.tags.includes("failure-pattern")) &&
                 (!ftsQuery || matches.has(row.id)),
             ),
         ),
@@ -378,6 +445,7 @@ export const layer = Layer.effect(
               recencyScore(note.time.updated) +
               note.importance +
               (note.pinned ? 10 : 0) +
+              tagScore(note.tags, input) +
               (matches.get(note.id) ?? 0),
             match: ftsQuery ? "fts" : "recent",
           })
@@ -396,7 +464,13 @@ export const layer = Layer.effect(
             ? "scheduler"
             : input.kind === "coordinator_run_completed"
               ? "coordinator"
-              : "verify"
+              : input.kind === "expert_output"
+                ? "expert"
+                : input.kind === "reviser_pattern"
+                  ? "reviser"
+                  : input.kind === "reducer_summary"
+                    ? "reducer"
+                    : "verifier"
       return yield* remember({
         scope,
         title: input.title,
@@ -404,6 +478,7 @@ export const layer = Layer.effect(
         projectID: input.projectID,
         sessionID: input.sessionID,
         tags: input.tags ?? [input.kind],
+        metadata: input.metadata,
         importance: input.importance ?? (input.kind === "verify_completed" ? 7 : 6),
         source,
       })
@@ -422,6 +497,8 @@ export const layer = Layer.effect(
       sessionID?: SessionID
       title: string
       content: string
+      tags?: string[]
+      metadata?: Record<string, unknown>
       importance?: number
     }) {
       if (yield* hasMemoryTag(input.tag)) return
@@ -432,7 +509,8 @@ export const layer = Layer.effect(
         title: input.title,
         content: input.content,
         importance: input.importance,
-        tags: [input.tag],
+        tags: [...new Set([input.tag, ...(input.tags ?? [])])],
+        metadata: input.metadata,
       })
     })
 
@@ -699,19 +777,59 @@ export const layer = Layer.effect(
       })
 
       const stopTaskUpdated = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
-        if (event.properties.result.status !== "completed" || event.properties.result.task_kind !== "verify") return
+        if (event.properties.result.status !== "completed") return
         void Effect.runPromise(
           attachWith(
             Effect.gen(function* () {
               const parent = yield* sessions.get(event.properties.parent_session_id)
+              const metadata = event.properties.result.metadata ?? {}
+              const workflow = typeof metadata.workflow === "string" ? metadata.workflow : undefined
+              const expertID = typeof metadata.expert_id === "string" ? metadata.expert_id : undefined
+              const role = typeof metadata.expert_role === "string"
+                ? metadata.expert_role
+                : typeof metadata.role === "string"
+                  ? metadata.role
+                  : undefined
+              const artifactType = typeof metadata.artifact_type === "string" ? metadata.artifact_type : undefined
+              const tags = memoryTags({
+                workflow,
+                expertID,
+                role,
+                artifactType,
+                sourceTaskID: event.properties.result.task_id,
+                tags: event.properties.result.task_kind === "verify" ? ["verified"] : undefined,
+              })
+              if (event.properties.result.task_kind === "verify") {
+                yield* synthesizeOnce({
+                  tag: `verify_task:${event.properties.result.task_id}`,
+                  kind: "verify_completed",
+                  projectID: parent.projectID,
+                  sessionID: parent.id,
+                  title: `Verified: ${event.properties.result.description}`,
+                  content: event.properties.result.summary,
+                  tags,
+                  metadata,
+                  importance: 7,
+                })
+              }
+              if (!expertID) return
+              const kind = role === "reviser"
+                ? "reviser_pattern"
+                : role === "reducer"
+                  ? "reducer_summary"
+                  : role === "verifier" || event.properties.result.task_kind === "verify"
+                    ? "verifier_rule"
+                    : "expert_output"
               yield* synthesizeOnce({
-                tag: `verify_task:${event.properties.result.task_id}`,
-                kind: "verify_completed",
+                tag: `expert_task:${event.properties.result.task_id}`,
+                kind,
                 projectID: parent.projectID,
                 sessionID: parent.id,
-                title: `Verified: ${event.properties.result.description}`,
+                title: `Expert memory: ${event.properties.result.description}`,
                 content: event.properties.result.summary,
-                importance: 7,
+                tags,
+                metadata,
+                importance: role === "reviser" ? 6 : 7,
               })
             }),
             {

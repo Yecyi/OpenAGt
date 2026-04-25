@@ -46,7 +46,7 @@ export const ScheduledWakeupID = scheduledWakeupIdSchema.pipe(
 export const MemoryScope = z.enum(["profile", "workspace", "session"])
 export type MemoryScope = z.infer<typeof MemoryScope>
 
-export const MemorySource = z.enum(["manual", "coordinator", "verify", "scheduler", "gateway"])
+export const MemorySource = z.enum(["manual", "coordinator", "verify", "scheduler", "gateway", "expert", "reviser", "verifier", "reducer"])
 export type MemorySource = z.infer<typeof MemorySource>
 
 export const InboxSource = z.enum(["session", "scheduled", "webhook"])
@@ -69,6 +69,7 @@ export const MemoryNote = z.object({
   title: z.string(),
   content: z.string(),
   tags: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   source: MemorySource,
   importance: z.number().int().min(0).max(10),
   pinned: z.boolean(),

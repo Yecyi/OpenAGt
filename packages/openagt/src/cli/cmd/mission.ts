@@ -11,6 +11,19 @@ type MissionMode = "manual" | "assisted" | "autonomous"
 type MissionFormat = "text" | "json"
 type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection"
 type ParallelMode = "off" | "safe" | "aggressive"
+type MissionEffort = "low" | "medium" | "high" | "deep"
+type MissionWorkflow =
+  | "coding"
+  | "research"
+  | "writing"
+  | "data-analysis"
+  | "planning"
+  | "personal-admin"
+  | "automation"
+  | "documentation"
+  | "environment-audit"
+  | "file-data-organization"
+  | "general-operations"
 
 function parseReviewerModel(input?: string) {
   if (!input) return
@@ -31,6 +44,7 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
       task_type: string
       risk_level: string
       workflow: string
+      workflow_confidence?: string
       expected_output: string
       permission_expectations: string[]
       clarification_questions: string[]
@@ -38,7 +52,7 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     UI.println(UI.Style.TEXT_NORMAL_BOLD + "Intent" + UI.Style.TEXT_NORMAL)
     UI.println(`  task: ${intent.task_type}`)
     UI.println(`  risk: ${intent.risk_level}`)
-    UI.println(`  workflow: ${intent.workflow}`)
+    UI.println(`  workflow: ${intent.workflow}${intent.workflow_confidence ? ` (${intent.workflow_confidence})` : ""}`)
     UI.println(`  output: ${intent.expected_output}`)
     UI.println(`  permissions: ${intent.permission_expectations.join(", ") || "none"}`)
     if (intent.clarification_questions.length > 0) {
@@ -78,6 +92,10 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     const projection = data.projection as {
       run: { id: string; state: string; summary?: string }
       counts: Record<string, number>
+      effort_profile?: Record<string, unknown>
+      expert_lanes?: Array<{ id: string; expert_id: string; role: string; node_ids: string[] }>
+      quality_gates?: Array<{ id: string; kind: string; status: string }>
+      revise_points?: Array<{ id: string; kind: string; status: string }>
       tasks: Array<{
         status: string
         description: string
@@ -98,6 +116,12 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     UI.println(
       `  tasks: ${projection.counts.completed} completed, ${projection.counts.running} running, ${projection.counts.pending} pending, ${projection.counts.failed} failed, ${projection.counts.cancelled} cancelled`,
     )
+    if (projection.effort_profile) {
+      UI.println(`  effort: ${String(projection.effort_profile.revise_policy ?? "none")}, revise points ${projection.revise_points?.length ?? 0}`)
+    }
+    if (projection.expert_lanes?.length) {
+      UI.println(`  experts: ${projection.expert_lanes.map((item) => item.expert_id).join(", ")}`)
+    }
     if (showGroups) {
       for (const group of projection.groups ?? []) {
         UI.println(`  group ${group.id}: ${group.status}, merge ${group.merge_status}, nodes ${group.node_ids.join(", ")}`)
@@ -161,6 +185,8 @@ async function createMission(
     parallelMode?: ParallelMode
     maxParallelAgents?: number
     showGroups?: boolean
+    effort?: MissionEffort
+    workflow?: MissionWorkflow
   },
 ) {
   const sessionID =
@@ -172,24 +198,34 @@ async function createMission(
     mode: input.parallelMode ?? "safe",
     max_parallel_agents: input.maxParallelAgents ?? 4,
   }
-  const plan = (await sdk.coordinator.plan2.generate({ goal: input.goal, intent, parallel_policy }, { throwOnError: true })).data
+  const planPayload = {
+    goal: input.goal,
+    intent,
+    parallel_policy,
+    effort: input.effort,
+    workflow: input.workflow,
+  }
+  const plan = (await sdk.coordinator.plan2.generate(planPayload, { throwOnError: true })).data
   const reviewerModel = parseReviewerModel(input.reviewerModel)
   const nodes = reviewerModel
     ? plan.nodes.map((node) => (node.role === "reviewer" ? { ...node, model: reviewerModel } : node))
     : plan.nodes
   emit(input.format, "plan", { plan: { ...plan, nodes }, sessionID })
   const mode = input.mode ?? (intent.risk_level === "high" ? "assisted" : "autonomous")
+  const runPayload = {
+    sessionID,
+    goal: input.goal,
+    intent,
+    nodes,
+    mode,
+    approved: input.approve,
+    parallel_policy,
+    effort: input.effort,
+    workflow: input.workflow,
+  }
   const run = (
     await sdk.coordinator.run(
-      {
-        sessionID,
-        goal: input.goal,
-        intent,
-        nodes,
-        mode,
-        approved: input.approve,
-        parallel_policy,
-      },
+      runPayload,
       { throwOnError: true },
     )
   ).data
@@ -256,6 +292,29 @@ export const MissionCommand = cmd({
       .option("reviewer-model", {
         type: "string",
         describe: "reviewer model in provider/model format",
+      })
+      .option("effort", {
+        type: "string",
+        choices: ["low", "medium", "high", "deep"] as const,
+        default: "medium",
+        describe: "mission governance depth and token/time budget",
+      })
+      .option("workflow", {
+        type: "string",
+        choices: [
+          "coding",
+          "research",
+          "writing",
+          "data-analysis",
+          "planning",
+          "personal-admin",
+          "automation",
+          "documentation",
+          "environment-audit",
+          "file-data-organization",
+          "general-operations",
+        ] as const,
+        describe: "specialized workflow adapter",
       })
       .option("approve", {
         type: "boolean",
@@ -350,6 +409,8 @@ export const MissionCommand = cmd({
         parallelMode: args.parallel as ParallelMode,
         maxParallelAgents: args["max-parallel-agents"],
         showGroups: args["show-groups"],
+        effort: args.effort as MissionEffort,
+        workflow: args.workflow as MissionWorkflow | undefined,
       })
     })
   },
