@@ -5,13 +5,32 @@ import path from "path"
 
 const root = process.cwd()
 const pkg = await Bun.file(path.join(root, "packages", "openagt", "package.json")).json()
-const bin =
-  process.platform === "win32"
-    ? path.join(root, "packages", "openagt", "dist", "openagt-windows-x64", "release", "bin", "openagt.exe")
-    : path.join(root, "packages", "openagt", "dist", `openagt-${process.platform === "darwin" ? "macos" : "linux"}-${process.arch === "arm64" ? "arm64" : "x64"}`, "release", "bin", "openagt")
 
-if (!(await Bun.file(bin).exists())) {
-  throw new Error(`Packaged binary not found: ${bin}`)
+const arch = process.arch === "arm64" ? "arm64" : "x64"
+const platformNames =
+  process.platform === "win32"
+    ? ["windows"]
+    : process.platform === "darwin"
+      ? ["macos", "darwin"]
+      : ["linux"]
+const candidates = platformNames.map((platform) =>
+  path.join(
+    root,
+    "packages",
+    "openagt",
+    "dist",
+    `openagt-${platform}-${arch}`,
+    "release",
+    "bin",
+    process.platform === "win32" ? "openagt.exe" : "openagt",
+  ),
+)
+const bin = (await Promise.all(candidates.map(async (candidate) => ((await Bun.file(candidate).exists()) ? candidate : undefined)))).find(
+  (item) => item !== undefined,
+)
+
+if (!bin) {
+  throw new Error(`Packaged binary not found. Tried:\n${candidates.join("\n")}`)
 }
 
 const help = await $`${bin} --help`.quiet()
