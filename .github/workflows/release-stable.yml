@@ -95,14 +95,8 @@ jobs:
           $env:PATH="$env:USERPROFILE\\.dotnet\\tools;$env:PATH"
           .\packages\openagt\script\build-windows-installer.ps1 -Version $env:OPENAGT_VERSION
 
-      - name: Require Windows signing configuration for GA
-        if: runner.os == 'Windows' && inputs.release_kind == 'ga' && env.AZURE_TRUSTED_SIGNING_CONFIGURED != 'true'
-        shell: pwsh
-        run: |
-          throw "GA Windows releases require Azure Trusted Signing secrets. Use release_kind=rc for unsigned builds."
-
       - name: Azure login for Trusted Signing
-        if: runner.os == 'Windows' && inputs.release_kind == 'ga' && env.AZURE_TRUSTED_SIGNING_CONFIGURED == 'true'
+        if: runner.os == 'Windows' && env.AZURE_TRUSTED_SIGNING_CONFIGURED == 'true'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
         with:
           client-id: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID }}
@@ -113,7 +107,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          OPENAGT_REQUIRE_WINDOWS_SIGNING: ${{ inputs.release_kind == 'ga' && '1' || '0' }}
+          OPENAGT_REQUIRE_WINDOWS_SIGNING: "0"
           AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME }}

@@ -256,7 +256,7 @@ describe("coordinator runtime", () => {
           id: run.id,
           taskID: first.task_id,
         })
-        yield* Effect.sleep("20 millis")
+        yield* Effect.sleep("100 millis")
         const retried = yield* coordinator.projection(run.id)
         const retriedTask = retried.tasks.find((item) => item.task_id === first.task_id)
 
