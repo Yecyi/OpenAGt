@@ -77,6 +77,48 @@ describe("ExecPolicy", () => {
     expect(result.matchedRules[0]?.pattern).toEqual(["sudo|su|doas|runas"])
   })
 
+  test("applies built-in runas confirmation rules by default", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "runas /user:Administrator cmd.exe",
+          shellFamily: "cmd",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+
+    expect(result.decision).toBe("confirm")
+    expect(result.justification).toBe("Privilege escalation commands require confirmation.")
+    expect(result.matchedRules).toHaveLength(1)
+  })
+
+  test("applies built-in git context redirection rules by default", async () => {
+    const gitDir = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "git --git-dir .git status",
+          shellFamily: "posix",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+    const workTree = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ExecPolicy.Service
+        return yield* svc.evaluate({
+          command: "git --work-tree .. status",
+          shellFamily: "posix",
+        })
+      }).pipe(Effect.provide(ExecPolicy.layer.pipe(Layer.provide(config())))),
+    )
+
+    expect(gitDir.decision).toBe("confirm")
+    expect(gitDir.justification).toBe("git --git-dir can redirect repository context and requires confirmation.")
+    expect(workTree.decision).toBe("confirm")
+    expect(workTree.justification).toBe("git --work-tree can redirect filesystem writes and requires confirmation.")
+  })
+
   test("applies built-in powershell elevation rules by default", async () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {

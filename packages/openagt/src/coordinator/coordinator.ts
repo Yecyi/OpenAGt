@@ -973,7 +973,7 @@ export const layer = Layer.effect(
             instance,
             workspace,
           }).pipe(
-            Effect.catch(() => Effect.void),
+            Effect.catchCause(() => Effect.void),
           ),
         )
       })

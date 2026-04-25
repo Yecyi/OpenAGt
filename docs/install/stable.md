@@ -1,6 +1,6 @@
 # OpenAGt Stable Install
 
-OpenAGt `v1.15.1` stable covers:
+OpenAGt `v1.16.0` stable covers:
 
 - CLI / TUI
 - headless server
@@ -16,6 +16,7 @@ Flutter is not part of this release line.
 - `openagt-macos-arm64.tar.gz`
 - `openagt-macos-x64.tar.gz`
 - `SHA256SUMS.txt`
+- SBOM
 
 ## Windows
 
@@ -65,3 +66,16 @@ bun run --cwd packages/openagt src/index.ts --help
 ## Verification
 
 Check the downloaded asset against `SHA256SUMS.txt` before installation.
+
+Runtime diagnostics:
+
+```powershell
+openagt debug doctor
+openagt debug bundle --session <id>
+```
+
+Release maintainers can run the local v1.16 gate with:
+
+```bash
+bun run verify:v1.16
+```

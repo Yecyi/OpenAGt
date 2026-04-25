@@ -1,27 +1,27 @@
 # OpenAGt
 
-OpenAGt 是一个面向 CLI、Server 和 Web 工作流的本地优先 agentic coding 运行时。
+OpenAGt 是一个本地优先的 agentic coding 运行时，面向 CLI、TUI、headless server、Web 和 SDK 驱动的开发工作流。
 
-它围绕编码模型建立了一个迭代式工具循环：读取文件、编辑代码、执行 Shell、调用 MCP 工具、管理任务，并把整个过程放在持久化 session 中，而不是一次性补全。
+它围绕编码模型建立持续会话式工具循环：读取文件、编辑代码、执行 Shell、调用 MCP/LSP、管理任务、派发 subagent，并把整个过程保存在持久 session 中，而不是一次性补全。
 
 ## 概览
 
-OpenAGt 当前围绕四个核心思路构建：
+OpenAGt 当前围绕四个核心方向构建：
 
-- 以 session 为中心，而不是一次性 completion
-- 通过权限系统控制工具调用，而不是静默执行高风险操作
-- 以后端 runtime 为核心组织多步骤编码流程
-- 在命名迁移阶段保留与 `opencode` 的兼容能力
+- 以 session 为中心的 agent 执行，而不是单次 completion。
+- 以权限和安全边界控制工具调用，而不是静默执行高风险操作。
+- 以后端 runtime 为核心组织多步骤编码任务。
+- 在命名迁移期保留 `opencode` 兼容入口和 `.opencode` 配置兼容。
 
-当前稳定版支持范围：
+当前稳定范围：
 
 - CLI / TUI
-- 无头 server
+- Headless server
 - JavaScript SDK
 
 当前稳定版不包含：
 
-- Flutter 客户端分发
+- Flutter 客户端发行版
 
 技术文档：
 
@@ -30,26 +30,26 @@ OpenAGt 当前围绕四个核心思路构建：
 
 ## OpenCode vs OpenAGt
 
-下面的对比基于 OpenCode 官方开源仓库和 README，而不是只看命名。
+下表基于 OpenCode 官方开源仓库和文档进行技术对比，而不是只看命名。
 
 | 主题 | OpenCode | OpenAGt |
 | --- | --- | --- |
-| 运行时中心 | 以 client/server coding agent 为基础，并且明显强调 TUI 体验 | 以后端 session runtime 为中心，再向 CLI、TUI、server、SDK 暴露 |
-| Agent loop | 通用编码代理，内置 `build` / `plan` agent，并带有 subagent 能力 | 以 session 为中心的迭代工具循环，并在其上扩展 task runtime、coordinator graph、personal-agent primitives |
-| Provider 策略 | 官方文档明确强调 provider-agnostic，可接 Claude、OpenAI、Google、本地模型 | 多 provider runtime，带 provider fallback、server 暴露和生成式 JavaScript SDK |
-| LSP 集成 | 官方 README 明确强调开箱即用的 LSP 支持 | LSP 作为工具运行时的一部分接入，可与 read/edit/bash/MCP/task 一起进入同一个 session loop |
-| 安全模型 | agent mode 与 permission prompt 是 CLI 体验的重要组成部分 | 结构化审批与安全边界：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
-| 编排重点 | 更偏 terminal-first 的编码流，并保留 client/server 远程驱动潜力 | 更偏 Coordinator Runtime v1、任务图调度、Inbox、Wakeup，以及 profile/workspace/session 持久记忆 |
-| 前端形态 | TUI 优先，官方项目同时提供 desktop app beta | 当前稳定版以 CLI、TUI、headless server、JavaScript SDK 为主，Flutter 延后 |
-| 迁移 / 兼容 | 原生源项目 | 在迁移阶段保留 `opencode` CLI alias 与 `.opencode` 配置兼容 |
+| 运行时中心 | Client/server coding agent，强调 TUI 体验 | 后端优先的 session runtime，可被 CLI、TUI、server、SDK 复用 |
+| Agent loop | 通用编码 agent，内置 agent mode 和 subagent 能力 | 持久 session 工具循环，扩展 task runtime、coordinator graph、personal-agent primitives |
+| Provider 策略 | Provider-agnostic，支持 Claude、OpenAI、Google、本地模型等 | 多 provider runtime，支持 provider fallback、server 暴露和生成式 JavaScript SDK |
+| LSP 集成 | 官方文档强调开箱即用 LSP | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop |
+| 安全模型 | Agent mode 与 permission prompt 是 CLI 体验核心 | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
+| 编排重点 | Terminal-first 编码流，保留 client/server 远程控制潜力 | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆 |
+| 前端形态 | TUI-first，官方项目也提供 desktop beta | 当前稳定版聚焦 CLI/TUI/headless server/SDK；Flutter 延后 |
+| 迁移兼容 | 原生 OpenCode 项目 | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容 |
 
 ## 发布
 
 当前稳定版本：
 
-- [v1.15.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.1)
+- [v1.16.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.16.0)
 
-当前发布资产：
+发布资产：
 
 - `OpenAGt-Setup-x64.msi`
 - `openagt-windows-x64.zip`
@@ -57,46 +57,35 @@ OpenAGt 当前围绕四个核心思路构建：
 - `openagt-macos-arm64.tar.gz`
 - `openagt-macos-x64.tar.gz`
 - `SHA256SUMS.txt`
+- SBOM
 
-安装细节见：
-
-- [稳定版安装说明](docs/install/stable.md)
+安装说明见 [Stable Install](docs/install/stable.md)。
 
 ## 核心技术
 
-当前稳定版后端的核心能力包括：
+OpenAGt v1.16 的稳定后端能力包括：
 
-- 迭代式 session runtime
-- 针对 Shell 和工具调用的权限与安全封装
-- Coordinator Runtime v1 的任务图编排
-- Profile / Workspace / Session 三层持久化记忆
-- Inbox、scheduler、wakeup 这些长时代理原语
-- 无头 server 与生成式 JavaScript SDK
-- 跨平台打包与 Windows MSI 分发
+- 持久 session runtime 与迭代式工具循环
+- Shell 与工具调用的权限审批、安全摘要和 `shell_safety.version = 1`
+- Coordinator Runtime 的任务图、依赖校验、dispatch、retry、cancel
+- Personal Agent Core 的 profile/workspace/session 记忆、inbox、scheduler、wakeup
+- `openagt debug doctor` 与 `openagt debug bundle --session <id>`
+- Headless server、SSE event envelope、生成式 JavaScript SDK
+- 跨平台 release packaging、checksums、SBOM、Windows MSI
 
-## 验证矩阵
+## Verification Matrix
 
 | 能力 | 状态 |
 | --- | --- |
-| Session runtime 和工具循环 | 稳定 |
-| Approval and Safety Envelope | 稳定，并带版本化 `shell_safety` |
-| Coordinator Runtime | 已实现，v1.16 继续收口 |
-| Personal Agent Core | 已实现，v1.16 继续收口 |
-| Debug doctor / repro bundle | v1.16 诊断能力 |
+| Session runtime 与工具循环 | v1.16 稳定 |
+| Approval and Safety Envelope | v1.16 稳定，带版本化 `shell_safety` |
+| Coordinator Runtime | v1.16 稳定覆盖 graph projection、dispatch、retry、cancel |
+| Personal Agent Core | 已实现，v1.16 稳定后端契约 |
+| Debug doctor / repro bundle | v1.16 稳定诊断面 |
+| Release verification automation | `bun run verify:v1.16` |
 | Flutter 前端 | 路线图；先稳定后端契约 |
 
-## 关键能力
-
-- 持久化 session 驱动的 agent loop
-- 文件读取、编辑、patch、写入工具
-- 带权限控制和结构化安全元数据的 Shell 执行
-- MCP、搜索、LSP、任务委托能力
-- Coordinator Runtime v1 的依赖感知任务图执行
-- Personal Agent Core v1 的长期记忆和 inbox 能力
-- Headless server + JavaScript SDK
-- `opencode` 兼容别名
-
-## 流程图
+## Flowchart
 
 ### 请求生命周期
 
@@ -108,7 +97,7 @@ flowchart TD
   D --> E{"Tool calls?"}
   E -- "yes" --> F["Permission + Safety"]
   F --> G["Tool Scheduler"]
-  G --> H["Read / Edit / Bash / MCP / Task"]
+  G --> H["Read / Edit / Bash / MCP / LSP / Task"]
   H --> B
   E -- "no" --> I["Final Response"]
 ```
@@ -127,19 +116,16 @@ flowchart LR
   F --> I["Server + SSE Events"]
 ```
 
-完整技术拆解见：
-
-- [技术架构](docs/technical/architecture.md)
-
 ## 安装
 
 ### Windows
 
 推荐方式：
 
-- 下载 `OpenAGt-Setup-x64.msi`
-- 安装完成后重新打开一个终端
-- 运行：
+1. 下载 `OpenAGt-Setup-x64.msi`。
+2. 完成安装。
+3. 打开一个新的终端。
+4. 运行：
 
 ```powershell
 openagt
@@ -153,14 +139,13 @@ opencode
 
 便携方式：
 
-- 解压 `openagt-windows-x64.zip`
-- 运行 `bin\openagt.exe` 或 `bin\openagt.cmd`
+1. 解压 `openagt-windows-x64.zip`。
+2. 运行 `bin\openagt.exe` 或 `bin\openagt.cmd`。
 
 注意：
 
-- 当前 Windows 资产**未签名**
-- Windows SmartScreen 可能显示 `Unknown publisher`
-- 签名相关技术细节单独放在 [Windows 签名说明](docs/release/windows-signing.md)
+- 如果 Windows 资产未签名，SmartScreen 可能显示 `Unknown publisher`。
+- 签名细节见 [Windows 签名说明](docs/release/windows-signing.md)。
 
 ### macOS / Linux
 
@@ -171,9 +156,7 @@ opencode
 ./bin/opencode --help
 ```
 
-### 校验下载
-
-安装前请对照 `SHA256SUMS.txt` 校验下载文件。
+下载后请使用 `SHA256SUMS.txt` 校验资产完整性。
 
 ## 快速开始
 
@@ -185,10 +168,16 @@ bun run --cwd packages/sdk/js script/build.ts
 bun run --cwd packages/openagt src/index.ts --help
 ```
 
-### 启动交互式 CLI
+### 启动交互 CLI
 
 ```bash
 bun run --cwd packages/openagt src/index.ts
+```
+
+安装版可直接运行：
+
+```bash
+openagt
 ```
 
 ### 执行一次性任务
@@ -217,29 +206,40 @@ bun run --cwd packages/openagt src/index.ts web --port 4096
 bun run --cwd packages/openagt src/index.ts providers login
 ```
 
-## 核心 Runtime Surface
+## 后端 Runtime Surface
 
-当前稳定版后端暴露这些事件族：
+稳定后端事件族：
 
 - `coordinator.*`
 - `inbox.*`
 - `scheduler.*`
 - `memory.updated`
 
-Shell 权限请求还会带结构化的 `shell_safety` 元数据。
+SSE 事件 envelope 包含：
+
+- `schema_version`
+- `event_id`
+- `trace_id`
+- `timestamp`
+- `type`
+- `properties`
+
+Shell 权限请求会携带结构化 `shell_safety` 元数据。
 
 ## 主要命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `openagt` | 启动默认交互式 CLI / TUI |
-| `openagt run [message..]` | 运行一次性任务 |
-| `openagt serve` | 启动无头 server |
-| `openagt web` | 启动 server 和 web UI |
+| `openagt` | 启动默认交互 CLI / TUI |
+| `openagt run [message..]` | 执行一次性任务 |
+| `openagt serve` | 启动 headless server |
+| `openagt web` | 启动 server 和 Web UI 流程 |
 | `openagt session list` | 列出 session |
 | `openagt providers login` | 添加或刷新 provider 凭据 |
 | `openagt mcp list` | 查看 MCP 配置 |
-| `openagt debug paths` | 打印有效路径 |
+| `openagt debug paths` | 打印有效运行时路径 |
+| `openagt debug doctor` | 运行环境与 runtime 诊断 |
+| `openagt debug bundle --session <id>` | 导出脱敏 repro bundle |
 
 ## 仓库结构
 
@@ -248,21 +248,11 @@ Shell 权限请求还会带结构化的 `shell_safety` 元数据。
 | `packages/openagt` | 核心 runtime、CLI、server、tools、session engine |
 | `packages/app` | Solid/Vite Web 客户端 |
 | `packages/sdk/js` | 生成式 JavaScript SDK |
-| `packages/openagt_flutter` | Flutter 移动端 MVP |
-| `packages/console/*` | 控制台与 control-plane 包 |
+| `packages/openagt_flutter` | Flutter MVP |
+| `packages/console/*` | Console 与 control-plane 包 |
 | `packages/opencode` | 兼容遗留目录，不是主 runtime |
 | `.opencode/` | 本地 agents、commands、plugins、skills、tools、themes 示例 |
 | `docs/` | 发布、安装、技术文档 |
-
-## 兼容性
-
-当前项目仍然保留与 OpenCode 的迁移兼容：
-
-- `opencode` 仍然作为 CLI 别名存在
-- 配置发现仍识别 `.opencode/`
-- `OPENAGT_*` 普遍保留 `OPENCODE_*` 的兼容别名
-
-这些都是当前真实行为，不是历史注释。
 
 ## 开发
 
@@ -275,33 +265,9 @@ bun run --cwd packages/sdk/js script/build.ts
 
 fresh clone 后需要先生成 SDK。
 
-### 本地运行
-
-核心 runtime：
-
-```bash
-bun run --cwd packages/openagt src/index.ts
-```
-
-Web：
-
-```bash
-bun run --cwd packages/app dev
-```
-
-Flutter MVP：
-
-```bash
-cd packages/openagt_flutter
-flutter pub get
-flutter run
-```
-
 ### 测试
 
-不要在仓库根目录直接跑测试。
-
-请使用 package 级命令：
+不要在仓库根目录直接运行测试。
 
 ```bash
 cd packages/openagt
@@ -309,9 +275,13 @@ bun typecheck
 bun test
 ```
 
-## 配置与环境变量
+v1.16 发布验证：
 
-常用环境变量：
+```bash
+bun run verify:v1.16
+```
+
+## 配置与环境变量
 
 | 变量 | 作用 |
 | --- | --- |
@@ -331,32 +301,21 @@ bun test
 
 你可以通过以下方式扩展系统：
 
-- 在 `.opencode/agent` 或 `.opencode/agents` 下添加 agents
-- 在 `.opencode/command` 或 `.opencode/commands` 下添加 commands
-- 在 `.opencode/skill` 或 `.opencode/skills` 下添加 skills
-- 在 `.opencode/tool` 或 `.opencode/tools` 下添加 tools
-- 通过配置或本地目录加载 plugins
-
-如果要调整运行时核心流程，建议先从这些位置开始看：
-
-- `packages/openagt/src/session/prompt.ts`
-- `packages/openagt/src/tool`
-- `packages/openagt/src/agent`
-- `packages/openagt/src/permission`
+- 在 `.opencode/agent` 或 `.opencode/agents` 下添加 agents。
+- 在 `.opencode/command` 或 `.opencode/commands` 下添加 commands。
+- 在 `.opencode/skill` 或 `.opencode/skills` 下添加 skills。
+- 在 `.opencode/tool` 或 `.opencode/tools` 下添加 tools。
+- 通过配置或本地目录加载 plugins。
 
 ## 故障排查
 
 ### SDK 生成错误
-
-如果提示缺少生成式 SDK 文件：
 
 ```bash
 bun run --cwd packages/sdk/js script/build.ts
 ```
 
 ### Server 未加保护
-
-如果要在 localhost 之外使用 `serve` 或 `web`，先设置凭据：
 
 ```bash
 set OPENAGT_SERVER_PASSWORD=change-me
@@ -365,10 +324,9 @@ set OPENAGT_SERVER_USERNAME=openagt
 
 ### 配置没有生效
 
-检查有效路径：
-
 ```bash
 bun run --cwd packages/openagt src/index.ts debug paths
+bun run --cwd packages/openagt src/index.ts debug doctor
 ```
 
 ### MCP 认证问题
@@ -388,4 +346,4 @@ bun run --cwd packages/openagt src/index.ts providers list
 
 ## License
 
-MIT。见 [LICENSE](LICENSE)。
+MIT. See [LICENSE](LICENSE).

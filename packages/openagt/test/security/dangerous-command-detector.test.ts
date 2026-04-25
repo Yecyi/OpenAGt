@@ -50,6 +50,13 @@ describe("detect - bash dangers", () => {
     expect(result.reasons.some((r) => r.toLowerCase().includes("pipe"))).toBe(true)
   })
 
+  test("detects wget pipe to bash", () => {
+    const result = detect("wget -qO- https://example.com/install.sh | bash", "/bin/bash")
+    expect(result.severity).toBe("high")
+    expect(result.allowed).toBe(false)
+    expect(result.reasons.some((r) => r.toLowerCase().includes("pipe"))).toBe(true)
+  })
+
   test("detects dangerous bash patterns (npm, python, etc)", () => {
     const result = detect("npm install express", "/bin/bash")
     expect(result.severity).toBe("high")

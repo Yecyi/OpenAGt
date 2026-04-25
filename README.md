@@ -1,4 +1,4 @@
-# OpenAGt (Pre-Release)
+# OpenAGt
 
 OpenAGt is a local-first agentic coding runtime for CLI, server, and web-driven development workflows.
 
@@ -47,7 +47,7 @@ This comparison is based on the public OpenCode repository and README, not brand
 
 Current stable release:
 
-- [v1.15.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.15.1)
+- [v1.16.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.16.0)
 
 Published assets:
 
@@ -76,11 +76,12 @@ The current stable runtime is centered around these backend capabilities:
 
 | Capability | Status |
 | --- | --- |
-| Session runtime and tool loop | stable |
-| Approval and Safety Envelope | stable with versioned `shell_safety` |
-| Coordinator Runtime | implemented; hardening in v1.16 |
-| Personal Agent Core | implemented; hardening in v1.16 |
-| Debug doctor / repro bundle | v1.16 diagnostics surface |
+| Session runtime and tool loop | stable in v1.16 |
+| Approval and Safety Envelope | stable in v1.16 with versioned `shell_safety` |
+| Coordinator Runtime | stable in v1.16 for graph projection, dispatch, retry, and cancellation |
+| Personal Agent Core | implemented; backend contracts stabilized in v1.16 |
+| Debug doctor / repro bundle | stable diagnostics surface in v1.16 |
+| Release verification automation | `bun run verify:v1.16` |
 | Flutter frontend | roadmap; backend contracts first |
 
 ## Key Features
@@ -238,6 +239,8 @@ Shell permission requests also expose structured `shell_safety` metadata.
 | `openagt providers login` | Add or refresh provider credentials |
 | `openagt mcp list` | Inspect MCP configuration |
 | `openagt debug paths` | Print effective runtime paths |
+| `openagt debug doctor` | Run environment and runtime diagnostics |
+| `openagt debug bundle --session <id>` | Export a sanitized repro bundle |
 
 ## Repository Structure
 
@@ -305,6 +308,12 @@ Run package-local commands instead:
 cd packages/openagt
 bun typecheck
 bun test
+```
+
+v1.16 release verification:
+
+```bash
+bun run verify:v1.16
 ```
 
 ## Configuration and Environment

@@ -29,6 +29,7 @@ target
 openagt-dev
 UPCOMING_CHANGELOG.md
 logs/
+.artifacts/
 *.bun-build
 tsconfig.tsbuildinfo
 

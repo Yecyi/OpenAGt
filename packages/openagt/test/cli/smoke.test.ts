@@ -210,6 +210,20 @@ describe("CLI Smoke Tests", () => {
       expect(result.stdout.toString()).toContain("doctor")
     })
 
+    test("debug doctor --json emits a stable diagnostic envelope", async () => {
+      await using tmp = await tmpdir({ git: true })
+
+      const result = await $`bun run ${CLI_ENTRY} debug doctor --json`
+        .cwd(tmp.path)
+        .quiet()
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.toString()).toContain('"schema_version": 1')
+      expect(result.stdout.toString()).toContain('"name": "config"')
+      expect(result.stdout.toString()).toContain('"name": "shell"')
+      expect(result.stdout.toString()).toContain('"name": "release-install"')
+    })
+
     test("debug bundle --help shows usage", async () => {
       const result = await $`bun run ${CLI_ENTRY} debug bundle --help`
         .quiet()

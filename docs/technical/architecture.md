@@ -14,6 +14,8 @@ The system is organized around five backend pillars:
 
 This document focuses on the current stable backend and release-facing architecture.
 
+For v1.16, the stable backend surface is CLI/TUI, headless server, SSE event envelopes, and the generated JavaScript SDK. Flutter remains a future control panel over these backend contracts.
+
 ## OpenCode Comparison
 
 The comparison below uses the public OpenCode repository and README as the source baseline, then compares that baseline with the current OpenAGt codebase.
@@ -238,10 +240,43 @@ Stable backend-facing event families:
 - `scheduler.*`
 - `memory.updated`
 
+SSE events use a stable envelope:
+
+- `schema_version`
+- `event_id`
+- `trace_id`
+- `timestamp`
+- `type`
+- `properties`
+
+SDK helpers expose stable runtime metadata:
+
+- `getShellSafety(metadata)`
+- `getCoordinatorProjection(eventOrResponse)`
+- `getInboxOverview(response)`
+
 Primary implementation areas:
 
 - `packages/openagt/src/server`
 - `packages/sdk/js`
+
+```mermaid
+sequenceDiagram
+  participant Client as CLI / Web / SDK
+  participant Server as OpenAGt Server
+  participant Runtime as Session Runtime
+  participant Coord as Coordinator
+  participant Tools as Tools + Safety
+  participant SSE as SSE Stream
+
+  Client->>Server: request / session input
+  Server->>Runtime: create or resume session
+  Runtime->>Coord: optional task graph dispatch
+  Coord->>Tools: task / bash / file / MCP / LSP calls
+  Tools-->>Runtime: result metadata + shell_safety
+  Runtime-->>SSE: session/tool/coordinator events
+  SSE-->>Client: EventEnvelope
+```
 
 ## Verification Matrix
 
@@ -252,8 +287,10 @@ Primary implementation areas:
 | Windows signed-GA release policy | stable in v1.16 when signing secrets are configured |
 | Packaged binary smoke tests | stable in v1.16 |
 | `openagt debug doctor` and `debug bundle` | stable in v1.16 |
-| Coordinator Runtime projection and dispatch | implemented; hardening continues in v1.16 |
-| Personal Agent inbox and memory primitives | implemented; state-machine hardening continues in v1.16 |
+| Coordinator Runtime projection and dispatch | stable in v1.16 for graph projection, duplicate-id rejection, retry, and cancellation |
+| Personal Agent inbox and memory primitives | implemented; backend contracts stabilized in v1.16 |
+| SSE EventEnvelope | stable in v1.16 |
+| JavaScript SDK runtime helpers | stable in v1.16 |
 | Flutter control panel | roadmap; backend contracts only in v1.16 |
 
 ## Repository Map
