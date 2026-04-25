@@ -183,6 +183,48 @@ describe("coordinator runtime", () => {
     ),
   )
 
+  it.live("projects parallel groups and respects max parallel dispatch slots", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator parallel parent" })
+
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "implement parallel mission control planner",
+          mode: "assisted",
+          parallel_policy: {
+            max_parallel_agents: 2,
+          },
+        })
+
+        expect(run.state).toBe("awaiting_approval")
+        expect(run.plan.nodes.filter((item) => item.parallel_group === "research")).toHaveLength(4)
+        expect(run.plan.nodes.find((item) => item.id === "research_synthesis")?.depends_on).toEqual([
+          "research_repo_structure",
+          "research_domain",
+          "research_tests",
+          "research_risk",
+        ])
+
+        yield* coordinator.approve(run.id)
+        const dispatched = yield* coordinator.dispatch(run.id)
+        const projection = yield* coordinator.projection(run.id)
+        const researchGroup = projection.groups.find((item) => item.id === "research")
+
+        expect(dispatched.dispatched).toBeLessThanOrEqual(2)
+        expect(researchGroup?.node_ids).toEqual([
+          "research_repo_structure",
+          "research_domain",
+          "research_tests",
+          "research_risk",
+        ])
+        expect(researchGroup?.merge_status).toBe("waiting")
+      }),
+    ),
+  )
+
   it.live("cancels pending coordinator tasks from an approval gate", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {

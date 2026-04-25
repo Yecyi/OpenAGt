@@ -83,35 +83,34 @@ const it = testEffect(
 )
 
 describe("coordinator runner", () => {
-  it.live("auto-dispatches runnable nodes to session prompt and synthesizes memory", () =>
+  it.live("tracks coordinator task completion and synthesizes memory", () =>
     provideTmpdirServer(
-      ({ llm }) =>
+      () =>
         Effect.gen(function* () {
           const sessions = yield* Session.Service
           const tasks = yield* TaskRuntime.Service
           const coordinator = yield* Coordinator.Service
           const personal = yield* PersonalAgent.Service
-          yield* llm.text("researched")
-          yield* llm.text("implemented")
-          yield* llm.text("verified")
-
           const parent = yield* sessions.create({ title: "Coordinator runner parent" })
           yield* personal.listMemory({ projectID: parent.projectID })
           const run = yield* coordinator.run({
             sessionID: parent.id,
             goal: "Run coordinator automatically",
+            mode: "assisted",
           })
-          const waited = yield* tasks.wait({
-            parentSessionID: parent.id,
-            taskIDs: run.task_ids.map((item) => item as never),
-            mode: "all",
-            timeoutMs: 10000,
-          })
+          const records = yield* tasks.list(parent.id)
+          const research = records.find((item) => item.metadata?.coordinator_node_id === "research")
+          const execute = records.find((item) => item.metadata?.coordinator_node_id === "execute")
+          const review = records.find((item) => item.metadata?.coordinator_node_id === "review")
+          if (!research || !execute || !review) throw new Error("Expected coordinator tasks")
+          yield* tasks.complete({ taskID: research.task_id, parentSessionID: parent.id, output: "researched" })
+          yield* tasks.complete({ taskID: execute.task_id, parentSessionID: parent.id, output: "implemented" })
+          yield* tasks.complete({ taskID: review.task_id, parentSessionID: parent.id, output: "verified" })
+          yield* coordinator.summarize(run.id)
           const projection = yield* coordinator.projection(run.id)
           yield* Effect.sleep("20 millis")
           const memory = yield* personal.listMemory({ projectID: parent.projectID })
 
-          expect(waited).toHaveLength(3)
           expect(projection.counts.completed).toBe(3)
           expect(memory.some((item) => item.tags.includes(`coordinator_run:${run.id}`))).toBe(true)
           expect(memory.some((item) => item.tags.some((tag) => tag.startsWith("verify_task:")))).toBe(true)

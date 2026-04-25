@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import { describeRoute, resolver, validator } from "hono-openapi"
 import z from "zod"
 import { Coordinator } from "@/coordinator/coordinator"
-import { CoordinatorMode, CoordinatorNode, CoordinatorPlan, CoordinatorRun, CoordinatorRunID, IntentProfile } from "@/coordinator/schema"
+import { CoordinatorMode, CoordinatorNode, CoordinatorPlan, CoordinatorRun, CoordinatorRunID, IntentProfile, ParallelExecutionPolicy } from "@/coordinator/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { SessionID } from "@/session/schema"
 import { errors } from "../../error"
@@ -14,6 +14,7 @@ const runPayload = z.object({
   intent: IntentProfile.optional(),
   mode: CoordinatorMode.optional(),
   approved: z.boolean().optional(),
+  parallel_policy: ParallelExecutionPolicy.partial().optional(),
 })
 
 const intentPayload = z.object({
@@ -35,6 +36,17 @@ const projection = z.object({
     failed: z.number().int(),
     cancelled: z.number().int(),
   }),
+  groups: z.array(z.object({
+    id: z.string(),
+    node_ids: z.array(z.string()),
+    task_ids: z.array(z.string()),
+    status: z.enum(["pending", "running", "completed", "failed", "cancelled"]),
+    merge_status: z.enum(["none", "waiting", "merged", "conflict"]),
+    blocked_by: z.array(z.string()),
+    conflicts: z.array(z.string()),
+    started_at: z.number().optional(),
+    completed_at: z.number().optional(),
+  })),
 })
 
 export const CoordinatorRoutes = () =>
@@ -137,6 +149,7 @@ export const CoordinatorRoutes = () =>
             intent: body.intent,
             mode: body.mode,
             approved: body.approved,
+            parallel_policy: body.parallel_policy,
           })
         }),
     )

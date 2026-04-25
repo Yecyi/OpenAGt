@@ -42,9 +42,24 @@ export type RiskLevel = z.infer<typeof RiskLevel>
 export const CoordinatorMode = z.enum(["manual", "assisted", "autonomous"])
 export type CoordinatorMode = z.infer<typeof CoordinatorMode>
 
+export const CoordinatorParallelMode = z.enum(["off", "safe", "aggressive"])
+export type CoordinatorParallelMode = z.infer<typeof CoordinatorParallelMode>
+
+export const ParallelExecutionPolicy = z.object({
+  mode: CoordinatorParallelMode.default("safe"),
+  max_parallel_agents: z.number().int().min(1).max(16).default(4),
+  max_parallel_tools: z.number().int().min(1).max(32).default(8),
+  read_only_parallel_allowed: z.boolean().default(true),
+  write_parallel_requires_disjoint_scope: z.boolean().default(true),
+  merge_strategy: z.enum(["none", "research-synthesis", "verification-evidence"]).default("research-synthesis"),
+  conflict_resolution_strategy: z.enum(["block", "targeted-research", "reviewer-judgement"]).default("targeted-research"),
+})
+export type ParallelExecutionPolicy = z.infer<typeof ParallelExecutionPolicy>
+
 export const CoordinatorNodeRole = z.enum([
   "coordinator",
   "researcher",
+  "reducer",
   "implementer",
   "verifier",
   "reviewer",
@@ -66,6 +81,7 @@ export const CoordinatorOutputSchema = z.enum([
   "environment-diagnosis",
   "automation-plan",
   "memory",
+  "research-synthesis",
   "summary",
 ])
 export type CoordinatorOutputSchema = z.infer<typeof CoordinatorOutputSchema>
@@ -102,6 +118,11 @@ export const CoordinatorNode = z.object({
   depends_on: z.array(z.string()),
   write_scope: z.array(z.string()),
   read_scope: z.array(z.string()),
+  parallel_group: z.string().optional(),
+  assigned_scope: z.array(z.string()).default([]),
+  excluded_scope: z.array(z.string()).default([]),
+  merge_status: z.enum(["none", "waiting", "merged", "conflict"]).default("none"),
+  conflicts: z.array(z.string()).default([]),
   acceptance_checks: z.array(z.string()),
   output_schema: CoordinatorOutputSchema.default("summary"),
   requires_user_input: z.boolean().default(false),
@@ -114,6 +135,15 @@ export type CoordinatorNodeInput = z.input<typeof CoordinatorNode>
 export const CoordinatorPlan = z.object({
   goal: z.string(),
   nodes: z.array(CoordinatorNode),
+  parallel_policy: ParallelExecutionPolicy.default({
+    mode: "safe",
+    max_parallel_agents: 4,
+    max_parallel_tools: 8,
+    read_only_parallel_allowed: true,
+    write_parallel_requires_disjoint_scope: true,
+    merge_strategy: "research-synthesis",
+    conflict_resolution_strategy: "targeted-research",
+  }),
 })
 export type CoordinatorPlan = z.infer<typeof CoordinatorPlan>
 

@@ -32,6 +32,7 @@ import type {
   CoordinatorPlanResponses,
   CoordinatorProjectionResponses,
   CoordinatorResumeResponses,
+  CoordinatorRetryErrors,
   CoordinatorRetryResponses,
   CoordinatorRunErrors,
   CoordinatorRunResponses,
@@ -3061,6 +3062,7 @@ export class Plan extends HeyApiClient {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -3078,6 +3080,11 @@ export class Plan extends HeyApiClient {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -3089,6 +3096,7 @@ export class Plan extends HeyApiClient {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
@@ -3125,6 +3133,15 @@ export class Plan extends HeyApiClient {
       }
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3140,6 +3157,7 @@ export class Plan extends HeyApiClient {
             { in: "body", key: "intent" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
+            { in: "body", key: "parallel_policy" },
           ],
         },
       ],
@@ -3176,6 +3194,7 @@ export class Coordinator extends HeyApiClient {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -3193,6 +3212,11 @@ export class Coordinator extends HeyApiClient {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -3204,6 +3228,7 @@ export class Coordinator extends HeyApiClient {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
@@ -3240,6 +3265,15 @@ export class Coordinator extends HeyApiClient {
       }
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3255,6 +3289,7 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "intent" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
+            { in: "body", key: "parallel_policy" },
           ],
         },
       ],
@@ -3286,6 +3321,7 @@ export class Coordinator extends HeyApiClient {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -3303,6 +3339,11 @@ export class Coordinator extends HeyApiClient {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -3314,6 +3355,7 @@ export class Coordinator extends HeyApiClient {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
@@ -3350,6 +3392,15 @@ export class Coordinator extends HeyApiClient {
       }
       mode?: "manual" | "assisted" | "autonomous"
       approved?: boolean
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3366,6 +3417,7 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "intent" },
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
+            { in: "body", key: "parallel_policy" },
           ],
         },
       ],
@@ -3490,6 +3542,42 @@ export class Coordinator extends HeyApiClient {
     })
   }
 
+  public retry<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+      task_id?: string
+      node_id?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "task_id" },
+            { in: "body", key: "node_id" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorRetryResponses, CoordinatorRetryErrors, ThrowOnError>({
+      url: "/coordinator/run/{runID}/retry",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
   public summarize<ThrowOnError extends boolean = false>(
     parameters: {
       runID: string
@@ -3595,42 +3683,6 @@ export class Coordinator extends HeyApiClient {
       url: "/coordinator/run/{runID}/resume",
       ...options,
       ...params,
-    })
-  }
-
-  public retry<ThrowOnError extends boolean = false>(
-    parameters: {
-      runID: string
-      directory?: string
-      workspace?: string
-      task_id?: string
-      node_id?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "runID" },
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-            { in: "body", key: "task_id" },
-            { in: "body", key: "node_id" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<CoordinatorRetryResponses, unknown, ThrowOnError>({
-      url: "/coordinator/run/{runID}/retry",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
     })
   }
 

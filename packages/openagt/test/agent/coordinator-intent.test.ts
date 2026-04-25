@@ -2,14 +2,30 @@ import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 
 describe("coordinator intent planning", () => {
-  test("builds a coding workflow with executor, verifier, and reviewer roles", () => {
+  test("builds a coding workflow with parallel research, reducer, verifier group, and reviewer", () => {
     const intent = settleIntentProfile({ goal: "implement mission control backend API" })
     const plan = defaultPlanForIntent(intent)
 
     expect(intent.task_type).toBe("coding")
     expect(intent.needs_user_clarification).toBe(false)
-    expect(plan.nodes.map((item) => item.role)).toEqual(["researcher", "implementer", "verifier", "reviewer"])
-    expect(plan.nodes.find((item) => item.id === "review")?.depends_on).toEqual(["verify"])
+    expect(plan.nodes.filter((item) => item.parallel_group === "research").map((item) => item.role)).toEqual([
+      "researcher",
+      "researcher",
+      "researcher",
+      "researcher",
+    ])
+    expect(plan.nodes.find((item) => item.id === "research_synthesis")?.role).toBe("reducer")
+    expect(plan.nodes.find((item) => item.id === "implement")?.depends_on).toEqual(["research_synthesis"])
+    expect(plan.nodes.filter((item) => item.parallel_group === "verify").map((item) => item.id)).toEqual([
+      "verify_typecheck",
+      "verify_focused_tests",
+      "verify_acceptance",
+    ])
+    expect(plan.nodes.find((item) => item.id === "review")?.depends_on).toEqual([
+      "verify_typecheck",
+      "verify_focused_tests",
+      "verify_acceptance",
+    ])
   })
 
   test("routes review work to read-first reviewer workflow", () => {

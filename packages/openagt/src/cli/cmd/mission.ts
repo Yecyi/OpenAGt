@@ -10,6 +10,7 @@ import { createOpencodeClient, type OpencodeClient } from "@openagt/sdk/v2"
 type MissionMode = "manual" | "assisted" | "autonomous"
 type MissionFormat = "text" | "json"
 type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection"
+type ParallelMode = "off" | "safe" | "aggressive"
 
 function parseReviewerModel(input?: string) {
   if (!input) return
@@ -54,12 +55,15 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         description: string
         risk: string
         depends_on: string[]
+        parallel_group?: string
+        assigned_scope?: string[]
       }>
     }
     UI.println(UI.Style.TEXT_NORMAL_BOLD + "DAG" + UI.Style.TEXT_NORMAL)
     for (const node of plan.nodes) {
-      UI.println(`  ${node.id} [${node.role}/${node.risk}] ${node.description}`)
+      UI.println(`  ${node.id} [${node.role}/${node.risk}${node.parallel_group ? `/group:${node.parallel_group}` : ""}] ${node.description}`)
       if (node.depends_on.length > 0) UI.println(`    depends on: ${node.depends_on.join(", ")}`)
+      if (node.assigned_scope?.length) UI.println(`    scope: ${node.assigned_scope.join(", ")}`)
     }
     UI.empty()
     return
@@ -70,6 +74,7 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     return
   }
   if (type === "projection") {
+    const showGroups = data.showGroups === true
     const projection = data.projection as {
       run: { id: string; state: string; summary?: string }
       counts: Record<string, number>
@@ -78,13 +83,28 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         description: string
         metadata?: { coordinator_node_id?: unknown; role?: unknown }
         result_summary?: string
-        error_summary?: string
+      error_summary?: string
+    }>
+      groups?: Array<{
+        id: string
+        status: string
+        merge_status: string
+        node_ids: string[]
+        blocked_by: string[]
+        conflicts: string[]
       }>
     }
     UI.println(`Run ${projection.run.id}: ${projection.run.state}${projection.run.summary ? ` - ${projection.run.summary}` : ""}`)
     UI.println(
       `  tasks: ${projection.counts.completed} completed, ${projection.counts.running} running, ${projection.counts.pending} pending, ${projection.counts.failed} failed, ${projection.counts.cancelled} cancelled`,
     )
+    if (showGroups) {
+      for (const group of projection.groups ?? []) {
+        UI.println(`  group ${group.id}: ${group.status}, merge ${group.merge_status}, nodes ${group.node_ids.join(", ")}`)
+        if (group.blocked_by.length > 0) UI.println(`    blocked by: ${group.blocked_by.join(", ")}`)
+        if (group.conflicts.length > 0) UI.println(`    conflicts: ${group.conflicts.join("; ")}`)
+      }
+    }
     for (const task of projection.tasks) {
       const node = typeof task.metadata?.coordinator_node_id === "string" ? task.metadata.coordinator_node_id : "task"
       const role = typeof task.metadata?.role === "string" ? task.metadata.role : "subagent"
@@ -104,7 +124,7 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function watchProjection(sdk: OpencodeClient, runID: string, format: MissionFormat) {
+async function watchProjection(sdk: OpencodeClient, runID: string, format: MissionFormat, showGroups = false) {
   let last = ""
   while (true) {
     const result = await sdk.coordinator.projection({ runID }, { throwOnError: true })
@@ -120,7 +140,7 @@ async function watchProjection(sdk: OpencodeClient, runID: string, format: Missi
       })),
     })
     if (key !== last) {
-      emit(format, "projection", { projection })
+      emit(format, "projection", { projection, showGroups })
       last = key
     }
     if (terminal(projection.run.state)) return projection
@@ -138,6 +158,9 @@ async function createMission(
     watch?: boolean
     sessionID?: string
     format: MissionFormat
+    parallelMode?: ParallelMode
+    maxParallelAgents?: number
+    showGroups?: boolean
   },
 ) {
   const sessionID =
@@ -145,7 +168,11 @@ async function createMission(
     (await sdk.session.create({ title: input.goal.slice(0, 80) || "Mission" }, { throwOnError: true })).data.id
   const intent = (await sdk.coordinator.intent.settle({ goal: input.goal }, { throwOnError: true })).data
   emit(input.format, "intent", { intent, sessionID })
-  const plan = (await sdk.coordinator.plan2.generate({ goal: input.goal, intent }, { throwOnError: true })).data
+  const parallel_policy = {
+    mode: input.parallelMode ?? "safe",
+    max_parallel_agents: input.maxParallelAgents ?? 4,
+  }
+  const plan = (await sdk.coordinator.plan2.generate({ goal: input.goal, intent, parallel_policy }, { throwOnError: true })).data
   const reviewerModel = parseReviewerModel(input.reviewerModel)
   const nodes = reviewerModel
     ? plan.nodes.map((node) => (node.role === "reviewer" ? { ...node, model: reviewerModel } : node))
@@ -161,6 +188,7 @@ async function createMission(
         nodes,
         mode,
         approved: input.approve,
+        parallel_policy,
       },
       { throwOnError: true },
     )
@@ -170,7 +198,7 @@ async function createMission(
     if (input.format === "text") UI.println(`Approve with: openagt mission --run ${run.id} --action approve --watch`)
     return run
   }
-  if (input.watch) return await watchProjection(sdk, run.id, input.format)
+  if (input.watch) return await watchProjection(sdk, run.id, input.format, input.showGroups)
   return run
 }
 
@@ -183,6 +211,7 @@ async function controlMission(
     format: MissionFormat
     nodeID?: string
     taskID?: string
+    showGroups?: boolean
   },
 ) {
   const result =
@@ -200,11 +229,11 @@ async function controlMission(
             : undefined
   if (input.action === "projection") {
     const projection = (await sdk.coordinator.projection({ runID: input.runID }, { throwOnError: true })).data
-    emit(input.format, "projection", { projection })
+    emit(input.format, "projection", { projection, showGroups: input.showGroups })
     return projection.run
   }
   if (result) emit(input.format, "run", { run: result.data })
-  if (input.watch) return await watchProjection(sdk, input.runID, input.format)
+  if (input.watch) return await watchProjection(sdk, input.runID, input.format, input.showGroups)
   return result?.data
 }
 
@@ -243,6 +272,22 @@ export const MissionCommand = cmd({
         choices: ["text", "json"] as const,
         default: "text",
         describe: "output format",
+      })
+      .option("parallel", {
+        type: "string",
+        choices: ["off", "safe", "aggressive"] as const,
+        default: "safe",
+        describe: "parallel coordinator scheduling mode",
+      })
+      .option("max-parallel-agents", {
+        type: "number",
+        default: 4,
+        describe: "maximum coordinator subagents to run concurrently",
+      })
+      .option("show-groups", {
+        type: "boolean",
+        default: false,
+        describe: "show parallel groups in projection output",
       })
       .option("session", {
         type: "string",
@@ -285,6 +330,7 @@ export const MissionCommand = cmd({
           format: args.format as MissionFormat,
           nodeID: args.node,
           taskID: args.task,
+          showGroups: args["show-groups"],
         })
         return
       }
@@ -301,6 +347,9 @@ export const MissionCommand = cmd({
         watch: args.watch,
         sessionID: args.session,
         format: args.format as MissionFormat,
+        parallelMode: args.parallel as ParallelMode,
+        maxParallelAgents: args["max-parallel-agents"],
+        showGroups: args["show-groups"],
       })
     })
   },

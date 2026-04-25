@@ -619,6 +619,7 @@ export type EventCoordinatorCreated = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -636,6 +637,11 @@ export type EventCoordinatorCreated = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -647,11 +653,21 @@ export type EventCoordinatorCreated = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -729,6 +745,7 @@ export type EventCoordinatorUpdated = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -746,6 +763,11 @@ export type EventCoordinatorUpdated = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -757,11 +779,21 @@ export type EventCoordinatorUpdated = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -839,6 +871,7 @@ export type EventCoordinatorCompleted = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -856,6 +889,11 @@ export type EventCoordinatorCompleted = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -867,11 +905,21 @@ export type EventCoordinatorCompleted = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -5250,6 +5298,7 @@ export type CoordinatorPlanGenerateData = {
       role?:
         | "coordinator"
         | "researcher"
+        | "reducer"
         | "implementer"
         | "verifier"
         | "reviewer"
@@ -5267,6 +5316,11 @@ export type CoordinatorPlanGenerateData = {
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
+      parallel_group?: string
+      assigned_scope?: Array<string>
+      excluded_scope?: Array<string>
+      merge_status?: "none" | "waiting" | "merged" | "conflict"
+      conflicts?: Array<string>
       acceptance_checks: Array<string>
       output_schema?:
         | "research"
@@ -5278,6 +5332,7 @@ export type CoordinatorPlanGenerateData = {
         | "environment-diagnosis"
         | "automation-plan"
         | "memory"
+        | "research-synthesis"
         | "summary"
       requires_user_input?: boolean
       priority: "high" | "normal" | "low"
@@ -5314,6 +5369,15 @@ export type CoordinatorPlanGenerateData = {
     }
     mode?: "manual" | "assisted" | "autonomous"
     approved?: boolean
+    parallel_policy?: {
+      mode?: "off" | "safe" | "aggressive"
+      max_parallel_agents?: number
+      max_parallel_tools?: number
+      read_only_parallel_allowed?: boolean
+      write_parallel_requires_disjoint_scope?: boolean
+      merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+      conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+    }
   }
   path?: never
   query?: {
@@ -5347,6 +5411,7 @@ export type CoordinatorPlanGenerateResponses = {
       role?:
         | "coordinator"
         | "researcher"
+        | "reducer"
         | "implementer"
         | "verifier"
         | "reviewer"
@@ -5364,6 +5429,11 @@ export type CoordinatorPlanGenerateResponses = {
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
+      parallel_group?: string
+      assigned_scope?: Array<string>
+      excluded_scope?: Array<string>
+      merge_status?: "none" | "waiting" | "merged" | "conflict"
+      conflicts?: Array<string>
       acceptance_checks: Array<string>
       output_schema?:
         | "research"
@@ -5375,11 +5445,21 @@ export type CoordinatorPlanGenerateResponses = {
         | "environment-diagnosis"
         | "automation-plan"
         | "memory"
+        | "research-synthesis"
         | "summary"
       requires_user_input?: boolean
       priority: "high" | "normal" | "low"
       origin: "user" | "coordinator" | "scheduler" | "gateway"
     }>
+    parallel_policy?: {
+      mode?: "off" | "safe" | "aggressive"
+      max_parallel_agents?: number
+      max_parallel_tools?: number
+      read_only_parallel_allowed?: boolean
+      write_parallel_requires_disjoint_scope?: boolean
+      merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+      conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+    }
   }
 }
 
@@ -5397,6 +5477,7 @@ export type CoordinatorPlanData = {
       role?:
         | "coordinator"
         | "researcher"
+        | "reducer"
         | "implementer"
         | "verifier"
         | "reviewer"
@@ -5414,6 +5495,11 @@ export type CoordinatorPlanData = {
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
+      parallel_group?: string
+      assigned_scope?: Array<string>
+      excluded_scope?: Array<string>
+      merge_status?: "none" | "waiting" | "merged" | "conflict"
+      conflicts?: Array<string>
       acceptance_checks: Array<string>
       output_schema?:
         | "research"
@@ -5425,6 +5511,7 @@ export type CoordinatorPlanData = {
         | "environment-diagnosis"
         | "automation-plan"
         | "memory"
+        | "research-synthesis"
         | "summary"
       requires_user_input?: boolean
       priority: "high" | "normal" | "low"
@@ -5461,6 +5548,15 @@ export type CoordinatorPlanData = {
     }
     mode?: "manual" | "assisted" | "autonomous"
     approved?: boolean
+    parallel_policy?: {
+      mode?: "off" | "safe" | "aggressive"
+      max_parallel_agents?: number
+      max_parallel_tools?: number
+      read_only_parallel_allowed?: boolean
+      write_parallel_requires_disjoint_scope?: boolean
+      merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+      conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+    }
   }
   path?: never
   query?: {
@@ -5494,6 +5590,7 @@ export type CoordinatorPlanResponses = {
       role?:
         | "coordinator"
         | "researcher"
+        | "reducer"
         | "implementer"
         | "verifier"
         | "reviewer"
@@ -5511,6 +5608,11 @@ export type CoordinatorPlanResponses = {
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
+      parallel_group?: string
+      assigned_scope?: Array<string>
+      excluded_scope?: Array<string>
+      merge_status?: "none" | "waiting" | "merged" | "conflict"
+      conflicts?: Array<string>
       acceptance_checks: Array<string>
       output_schema?:
         | "research"
@@ -5522,11 +5624,21 @@ export type CoordinatorPlanResponses = {
         | "environment-diagnosis"
         | "automation-plan"
         | "memory"
+        | "research-synthesis"
         | "summary"
       requires_user_input?: boolean
       priority: "high" | "normal" | "low"
       origin: "user" | "coordinator" | "scheduler" | "gateway"
     }>
+    parallel_policy?: {
+      mode?: "off" | "safe" | "aggressive"
+      max_parallel_agents?: number
+      max_parallel_tools?: number
+      read_only_parallel_allowed?: boolean
+      write_parallel_requires_disjoint_scope?: boolean
+      merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+      conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+    }
   }
 }
 
@@ -5544,6 +5656,7 @@ export type CoordinatorRunData = {
       role?:
         | "coordinator"
         | "researcher"
+        | "reducer"
         | "implementer"
         | "verifier"
         | "reviewer"
@@ -5561,6 +5674,11 @@ export type CoordinatorRunData = {
       depends_on: Array<string>
       write_scope: Array<string>
       read_scope: Array<string>
+      parallel_group?: string
+      assigned_scope?: Array<string>
+      excluded_scope?: Array<string>
+      merge_status?: "none" | "waiting" | "merged" | "conflict"
+      conflicts?: Array<string>
       acceptance_checks: Array<string>
       output_schema?:
         | "research"
@@ -5572,6 +5690,7 @@ export type CoordinatorRunData = {
         | "environment-diagnosis"
         | "automation-plan"
         | "memory"
+        | "research-synthesis"
         | "summary"
       requires_user_input?: boolean
       priority: "high" | "normal" | "low"
@@ -5608,6 +5727,15 @@ export type CoordinatorRunData = {
     }
     mode?: "manual" | "assisted" | "autonomous"
     approved?: boolean
+    parallel_policy?: {
+      mode?: "off" | "safe" | "aggressive"
+      max_parallel_agents?: number
+      max_parallel_tools?: number
+      read_only_parallel_allowed?: boolean
+      write_parallel_requires_disjoint_scope?: boolean
+      merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+      conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+    }
   }
   path: {
     sessionID: string
@@ -5696,6 +5824,7 @@ export type CoordinatorRunResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -5713,6 +5842,11 @@ export type CoordinatorRunResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -5724,11 +5858,21 @@ export type CoordinatorRunResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -5822,6 +5966,7 @@ export type CoordinatorGetResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -5839,6 +5984,11 @@ export type CoordinatorGetResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -5850,11 +6000,21 @@ export type CoordinatorGetResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -5948,6 +6108,7 @@ export type CoordinatorListResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -5965,6 +6126,11 @@ export type CoordinatorListResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -5976,11 +6142,21 @@ export type CoordinatorListResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -6074,6 +6250,7 @@ export type CoordinatorApproveResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -6091,6 +6268,11 @@ export type CoordinatorApproveResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -6102,11 +6284,21 @@ export type CoordinatorApproveResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -6200,6 +6392,7 @@ export type CoordinatorCancelResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -6217,6 +6410,11 @@ export type CoordinatorCancelResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -6228,11 +6426,21 @@ export type CoordinatorCancelResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -6245,6 +6453,160 @@ export type CoordinatorCancelResponses = {
 }
 
 export type CoordinatorCancelResponse = CoordinatorCancelResponses[keyof CoordinatorCancelResponses]
+
+export type CoordinatorRetryData = {
+  body?: {
+    task_id?: string
+    node_id?: string
+  }
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/retry"
+}
+
+export type CoordinatorRetryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorRetryError = CoordinatorRetryErrors[keyof CoordinatorRetryErrors]
+
+export type CoordinatorRetryResponses = {
+  /**
+   * Retried coordinator run
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "researcher"
+          | "reducer"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "writer"
+          | "environment-auditor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "debug"
+          | "document"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "memory"
+          | "research-synthesis"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+      }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorRetryResponse = CoordinatorRetryResponses[keyof CoordinatorRetryResponses]
 
 export type CoordinatorSummarizeData = {
   body?: never
@@ -6350,6 +6712,7 @@ export type CoordinatorDispatchResponses = {
           role?:
             | "coordinator"
             | "researcher"
+            | "reducer"
             | "implementer"
             | "verifier"
             | "reviewer"
@@ -6367,6 +6730,11 @@ export type CoordinatorDispatchResponses = {
           depends_on: Array<string>
           write_scope: Array<string>
           read_scope: Array<string>
+          parallel_group?: string
+          assigned_scope?: Array<string>
+          excluded_scope?: Array<string>
+          merge_status?: "none" | "waiting" | "merged" | "conflict"
+          conflicts?: Array<string>
           acceptance_checks: Array<string>
           output_schema?:
             | "research"
@@ -6378,11 +6746,21 @@ export type CoordinatorDispatchResponses = {
             | "environment-diagnosis"
             | "automation-plan"
             | "memory"
+            | "research-synthesis"
             | "summary"
           requires_user_input?: boolean
           priority: "high" | "normal" | "low"
           origin: "user" | "coordinator" | "scheduler" | "gateway"
         }>
+        parallel_policy?: {
+          mode?: "off" | "safe" | "aggressive"
+          max_parallel_agents?: number
+          max_parallel_tools?: number
+          read_only_parallel_allowed?: boolean
+          write_parallel_requires_disjoint_scope?: boolean
+          merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+          conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+        }
       }
       task_ids: Array<string>
       summary?: string
@@ -6479,6 +6857,7 @@ export type CoordinatorProjectionResponses = {
           role?:
             | "coordinator"
             | "researcher"
+            | "reducer"
             | "implementer"
             | "verifier"
             | "reviewer"
@@ -6496,6 +6875,11 @@ export type CoordinatorProjectionResponses = {
           depends_on: Array<string>
           write_scope: Array<string>
           read_scope: Array<string>
+          parallel_group?: string
+          assigned_scope?: Array<string>
+          excluded_scope?: Array<string>
+          merge_status?: "none" | "waiting" | "merged" | "conflict"
+          conflicts?: Array<string>
           acceptance_checks: Array<string>
           output_schema?:
             | "research"
@@ -6507,11 +6891,21 @@ export type CoordinatorProjectionResponses = {
             | "environment-diagnosis"
             | "automation-plan"
             | "memory"
+            | "research-synthesis"
             | "summary"
           requires_user_input?: boolean
           priority: "high" | "normal" | "low"
           origin: "user" | "coordinator" | "scheduler" | "gateway"
         }>
+        parallel_policy?: {
+          mode?: "off" | "safe" | "aggressive"
+          max_parallel_agents?: number
+          max_parallel_tools?: number
+          read_only_parallel_allowed?: boolean
+          write_parallel_requires_disjoint_scope?: boolean
+          merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+          conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+        }
       }
       task_ids: Array<string>
       summary?: string
@@ -6562,6 +6956,17 @@ export type CoordinatorProjectionResponses = {
       failed: number
       cancelled: number
     }
+    groups: Array<{
+      id: string
+      node_ids: Array<string>
+      task_ids: Array<string>
+      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      merge_status: "none" | "waiting" | "merged" | "conflict"
+      blocked_by: Array<string>
+      conflicts: Array<string>
+      started_at?: number
+      completed_at?: number
+    }>
   }
 }
 
@@ -6647,6 +7052,7 @@ export type CoordinatorResumeResponses = {
         role?:
           | "coordinator"
           | "researcher"
+          | "reducer"
           | "implementer"
           | "verifier"
           | "reviewer"
@@ -6664,6 +7070,11 @@ export type CoordinatorResumeResponses = {
         depends_on: Array<string>
         write_scope: Array<string>
         read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
         acceptance_checks: Array<string>
         output_schema?:
           | "research"
@@ -6675,11 +7086,21 @@ export type CoordinatorResumeResponses = {
           | "environment-diagnosis"
           | "automation-plan"
           | "memory"
+          | "research-synthesis"
           | "summary"
         requires_user_input?: boolean
         priority: "high" | "normal" | "low"
         origin: "user" | "coordinator" | "scheduler" | "gateway"
       }>
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
     }
     task_ids: Array<string>
     summary?: string
@@ -8240,132 +8661,3 @@ export type FormatterStatusResponses = {
 }
 
 export type FormatterStatusResponse = FormatterStatusResponses[keyof FormatterStatusResponses]
-
-export type CoordinatorRetryData = {
-  body?: {
-    task_id?: string
-    node_id?: string
-  }
-  path: {
-    runID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/coordinator/run/{runID}/retry"
-}
-
-export type CoordinatorRetryResponses = {
-  /**
-   * Retried coordinator run
-   */
-  200: {
-    id: string
-    sessionID: string
-    goal: string
-    intent: {
-      goal: string
-      task_type:
-        | "coding"
-        | "review"
-        | "debugging"
-        | "research"
-        | "documentation"
-        | "environment-audit"
-        | "automation"
-        | "file-data-organization"
-        | "general-operations"
-      success_criteria: Array<string>
-      risk_level: "low" | "medium" | "high"
-      needs_user_clarification: boolean
-      clarification_questions: Array<string>
-      workflow:
-        | "coding"
-        | "review"
-        | "debugging"
-        | "research"
-        | "documentation"
-        | "environment-audit"
-        | "automation"
-        | "file-data-organization"
-        | "general-operations"
-      expected_output: string
-      permission_expectations: Array<string>
-    }
-    mode: "manual" | "assisted" | "autonomous"
-    workflow:
-      | "coding"
-      | "review"
-      | "debugging"
-      | "research"
-      | "documentation"
-      | "environment-audit"
-      | "automation"
-      | "file-data-organization"
-      | "general-operations"
-    state:
-      | "settling_intent"
-      | "awaiting_approval"
-      | "planned"
-      | "active"
-      | "blocked"
-      | "completed"
-      | "failed"
-      | "cancelled"
-    plan: {
-      goal: string
-      nodes: Array<{
-        id: string
-        description: string
-        prompt: string
-        task_kind: "research" | "implement" | "verify" | "generic"
-        subagent_type: string
-        role?:
-          | "coordinator"
-          | "researcher"
-          | "implementer"
-          | "verifier"
-          | "reviewer"
-          | "debugger"
-          | "writer"
-          | "environment-auditor"
-          | "memory-curator"
-          | "automation-planner"
-        model?: {
-          providerID: string
-          modelID: string
-          variant?: string
-        }
-        risk?: "low" | "medium" | "high"
-        depends_on: Array<string>
-        write_scope: Array<string>
-        read_scope: Array<string>
-        acceptance_checks: Array<string>
-        output_schema?:
-          | "research"
-          | "implementation"
-          | "verification"
-          | "review"
-          | "debug"
-          | "document"
-          | "environment-diagnosis"
-          | "automation-plan"
-          | "memory"
-          | "summary"
-        requires_user_input?: boolean
-        priority: "high" | "normal" | "low"
-        origin: "user" | "coordinator" | "scheduler" | "gateway"
-      }>
-    }
-    task_ids: Array<string>
-    summary?: string
-    time: {
-      created: number
-      updated: number
-      finished?: number
-    }
-  }
-}
-
-export type CoordinatorRetryResponse = CoordinatorRetryResponses[keyof CoordinatorRetryResponses]

@@ -19,6 +19,7 @@ import {
   CoordinatorRun,
   CoordinatorRunID,
   CoordinatorMode,
+  ParallelExecutionPolicy,
   IntentProfile,
   TaskType,
   type CoordinatorNode as CoordinatorNodeType,
@@ -28,6 +29,7 @@ import {
   type CoordinatorRun as CoordinatorRunType,
   type CoordinatorRunID as CoordinatorRunIDType,
   type IntentProfile as IntentProfileType,
+  type ParallelExecutionPolicy as ParallelExecutionPolicyType,
   type TaskType as TaskTypeType,
 } from "./schema"
 
@@ -111,7 +113,7 @@ export function settleIntentProfile(input: { goal: string }) {
   })
 }
 
-function node(input: Omit<CoordinatorNodeType, "priority" | "origin"> & Partial<Pick<CoordinatorNodeType, "priority" | "origin">>) {
+function node(input: Omit<CoordinatorNodeInput, "priority" | "origin"> & Partial<Pick<CoordinatorNodeInput, "priority" | "origin">>) {
   return CoordinatorNode.parse({
     priority: "normal",
     origin: "coordinator",
@@ -138,21 +140,185 @@ function researcher(goal: string) {
   })
 }
 
+function researcherShard(input: {
+  id: string
+  description: string
+  goal: string
+  assignedScope: string[]
+  excludedScope?: string[]
+  expectedFindings: string[]
+}) {
+  return node({
+    id: input.id,
+    description: input.description,
+    prompt: [
+      `Explore only your assigned slice of the project for this mission.`,
+      ``,
+      `Goal: ${input.goal}`,
+      `Assigned scope: ${input.assignedScope.join(", ")}`,
+      input.excludedScope?.length ? `Excluded scope: ${input.excludedScope.join(", ")}` : undefined,
+      `Expected findings:`,
+      ...input.expectedFindings.map((item) => `- ${item}`),
+      ``,
+      `Return evidence, confidence, unknowns, and the recommended next step for this slice.`,
+    ].filter((item): item is string => Boolean(item)).join("\n"),
+    task_kind: "research",
+    subagent_type: "explore",
+    role: "researcher",
+    risk: "low",
+    depends_on: [],
+    write_scope: [],
+    read_scope: input.assignedScope,
+    parallel_group: "research",
+    assigned_scope: input.assignedScope,
+    excluded_scope: input.excludedScope ?? [],
+    acceptance_checks: input.expectedFindings,
+    output_schema: "research",
+    requires_user_input: false,
+    priority: "high",
+  })
+}
+
+function parallelResearchers(goal: string) {
+  const scopes = [
+    {
+      id: "research_repo_structure",
+      description: "Research repository structure",
+      assignedScope: ["workspace structure", "package entrypoints", "module boundaries"],
+      expectedFindings: ["Repository structure mapped", "Entrypoints and package relationships identified"],
+    },
+    {
+      id: "research_domain",
+      description: "Research domain logic",
+      assignedScope: ["core domain modules", "runtime behavior", "existing abstractions"],
+      expectedFindings: ["Relevant domain modules identified", "Existing abstractions and contracts summarized"],
+    },
+    {
+      id: "research_tests",
+      description: "Research tests and verification",
+      assignedScope: ["tests", "typecheck", "lint", "CI and local verification commands"],
+      expectedFindings: ["Focused tests and verification commands identified", "Known test risks summarized"],
+    },
+    {
+      id: "research_risk",
+      description: "Research risk and permissions",
+      assignedScope: ["write boundaries", "permission expectations", "destructive or costly operations"],
+      expectedFindings: ["Risk boundaries identified", "Required approvals and write scopes summarized"],
+    },
+  ]
+  return scopes.map((item) =>
+    researcherShard({
+      ...item,
+      goal,
+      excludedScope: scopes.filter((scope) => scope.id !== item.id).flatMap((scope) => scope.assignedScope),
+    }),
+  )
+}
+
+function researchReducer(goal: string, dependsOn: string[]) {
+  return node({
+    id: "research_synthesis",
+    description: "Merge parallel research",
+    prompt: [
+      `Merge the completed parallel researcher outputs into a compact handoff for later agents.`,
+      ``,
+      `Goal: ${goal}`,
+      ``,
+      `Deduplicate overlapping findings, mark conflicts explicitly, and do not invent facts missing from evidence.`,
+      `Output fields: summary, key_files, architecture_map, risks, recommended_plan_changes, open_questions, confidence.`,
+    ].join("\n"),
+    task_kind: "generic",
+    subagent_type: "general",
+    role: "reducer",
+    risk: "low",
+    depends_on: dependsOn,
+    write_scope: [],
+    read_scope: [],
+    merge_status: "waiting",
+    acceptance_checks: ["Parallel research merged", "Conflicts and unknowns marked"],
+    output_schema: "research-synthesis",
+    requires_user_input: false,
+    priority: "high",
+  })
+}
+
+function parallelResearchStage(goal: string) {
+  const research = parallelResearchers(goal)
+  return [...research, researchReducer(goal, research.map((item) => item.id))]
+}
+
+function verifierShard(input: { id: string; description: string; goal: string; dependsOn: string[]; checks: string[] }) {
+  return node({
+    id: input.id,
+    description: input.description,
+    prompt: [
+      `Verify exactly one quality dimension for this mission.`,
+      ``,
+      `Goal: ${input.goal}`,
+      `Verification focus:`,
+      ...input.checks.map((item) => `- ${item}`),
+      ``,
+      `Return evidence, command/output summaries when available, confidence, and residual risk.`,
+    ].join("\n"),
+    task_kind: "verify",
+    subagent_type: "general",
+    role: "verifier",
+    risk: "low",
+    depends_on: input.dependsOn,
+    write_scope: [],
+    read_scope: [],
+    parallel_group: "verify",
+    assigned_scope: input.checks,
+    acceptance_checks: input.checks,
+    output_schema: "verification",
+    requires_user_input: false,
+    priority: "normal",
+  })
+}
+
+function parallelVerificationStage(goal: string, dependsOn: string[]) {
+  return [
+    verifierShard({
+      id: "verify_typecheck",
+      description: "Verify typecheck/static contracts",
+      goal,
+      dependsOn,
+      checks: ["Typecheck or static contract verification completed"],
+    }),
+    verifierShard({
+      id: "verify_focused_tests",
+      description: "Verify focused tests",
+      goal,
+      dependsOn,
+      checks: ["Focused tests or a concrete test gap report completed"],
+    }),
+    verifierShard({
+      id: "verify_acceptance",
+      description: "Verify acceptance criteria",
+      goal,
+      dependsOn,
+      checks: ["Acceptance criteria checked against the result"],
+    }),
+  ]
+}
+
 export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
   const goal = intent.goal
+  const researchStage = parallelResearchStage(goal)
+  const researchDependsOn = ["research_synthesis"]
   return CoordinatorPlan.parse({
     goal,
     nodes: intent.workflow === "coding" ? [
-      researcher(goal),
+      ...researchStage,
       node({
         id: "implement",
         description: "Implement change",
-        prompt: `Implement the requested change.\n\nGoal: ${goal}`,
+        prompt: `Implement the requested change using the research_synthesis handoff as the primary project context.\n\nGoal: ${goal}`,
         task_kind: "implement",
         subagent_type: "general",
         role: "implementer",
         risk: intent.risk_level,
-        depends_on: ["research"],
+        depends_on: researchDependsOn,
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Requested change implemented"],
@@ -160,31 +326,16 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         requires_user_input: false,
         priority: "high",
       }),
-      node({
-        id: "verify",
-        description: "Verify result",
-        prompt: `Verify the completed result and summarize residual issues.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "verifier",
-        risk: "low",
-        depends_on: ["implement"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Verification completed"],
-        output_schema: "verification",
-        requires_user_input: false,
-        priority: "normal",
-      }),
+      ...parallelVerificationStage(goal, ["implement"]),
       node({
         id: "review",
         description: "Review result",
-        prompt: `Independently review the result for defects, missing tests, and remaining risks.\n\nGoal: ${goal}`,
+        prompt: `Independently review the result using research_synthesis and all verifier evidence. Judge conflicts explicitly.\n\nGoal: ${goal}`,
         task_kind: "verify",
         subagent_type: "general",
         role: "reviewer",
         risk: "low",
-        depends_on: ["verify"],
+        depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Review completed"],
@@ -192,7 +343,7 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         requires_user_input: false,
       }),
     ] : intent.workflow === "debugging" ? [
-      researcher(goal),
+      ...researchStage,
       node({
         id: "debug",
         description: "Diagnose failure",
@@ -201,7 +352,7 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         subagent_type: "general",
         role: "debugger",
         risk: "medium",
-        depends_on: ["research"],
+        depends_on: researchDependsOn,
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Root cause identified"],
@@ -225,19 +376,20 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         requires_user_input: false,
         priority: "high",
       }),
+      ...parallelVerificationStage(goal, ["implement"]),
       node({
-        id: "verify",
-        description: "Verify fix",
-        prompt: `Verify the fix and report residual failures.\n\nGoal: ${goal}`,
+        id: "review",
+        description: "Review fix",
+        prompt: `Review the fix using debugger output, research_synthesis, and verifier evidence.\n\nGoal: ${goal}`,
         task_kind: "verify",
         subagent_type: "general",
-        role: "verifier",
+        role: "reviewer",
         risk: "low",
-        depends_on: ["implement"],
+        depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
         write_scope: [],
         read_scope: [],
-        acceptance_checks: ["Fix verified"],
-        output_schema: "verification",
+        acceptance_checks: ["Fix reviewed"],
+        output_schema: "review",
         requires_user_input: false,
       }),
     ] : intent.workflow === "review" ? [
@@ -259,16 +411,16 @@ export function defaultPlanForIntent(intent: IntentProfileType): CoordinatorPlan
         priority: "high",
       }),
     ] : intent.workflow === "research" ? [
-      researcher(goal),
+      ...researchStage,
       node({
         id: "synthesize",
         description: "Synthesize research",
-        prompt: `Synthesize the research into actionable conclusions.\n\nGoal: ${goal}`,
+        prompt: `Synthesize research_synthesis into actionable conclusions.\n\nGoal: ${goal}`,
         task_kind: "generic",
         subagent_type: "general",
         role: "writer",
         risk: "low",
-        depends_on: ["research"],
+        depends_on: researchDependsOn,
         write_scope: [],
         read_scope: [],
         acceptance_checks: ["Research report produced"],
@@ -468,6 +620,7 @@ function expandVerifyNodes(plan: CoordinatorPlanType) {
   return CoordinatorPlan.parse({
     goal: plan.goal,
     nodes: [...plan.nodes, ...generated],
+    parallel_policy: plan.parallel_policy,
   })
 }
 
@@ -506,6 +659,7 @@ function orderPlan(plan: CoordinatorPlanType) {
   return CoordinatorPlan.parse({
     goal: plan.goal,
     nodes: ordered,
+    parallel_policy: plan.parallel_policy,
   })
 }
 
@@ -541,7 +695,12 @@ export const Event = {
 
 export interface Interface {
   readonly settleIntent: (input: { goal: string }) => Effect.Effect<IntentProfileType, Error>
-  readonly plan: (input: { goal: string; nodes?: CoordinatorNodeInput[]; intent?: IntentProfileType }) => Effect.Effect<CoordinatorPlanType, Error>
+  readonly plan: (input: {
+    goal: string
+    nodes?: CoordinatorNodeInput[]
+    intent?: IntentProfileType
+    parallel_policy?: Partial<ParallelExecutionPolicyType>
+  }) => Effect.Effect<CoordinatorPlanType, Error>
   readonly run: (input: {
     sessionID: SessionID
     goal: string
@@ -549,6 +708,7 @@ export interface Interface {
     intent?: IntentProfileType
     mode?: CoordinatorModeType
     approved?: boolean
+    parallel_policy?: Partial<ParallelExecutionPolicyType>
   }) => Effect.Effect<CoordinatorRunType, Error>
   readonly approve: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly cancel: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
@@ -560,6 +720,17 @@ export interface Interface {
     run: CoordinatorRunType
     tasks: TaskRuntime.TaskRecord[]
     counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
+    groups: Array<{
+      id: string
+      node_ids: string[]
+      task_ids: string[]
+      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      merge_status: "none" | "waiting" | "merged" | "conflict"
+      blocked_by: string[]
+      conflicts: string[]
+      started_at?: number
+      completed_at?: number
+    }>
   }, Error>
   readonly resume: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly summarize: (id: CoordinatorRunIDType) => Effect.Effect<string, Error>
@@ -586,7 +757,10 @@ export const layer = Layer.effect(
 
     const plan: Interface["plan"] = Effect.fn("Coordinator.plan")(function* (input) {
       const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
-      const base = input.nodes && input.nodes.length > 0 ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes }) : defaultPlanForIntent(intent)
+      const parallel_policy = ParallelExecutionPolicy.parse(input.parallel_policy ?? {})
+      const base = input.nodes && input.nodes.length > 0
+        ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes, parallel_policy })
+        : CoordinatorPlan.parse({ ...defaultPlanForIntent(intent), parallel_policy })
       const expanded = expandVerifyNodes(base)
       validatePlan(expanded)
       yield* Effect.forEach(
@@ -610,16 +784,26 @@ export const layer = Layer.effect(
       })
     })
 
-    const taskPrompt = (record: TaskRuntime.TaskRecord) => {
+    const taskPrompt = (record: TaskRuntime.TaskRecord, dependencies: TaskRuntime.TaskRecord[]) => {
       const metadata = record.metadata ?? {}
       const promptText = typeof metadata.prompt === "string" ? metadata.prompt : record.description
       const role = typeof metadata.role === "string" ? `\n\nRole: ${metadata.role}` : ""
       const risk = typeof metadata.risk === "string" ? `\nRisk: ${metadata.risk}` : ""
       const output = typeof metadata.output_schema === "string" ? `\nOutput schema: ${metadata.output_schema}` : ""
+      const parallelGroup = typeof metadata.parallel_group === "string" ? `\nParallel group: ${metadata.parallel_group}` : ""
+      const assignedScope = Array.isArray(metadata.assigned_scope) && metadata.assigned_scope.length
+        ? `\nAssigned scope:\n${metadata.assigned_scope.map((item) => `- ${String(item)}`).join("\n")}`
+        : ""
+      const excludedScope = Array.isArray(metadata.excluded_scope) && metadata.excluded_scope.length
+        ? `\nExcluded scope:\n${metadata.excluded_scope.map((item) => `- ${String(item)}`).join("\n")}`
+        : ""
+      const dependencySummaries = dependencies.length
+        ? `\n\nCompleted dependency handoff:\n${dependencies.map((item) => `- ${item.description}: ${item.result_summary ?? item.error_summary ?? item.status}`).join("\n")}`
+        : ""
       const checks = record.acceptance_checks.length
         ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
         : ""
-      return `${promptText}${role}${risk}${output}${checks}\n\nReturn a concise structured result that the coordinator can consume.`
+      return `${promptText}${role}${risk}${output}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nReturn a concise structured result with summary, evidence, confidence, unknowns, conflicts, and recommended next step.`
     }
 
     const taskModel = (metadata: Record<string, unknown>) => {
@@ -654,6 +838,7 @@ export const layer = Layer.effect(
       })
       if (Option.isNone(prompt)) return
       if (Option.isNone(current) || current.value.status !== "pending") return
+      const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) => record.depends_on.includes(item.task_id))
       const continueGroup = () =>
         record.group_id ? dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore) : Effect.void
       yield* tasks.setRunning(record.task_id, record.parent_session_id)
@@ -666,16 +851,18 @@ export const layer = Layer.effect(
           parts: [
             {
               type: "text",
-              text: taskPrompt(record),
+              text: taskPrompt(record, dependencies),
             },
           ],
         })
         .pipe(
           Effect.tap((message: MessageV2.WithParts) =>
-            tasks.complete({
-              taskID: record.task_id,
-              parentSessionID: record.parent_session_id,
-              result: message,
+            Effect.gen(function* () {
+              yield* tasks.complete({
+                taskID: record.task_id,
+                parentSessionID: record.parent_session_id,
+                result: message,
+              })
             }),
           ),
           Effect.tapError((error) =>
@@ -707,7 +894,8 @@ export const layer = Layer.effect(
       if (run.state !== "active") {
         return yield* Effect.fail(new Error(`Coordinator run cannot dispatch from state: ${run.state}`))
       }
-      const pending = (yield* relevantTasks(run)).filter((item) => item.status === "pending")
+      const allTasks = yield* relevantTasks(run)
+      const pending = allTasks.filter((item) => item.status === "pending")
       const ready = (
         yield* Effect.forEach(
           pending,
@@ -721,18 +909,38 @@ export const layer = Layer.effect(
           },
         )
       ).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
+      const planOrder = new Map(run.plan.nodes.map((item, index) => [item.id, index]))
+      const groupFor = (item: TaskRuntime.TaskRecord) =>
+        typeof item.metadata?.parallel_group === "string" ? item.metadata.parallel_group : undefined
+      const nodeFor = (item: TaskRuntime.TaskRecord) =>
+        typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : ""
+      const orderedReady = ready.toSorted((a, b) => (planOrder.get(nodeFor(a)) ?? 0) - (planOrder.get(nodeFor(b)) ?? 0))
+      const running = allTasks.filter((item) => item.status === "running")
+      const runningGroups = new Set(running.flatMap((item) => {
+        const group = groupFor(item)
+        return group ? [group] : []
+      }))
+      const activeGroup = run.plan.nodes.map((item) => item.parallel_group).find((item) => item && runningGroups.has(item))
+      const firstReady = orderedReady[0]
+      const targetGroup = activeGroup ?? (firstReady ? groupFor(firstReady) : undefined)
+      const slots = Math.max(0, run.plan.parallel_policy.max_parallel_agents - running.length)
+      const selected = run.plan.parallel_policy.mode === "off"
+        ? orderedReady.slice(0, Math.min(slots, 1))
+        : targetGroup
+          ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
+          : orderedReady.slice(0, Math.min(slots, 1))
       yield* Effect.forEach(
-        ready,
+        selected,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
         {
           concurrency: "unbounded",
           discard: true,
         },
       )
-      if (ready.length === 0) yield* summarize(id).pipe(Effect.ignore)
+      if (selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
       return {
         run,
-        dispatched: ready.length,
+        dispatched: selected.length,
       }
     })
 
@@ -770,7 +978,7 @@ export const layer = Layer.effect(
     const run: Interface["run"] = Effect.fn("Coordinator.run")(function* (input) {
       yield* ensureSubscribed()
       const intent = input.intent ?? settleIntentProfile({ goal: input.goal })
-      const planned = yield* plan({ goal: input.goal, nodes: input.nodes, intent })
+      const planned = yield* plan({ goal: input.goal, nodes: input.nodes, intent, parallel_policy: input.parallel_policy })
       const mode = input.mode ?? (intent.risk_level === "high" ? "assisted" : "autonomous")
       const state = input.approved || (mode === "autonomous" && !intent.needs_user_clarification && intent.risk_level !== "high")
         ? "active"
@@ -809,6 +1017,11 @@ export const layer = Layer.effect(
             role: node.role,
             model: node.model,
             risk: node.risk,
+            parallel_group: node.parallel_group,
+            assigned_scope: node.assigned_scope,
+            excluded_scope: node.excluded_scope,
+            merge_status: node.merge_status,
+            conflicts: node.conflicts,
             output_schema: node.output_schema,
             requires_user_input: node.requires_user_input,
             intent,
@@ -872,6 +1085,54 @@ export const layer = Layer.effect(
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const run = runOpt.value
       const taskList = yield* relevantTasks(run)
+      const taskByNode = new Map(
+        taskList.flatMap((item) => {
+          const nodeID = typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : undefined
+          return nodeID ? [[nodeID, item] as const] : []
+        }),
+      )
+      const statusFor = (items: TaskRuntime.TaskRecord[]) => {
+        if (items.some((item) => item.status === "failed")) return "failed" as const
+        if (items.some((item) => item.status === "cancelled")) return "cancelled" as const
+        if (items.every((item) => item.status === "completed")) return "completed" as const
+        if (items.some((item) => item.status === "running")) return "running" as const
+        return "pending" as const
+      }
+      const groupIDs = [
+        ...new Set(run.plan.nodes.flatMap((item) => item.parallel_group ? [item.parallel_group] : [])),
+      ]
+      const groups = groupIDs.map((groupID) => {
+        const nodes = run.plan.nodes.filter((item) => item.parallel_group === groupID)
+        const groupTasks = nodes.flatMap((item) => {
+          const task = taskByNode.get(item.id)
+          return task ? [task] : []
+        })
+        const blocked_by = nodes.flatMap((item) =>
+          item.depends_on.filter((dependency) => taskByNode.get(dependency)?.status !== "completed"),
+        )
+        const started = groupTasks.flatMap((item) => item.started_at ? [item.started_at] : [])
+        const finished = groupTasks.flatMap((item) => item.finished_at ? [item.finished_at] : [])
+        const reducer = run.plan.nodes.find((item) => item.depends_on.some((dependency) => nodes.some((node) => node.id === dependency)) && item.role === "reducer")
+        const reducerTask = reducer ? taskByNode.get(reducer.id) : undefined
+        const conflicts = nodes.flatMap((item) => item.conflicts)
+        return {
+          id: groupID,
+          node_ids: nodes.map((item) => item.id),
+          task_ids: groupTasks.map((item) => item.task_id),
+          status: groupTasks.length > 0 ? statusFor(groupTasks) : "pending" as const,
+          merge_status: conflicts.length > 0
+            ? "conflict" as const
+            : reducerTask?.status === "completed"
+              ? "merged" as const
+              : reducer
+                ? "waiting" as const
+                : "none" as const,
+          blocked_by: [...new Set(blocked_by)],
+          conflicts,
+          started_at: started.length ? Math.min(...started) : undefined,
+          completed_at: groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
+        }
+      })
       return {
         run,
         tasks: taskList,
@@ -882,6 +1143,7 @@ export const layer = Layer.effect(
           failed: taskList.filter((item) => item.status === "failed").length,
           cancelled: taskList.filter((item) => item.status === "cancelled").length,
         },
+        groups,
       }
     })
 

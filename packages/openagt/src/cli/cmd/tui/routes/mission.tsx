@@ -20,6 +20,18 @@ type CoordinatorTask = {
   metadata?: Record<string, unknown>
 }
 
+type CoordinatorGroup = {
+  id: string
+  node_ids: string[]
+  task_ids: string[]
+  status: "pending" | "running" | "completed" | "failed" | "cancelled"
+  merge_status: "none" | "waiting" | "merged" | "conflict"
+  blocked_by: string[]
+  conflicts: string[]
+  started_at?: number
+  completed_at?: number
+}
+
 type CoordinatorProjection = {
   run: {
     id: string
@@ -46,6 +58,11 @@ type CoordinatorProjection = {
         depends_on: string[]
         read_scope: string[]
         write_scope: string[]
+        parallel_group?: string
+        assigned_scope: string[]
+        excluded_scope: string[]
+        merge_status: "none" | "waiting" | "merged" | "conflict"
+        conflicts: string[]
         acceptance_checks: string[]
         model?: {
           providerID: string
@@ -56,6 +73,7 @@ type CoordinatorProjection = {
   }
   tasks: CoordinatorTask[]
   counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
+  groups: CoordinatorGroup[]
 }
 
 function taskNodeID(task: CoordinatorTask) {
@@ -92,7 +110,7 @@ export function Mission() {
 
   async function refresh() {
     const result = await sdk.client.coordinator.projection({ runID: route.runID }, { throwOnError: true })
-    setProjection(result.data as CoordinatorProjection)
+    setProjection(result.data as unknown as CoordinatorProjection)
   }
 
   async function action(name: "approve" | "cancel" | "resume" | "retry") {
@@ -194,6 +212,34 @@ export function Mission() {
               <text fg={theme.warning}>{data().counts.cancelled} cancelled</text>
             </box>
 
+            <Show when={data().groups.length > 0}>
+              <box flexDirection="column" gap={0}>
+                <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                  Parallel Groups
+                </text>
+                <For each={data().groups}>
+                  {(group) => (
+                    <box flexDirection="column" paddingLeft={1}>
+                      <box flexDirection="row" gap={1}>
+                        <text fg={theme.text}>{group.id}</text>
+                        <text fg={theme[group.status === "failed" ? "error" : group.status === "running" ? "info" : group.status === "completed" ? "success" : "textMuted"]}>
+                          {group.status}
+                        </text>
+                        <text fg={theme.textMuted}>merge: {group.merge_status}</text>
+                      </box>
+                      <text fg={theme.textMuted}>nodes: {group.node_ids.join(", ")}</text>
+                      <Show when={group.blocked_by.length > 0}>
+                        <text fg={theme.warning}>blocked by: {group.blocked_by.join(", ")}</text>
+                      </Show>
+                      <Show when={group.conflicts.length > 0}>
+                        <text fg={theme.error}>conflicts: {group.conflicts.join("; ")}</text>
+                      </Show>
+                    </box>
+                  )}
+                </For>
+              </box>
+            </Show>
+
             <box flexDirection="column" gap={1} flexGrow={1} minHeight={0}>
               <text fg={theme.text} attributes={TextAttributes.BOLD}>
                 DAG
@@ -206,7 +252,7 @@ export function Mission() {
                       <box flexDirection="row" gap={1}>
                         <text fg={theme.text}>{node.id}</text>
                         <text fg={theme.textMuted}>
-                          [{node.role}/{node.task_kind}/{node.risk}]
+                          [{node.role}/{node.task_kind}/{node.risk}{node.parallel_group ? `/group:${node.parallel_group}` : ""}]
                         </text>
                         <text fg={theme[node.risk === "high" ? "error" : node.risk === "medium" ? "warning" : "success"]}>
                           {task()?.status ?? "pending"}
@@ -230,6 +276,9 @@ export function Mission() {
                       </text>
                       <Show when={node.depends_on.length > 0}>
                         <text fg={theme.textMuted}>depends on: {node.depends_on.join(", ")}</text>
+                      </Show>
+                      <Show when={node.assigned_scope.length > 0}>
+                        <text fg={theme.textMuted}>scope: {node.assigned_scope.join(", ")}</text>
                       </Show>
                       <Show when={node.acceptance_checks.length > 0}>
                         <text fg={theme.textMuted}>checks: {node.acceptance_checks.join("; ")}</text>
