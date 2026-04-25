@@ -187,9 +187,14 @@ jobs:
           if [ "${{ inputs.release_kind }}" = "rc" ]; then
             PRERELEASE_ARGS+=(--prerelease)
           fi
+          git fetch --tags origin
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git tag "$TAG"
+            git push origin "refs/tags/$TAG"
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=true "${PRERELEASE_ARGS[@]}"
+            gh release edit "$TAG" --draft=false --title "$TAG" --notes-file packages/openagt/dist/release-notes.md "${PRERELEASE_ARGS[@]}"
           else
-            gh release create "$TAG" --draft --title "$TAG" --notes-file packages/openagt/dist/release-notes.md "${PRERELEASE_ARGS[@]}"
+            gh release create "$TAG" --title "$TAG" --notes-file packages/openagt/dist/release-notes.md "${PRERELEASE_ARGS[@]}"
           fi
           gh release upload "$TAG" packages/openagt/dist/* --clobber
