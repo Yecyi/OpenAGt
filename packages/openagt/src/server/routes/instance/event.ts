@@ -9,6 +9,31 @@ import { AsyncQueue } from "@/util/queue"
 
 const log = Log.create({ service: "server" })
 
+const ServerEvent = z.union([
+  z.object({
+    type: z.literal("server.connected"),
+    properties: z.object({}),
+  }),
+  z.object({
+    type: z.literal("server.heartbeat"),
+    properties: z.object({}),
+  }),
+])
+
+const EventPayload = z.union([ServerEvent, ...BusEvent.payloads()])
+
+export const EventEnvelope = z
+  .object({
+    schema_version: z.literal(1),
+    event_id: z.string(),
+    trace_id: z.string(),
+    timestamp: z.string(),
+  })
+  .and(EventPayload)
+  .meta({
+    ref: "EventEnvelope",
+  })
+
 function eventEnvelope(event: { type: string; properties: unknown }) {
   const properties =
     typeof event.properties === "object" && event.properties !== null && !Array.isArray(event.properties)
@@ -41,11 +66,7 @@ export const EventRoutes = () =>
           description: "Event stream",
           content: {
             "text/event-stream": {
-              schema: resolver(
-                z.union(BusEvent.payloads()).meta({
-                  ref: "Event",
-                }),
-              ),
+              schema: resolver(EventEnvelope),
             },
           },
         },

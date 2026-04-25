@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Deferred, Effect, Fiber, Layer } from "effect"
 import { Agent } from "../../src/agent/agent"
 import { Config } from "../../src/config"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
@@ -7,7 +7,7 @@ import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
 import type { SessionPrompt } from "../../src/session/prompt"
-import { MessageID, PartID } from "../../src/session/schema"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { TaskTool, type TaskPromptOps } from "../../src/tool/task"
 import { TaskGetTool } from "../../src/tool/task_get"
@@ -72,9 +72,11 @@ const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
   return { chat, assistant }
 })
 
-function stubOps(opts?: { onPrompt?: (input: SessionPrompt.PromptInput) => void; text?: string }): TaskPromptOps {
+function stubOps(opts?: { onPrompt?: (input: SessionPrompt.PromptInput) => void; onCancel?: (sessionID: SessionID) => void; text?: string }): TaskPromptOps {
   return {
-    cancel() {},
+    cancel(sessionID) {
+      opts?.onCancel?.(sessionID)
+    },
     resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
     prompt: (input) =>
       Effect.sync(() => {
@@ -481,6 +483,80 @@ describe("tool.task", () => {
           },
         )
         expect(stopped.output).toContain("cancelled")
+      }),
+    ),
+  )
+
+  it.live("task_stop cancels an active raw task prompt", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const task = yield* TaskTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const taskStop = yield* TaskStopTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const started = yield* Deferred.make<SessionID>()
+        const cancelled = yield* Deferred.make<SessionID>()
+        const releasePrompt = yield* Deferred.make<void>()
+        const calls: string[] = []
+        const promptOps: TaskPromptOps = {
+          cancel: (sessionID) => {
+            calls.push("cancel")
+            Deferred.doneUnsafe(cancelled, Effect.succeed(sessionID))
+            Deferred.doneUnsafe(releasePrompt, Effect.void)
+          },
+          resolvePromptParts: (template) =>
+            Effect.sync(() => {
+              calls.push("resolve")
+              return [{ type: "text" as const, text: template }]
+            }),
+          prompt: (input) =>
+            Effect.gen(function* () {
+              calls.push("prompt")
+              Deferred.doneUnsafe(started, Effect.succeed(input.sessionID))
+              yield* Deferred.await(releasePrompt)
+              return reply(input, "stopped")
+            }),
+        }
+        const ctx = {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.sync(() => calls.push("metadata")),
+          ask: () => Effect.sync(() => calls.push("ask")),
+        }
+        const fiber = yield* task.execute(
+          {
+            description: "inspect slow",
+            prompt: "wait until stopped",
+            subagent_type: "general",
+            task_kind: "research",
+          },
+          ctx,
+        ).pipe(Effect.forkScoped)
+        const taskID = yield* Deferred.await(started).pipe(
+          Effect.timeout("1 second"),
+          Effect.catchTag("TimeoutError", () => Effect.fail(new Error(`Task prompt did not start: ${calls.join(",")}`))),
+        )
+
+        const stopped = yield* taskStop.execute(
+          { task_id: taskID, reason: "user-stop" },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        const cancelledID = yield* Deferred.await(cancelled).pipe(Effect.timeout("1 second"))
+
+        expect(cancelledID).toBe(taskID)
+        expect(stopped.output).toContain("cancelled")
+        yield* Fiber.join(fiber)
       }),
     ),
   )

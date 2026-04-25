@@ -625,6 +625,8 @@ function expandVerifyNodes(plan: CoordinatorPlanType) {
 }
 
 function validatePlan(plan: CoordinatorPlanType) {
+  const duplicate = plan.nodes.map((item) => item.id).find((id, index, ids) => ids.indexOf(id) !== index)
+  if (duplicate) throw new Error(`Coordinator plan contains duplicate node id: ${duplicate}`)
   const nodes = new Map(plan.nodes.map((item) => [item.id, item]))
   for (const node of plan.nodes) {
     for (const dep of node.depends_on) {
@@ -762,7 +764,10 @@ export const layer = Layer.effect(
         ? CoordinatorPlan.parse({ goal: input.goal, nodes: input.nodes, parallel_policy })
         : CoordinatorPlan.parse({ ...defaultPlanForIntent(intent), parallel_policy })
       const expanded = expandVerifyNodes(base)
-      validatePlan(expanded)
+      yield* Effect.try({
+        try: () => validatePlan(expanded),
+        catch: (error) => error instanceof Error ? error : new Error(String(error)),
+      })
       yield* Effect.forEach(
         expanded.nodes.flatMap((item) => (item.model ? [item.model] : [])),
         (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
@@ -832,16 +837,20 @@ export const layer = Layer.effect(
 
     const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn("Coordinator.executeTask")(function* (record) {
       const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
-      const current = yield* tasks.get({
-        taskID: record.task_id,
-        parentSessionID: record.parent_session_id,
-      })
-      if (Option.isNone(prompt)) return
-      if (Option.isNone(current) || current.value.status !== "pending") return
-      const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) => record.depends_on.includes(item.task_id))
       const continueGroup = () =>
         record.group_id ? dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore) : Effect.void
-      yield* tasks.setRunning(record.task_id, record.parent_session_id)
+      const started = yield* tasks.tryStartPending(record.task_id, record.parent_session_id)
+      if (!started) return
+      if (Option.isNone(prompt)) {
+        yield* tasks.fail({
+          taskID: record.task_id,
+          parentSessionID: record.parent_session_id,
+          error: "Coordinator executor unavailable: SessionPrompt.Service is not available",
+        })
+        yield* continueGroup()
+        return
+      }
+      const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) => record.depends_on.includes(item.task_id))
       yield* prompt.value
         .prompt({
           sessionID: record.child_session_id,
@@ -934,7 +943,6 @@ export const layer = Layer.effect(
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
         {
           concurrency: "unbounded",
-          discard: true,
         },
       )
       if (selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
@@ -1240,6 +1248,20 @@ export const layer = Layer.effect(
       }
       const taskList = yield* relevantTasks(runOpt.value)
       const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
+      const timestamp = now()
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db.update(CoordinatorRunTable)
+            .set({
+              state: "cancelled",
+              summary: "Coordinator run cancelled",
+              time_updated: timestamp,
+              time_finished: timestamp,
+            })
+            .where(eq(CoordinatorRunTable.id, id))
+            .run(),
+        ),
+      )
       yield* Effect.forEach(
         taskList.filter((item) => item.status === "pending" || item.status === "running"),
         (item) =>
@@ -1255,21 +1277,7 @@ export const layer = Layer.effect(
           }),
         {
           concurrency: "unbounded",
-          discard: true,
         },
-      )
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db.update(CoordinatorRunTable)
-            .set({
-              state: "cancelled",
-              summary: "Coordinator run cancelled",
-              time_updated: now(),
-              time_finished: now(),
-            })
-            .where(eq(CoordinatorRunTable.id, id))
-            .run(),
-        ),
       )
       const updated = yield* Effect.sync(() =>
         Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),

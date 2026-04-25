@@ -2,10 +2,12 @@ export * from "./gen/types.gen.js"
 
 import { createClient } from "./gen/client/client.gen.js"
 import { type Config } from "./gen/client/types.gen.js"
+import type { GlobalEvent as GeneratedGlobalEvent } from "./gen/types.gen.js"
 import { OpencodeClient } from "./gen/sdk.gen.js"
 export class OpenagtClient extends OpencodeClient {}
 export { type Config as OpencodeClientConfig, OpencodeClient }
 export { type Config as OpenagtClientConfig }
+export type Event = Exclude<GeneratedGlobalEvent["payload"], { type: "sync" }>
 
 function pick(value: string | null, fallback?: string) {
   if (!value) return

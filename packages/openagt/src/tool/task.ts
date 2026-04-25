@@ -191,12 +191,18 @@ export const TaskTool = Tool.define(
       }
 
       return yield* Effect.acquireUseRelease(
-        Effect.sync(() => {
+        Effect.gen(function* () {
           ctx.abort.addEventListener("abort", cancel)
+          return yield* tasks.registerCancelHandler({
+            taskID: nextSession.id,
+            parentSessionID: ctx.sessionID,
+            cancel,
+          })
         }),
         () =>
           Effect.gen(function* () {
-            yield* tasks.setRunning(nextSession.id, ctx.sessionID)
+            const started = yield* tasks.tryStartPending(nextSession.id, ctx.sessionID)
+            if (!started) return yield* Effect.fail(new Error(`Task is not pending: ${nextSession.id}`))
             const parts = yield* ops.resolvePromptParts(params.prompt)
             const result = yield* ops
               .prompt({
@@ -254,8 +260,9 @@ export const TaskTool = Tool.define(
                   : `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
             }
           }),
-        () =>
+        (unregister) =>
           Effect.sync(() => {
+            unregister()
             ctx.abort.removeEventListener("abort", cancel)
           }),
       )

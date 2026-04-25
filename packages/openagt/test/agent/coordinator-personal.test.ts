@@ -30,6 +30,89 @@ const it = testEffect(
 )
 
 describe("coordinator runtime", () => {
+  it.live("rejects duplicate custom plan node ids", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator duplicate parent" })
+
+        const error = yield* Effect.flip(coordinator.run({
+          sessionID: parent.id,
+          goal: "Inspect duplicate nodes",
+          nodes: [
+            {
+              id: "research",
+              description: "First research",
+              prompt: "Inspect first.",
+              task_kind: "research",
+              subagent_type: "general",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src"],
+              acceptance_checks: ["first checked"],
+              priority: "normal",
+              origin: "coordinator",
+            },
+            {
+              id: "research",
+              description: "Second research",
+              prompt: "Inspect second.",
+              task_kind: "research",
+              subagent_type: "general",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["test"],
+              acceptance_checks: ["second checked"],
+              priority: "normal",
+              origin: "coordinator",
+            },
+          ],
+        }))
+
+        expect(error.message).toContain("Coordinator plan contains duplicate node id: research")
+      }),
+    ),
+  )
+
+  it.live("fails dispatched tasks when no prompt executor is available", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator executor parent" })
+
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Inspect executor availability",
+          mode: "assisted",
+          nodes: [
+            {
+              id: "research",
+              description: "Inspect executor",
+              prompt: "Inspect executor.",
+              task_kind: "research",
+              subagent_type: "general",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src"],
+              acceptance_checks: ["executor checked"],
+              priority: "normal",
+              origin: "coordinator",
+            },
+          ],
+        })
+
+        yield* coordinator.approve(run.id)
+        yield* Effect.sleep("20 millis")
+        const projection = yield* coordinator.projection(run.id)
+
+        expect(projection.counts.failed).toBe(1)
+        expect(projection.tasks[0]?.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
+      }),
+    ),
+  )
+
   it.live("orders DAG nodes, creates verify follow-up, and summarizes the run", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
@@ -48,6 +131,7 @@ describe("coordinator runtime", () => {
         const run = yield* coordinator.run({
           sessionID: parent.id,
           goal: "Ship runtime scheduling",
+          mode: "assisted",
           nodes: [
             {
               id: "implement",
@@ -160,25 +244,25 @@ describe("coordinator runtime", () => {
         const approved = yield* coordinator.approve(run.id)
         expect(approved.state).toBe("active")
 
-        const first = (yield* tasks.list(parent.id)).find((item) => item.status === "pending")
-        if (!first) throw new Error("Expected a pending coordinator task")
+        yield* Effect.sleep("20 millis")
+        const first = (yield* tasks.list(parent.id)).find((item) => item.status === "failed")
+        if (!first) throw new Error("Expected a failed coordinator task")
+        expect(first.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
 
-        yield* tasks.fail({
-          taskID: first.task_id,
-          parentSessionID: parent.id,
-          error: "verification failed",
-        })
         yield* coordinator.summarize(run.id)
         expect((yield* coordinator.projection(run.id)).run.state).toBe("failed")
 
-        const retried = yield* coordinator.retry({
+        yield* coordinator.retry({
           id: run.id,
           taskID: first.task_id,
         })
-        const retriedTask = (yield* coordinator.projection(run.id)).tasks.find((item) => item.task_id === first.task_id)
+        yield* Effect.sleep("20 millis")
+        const retried = yield* coordinator.projection(run.id)
+        const retriedTask = retried.tasks.find((item) => item.task_id === first.task_id)
 
-        expect(retried.state).toBe("active")
-        expect(retriedTask?.status).toBe("pending")
+        expect(retried.run.state).toBe("failed")
+        expect(retriedTask?.status).toBe("failed")
+        expect(retriedTask?.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
       }),
     ),
   )

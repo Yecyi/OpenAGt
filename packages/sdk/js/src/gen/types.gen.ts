@@ -2774,7 +2774,24 @@ export type File = {
   status: "added" | "deleted" | "modified"
 }
 
-export type Event =
+export type EventEnvelope = {
+  schema_version: 1
+  event_id: string
+  trace_id: string
+  timestamp: string
+} & (
+  | {
+      type: "server.connected"
+      properties: {
+        [key: string]: unknown
+      }
+    }
+  | {
+      type: "server.heartbeat"
+      properties: {
+        [key: string]: unknown
+      }
+    }
   | EventProviderFallbackHop
   | EventProjectUpdated
   | EventServerInstanceDisposed
@@ -2833,6 +2850,7 @@ export type Event =
   | EventSessionCreated
   | EventSessionUpdated
   | EventSessionDeleted
+)
 
 export type McpStatusConnected = {
   status: "connected"
@@ -7933,7 +7951,7 @@ export type EventSubscribeResponses = {
   /**
    * Event stream
    */
-  200: Event
+  200: EventEnvelope
 }
 
 export type EventSubscribeResponse = EventSubscribeResponses[keyof EventSubscribeResponses]

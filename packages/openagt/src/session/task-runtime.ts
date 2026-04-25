@@ -104,6 +104,10 @@ function taskKey(parentSessionID: SessionID, taskID: SessionID) {
   return ["task", parentSessionID, taskID]
 }
 
+function cancelHandlerKey(parentSessionID: SessionID, taskID: SessionID) {
+  return `${parentSessionID}:${taskID}`
+}
+
 function groupKey(parentSessionID: SessionID, groupID: string) {
   return ["task_group", parentSessionID, groupID]
 }
@@ -175,6 +179,12 @@ export interface Interface {
     metadata?: Record<string, unknown>
   }) => Effect.Effect<TaskRecord, Error>
   readonly setRunning: (taskID: SessionID, parentSessionID: SessionID) => Effect.Effect<TaskRecord, Error>
+  readonly tryStartPending: (taskID: SessionID, parentSessionID: SessionID) => Effect.Effect<TaskRecord | undefined, Error>
+  readonly registerCancelHandler: (input: {
+    taskID: SessionID
+    parentSessionID: SessionID
+    cancel: () => void
+  }) => Effect.Effect<() => void>
   readonly complete: (input: {
     taskID: SessionID
     parentSessionID: SessionID
@@ -213,6 +223,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const storage = yield* Storage.Service
     const bus = yield* Bus.Service
+    const cancelHandlers = new Map<string, () => void>()
 
     const publishUpdate = Effect.fn("TaskRuntime.publishUpdate")(function* (record: TaskRecord) {
       yield* bus.publish(Event.Updated, {
@@ -311,6 +322,30 @@ export const layer = Layer.effect(
       })
     })
 
+    const tryStartPending: Interface["tryStartPending"] = Effect.fn("TaskRuntime.tryStartPending")(function* (taskID, parentSessionID) {
+      const started = { value: false }
+      const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), (draft) => {
+        if (draft.status !== "pending") return
+        started.value = true
+        draft.status = "running"
+        draft.started_at = draft.started_at ?? Date.now()
+      })
+      if (!started.value) return
+      yield* refreshGroup(record)
+      yield* publishUpdate(record)
+      return record
+    })
+
+    const registerCancelHandler: Interface["registerCancelHandler"] = Effect.fn("TaskRuntime.registerCancelHandler")(function* (input) {
+      const key = cancelHandlerKey(input.parentSessionID, input.taskID)
+      return yield* Effect.sync(() => {
+        cancelHandlers.set(key, input.cancel)
+        return () => {
+          cancelHandlers.delete(key)
+        }
+      })
+    })
+
     const complete: Interface["complete"] = Effect.fn("TaskRuntime.complete")(function* (input) {
       return yield* update(input.parentSessionID, input.taskID, (draft) => {
         draft.status = "completed"
@@ -348,12 +383,19 @@ export const layer = Layer.effect(
     })
 
     const cancel: Interface["cancel"] = Effect.fn("TaskRuntime.cancel")(function* (input) {
-      return yield* update(input.parentSessionID, input.taskID, (draft) => {
+      const record = yield* update(input.parentSessionID, input.taskID, (draft) => {
         draft.status = "cancelled"
         draft.finished_at = Date.now()
         draft.stop_reason = input.reason
         draft.error_summary = input.reason?.slice(0, 400) ?? "Task cancelled"
       })
+      yield* Effect.sync(() => {
+        const key = cancelHandlerKey(input.parentSessionID, input.taskID)
+        const handler = cancelHandlers.get(key)
+        cancelHandlers.delete(key)
+        handler?.()
+      })
+      return record
     })
 
     const retry: Interface["retry"] = Effect.fn("TaskRuntime.retry")(function* (input) {
@@ -440,6 +482,8 @@ export const layer = Layer.effect(
     return Service.of({
       create,
       setRunning,
+      tryStartPending,
+      registerCancelHandler,
       complete,
       fail,
       cancel,

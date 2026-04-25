@@ -53,6 +53,33 @@ describe("task runtime agentic scheduling", () => {
     ),
   )
 
+  it.live("starts a pending task only once", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const tasks = yield* TaskRuntime.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Atomic task parent" })
+        const task = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_atomic_start" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "atomic start",
+          prompt: "start once",
+          dependsOn: [],
+        })
+
+        const [first, second] = yield* Effect.all([
+          tasks.tryStartPending(task.task_id, parent.id),
+          tasks.tryStartPending(task.task_id, parent.id),
+        ], { concurrency: "unbounded" })
+
+        expect([first, second].filter(Boolean)).toHaveLength(1)
+        expect((yield* tasks.list(parent.id)).find((item) => item.task_id === task.task_id)?.status).toBe("running")
+      }),
+    ),
+  )
+
   it.live("allows verify tasks to run beside implement tasks when read_scope does not overlap", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
