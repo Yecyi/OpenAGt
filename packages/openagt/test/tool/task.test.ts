@@ -487,6 +487,45 @@ describe("tool.task", () => {
     ),
   )
 
+  it.live("explore subagents run with read-only tool restrictions", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+        yield* def.execute(
+          {
+            description: "inspect project",
+            prompt: "explore repository structure",
+            subagent_type: "explore",
+            task_kind: "research",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(seen?.tools).toMatchObject({
+          bash: false,
+          edit: false,
+          write: false,
+          multiedit: false,
+          apply_patch: false,
+        })
+      }),
+    ),
+  )
+
   it.live("task_stop cancels an active raw task prompt", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
@@ -557,6 +596,61 @@ describe("tool.task", () => {
         expect(cancelledID).toBe(taskID)
         expect(stopped.output).toContain("cancelled")
         yield* Fiber.join(fiber)
+      }),
+    ),
+  )
+
+  it.live("raw task prompt timeout cancels and marks task failed", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const task = yield* TaskTool.pipe(Effect.flatMap((tool) => tool.init()))
+        const tasks = yield* TaskRuntime.Service
+        const started = yield* Deferred.make<SessionID>()
+        const cancelled = yield* Deferred.make<SessionID>()
+        const promptOps: TaskPromptOps = {
+          cancel: (sessionID) => {
+            Deferred.doneUnsafe(cancelled, Effect.succeed(sessionID))
+          },
+          resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+          prompt: (input) =>
+            Effect.gen(function* () {
+              Deferred.doneUnsafe(started, Effect.succeed(input.sessionID))
+              yield* Effect.never
+              return reply(input, "unreachable")
+            }),
+        }
+        const fiber = yield* task.execute(
+          {
+            description: "inspect timeout",
+            prompt: "wait forever",
+            subagent_type: "general",
+            task_kind: "research",
+            metadata: { timeout_ms: 20 },
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        ).pipe(Effect.forkScoped)
+
+        const taskID = yield* Deferred.await(started).pipe(Effect.timeout("1 second"))
+        const result = yield* Fiber.join(fiber)
+        const cancelledID = yield* Deferred.await(cancelled).pipe(Effect.timeout("1 second"))
+        const record = (yield* tasks.list(chat.id)).find((item) => item.task_id === taskID)
+
+        expect(result.metadata.status).toBe("failed")
+        expect(result.metadata.retryable).toBe(true)
+        expect(result.output).toContain("<task_result status=\"failed\">")
+        expect(cancelledID).toBe(taskID)
+        expect(record?.status).toBe("failed")
+        expect(record?.error_summary).toContain("Subagent timed out after")
       }),
     ),
   )

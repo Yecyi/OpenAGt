@@ -179,7 +179,9 @@ export const layer: Layer.Layer<
         },
       ) {
         const match = yield* readToolCall(toolCallID)
-        if (!match || match.part.state.status !== "running") return
+        if (!match) return
+        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return
+        const end = Date.now()
         yield* session.updatePart({
           ...match.part,
           state: {
@@ -188,7 +190,7 @@ export const layer: Layer.Layer<
             output: output.output,
             metadata: output.metadata,
             title: output.title,
-            time: { start: match.part.state.time.start, end: Date.now() },
+            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
             attachments: output.attachments,
           },
         })
@@ -197,7 +199,9 @@ export const layer: Layer.Layer<
 
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
-        if (!match || match.part.state.status !== "running") return false
+        if (!match) return false
+        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return false
+        const end = Date.now()
         const metadata = "metadata" in match.part.state ? match.part.state.metadata : undefined
         yield* session.updatePart({
           ...match.part,
@@ -206,7 +210,7 @@ export const layer: Layer.Layer<
             input: match.part.state.input,
             error: errorMessage(error),
             metadata,
-            time: { start: match.part.state.time.start, end: Date.now() },
+            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
           },
         })
         if (error instanceof Permission.RejectedError || error instanceof Question.RejectedError) {

@@ -118,7 +118,7 @@ export const layer = Layer.effect(
               process.platform === "darwin"
                 ? item.name === "seatbelt"
                 : process.platform === "win32"
-                  ? item.name === "windows_native"
+                  ? item.name === "process"
                   : item.name === "landlock",
             )
           : capabilities.find((item) => item.name === input.backendPreference)

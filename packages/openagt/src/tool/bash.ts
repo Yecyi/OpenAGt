@@ -376,7 +376,7 @@ function stricterDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): 
 function preferredBackendName(preference: SandboxBackendPreference): SandboxBackendName | undefined {
   if (preference !== "auto") return preference
   if (process.platform === "darwin") return "seatbelt"
-  if (process.platform === "win32") return "windows_native"
+  if (process.platform === "win32") return "process"
   return "landlock"
 }
 

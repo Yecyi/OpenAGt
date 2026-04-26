@@ -49,6 +49,27 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+function isProjectDeepDiveGoal(goal: string) {
+  const normalized = goal.toLowerCase()
+  return hasAny(normalized, [
+    "deep dive",
+    "dive deeper",
+    "codebase overview",
+    "project overview",
+    "project architecture",
+    "technical detail",
+    "technological detail",
+    "key technology",
+    "key technological",
+    "algorithm",
+    "algorith",
+    "algor",
+    "internals",
+    "how this project works",
+    "how the project works",
+  ]) && hasAny(normalized, ["project", "codebase", "repo", "repository", "architecture", "runtime", "algorithm", "algor"])
+}
+
 export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
   return EffortProfile.parse(effort === "low"
     ? {
@@ -115,6 +136,7 @@ function taskTypeForGoal(goal: string): TaskTypeType {
   const normalized = goal.toLowerCase()
   if (hasAny(normalized, ["review", "code review", "pull request", "pr "])) return "review"
   if (hasAny(normalized, ["debug", "bug", "error", "fail", "failing", "fix"])) return "debugging"
+  if (isProjectDeepDiveGoal(goal)) return "research"
   if (hasAny(normalized, ["write", "draft", "essay", "article", "copy", "story"])) return "writing"
   if (hasAny(normalized, ["data analysis", "analyze dataset", "spreadsheet", "statistics", "stats", "chart"])) return "data-analysis"
   if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"])) return "coding"
@@ -180,6 +202,7 @@ export function settleIntentProfile(input: { goal: string }) {
   const task_type = taskTypeForGoal(input.goal)
   const risk_level = riskForGoal(input.goal, task_type)
   const needs_user_clarification = input.goal.trim().length < 12
+  const projectDeepDive = isProjectDeepDiveGoal(input.goal)
   return IntentProfile.parse({
     goal: input.goal,
     task_type,
@@ -190,7 +213,7 @@ export function settleIntentProfile(input: { goal: string }) {
       ? ["What concrete output should this task produce?"]
       : [],
     workflow: task_type,
-    workflow_confidence: input.goal.trim().length < 12 ? "low" : "medium",
+    workflow_confidence: projectDeepDive ? "high" : input.goal.trim().length < 12 ? "low" : "medium",
     secondary_workflows: [],
     expected_output: expectedOutput(task_type),
     permission_expectations: permissionExpectations(task_type, risk_level),
@@ -237,6 +260,7 @@ function researcherShard(input: {
     description: input.description,
     prompt: [
       `Explore only your assigned slice of the project for this mission.`,
+      `Do not scan the whole repository. Stay within the assigned slice and hand off concise evidence to the reducer.`,
       ``,
       `Goal: ${input.goal}`,
       `Assigned scope: ${input.assignedScope.join(", ")}`,
@@ -299,7 +323,49 @@ function parallelResearchers(goal: string) {
   )
 }
 
+function projectDeepDiveResearchers(goal: string) {
+  const scopes = [
+    {
+      id: "research_architecture",
+      description: "Research architecture and entrypoints",
+      assignedScope: ["package layout", "entrypoints", "runtime boundaries", "server/cli/sdk boundaries"],
+      expectedFindings: ["Architecture map produced", "Entrypoints and module boundaries identified"],
+    },
+    {
+      id: "research_agent_runtime",
+      description: "Research agent runtime and algorithms",
+      assignedScope: ["agent loop", "prompt assembly", "tool registry", "subagent orchestration", "coordinator runtime"],
+      expectedFindings: ["Agent runtime flow summarized", "Subagent and coordinator scheduling algorithms identified"],
+    },
+    {
+      id: "research_data_safety",
+      description: "Research state, memory, safety, and events",
+      assignedScope: ["session memory", "personal memory", "database storage", "permission and shell safety", "event bus and SSE"],
+      expectedFindings: ["State and memory model summarized", "Safety envelope and event flow identified"],
+    },
+    {
+      id: "research_tests_release",
+      description: "Research verification, SDK, docs, and release",
+      assignedScope: ["tests", "typecheck", "release scripts", "OpenAPI and SDK", "documentation"],
+      expectedFindings: ["Verification matrix identified", "Release and SDK integration points summarized"],
+    },
+  ]
+  return scopes.map((item) =>
+    researcherShard({
+      ...item,
+      goal,
+      excludedScope: scopes.filter((scope) => scope.id !== item.id).flatMap((scope) => scope.assignedScope),
+    }),
+  )
+}
+
+function researchersForGoal(goal: string) {
+  if (isProjectDeepDiveGoal(goal)) return projectDeepDiveResearchers(goal)
+  return parallelResearchers(goal)
+}
+
 function researchReducer(goal: string, dependsOn: string[]) {
+  const projectDeepDive = isProjectDeepDiveGoal(goal)
   return node({
     id: "research_synthesis",
     description: "Merge parallel research",
@@ -309,8 +375,11 @@ function researchReducer(goal: string, dependsOn: string[]) {
       `Goal: ${goal}`,
       ``,
       `Deduplicate overlapping findings, mark conflicts explicitly, and do not invent facts missing from evidence.`,
+      projectDeepDive
+        ? `For project deep dives, produce a technical architecture outline covering core subsystems, key algorithms, data flows, safety/runtime boundaries, important files, extension points, risks, and unknowns.`
+        : undefined,
       `Output fields: summary, key_files, architecture_map, risks, recommended_plan_changes, open_questions, confidence.`,
-    ].join("\n"),
+    ].filter((item): item is string => Boolean(item)).join("\n"),
     task_kind: "generic",
     subagent_type: "general",
     role: "reducer",
@@ -327,7 +396,7 @@ function researchReducer(goal: string, dependsOn: string[]) {
 }
 
 function parallelResearchStage(goal: string) {
-  const research = parallelResearchers(goal)
+  const research = researchersForGoal(goal)
   return [...research, researchReducer(goal, research.map((item) => item.id))]
 }
 

@@ -8,7 +8,7 @@ import { Agent } from "../agent/agent"
 import { Provider } from "../provider"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
-import { Effect } from "effect"
+import { Cause, Effect, Exit } from "effect"
 import { TaskRuntime } from "../session/task-runtime"
 
 export interface TaskPromptOps {
@@ -49,8 +49,10 @@ type TaskMetadata = {
     providerID: string
   }
   taskId?: SessionID
-  status?: "pending" | "completed"
+  status?: "pending" | "completed" | "failed"
   groupId?: string
+  error?: string
+  retryable?: boolean
 }
 
 export const TaskTool = Tool.define(
@@ -84,6 +86,7 @@ export const TaskTool = Tool.define(
 
       const canTask = next.permission.some((rule) => rule.permission === id)
       const canTodo = next.permission.some((rule) => rule.permission === "todowrite")
+      const readOnlyExplore = next.name === "explore"
 
       const taskID = params.task_id
       const session = taskID
@@ -147,6 +150,13 @@ export const TaskTool = Tool.define(
       const messageID = MessageID.ascending()
       const taskKind = params.task_kind ?? "generic"
       const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
+      const requestedTimeout = params.metadata?.timeout_ms
+      const timeoutMs =
+        typeof requestedTimeout === "number" && Number.isFinite(requestedTimeout) && requestedTimeout > 0
+          ? Math.min(requestedTimeout, 900_000)
+          : next.name === "explore"
+            ? 90_000
+            : 300_000
 
       const record = yield* tasks.create({
         parentSessionID: ctx.sessionID,
@@ -204,7 +214,7 @@ export const TaskTool = Tool.define(
             const started = yield* tasks.tryStartPending(nextSession.id, ctx.sessionID)
             if (!started) return yield* Effect.fail(new Error(`Task is not pending: ${nextSession.id}`))
             const parts = yield* ops.resolvePromptParts(params.prompt)
-            const result = yield* ops
+            const promptExit = yield* ops
               .prompt({
                 messageID,
                 sessionID: nextSession.id,
@@ -214,6 +224,9 @@ export const TaskTool = Tool.define(
                 },
                 agent: next.name,
                 tools: {
+                  ...(readOnlyExplore
+                    ? { bash: false, edit: false, write: false, multiedit: false, apply_patch: false }
+                    : {}),
                   ...(canTodo ? {} : { todowrite: false }),
                   ...(canTask ? {} : { task: false }),
                   ...Object.fromEntries((cfg.experimental?.primary_tools ?? []).map((item) => [item, false])),
@@ -221,23 +234,62 @@ export const TaskTool = Tool.define(
                 parts,
               })
               .pipe(
-                Effect.tap((message) =>
-                  tasks.complete({
-                    taskID: nextSession.id,
-                    parentSessionID: ctx.sessionID,
-                    result: message,
-                  }),
-                ),
-                Effect.tapError((error) =>
-                  tasks.fail({
-                    taskID: nextSession.id,
-                    parentSessionID: ctx.sessionID,
-                    error: error instanceof Error ? error.message : String(error),
-                  }),
-                ),
+                Effect.timeout(`${timeoutMs} millis`),
+                Effect.exit,
               )
+            const result = Exit.isSuccess(promptExit)
+              ? { status: "completed" as const, message: promptExit.value }
+              : yield* Effect.sync(() => {
+                  const error = Cause.squash(promptExit.cause)
+                  const timeout =
+                    typeof error === "object" && error !== null && "_tag" in error && error._tag === "TimeoutError"
+                  if (timeout) cancel()
+                  return {
+                    status: "failed" as const,
+                    error: timeout
+                      ? `Subagent timed out after ${Math.round(timeoutMs / 1000)}s`
+                      : error instanceof Error
+                        ? error.message
+                        : String(error),
+                    retryable: timeout,
+                  }
+                })
 
-            const summary = result.parts.findLast((item) => item.type === "text")?.text ?? ""
+            if (result.status === "failed") {
+              yield* tasks.fail({
+                taskID: nextSession.id,
+                parentSessionID: ctx.sessionID,
+                error: result.error,
+              })
+
+              return {
+                title: params.description,
+                metadata: {
+                  sessionId: nextSession.id,
+                  model,
+                  taskId: nextSession.id,
+                  status: "failed" as const,
+                  groupId: params.group_id,
+                  error: result.error,
+                  retryable: result.retryable,
+                },
+                output: [
+                  `task_id: ${nextSession.id} (failed${result.retryable ? ", retryable" : ""})`,
+                  "",
+                  "<task_result status=\"failed\">",
+                  result.error,
+                  "</task_result>",
+                ].join("\n"),
+              }
+            }
+
+            yield* tasks.complete({
+              taskID: nextSession.id,
+              parentSessionID: ctx.sessionID,
+              result: result.message,
+            })
+
+            const summary = result.message.parts.findLast((item) => item.type === "text")?.text ?? ""
 
             return {
               title: params.description,

@@ -93,12 +93,17 @@ export function createToolScheduler() {
       { toolName: "right", input: right },
     ]).length > 0
 
+  const schedulingPaths = (call: PartitionToolCallItem) => {
+    if (call.toolName === "task") return []
+    return extractPaths(call.input)
+  }
+
   const schedule = <T>(
     call: PartitionToolCallItem,
     execute: () => Promise<T>,
   ) => {
-    const safe = isConcurrencySafe(call.toolName)
-    const paths = extractPaths(call.input)
+    const safe = isConcurrencySafe(call.toolName, call.input)
+    const paths = schedulingPaths(call)
     const blockers = running
       .filter((active) => {
         if (!safe) return true
@@ -144,8 +149,8 @@ export function createToolScheduler() {
 /**
  * Check if a tool is concurrency-safe
  */
-export function isConcurrencySafe(toolName: string): boolean {
-  return checkConcurrencySafe(toolName)
+export function isConcurrencySafe(toolName: string, input?: Record<string, unknown>): boolean {
+  return checkConcurrencySafe(toolName, input)
 }
 
 /**

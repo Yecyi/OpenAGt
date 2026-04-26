@@ -159,6 +159,7 @@ export const layer = Layer.effect(
             options: {},
             mode: "subagent",
             native: true,
+            steps: 12,
           },
           explore: {
             name: "explore",
@@ -169,7 +170,6 @@ export const layer = Layer.effect(
                 grep: "allow",
                 glob: "allow",
                 list: "allow",
-                bash: "allow",
                 webfetch: "allow",
                 websearch: "allow",
                 codesearch: "allow",
@@ -186,6 +186,7 @@ export const layer = Layer.effect(
             options: {},
             mode: "subagent",
             native: true,
+            steps: 6,
           },
           compaction: {
             name: "compaction",

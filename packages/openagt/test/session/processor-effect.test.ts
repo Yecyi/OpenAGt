@@ -712,6 +712,85 @@ it.live("session.processor effect tests mark pending tools as aborted on cleanup
   ),
 )
 
+it.live("session.processor effect tests complete pending tools", () =>
+  provideTmpdirServer(
+    ({ dir, llm }) =>
+      Effect.gen(function* () {
+        const { processors, session, provider } = yield* boot()
+
+        yield* llm.toolHang("bash", { cmd: "pwd" })
+
+        const chat = yield* session.create({})
+        const parent = yield* user(chat.id, "tool pending complete")
+        const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+        const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+        const handle = yield* processors.create({
+          assistantMessage: msg,
+          sessionID: chat.id,
+          model: mdl,
+        })
+
+        const run = yield* handle
+          .process({
+            user: {
+              id: parent.id,
+              sessionID: chat.id,
+              role: "user",
+              time: parent.time,
+              agent: parent.agent,
+              model: { providerID: ref.providerID, modelID: ref.modelID },
+            } satisfies MessageV2.User,
+            sessionID: chat.id,
+            model: mdl,
+            agent: agent(),
+            system: [],
+            messages: [{ role: "user", content: "tool pending complete" }],
+            tools: {},
+          })
+          .pipe(Effect.forkChild)
+
+        yield* llm.wait(1)
+        const pending = yield* Effect.promise(async () => {
+          const end = Date.now() + 500
+          while (Date.now() < end) {
+            const part = (await MessageV2.parts(msg.id)).find(
+              (item): item is MessageV2.ToolPart => item.type === "tool",
+            )
+            if (part?.state.status === "pending") return part
+            await Bun.sleep(10)
+          }
+        })
+
+        expect(pending?.state.status).toBe("pending")
+        yield* handle.completeToolCall("call_1", {
+          title: "bash",
+          metadata: {},
+          output: "ok",
+        })
+
+        const parts = MessageV2.parts(msg.id)
+        const completed = parts.find((part): part is MessageV2.ToolPart => part.type === "tool")
+
+        expect(completed?.state.status).toBe("completed")
+        if (completed?.state.status === "completed") {
+          expect(completed.state.output).toBe("ok")
+          expect(completed.state.time.end).toBeDefined()
+        }
+
+        yield* Fiber.interrupt(run)
+        const exit = yield* Fiber.await(run)
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) {
+          expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true)
+        }
+        const final = MessageV2.parts(msg.id).find((part): part is MessageV2.ToolPart => part.type === "tool")
+        expect(final?.state.status).toBe("completed")
+      }),
+    { git: true, config: (url) => providerCfg(url) },
+  ),
+)
+
 it.live("session.processor effect tests record aborted errors and idle state", () =>
   provideTmpdirServer(
     ({ dir, llm }) =>

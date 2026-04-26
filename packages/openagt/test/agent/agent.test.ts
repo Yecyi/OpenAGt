@@ -268,6 +268,19 @@ test("agent steps/maxSteps config sets steps property", async () => {
   })
 })
 
+test("native subagents have finite default step budgets", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const general = await load(tmp.path, (svc) => svc.get("general"))
+      const explore = await load(tmp.path, (svc) => svc.get("explore"))
+      expect(general?.steps).toBe(12)
+      expect(explore?.steps).toBe(6)
+    },
+  })
+})
+
 test("agent mode can be overridden", async () => {
   await using tmp = await tmpdir({
     config: {

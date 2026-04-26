@@ -81,6 +81,15 @@ function routeNavigate(route: ReturnType<typeof useRoute>, name: string, params?
     return
   }
 
+  if (name === "mission") {
+    const runID = params?.runID
+    const sessionID = params?.sessionID
+    if (typeof runID !== "string") return
+    if (typeof sessionID !== "string") return
+    route.navigate({ type: "mission", runID, sessionID })
+    return
+  }
+
   route.navigate({ type: "plugin", id: name, data: params })
 }
 

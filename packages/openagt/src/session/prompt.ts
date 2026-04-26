@@ -326,11 +326,11 @@ Goal: Gain a comprehensive understanding of the user's request by reading throug
 
 1. Focus on understanding the user's request and the code associated with their request
 
-2. **Launch up to 3 explore agents IN PARALLEL** (single message, multiple tool calls) to efficiently explore the codebase.
+2. **Launch up to 4 explore agents IN PARALLEL** (single message, multiple tool calls) to efficiently explore the codebase.
  - Use 1 agent when the task is isolated to known files, the user provided specific file paths, or you're making a small targeted change.
  - Use multiple agents when: the scope is uncertain, multiple areas of the codebase are involved, or you need to understand existing patterns before planning.
- - Quality over quantity - 3 agents maximum, but you should try to use the minimum number of agents necessary (usually just 1)
- - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: One agent searches for existing implementations, another explores related components, a third investigates testing patterns
+ - For broad project/codebase deep dives, architecture outlines, technical details, or algorithm analysis, use 3-4 explore agents by default rather than one broad explorer.
+ - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: structure/entrypoints, agent runtime/tools/coordinator, data/memory/safety/events, tests/release/docs.
 
 3. After exploring the code, use the question tool to clarify ambiguities in the user request up front.
 
@@ -457,7 +457,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             return scheduler.schedule(call, () =>
               run.promise(
                 Effect.gen(function* () {
-                  const ctx = context(args, options)
+                  const ctx = context(args, { ...options, toolCallId: call.toolCallId })
                   yield* plugin.trigger(
                     "tool.execute.before",
                     { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
@@ -467,7 +467,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   if (Exit.isFailure(exit)) {
                     const error = Cause.squash(exit.cause)
                     const toolError = error instanceof Error ? error : new Error(String(error))
-                    yield* input.processor.failToolCall(options.toolCallId, toolError)
+                    yield* input.processor.failToolCall(call.toolCallId, toolError)
                     return {
                       title: item.id,
                       metadata: { toolError: true },
@@ -489,8 +489,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
                     output,
                   )
-                  if (options.abortSignal?.aborted) {
-                    yield* input.processor.completeToolCall(options.toolCallId, output)
+                  if (!options.abortSignal?.aborted) {
+                    yield* input.processor.completeToolCall(call.toolCallId, output)
                   }
                   return output
                 }),
@@ -507,20 +507,21 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         const schema = yield* Effect.promise(() => Promise.resolve(asSchema(item.inputSchema).jsonSchema))
         const transformed = ProviderTransform.schema(input.model, schema)
         item.inputSchema = jsonSchema(transformed)
-        item.execute = (args, opts) =>
-          scheduler.schedule(
+        item.execute = (args, opts) => {
+          const toolCallId = opts.toolCallId ?? ulid()
+          return scheduler.schedule(
             {
-              toolCallId: opts.toolCallId ?? ulid(),
+              toolCallId,
               toolName: key,
               input: normalizeToolInput(args),
             },
             () =>
               run.promise(
                 Effect.gen(function* () {
-                  const ctx = context(args, opts)
+                  const ctx = context(args, { ...opts, toolCallId })
                   yield* plugin.trigger(
                     "tool.execute.before",
-                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+                    { tool: key, sessionID: ctx.sessionID, callID: ctx.callID },
                     { args },
                   )
                   yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
@@ -529,7 +530,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   )
                   yield* plugin.trigger(
                     "tool.execute.after",
-                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+                    { tool: key, sessionID: ctx.sessionID, callID: ctx.callID, args },
                     result,
                   )
 
@@ -576,13 +577,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     })),
                     content: result.content,
                   }
-                  if (opts.abortSignal?.aborted) {
-                    yield* input.processor.completeToolCall(opts.toolCallId, output)
+                  if (!opts.abortSignal?.aborted) {
+                    yield* input.processor.completeToolCall(toolCallId, output)
                   }
                   return output
                 }),
               ),
           )
+        }
         tools[key] = item
       }
 
@@ -1671,9 +1673,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 parentSessionID: session.parentID,
                 system,
                 messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
-                tools,
+                tools: isLastStep ? {} : tools,
                 model: activeModel,
-                toolChoice: format.type === "json_schema" ? "required" : undefined,
+                toolChoice: isLastStep ? undefined : format.type === "json_schema" ? "required" : undefined,
               })
 
               if (structured !== undefined) {

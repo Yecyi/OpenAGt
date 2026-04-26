@@ -43,6 +43,7 @@ import { DialogSkill } from "../dialog-skill"
 import { DialogWorkspaceCreate, restoreWorkspaceSession } from "../dialog-workspace-create"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "@tui/context/args"
+import { DialogSelect } from "@tui/ui/dialog-select"
 
 export type PromptProps = {
   sessionID?: string
@@ -74,6 +75,12 @@ const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 })
+const effortOptions = [
+  { title: "Medium", value: "medium", description: "default budget" },
+  { title: "Low", value: "low", description: "faster, lower token budget" },
+  { title: "High", value: "high", description: "stricter reasoning budget" },
+  { title: "Deep", value: "deep", description: "maximum available reasoning budget" },
+] as const
 
 function randomIndex(count: number) {
   if (count <= 0) return 0
@@ -123,6 +130,26 @@ export function Prompt(props: PromptProps) {
     if (sync.data.provider.length === 0) {
       dialog.replace(() => <DialogProviderConnect />)
     }
+  }
+
+  function showEffortDialog() {
+    dialog.replace(() => (
+      <DialogSelect<(typeof effortOptions)[number]["value"]>
+        title="Effort"
+        placeholder="Select effort"
+        skipFilter
+        current={local.effort.current()}
+        options={effortOptions.map((item) => ({
+          title: item.title,
+          value: item.value,
+          description: item.description,
+        }))}
+        onSelect={(option) => {
+          local.effort.set(option.value)
+          dialog.clear()
+        }}
+      />
+    ))
   }
 
   const textareaKeybindings = useTextareaKeybindings()
@@ -773,7 +800,7 @@ export function Prompt(props: PromptProps) {
 
     // Capture mode before it gets reset
     const currentMode = store.mode
-    const variant = local.model.variant.current()
+    const variant = local.effort.variant() ?? local.model.variant.current()
 
     if (store.mode === "shell") {
       void sdk.client.session.shell({
@@ -1236,26 +1263,34 @@ export function Prompt(props: PromptProps) {
               cursorColor={theme.text}
               syntaxStyle={syntax()}
             />
-            <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
-              <box flexDirection="row" gap={1}>
+            <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between" alignItems="flex-end">
+              <box flexDirection="column" minWidth={0}>
                 <Show when={local.agent.current()} fallback={<box height={1} />}>
                   {(agent) => (
                     <>
-                      <text fg={fadeColor(highlight(), agentMetaAlpha())}>
-                        {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
-                      </text>
-                      <Show when={store.mode === "normal"}>
-                        <box flexDirection="row" gap={1}>
-                          <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>·</text>
-                          <text
-                            flexShrink={0}
-                            fg={fadeColor(keybind.leader ? theme.textMuted : theme.text, modelMetaAlpha())}
-                          >
+                      <box flexDirection="row" gap={1} flexWrap="wrap">
+                        <text fg={fadeColor(highlight(), agentMetaAlpha())} wrapMode="none">
+                          {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
+                        </text>
+                        <Show when={store.mode === "normal"}>
+                          <text fg={fadeColor(keybind.leader ? theme.textMuted : theme.text, modelMetaAlpha())} wrapMode="none">
                             {local.model.parsed().model}
                           </text>
+                        </Show>
+                      </box>
+                      <Show when={store.mode === "normal"}>
+                        <box flexDirection="row" gap={1} flexWrap="wrap">
                           <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>{currentProviderLabel()}</text>
+                          <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>|</text>
+                          <text
+                            fg={fadeColor(theme.warning, modelMetaAlpha())}
+                            onMouseUp={() => showEffortDialog()}
+                            wrapMode="none"
+                          >
+                            Effort {local.effort.current()}
+                          </text>
                           <Show when={showVariant()}>
-                            <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>·</text>
+                            <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>|</text>
                             <text>
                               <span style={{ fg: fadeColor(theme.warning, variantMetaAlpha()), bold: true }}>
                                 {local.model.variant.current()}

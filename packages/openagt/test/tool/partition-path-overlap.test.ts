@@ -7,6 +7,19 @@ describe("tool.partition", () => {
     expect(isConcurrencySafe("read")).toBe(true)
     expect(isConcurrencySafe("grep")).toBe(true)
     expect(isConcurrencySafe("bash")).toBe(false)
+    expect(isConcurrencySafe("task")).toBe(false)
+    expect(isConcurrencySafe("task", { subagent_type: "explore", description: "inspect", prompt: "read only" })).toBe(
+      true,
+    )
+    expect(isConcurrencySafe("task", { task_kind: "research", description: "inspect", prompt: "read only" })).toBe(true)
+    expect(
+      isConcurrencySafe("task", {
+        task_kind: "implement",
+        description: "change",
+        prompt: "edit files",
+        subagent_type: "explore",
+      }),
+    ).toBe(false)
   })
 
   test("splits unsafe tool calls into isolated batches", () => {

@@ -93,6 +93,31 @@ describe("coordinator intent planning", () => {
     expect(plan.revise_points.length).toBeLessThanOrEqual(plan.effort_profile.max_revise_nodes)
   })
 
+  test("routes broad project deep dives to sharded research experts", () => {
+    const intent = settleIntentProfile({ goal: "dive deeper into this project and give me a outline of key technological details, algorithems" })
+    const plan = defaultPlanForIntent(intent)
+    const research = plan.nodes.filter((item) => item.parallel_group === "research")
+
+    expect(intent.workflow).toBe("research")
+    expect(intent.workflow_confidence).toBe("high")
+    expect(research.map((item) => item.id)).toEqual([
+      "research_architecture",
+      "research_agent_runtime",
+      "research_data_safety",
+      "research_tests_release",
+    ])
+    expect(research.every((item) => item.subagent_type === "explore")).toBe(true)
+    expect(research.every((item) => item.write_scope.length === 0)).toBe(true)
+    expect(plan.nodes.find((item) => item.id === "research_synthesis")?.depends_on).toEqual([
+      "research_architecture",
+      "research_agent_runtime",
+      "research_data_safety",
+      "research_tests_release",
+    ])
+    expect(plan.nodes.find((item) => item.id === "research_synthesis")?.prompt).toContain("technical architecture outline")
+    expect(plan.nodes.find((item) => item.id === "synthesize")?.depends_on).toEqual(["research_synthesis"])
+  })
+
   test("routes non-coding workflows to specialized expert adapters", () => {
     const writing = defaultPlanForIntent(settleIntentProfile({ goal: "write a product announcement article" }))
     const data = defaultPlanForIntent(settleIntentProfile({ goal: "analyze dataset statistics and anomalies" }))

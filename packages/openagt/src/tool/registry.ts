@@ -297,6 +297,8 @@ export const layer = Layer.effect(
         "- Use task_get or task_list to inspect status and summaries",
         "- Use task_stop to cancel queued or running tasks",
         "- Research tasks can run in parallel; implement tasks should stay serialized unless write domains are clearly independent",
+        "- For broad project/codebase analysis, architecture, technical-detail, algorithm, or deep-dive requests, launch 3-4 explore subagents concurrently with non-overlapping scopes instead of one broad explorer",
+        "- Default broad-analysis shards: structure/entrypoints, agent runtime/tools/coordinator, data/memory/safety/events, tests/release/docs",
         "",
         description,
       ].join("\n")

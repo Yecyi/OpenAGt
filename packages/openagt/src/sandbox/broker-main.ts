@@ -12,7 +12,7 @@ async function send(frame: unknown) {
 function backendFor(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"]) {
   if (frame.backend_preference !== "auto") return backends.get(frame.backend_preference)
   if (process.platform === "darwin") return backends.get("seatbelt")
-  if (process.platform === "win32") return backends.get("windows_native")
+  if (process.platform === "win32") return backends.get("process")
   if (process.platform === "linux") return backends.get("landlock")
   return backends.get("process")
 }

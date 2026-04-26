@@ -13,6 +13,13 @@ import { useSDK } from "./sdk"
 import { RGBA } from "@opentui/core"
 import { Filesystem } from "@/util"
 
+const effortLevels = ["low", "medium", "high", "deep"] as const
+type EffortLevel = (typeof effortLevels)[number]
+
+function isEffortLevel(value: unknown): value is EffortLevel {
+  return typeof value === "string" && effortLevels.some((item) => item === value)
+}
+
 export function parseModel(model: string) {
   const [providerID, ...rest] = model.split("/")
   return {
@@ -380,6 +387,70 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }
     })
 
+    const effort = iife(() => {
+      const [effortStore, setEffortStore] = createStore({
+        ready: false,
+        current: "medium" as EffortLevel,
+      })
+      const filePath = path.join(Global.Path.state, "effort.json")
+      const state = {
+        pending: false,
+      }
+
+      function save() {
+        if (!effortStore.ready) {
+          state.pending = true
+          return
+        }
+        state.pending = false
+        void Filesystem.writeJson(filePath, {
+          current: effortStore.current,
+        })
+      }
+
+      Filesystem.readJson(filePath)
+        .then((x: unknown) => {
+          if (typeof x !== "object" || x === null) return
+          const current = (x as { current?: unknown }).current
+          if (isEffortLevel(current)) setEffortStore("current", current)
+        })
+        .catch(() => {})
+        .finally(() => {
+          setEffortStore("ready", true)
+          if (state.pending) save()
+        })
+
+      function variantFor(value: EffortLevel) {
+        const variants = model.variant.list()
+        if (value === "low") return variants.find((item) => item === "low" || item === "minimal")
+        if (value === "high") return variants.find((item) => item === "high")
+        if (value === "deep") return variants.find((item) => item === "xhigh" || item === "max" || item === "high")
+        return variants.find((item) => item === "medium")
+      }
+
+      return {
+        current() {
+          return effortStore.current
+        },
+        list() {
+          return effortLevels
+        },
+        set(value: EffortLevel) {
+          setEffortStore("current", value)
+          save()
+          const variant = variantFor(value)
+          if (variant) {
+            model.variant.set(variant)
+            return
+          }
+          if (value === "medium") model.variant.set(undefined)
+        },
+        variant() {
+          return variantFor(effortStore.current)
+        },
+      }
+    })
+
     const mcp = {
       isEnabled(name: string) {
         const status = sync.data.mcp[name]
@@ -418,6 +489,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const result = {
       model,
+      effort,
       agent,
       mcp,
     }

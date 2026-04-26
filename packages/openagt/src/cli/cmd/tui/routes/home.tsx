@@ -1,5 +1,5 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, For } from "solid-js"
 import { TextAttributes } from "@opentui/core"
 import { useProject } from "../context/project"
 import { useSync } from "../context/sync"
@@ -12,11 +12,18 @@ import { TuiPluginRuntime } from "../plugin"
 import { useTheme } from "../context/theme"
 import { useCommandDialog } from "../component/dialog-command"
 import { DialogPrompt } from "../ui/dialog-prompt"
+import { DialogSelect } from "../ui/dialog-select"
 import { useSDK } from "../context/sdk"
 import { useToast } from "../ui/toast"
 
 let once = false
 const HOME_WIDTH = 75
+const effortOptions = [
+  { title: "Medium", value: "medium", description: "default planner + expert + verifier" },
+  { title: "Low", value: "low", description: "fast single-expert path" },
+  { title: "High", value: "high", description: "multi-round + multi-expert + reviewer" },
+  { title: "Deep", value: "deep", description: "full revise and verification governance" },
+] as const
 const placeholder = {
   normal: ["Fix a TODO in the codebase", "What is the tech stack of this project?", "Fix broken tests"],
   shell: ["ls -la", "git status", "pwd"],
@@ -73,10 +80,34 @@ export function Home() {
         })
         const text = goal?.trim()
         if (!text) return
+        const effort = await new Promise<(typeof effortOptions)[number]["value"] | undefined>((resolve) => {
+          dialog.replace(
+            () => (
+              <DialogSelect<(typeof effortOptions)[number]["value"]>
+                title="Mission effort"
+                placeholder="Select effort"
+                skipFilter
+                current={local.effort.current()}
+                options={effortOptions.map((item) => ({
+                  title: item.title,
+                  value: item.value,
+                  description: item.description,
+                }))}
+                onSelect={(option) => {
+                  local.effort.set(option.value)
+                  resolve(option.value)
+                  dialog.clear()
+                }}
+              />
+            ),
+            () => resolve(undefined),
+          )
+        })
+        if (!effort) return
         try {
           const session = (await sdk.client.session.create({ title: text.slice(0, 80) || "Mission" }, { throwOnError: true })).data
           const intent = (await sdk.client.coordinator.intent.settle({ goal: text }, { throwOnError: true })).data
-          const plan = (await sdk.client.coordinator.plan2.generate({ goal: text, intent }, { throwOnError: true })).data
+          const plan = (await sdk.client.coordinator.plan2.generate({ goal: text, intent, effort, workflow: intent.workflow }, { throwOnError: true })).data
           const mode = intent.risk_level === "high" ? "assisted" : "autonomous"
           const run = (
             await sdk.client.coordinator.run(
@@ -84,6 +115,8 @@ export function Home() {
                 sessionID: session.id,
                 goal: text,
                 intent,
+                effort,
+                workflow: intent.workflow,
                 mode,
                 nodes: plan.nodes,
               },
@@ -100,6 +133,34 @@ export function Home() {
         }
       },
       category: "Mission",
+    },
+    {
+      title: "Change effort",
+      value: "effort.change",
+      description: "Set the default effort for the next prompt or mission",
+      slash: {
+        name: "effort",
+      },
+      onSelect: (dialog) => {
+        dialog.replace(() => (
+          <DialogSelect<(typeof effortOptions)[number]["value"]>
+            title="Agent effort"
+            placeholder="Select effort"
+            skipFilter
+            current={local.effort.current()}
+            options={effortOptions.map((item) => ({
+              title: item.title,
+              value: item.value,
+              description: item.description,
+            }))}
+            onSelect={(option) => {
+              local.effort.set(option.value)
+              dialog.clear()
+            }}
+          />
+        ))
+      },
+      category: "Agent",
     },
   ])
 
@@ -128,6 +189,35 @@ export function Home() {
     sent = true
     r.submit()
   })
+
+  const EffortControl = () => (
+    <box width="100%" maxWidth={HOME_WIDTH} paddingTop={1} flexShrink={0} gap={1} flexDirection="column">
+      <box flexDirection="row" justifyContent="space-between" gap={2}>
+        <text fg={theme.textMuted} wrapMode="none">Agent effort</text>
+        <text fg={theme.textMuted} wrapMode="none">/effort</text>
+      </box>
+      <box flexDirection="row" gap={1} flexWrap="wrap">
+        <For each={effortOptions}>
+          {(item) => {
+            const selected = () => local.effort.current() === item.value
+            return (
+              <box
+                paddingLeft={1}
+                paddingRight={1}
+                backgroundColor={selected() ? theme.backgroundElement : undefined}
+                onMouseUp={() => local.effort.set(item.value)}
+              >
+                <text fg={selected() ? theme.warning : theme.textMuted} attributes={selected() ? TextAttributes.BOLD : undefined}>
+                  {item.title.toLowerCase()}
+                </text>
+              </box>
+            )
+          }}
+        </For>
+      </box>
+      <text fg={theme.textMuted}>applies to the next prompt and mission</text>
+    </box>
+  )
 
   return (
     <>
@@ -166,6 +256,7 @@ export function Home() {
             />
           </TuiPluginRuntime.Slot>
         </box>
+        <EffortControl />
         <TuiPluginRuntime.Slot name="home_bottom" />
         <box flexGrow={1} minHeight={0} />
         <Toast />
