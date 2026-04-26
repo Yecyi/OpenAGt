@@ -16,7 +16,12 @@ import { existsSync, readdirSync } from "fs"
 import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
-import { isBroadAgentTask } from "@/agent/task-classifier"
+import { BudgetTuning } from "@/agent/budget-tuning"
+import {
+  classifyGoal,
+  isBroadAgentTask,
+  isProjectDeepDiveGoal as classifiedProjectDeepDiveGoal,
+} from "@/agent/task-classifier"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -77,6 +82,9 @@ type WorkspaceSignals = {
   reasons: string[]
 }
 
+const workspaceSignalCache = new Map<string, { at: number; value: WorkspaceSignals }>()
+const workspaceSignalTtlMs = 30_000
+
 function safeReaddir(dir: string) {
   try {
     return readdirSync(dir, { withFileTypes: true }).slice(0, 256)
@@ -94,6 +102,13 @@ function workspaceSignalsForGoal(goal: string): WorkspaceSignals {
     return { file_count: 0, package_count: 0, language_count: 0, reasons: [] }
   }
   const root = process.cwd()
+  const cached = workspaceSignalCache.get(root)
+  if (cached && now() - cached.at < workspaceSignalTtlMs) {
+    return {
+      ...cached.value,
+      reasons: [...cached.value.reasons, "workspace signal cache hit"],
+    }
+  }
   const ignored = new Set([".git", "node_modules", "dist", "build", ".next", ".turbo", "coverage", ".artifacts"])
   const extensions = new Set<string>()
   const seenPackages = { value: 0 }
@@ -117,7 +132,7 @@ function workspaceSignalsForGoal(goal: string): WorkspaceSignals {
     seenPackages.value +
     (existsSync(path.join(root, "bun.lock")) || existsSync(path.join(root, "pnpm-lock.yaml")) ? 1 : 0)
   const language_count = extensions.size
-  return {
+  const value = {
     file_count,
     package_count,
     language_count,
@@ -127,24 +142,12 @@ function workspaceSignalsForGoal(goal: string): WorkspaceSignals {
       language_count >= 4 ? `workspace has ${language_count} file extension families` : undefined,
     ].filter((item): item is string => Boolean(item)),
   }
+  workspaceSignalCache.set(root, { at: now(), value })
+  return value
 }
 
 function isProjectDeepDiveGoal(goal: string) {
-  const normalized = goal.toLowerCase()
-  return (
-    isBroadAgentTask(goal) &&
-    (hasAny(normalized, [
-      "project",
-      "codebase",
-      "repo",
-      "repository",
-      "architecture",
-      "runtime",
-      "algorithm",
-      "algor",
-    ]) ||
-      hasAny(goal, ["项目", "代码库", "仓库", "架构", "运行时", "算法"]))
-  )
+  return classifiedProjectDeepDiveGoal(goal)
 }
 
 export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
@@ -212,13 +215,14 @@ export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
 }
 
 function scaleResourceLimit(limit: ResourceLimitType, multiplier: number) {
+  const minimum = BudgetTuning.resourceLimitMinimum
   return ResourceLimit.parse({
-    max_rounds: Math.max(1, Math.round(limit.max_rounds * multiplier)),
-    max_model_calls: Math.max(1, Math.round(limit.max_model_calls * multiplier)),
-    max_tool_calls: Math.max(1, Math.round(limit.max_tool_calls * multiplier)),
-    max_subagents: Math.max(1, Math.round(limit.max_subagents * multiplier)),
-    max_wallclock_ms: Math.max(60_000, Math.round(limit.max_wallclock_ms * multiplier)),
-    max_estimated_tokens: Math.max(10_000, Math.round(limit.max_estimated_tokens * multiplier)),
+    max_rounds: Math.max(minimum.max_rounds, Math.round(limit.max_rounds * multiplier)),
+    max_model_calls: Math.max(minimum.max_model_calls, Math.round(limit.max_model_calls * multiplier)),
+    max_tool_calls: Math.max(minimum.max_tool_calls, Math.round(limit.max_tool_calls * multiplier)),
+    max_subagents: Math.max(minimum.max_subagents, Math.round(limit.max_subagents * multiplier)),
+    max_wallclock_ms: Math.max(minimum.max_wallclock_ms, Math.round(limit.max_wallclock_ms * multiplier)),
+    max_estimated_tokens: Math.max(minimum.max_estimated_tokens, Math.round(limit.max_estimated_tokens * multiplier)),
   })
 }
 
@@ -272,43 +276,7 @@ function budgetScaleMultiplier(scale: BudgetScaleType) {
 }
 
 function absoluteBaseLimit(effort: EffortLevelType) {
-  return ResourceLimit.parse(
-    effort === "low"
-      ? {
-          max_rounds: 8,
-          max_model_calls: 16,
-          max_tool_calls: 80,
-          max_subagents: 4,
-          max_wallclock_ms: 20 * 60 * 1000,
-          max_estimated_tokens: 200_000,
-        }
-      : effort === "high"
-        ? {
-            max_rounds: 20,
-            max_model_calls: 48,
-            max_tool_calls: 240,
-            max_subagents: 12,
-            max_wallclock_ms: 60 * 60 * 1000,
-            max_estimated_tokens: 1_000_000,
-          }
-        : effort === "deep"
-          ? {
-              max_rounds: 30,
-              max_model_calls: 60,
-              max_tool_calls: 300,
-              max_subagents: 12,
-              max_wallclock_ms: 60 * 60 * 1000,
-              max_estimated_tokens: 1_250_000,
-            }
-          : {
-              max_rounds: 12,
-              max_model_calls: 32,
-              max_tool_calls: 160,
-              max_subagents: 8,
-              max_wallclock_ms: 45 * 60 * 1000,
-              max_estimated_tokens: 500_000,
-            },
-  )
+  return ResourceLimit.parse(BudgetTuning.resourceLimit[effort] ?? BudgetTuning.resourceLimit.medium)
 }
 
 function longTaskProfileFor(input: {
@@ -360,39 +328,11 @@ function longTaskProfileFor(input: {
 }
 
 function taskTypeForGoal(goal: string): TaskTypeType {
-  const normalized = goal.toLowerCase()
-  if (hasAny(normalized, ["review", "code review", "pull request", "pr "])) return "review"
-  if (hasAny(normalized, ["debug", "bug", "error", "fail", "failing", "fix"])) return "debugging"
-  if (isProjectDeepDiveGoal(goal)) return "research"
-  if (hasAny(normalized, ["write", "draft", "essay", "article", "copy", "story"])) return "writing"
-  if (hasAny(normalized, ["data analysis", "analyze dataset", "spreadsheet", "statistics", "stats", "chart"]))
-    return "data-analysis"
-  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"]))
-    return "coding"
-  if (hasAny(normalized, ["plan", "roadmap", "strategy", "timeline", "milestone"])) return "planning"
-  if (hasAny(normalized, ["calendar", "email", "inbox", "personal admin", "follow up", "follow-up"]))
-    return "personal-admin"
-  if (hasAny(normalized, ["research", "investigate", "analysis", "analyze"])) return "research"
-  if (hasAny(normalized, ["doc", "readme", "documentation", "writing"])) return "documentation"
-  if (hasAny(normalized, ["environment", "audit", "install", "path", "powershell", "python"]))
-    return "environment-audit"
-  if (hasAny(normalized, ["automation", "automate", "schedule", "cron"])) return "automation"
-  if (hasAny(normalized, ["organize", "file", "data", "csv", "xlsx"])) return "file-data-organization"
-  return "general-operations"
+  return classifyGoal(goal).workflow
 }
 
-function riskForGoal(goal: string, taskType: TaskTypeType) {
-  const normalized = goal.toLowerCase()
-  if (hasAny(normalized, ["delete", "drop", "reset", "wipe", "production", "deploy", "payment", "credential"]))
-    return "high"
-  if (
-    taskType === "coding" ||
-    taskType === "debugging" ||
-    taskType === "automation" ||
-    taskType === "environment-audit"
-  )
-    return "medium"
-  return "low"
+function riskForGoal(goal: string, _taskType: TaskTypeType) {
+  return classifyGoal(goal).risk_level
 }
 
 function successCriteria(taskType: TaskTypeType) {
@@ -472,6 +412,7 @@ function permissionExpectations(taskType: TaskTypeType, riskLevel: IntentProfile
 }
 
 export function settleIntentProfile(input: { goal: string }) {
+  const classification = classifyGoal(input.goal)
   const task_type = taskTypeForGoal(input.goal)
   const risk_level = riskForGoal(input.goal, task_type)
   const needs_user_clarification = input.goal.trim().length < 12
@@ -484,7 +425,7 @@ export function settleIntentProfile(input: { goal: string }) {
     needs_user_clarification,
     clarification_questions: needs_user_clarification ? ["What concrete output should this task produce?"] : [],
     workflow: task_type,
-    workflow_confidence: projectDeepDive ? "high" : input.goal.trim().length < 12 ? "low" : "medium",
+    workflow_confidence: projectDeepDive ? "high" : classification.confidence,
     secondary_workflows: [],
     expected_output: expectedOutput(task_type),
     permission_expectations: permissionExpectations(task_type, risk_level),
@@ -2060,11 +2001,18 @@ function validatePlan(plan: CoordinatorPlanType) {
   }
   const visiting = new Set<string>()
   const visited = new Set<string>()
+  const stack: string[] = []
   const walk = (id: string) => {
     if (visited.has(id)) return
-    if (visiting.has(id)) throw new Error(`Coordinator plan contains a cycle at node ${id}`)
+    if (visiting.has(id)) {
+      const start = stack.indexOf(id)
+      const cycle = [...(start >= 0 ? stack.slice(start) : stack), id].join(" -> ")
+      throw new Error(`Coordinator plan contains cycle: ${cycle}`)
+    }
     visiting.add(id)
+    stack.push(id)
     for (const dep of nodes.get(id)?.depends_on ?? []) walk(dep)
+    stack.pop()
     visiting.delete(id)
     visited.add(id)
   }
@@ -2072,6 +2020,7 @@ function validatePlan(plan: CoordinatorPlanType) {
 }
 
 function orderPlan(plan: CoordinatorPlanType) {
+  validatePlan(plan)
   const nodes = new Map(plan.nodes.map((item) => [item.id, item]))
   const ordered: CoordinatorNodeType[] = []
   const visited = new Set<string>()
@@ -2429,7 +2378,7 @@ function gateStatusFor(taskByNode: Map<string, TaskRuntime.TaskRecord>, nodeID?:
   if (!task) return "pending" as const
   if (task.status === "completed")
     return reviewFailureMessage(reviewVerdictForTask(task)) ? ("failed" as const) : ("passed" as const)
-  if (task.status === "partial") return "failed" as const
+  if (task.status === "partial") return task.metadata?.retryable === true ? ("pending" as const) : ("failed" as const)
   if (task.status === "failed") return "failed" as const
   if (task.status === "cancelled") return "skipped" as const
   return task.status
@@ -2626,7 +2575,7 @@ export const layer = Layer.effect(
       yield* Effect.forEach(
         governed.nodes.flatMap((item) => (item.model ? [item.model] : [])),
         (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
-        { concurrency: "unbounded", discard: true },
+        { concurrency: BudgetTuning.concurrency.storageRead, discard: true },
       )
       return orderPlan(governed)
     })
@@ -2868,7 +2817,7 @@ export const layer = Layer.effect(
             })
             .pipe(Effect.map((allowed) => (allowed ? item : undefined))),
         {
-          concurrency: "unbounded",
+          concurrency: BudgetTuning.concurrency.storageRead,
         },
       )).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
       const runtime = runtimeStateFor(run, allTasks)
@@ -2952,7 +2901,7 @@ export const layer = Layer.effect(
         selected,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
         {
-          concurrency: "unbounded",
+          concurrency: BudgetTuning.concurrency.storageRead,
         },
       )
       if (selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
@@ -3349,7 +3298,7 @@ export const layer = Layer.effect(
             })
           }),
         {
-          concurrency: "unbounded",
+          concurrency: BudgetTuning.concurrency.storageRead,
         },
       )
       const updated = yield* Effect.sync(() =>
@@ -3383,7 +3332,7 @@ export const layer = Layer.effect(
             parentSessionID: item.parent_session_id,
           }),
         {
-          concurrency: "unbounded",
+          concurrency: BudgetTuning.concurrency.storageRead,
           discard: true,
         },
       )
@@ -3421,7 +3370,12 @@ export const layer = Layer.effect(
       const taskList = yield* relevantTasks(runOpt.value)
       const runtime = runtimeStateFor(runOpt.value, taskList)
       const requested = input.budgetDelta ?? runtime.continuation_request?.requested_budget_delta
-      const delta = requested ?? scaleResourceLimit(runOpt.value.plan.budget_profile.single_checkpoint_ceiling, 0.5)
+      if (!requested) {
+        return yield* Effect.fail(
+          new Error("Coordinator continue requires an active continuation request or explicit budgetDelta"),
+        )
+      }
+      const delta = requested
       const fullDelta = ResourceLimit.parse({
         max_rounds: delta.max_rounds ?? 0,
         max_model_calls: delta.max_model_calls ?? 0,

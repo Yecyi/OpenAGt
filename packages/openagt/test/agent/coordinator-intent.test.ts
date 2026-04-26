@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+﻿import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 import { isBroadAgentTask } from "../../src/agent/task-classifier"
 
@@ -8,6 +8,14 @@ describe("coordinator intent planning", () => {
     expect(isBroadAgentTask("draft an architecture decision record")).toBe(false)
     expect(isBroadAgentTask("dive deeper into this project and outline architecture and algorithms")).toBe(true)
     expect(isBroadAgentTask("深入分析这个项目的架构和算法")).toBe(true)
+  })
+
+  test("classifies Chinese high-risk debugging without falling back to general operations", () => {
+    const intent = settleIntentProfile({ goal: "调试生产数据库丢失问题" })
+
+    expect(intent.workflow).toBe("debugging")
+    expect(intent.risk_level).toBe("high")
+    expect(intent.workflow_confidence).toBe("high")
   })
 
   test("builds a coding workflow with parallel research, reducer, verifier group, and reviewer", () => {
@@ -203,5 +211,30 @@ describe("coordinator intent planning", () => {
     expect([writing, data, planning, admin].every((plan) => plan.nodes.some((item) => item.role === "reviser"))).toBe(
       true,
     )
+  })
+
+  test("all public workflow adapters produce concrete non-empty plans", () => {
+    const cases = [
+      ["coding", "implement a backend API"],
+      ["review", "review this pull request"],
+      ["debugging", "debug failing tests"],
+      ["research", "research this project architecture"],
+      ["writing", "write a technical article"],
+      ["data-analysis", "analyze dataset statistics"],
+      ["planning", "plan a release roadmap"],
+      ["personal-admin", "prioritize inbox follow-up tasks"],
+      ["documentation", "update README documentation"],
+      ["environment-audit", "audit powershell python environment"],
+      ["automation", "automate scheduled cleanup workflow"],
+      ["file-data-organization", "organize files into folders"],
+      ["general-operations", "complete this general task"],
+    ] as const
+
+    for (const [workflow, goal] of cases) {
+      const plan = defaultPlanForIntent(settleIntentProfile({ goal }), { workflow })
+      expect(plan.workflow).toBe(workflow)
+      expect(plan.nodes.length).toBeGreaterThan(0)
+      expect(plan.nodes.some((item) => item.role !== "reviser")).toBe(true)
+    }
   })
 })

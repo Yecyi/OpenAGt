@@ -22,6 +22,12 @@ const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
 const SAMPLE_BYTES = 4096
 const EXACT_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
+async function newlineBytes(filepath: string) {
+  const sample = Buffer.from(await Bun.file(filepath).slice(0, SAMPLE_BYTES).arrayBuffer())
+  if (sample.includes("\r\n")) return 2
+  return 1
+}
+
 const parameters = z.object({
   filePath: z.string().describe("The absolute path to the file or directory to read"),
   offset: z.coerce.number().int().min(1).describe("The line number to start reading from (1-indexed)").optional(),
@@ -300,6 +306,7 @@ export const ReadTool = Tool.define(
 
 async function lines(filepath: string, opts: { limit: number; offset: number; exactTotal: boolean }) {
   const stream = createReadStream(filepath, { encoding: "utf8" })
+  const newline = await newlineBytes(filepath)
   const rl = createInterface({
     input: stream,
     // Note: we use the crlfDelay option to recognize all instances of CR LF
@@ -329,7 +336,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number; ex
       }
 
       const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
-      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? 1 : 0)
+      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? newline : 0)
       if (bytes + size > MAX_BYTES) {
         cut = true
         more = true

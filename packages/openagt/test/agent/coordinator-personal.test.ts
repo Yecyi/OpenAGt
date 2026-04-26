@@ -77,6 +77,87 @@ describe("coordinator runtime", () => {
     ),
   )
 
+  it.live("rejects dangling custom plan dependencies", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator dangling parent" })
+
+        const error = yield* Effect.flip(
+          coordinator.run({
+            sessionID: parent.id,
+            goal: "Inspect missing dependency",
+            nodes: [
+              {
+                id: "research",
+                description: "Research",
+                prompt: "Research.",
+                task_kind: "research",
+                subagent_type: "general",
+                depends_on: ["missing"],
+                write_scope: [],
+                read_scope: ["src"],
+                acceptance_checks: ["checked"],
+                priority: "normal",
+                origin: "coordinator",
+              },
+            ],
+          }),
+        )
+
+        expect(error.message).toContain("Coordinator dependency missing: research depends on unknown node missing")
+      }),
+    ),
+  )
+
+  it.live("rejects cyclic custom plan dependencies", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator cycle parent" })
+
+        const error = yield* Effect.flip(
+          coordinator.run({
+            sessionID: parent.id,
+            goal: "Inspect cyclic dependencies",
+            nodes: [
+              {
+                id: "a",
+                description: "A",
+                prompt: "A.",
+                task_kind: "research",
+                subagent_type: "general",
+                depends_on: ["b"],
+                write_scope: [],
+                read_scope: ["src/a"],
+                acceptance_checks: ["a checked"],
+                priority: "normal",
+                origin: "coordinator",
+              },
+              {
+                id: "b",
+                description: "B",
+                prompt: "B.",
+                task_kind: "research",
+                subagent_type: "general",
+                depends_on: ["a"],
+                write_scope: [],
+                read_scope: ["src/b"],
+                acceptance_checks: ["b checked"],
+                priority: "normal",
+                origin: "coordinator",
+              },
+            ],
+          }),
+        )
+
+        expect(error.message).toContain("Coordinator plan contains cycle:")
+      }),
+    ),
+  )
+
   it.live("fails dispatched tasks when no prompt executor is available", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
@@ -106,8 +187,14 @@ describe("coordinator runtime", () => {
         })
 
         yield* coordinator.approve(run.id)
-        yield* Effect.sleep("20 millis")
-        const projection = yield* coordinator.projection(run.id)
+        const projection = yield* Effect.gen(function* () {
+          for (const _ of Array.from({ length: 20 })) {
+            const current = yield* coordinator.projection(run.id)
+            if (current.counts.failed > 0) return current
+            yield* Effect.sleep("20 millis")
+          }
+          return yield* coordinator.projection(run.id)
+        })
         const failed = projection.tasks.find((item) => item.status === "failed")
 
         expect(projection.counts.failed).toBe(1)
@@ -259,8 +346,14 @@ describe("coordinator runtime", () => {
         const approved = yield* coordinator.approve(run.id)
         expect(approved.state).toBe("active")
 
-        yield* Effect.sleep("20 millis")
-        const first = (yield* tasks.list(parent.id)).find((item) => item.status === "failed")
+        const first = yield* Effect.gen(function* () {
+          for (const _ of Array.from({ length: 20 })) {
+            const failed = (yield* tasks.list(parent.id)).find((item) => item.status === "failed")
+            if (failed) return failed
+            yield* Effect.sleep("20 millis")
+          }
+          return (yield* tasks.list(parent.id)).find((item) => item.status === "failed")
+        })
         if (!first) throw new Error("Expected a failed coordinator task")
         expect(first.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
 

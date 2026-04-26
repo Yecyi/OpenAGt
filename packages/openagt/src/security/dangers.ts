@@ -88,8 +88,6 @@ export const SAFE_ENV_VARS = new Set([
  * Additional safe environment variables for ANT-specific context
  */
 export const ANT_ONLY_SAFE_ENV_VARS = new Set([
-  "KUBECONFIG",
-  "DOCKER_HOST",
   "AWS_PROFILE",
   "CLOUDSDK_CORE_PROJECT",
   "CLUSTER",

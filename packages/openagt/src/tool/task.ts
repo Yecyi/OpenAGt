@@ -10,7 +10,8 @@ import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Cause, Effect, Exit, Option } from "effect"
 import { TaskKind, TaskRuntime, type TaskRecord } from "../session/task-runtime"
-import { effortFromMetadata, isBroadAgentTask, numericMetadata } from "../agent/task-classifier"
+import { BudgetTuning, effortStepBudget, effortTimeoutFloor } from "../agent/budget-tuning"
+import { classifyGoal, effortFromMetadata, numericMetadata } from "../agent/task-classifier"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): void
@@ -57,10 +58,12 @@ type TaskMetadata = {
   partial?: boolean
   limitReason?: string
   partialSummary?: string
+  resultText?: string
+  remainingScope?: string[]
 }
 
 function taskPartialSummary(messages: MessageV2.WithParts[]) {
-  const summary = messages
+  const items = messages
     .filter((message) => message.info.role === "assistant")
     .flatMap((message) =>
       message.parts.flatMap((part) => {
@@ -74,34 +77,55 @@ function taskPartialSummary(messages: MessageV2.WithParts[]) {
         return [`tool ${part.tool} pending`]
       }),
     )
+  const finalText = items.findLast((item) => item.trim().length > 0)
+  const summary = items
     .join("\n")
     .trim()
   if (!summary) return undefined
-  return summary.length > 4_000 ? summary.slice(-4_000) : summary
+  if (summary.length <= 4_000) return summary
+  const tail = Array.from(summary).slice(-3_600).join("")
+  return ["[truncated partial task history]", tail, finalText && !tail.includes(finalText) ? finalText : undefined]
+    .filter((item): item is string => Boolean(item))
+    .join("\n")
 }
 
 function taskStepBudget(params: z.infer<typeof parameters>, agentName: string, taskKind: z.infer<typeof TaskKind>) {
   const explicit = numericMetadata(params.metadata, "max_steps") ?? numericMetadata(params.metadata, "step_budget")
-  if (explicit) return Math.min(explicit, 240)
+  if (explicit) {
+    const value = Math.min(explicit, BudgetTuning.step.absoluteCap)
+    return {
+      value,
+      metadata: {
+        requested_step_budget: explicit,
+        effective_step_budget: value,
+        limit_reason: explicit > value ? "step_budget_cap" : undefined,
+      },
+    }
+  }
   const effort = effortFromMetadata(params.metadata)
-  const broad = isBroadAgentTask(params.prompt)
+  const broad = classifyGoal(params.prompt).broad_task
   const base =
-    effort === "deep"
-      ? 96
-      : effort === "high"
-        ? 64
-        : effort === "medium"
-          ? 36
-          : effort === "low"
-            ? 16
-            : agentName === "explore" && broad
-              ? 48
-              : taskKind === "research" && broad
-                ? 36
-                : undefined
+    effortStepBudget(effort) ??
+    (agentName === "explore" && broad
+      ? BudgetTuning.step.broadExploreFloor
+      : taskKind === "research" && broad
+        ? BudgetTuning.step.broadResearchFloor
+        : undefined)
   if (!base) return undefined
-  if (agentName === "explore" && broad) return Math.max(base, 48)
-  return base
+  const broadFloor =
+    agentName === "explore" && broad
+      ? BudgetTuning.step.broadExploreFloor
+      : taskKind === "research" && broad
+        ? BudgetTuning.step.broadResearchFloor
+        : 0
+  const value = Math.max(base, broadFloor)
+  return {
+    value,
+    metadata: {
+      effective_step_budget: value,
+      limit_reason: value > base ? "broad_explore_floor" : undefined,
+    },
+  }
 }
 
 function taskTimeoutMs(
@@ -111,26 +135,36 @@ function taskTimeoutMs(
   stepBudget: number | undefined,
 ) {
   const requested = numericMetadata(params.metadata, "timeout_ms")
-  if (requested) return Math.min(requested, 1_800_000)
+  if (requested) {
+    const value = Math.min(requested, BudgetTuning.timeoutMs.absoluteCap)
+    return {
+      value,
+      metadata: {
+        requested_timeout_ms: requested,
+        effective_timeout_ms: value,
+        timeout_limit_reason: requested > value ? "timeout_cap" : undefined,
+      },
+    }
+  }
   const effort = effortFromMetadata(params.metadata)
-  const broad = isBroadAgentTask(params.prompt)
-  const base = agentName === "explore" ? 180_000 : 300_000
-  const effortFloor =
-    effort === "deep"
-      ? 900_000
-      : effort === "high"
-        ? 600_000
-        : effort === "medium"
-          ? 300_000
-          : effort === "low"
-            ? 120_000
-            : base
+  const broad = classifyGoal(params.prompt).broad_task
+  const base = agentName === "explore" ? BudgetTuning.timeoutMs.exploreBase : BudgetTuning.timeoutMs.defaultBase
+  const effortFloor = effortTimeoutFloor(effort) ?? base
   const broadFloor =
     broad || taskKind === "research"
-      ? Math.max(effortFloor, agentName === "explore" ? 360_000 : 480_000)
+      ? Math.max(
+          effortFloor,
+          agentName === "explore" ? BudgetTuning.timeoutMs.broadExploreFloor : BudgetTuning.timeoutMs.broadResearchFloor,
+        )
       : effortFloor
-  const stepFloor = stepBudget ? stepBudget * 12_000 : base
-  return Math.min(Math.max(base, broadFloor, stepFloor), 1_800_000)
+  const stepFloor = stepBudget ? stepBudget * BudgetTuning.timeoutMs.perStepFloor : base
+  const value = Math.min(Math.max(base, broadFloor, stepFloor), BudgetTuning.timeoutMs.absoluteCap)
+  return {
+    value,
+    metadata: {
+      effective_timeout_ms: value,
+    },
+  }
 }
 
 function assistantText(message: MessageV2.WithParts) {
@@ -257,8 +291,19 @@ export const TaskTool = Tool.define(
       const readOnlyTask = next.name === "explore" || (taskKind === "research" && (params.write_scope ?? []).length === 0)
       const stepBudget = taskStepBudget(params, next.name, taskKind)
       const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
-      const timeoutMs = taskTimeoutMs(params, next.name, taskKind, stepBudget)
+      const timeoutMs = taskTimeoutMs(params, next.name, taskKind, stepBudget?.value)
       const existingRecord = yield* tasks.get({ taskID: nextSession.id, parentSessionID: ctx.sessionID })
+      const classification = classifyGoal(params.prompt)
+      const runtimeMetadata = {
+        ...(params.metadata ?? {}),
+        ...stepBudget?.metadata,
+        ...timeoutMs.metadata,
+        broad_task: classification.broad_task,
+        classification_confidence: classification.confidence,
+        classification_reasons: classification.reasons,
+        matched_terms: classification.matched_terms,
+        fallback_used: classification.fallback_used,
+      }
 
       const record =
         Option.isSome(existingRecord)
@@ -281,7 +326,7 @@ export const TaskTool = Tool.define(
               acceptanceChecks: params.acceptance_checks,
               priority: params.priority,
               origin: params.origin,
-              metadata: params.metadata,
+              metadata: runtimeMetadata,
             })
 
       if (record.status !== "pending") {
@@ -295,10 +340,14 @@ export const TaskTool = Tool.define(
             groupId: record.group_id,
             partial: record.status === "partial" ? true : undefined,
             retryable: record.metadata?.retryable === true ? true : undefined,
-            limitReason: typeof record.metadata?.limit_reason === "string" ? record.metadata.limit_reason : undefined,
-            partialSummary:
-              typeof record.metadata?.partial_summary === "string" ? record.metadata.partial_summary : undefined,
-          },
+                  limitReason: typeof record.metadata?.limit_reason === "string" ? record.metadata.limit_reason : undefined,
+                  partialSummary:
+                    typeof record.metadata?.partial_summary === "string" ? record.metadata.partial_summary : undefined,
+                  resultText: typeof record.metadata?.result_text === "string" ? record.metadata.result_text : undefined,
+                  remainingScope: Array.isArray(record.metadata?.remaining_scope)
+                    ? record.metadata.remaining_scope.filter((item): item is string => typeof item === "string")
+                    : undefined,
+                },
           output: [
             `task_id: ${nextSession.id} (${record.status})`,
             "",
@@ -368,14 +417,14 @@ export const TaskTool = Tool.define(
                 },
                 agent: next.name,
                 runtime: {
-                  stepBudget,
-                  timeoutMs,
+                  stepBudget: stepBudget?.value,
+                  timeoutMs: timeoutMs.value,
                   maxParallelSubagents:
-                    numericMetadata(params.metadata, "max_parallel_subagents") ??
-                    numericMetadata(params.metadata, "maxParallelSubagents"),
+                    numericMetadata(runtimeMetadata, "max_parallel_subagents") ??
+                    numericMetadata(runtimeMetadata, "maxParallelSubagents"),
                   effort: effortFromMetadata(params.metadata),
                   taskKind,
-                  reason: isBroadAgentTask(params.prompt) ? "broad task or high-effort subagent" : undefined,
+                  reason: classification.broad_task ? "broad task or high-effort subagent" : undefined,
                 },
                 tools: {
                   ...(readOnlyTask
@@ -387,7 +436,7 @@ export const TaskTool = Tool.define(
                 },
                 parts,
               })
-              .pipe(Effect.timeout(`${timeoutMs} millis`), Effect.exit)
+              .pipe(Effect.timeout(`${timeoutMs.value} millis`), Effect.exit)
             const result = Exit.isSuccess(promptExit)
               ? { status: "completed" as const, message: promptExit.value }
               : yield* Effect.gen(function* () {
@@ -397,9 +446,9 @@ export const TaskTool = Tool.define(
                   if (timeout) cancel()
                   const partial = timeout ? yield* partialSummary() : undefined
                   return {
-                    status: "failed" as const,
+                    status: timeout ? ("partial" as const) : ("failed" as const),
                     error: timeout
-                      ? `Subagent timed out after ${Math.round(timeoutMs / 1000)}s`
+                      ? `Subagent timed out after ${Math.round(timeoutMs.value / 1000)}s`
                       : error instanceof Error
                         ? error.message
                         : String(error),
@@ -407,6 +456,44 @@ export const TaskTool = Tool.define(
                     partial,
                   }
                 })
+
+            if (result.status === "partial") {
+              const summary = result.partial ?? "No partial output was available before the subagent timed out."
+              yield* tasks.partial({
+                taskID: nextSession.id,
+                parentSessionID: ctx.sessionID,
+                output: summary,
+                reason: "timeout",
+                retryable: true,
+                remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
+              })
+
+              return {
+                title: params.description,
+                metadata: {
+                  sessionId: nextSession.id,
+                  model,
+                  taskId: nextSession.id,
+                  status: "partial" as const,
+                  groupId: params.group_id,
+                  error: result.error,
+                  retryable: true,
+                  partial: true,
+                  limitReason: "timeout",
+                  partialSummary: summary,
+                  remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
+                },
+                output: [
+                  `task_id: ${nextSession.id} (partial, retryable)`,
+                  "",
+                  '<partial_task_result status="partial" reason="timeout">',
+                  summary,
+                  "",
+                  result.error,
+                  "</partial_task_result>",
+                ].join("\n"),
+              }
+            }
 
             if (result.status === "failed") {
               yield* tasks.fail({
@@ -440,17 +527,23 @@ export const TaskTool = Tool.define(
               }
             }
 
-            const maxStepReason = limitReason(result.message)
+            if (result.status !== "completed") {
+              return yield* Effect.fail(new Error(`Unhandled task result status: ${result.status}`))
+            }
+
+            const completedMessage = result.message
+            const maxStepReason = limitReason(completedMessage)
             if (maxStepReason) {
               yield* tasks.partial({
                 taskID: nextSession.id,
                 parentSessionID: ctx.sessionID,
-                result: result.message,
+                result: completedMessage,
                 reason: maxStepReason,
                 retryable: true,
+                remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
               })
 
-              const summary = assistantText(result.message) || "Subagent reached its step budget before returning a detailed summary."
+              const summary = assistantText(completedMessage) || "Subagent reached its step budget before returning a detailed summary."
 
               return {
                 title: params.description,
@@ -464,6 +557,8 @@ export const TaskTool = Tool.define(
                   retryable: true,
                   limitReason: maxStepReason,
                   partialSummary: summary,
+                  resultText: summary,
+                  remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
                 },
                 output: [
                   `task_id: ${nextSession.id} (partial, retryable)`,
@@ -480,10 +575,10 @@ export const TaskTool = Tool.define(
             yield* tasks.complete({
               taskID: nextSession.id,
               parentSessionID: ctx.sessionID,
-              result: result.message,
+              result: completedMessage,
             })
 
-            const summary = assistantText(result.message)
+            const summary = assistantText(completedMessage)
 
             return {
               title: params.description,

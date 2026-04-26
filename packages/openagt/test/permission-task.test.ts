@@ -58,7 +58,7 @@ describe("Permission.evaluate for permission.task", () => {
     expect(Permission.evaluate("task", "code-reviewer", globalRuleset).action).toBe("ask")
   })
 
-  test("later rules take precedence (last match wins)", () => {
+  test("specific allow can override broader deny rules", () => {
     const ruleset = createRuleset({
       "orchestrator-*": "deny",
       "orchestrator-fast": "allow",
@@ -241,7 +241,7 @@ describe("permission.task with real config files", () => {
         const config = await load()
         const ruleset = Permission.fromConfig(config.permission ?? {})
 
-        // Verify task permissions
+        // Verify task permissions. Specific allow can override a broad deny.
         expect(Permission.evaluate("task", "general", ruleset).action).toBe("allow")
         expect(Permission.evaluate("task", "code-reviewer", ruleset).action).toBe("deny")
 
@@ -310,9 +310,9 @@ describe("permission.task with real config files", () => {
         const config = await load()
         const ruleset = Permission.fromConfig(config.permission ?? {})
 
-        // Evaluate uses findLast - "general" allow comes after "*" deny
+        // Specific allow can override a broad wildcard deny.
         expect(Permission.evaluate("task", "general", ruleset).action).toBe("allow")
-        // Other agents still denied by the earlier "*" deny
+        // Other agents are denied by the wildcard deny.
         expect(Permission.evaluate("task", "code-reviewer", ruleset).action).toBe("deny")
 
         // disabled() uses findLast and checks if the last rule has pattern: "*" with action: "deny"

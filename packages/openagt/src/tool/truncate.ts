@@ -72,7 +72,9 @@ export const layer = Layer.effect(
       const maxLines = options.maxLines ?? MAX_LINES
       const maxBytes = options.maxBytes ?? MAX_BYTES
       const direction = options.direction ?? "head"
-      const lines = text.split("\n")
+      const newline = text.includes("\r\n") ? "\r\n" : "\n"
+      const newlineBytes = Buffer.byteLength(newline, "utf-8")
+      const lines = text.split(newline)
       const totalBytes = Buffer.byteLength(text, "utf-8")
 
       if (lines.length <= maxLines && totalBytes <= maxBytes) {
@@ -86,7 +88,7 @@ export const layer = Layer.effect(
 
       if (direction === "head") {
         for (i = 0; i < lines.length && i < maxLines; i++) {
-          const size = Buffer.byteLength(lines[i], "utf-8") + (i > 0 ? 1 : 0)
+          const size = Buffer.byteLength(lines[i], "utf-8") + (i > 0 ? newlineBytes : 0)
           if (bytes + size > maxBytes) {
             hitBytes = true
             break
@@ -96,7 +98,7 @@ export const layer = Layer.effect(
         }
       } else {
         for (i = lines.length - 1; i >= 0 && out.length < maxLines; i--) {
-          const size = Buffer.byteLength(lines[i], "utf-8") + (out.length > 0 ? 1 : 0)
+          const size = Buffer.byteLength(lines[i], "utf-8") + (out.length > 0 ? newlineBytes : 0)
           if (bytes + size > maxBytes) {
             hitBytes = true
             break
@@ -108,7 +110,7 @@ export const layer = Layer.effect(
 
       const removed = hitBytes ? totalBytes - bytes : lines.length - out.length
       const unit = hitBytes ? "bytes" : "lines"
-      const preview = out.join("\n")
+      const preview = out.join(newline)
       const file = yield* write(text)
 
       const hint = hasTaskTool(agent)

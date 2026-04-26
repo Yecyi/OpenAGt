@@ -5,6 +5,7 @@ import { SessionID } from "./schema"
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { MessageV2 } from "./message-v2"
+import { BudgetTuning } from "@/agent/budget-tuning"
 
 export const TaskStatus = z.enum(["pending", "running", "completed", "partial", "failed", "cancelled"])
 export type TaskStatus = z.infer<typeof TaskStatus>
@@ -120,16 +121,31 @@ function summarizeMessage(text: string | undefined) {
     .split("\n")
     .map((item) => item.trim())
     .find(Boolean)
-  return line ? line.slice(0, 400) : ""
+  return line ? Array.from(line).slice(0, 400).join("") : ""
 }
 
 function fullMessageText(text: string | undefined) {
   if (!text) return ""
-  return text.replace(/<\/?task_result(?:\s[^>]*)?>/g, "").trim().slice(0, 8_000)
+  return text.replace(/<\/?task_result(?:\s[^>]*)?>/g, "").trim()
 }
 
 function promptHash(prompt: string) {
-  return Buffer.from(prompt).toString("base64url").slice(0, 64)
+  return Bun.hash(prompt).toString(36)
+}
+
+function normalizedUsage(info: Extract<MessageV2.Info, { role: "assistant" }>) {
+  const provider = String(info.providerID)
+  const totalTokens =
+    info.tokens.total ??
+    (provider.includes("anthropic")
+      ? info.tokens.input + info.tokens.output + info.tokens.reasoning
+      : info.tokens.input + info.tokens.output + info.tokens.reasoning + info.tokens.cache.read + info.tokens.cache.write)
+  return {
+    totalTokens,
+    inputTokens: info.tokens.input,
+    outputTokens: info.tokens.output,
+    reasoningTokens: info.tokens.reasoning,
+  }
 }
 
 function resultFromRecord(record: TaskRecord): TaskResult {
@@ -156,6 +172,18 @@ function resultFromRecord(record: TaskRecord): TaskResult {
           "retryable",
           "limit_reason",
           "partial_summary",
+          "result_text",
+          "remaining_scope",
+          "requested_step_budget",
+          "effective_step_budget",
+          "requested_timeout_ms",
+          "effective_timeout_ms",
+          "timeout_limit_reason",
+          "broad_task",
+          "classification_confidence",
+          "classification_reasons",
+          "matched_terms",
+          "fallback_used",
         ].flatMap((key) => (key in record.metadata! ? [[key, record.metadata![key]] as const] : [])),
       )
     : undefined
@@ -194,6 +222,10 @@ function scopeOverlap(left: string[], right: string[]) {
   return left.some((item) =>
     right.some((other) => item === other || item.startsWith(other + "/") || other.startsWith(item + "/")),
   )
+}
+
+function scopedReadOverlap(left: string[], right: string[]) {
+  return left.length > 0 && right.length > 0 && scopeOverlap(left, right)
 }
 
 export interface Interface {
@@ -237,6 +269,7 @@ export interface Interface {
     output?: string
     reason: string
     retryable?: boolean
+    remainingScope?: string[]
   }) => Effect.Effect<TaskRecord, Error>
   readonly fail: (input: {
     taskID: SessionID
@@ -288,7 +321,7 @@ export const layer = Layer.effect(
             .read<TaskRecord>(taskKey(record.parent_session_id, key[key.length - 1] as SessionID))
             .pipe(Effect.option),
         ),
-        { concurrency: "unbounded" },
+        { concurrency: BudgetTuning.concurrency.storageRead },
       )
       const all = records
         .filter(Option.isSome)
@@ -364,8 +397,16 @@ export const layer = Layer.effect(
       fn: (draft: TaskRecord) => void,
     ): Effect.Effect<TaskRecord, Error> =>
       Effect.gen(function* () {
+        const before = yield* storage.read<TaskRecord>(taskKey(parentSessionID, taskID)).pipe(Effect.option)
         const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), fn)
-        yield* refreshGroup(record)
+        const beforeStatus = Option.isSome(before) ? before.value.status : undefined
+        const groupStateChanged =
+          Option.isNone(before) ||
+          before.value.group_id !== record.group_id ||
+          beforeStatus !== record.status
+        if (groupStateChanged) {
+          yield* refreshGroup(record)
+        }
         yield* publishUpdate(record)
         return record
       })
@@ -425,16 +466,9 @@ export const layer = Layer.effect(
           }
         }
         if (input.result?.info.role === "assistant") {
+          const usage = normalizedUsage(input.result.info)
           draft.usage = {
-            totalTokens:
-              input.result.info.tokens.input +
-              input.result.info.tokens.output +
-              input.result.info.tokens.reasoning +
-              input.result.info.tokens.cache.read +
-              input.result.info.tokens.cache.write,
-            inputTokens: input.result.info.tokens.input,
-            outputTokens: input.result.info.tokens.output,
-            reasoningTokens: input.result.info.tokens.reasoning,
+            ...usage,
             durationMs:
               draft.started_at && input.result.info.time.created
                 ? Math.max(0, input.result.info.time.created - draft.started_at)
@@ -458,18 +492,13 @@ export const layer = Layer.effect(
           retryable: input.retryable ?? true,
           limit_reason: input.reason,
           partial_summary: fullMessageText(text),
+          result_text: fullMessageText(text),
+          remaining_scope: input.remainingScope ?? draft.acceptance_checks ?? draft.read_scope ?? draft.write_scope,
         }
         if (input.result?.info.role === "assistant") {
+          const usage = normalizedUsage(input.result.info)
           draft.usage = {
-            totalTokens:
-              input.result.info.tokens.input +
-              input.result.info.tokens.output +
-              input.result.info.tokens.reasoning +
-              input.result.info.tokens.cache.read +
-              input.result.info.tokens.cache.write,
-            inputTokens: input.result.info.tokens.input,
-            outputTokens: input.result.info.tokens.output,
-            reasoningTokens: input.result.info.tokens.reasoning,
+            ...usage,
             durationMs:
               draft.started_at && input.result.info.time.created
                 ? Math.max(0, input.result.info.time.created - draft.started_at)
@@ -525,6 +554,8 @@ export const layer = Layer.effect(
             limit_reason: undefined,
             partial_summary: undefined,
             result_text: undefined,
+            remaining_scope: undefined,
+            review_text: undefined,
           }
         }
       })
@@ -534,7 +565,7 @@ export const layer = Layer.effect(
       const keys = yield* storage.list(["task", parentSessionID])
       const items = yield* Effect.all(
         keys.map((key) => storage.read<TaskRecord>(key).pipe(Effect.catch(() => Effect.succeed(undefined)))),
-        { concurrency: "unbounded" },
+        { concurrency: BudgetTuning.concurrency.storageRead },
       )
       return items.filter((item): item is TaskRecord => Boolean(item)).toSorted((a, b) => b.created_at - a.created_at)
     })
@@ -557,7 +588,9 @@ export const layer = Layer.effect(
       }
       if (input.task.task_kind !== "verify") return true
       return !running.some(
-        (item) => item.task_kind === "implement" && scopeOverlap(item.write_scope, input.task.read_scope),
+        (item) =>
+          (item.task_kind === "implement" && scopeOverlap(item.write_scope, input.task.read_scope)) ||
+          (item.task_kind === "verify" && scopedReadOverlap(item.read_scope, input.task.read_scope)),
       )
     })
 

@@ -586,6 +586,44 @@ describe("tool.task", () => {
     ),
   )
 
+  it.live("explicit step budget clamps visibly in task metadata", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tasks = yield* TaskRuntime.Service
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+
+        const result = yield* def.execute(
+          {
+            description: "inspect budget",
+            prompt: "explore this project thoroughly",
+            subagent_type: "explore",
+            task_kind: "research",
+            metadata: { max_steps: 500 },
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps: stubOps({ onPrompt: (input) => (seen = input) }) },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        const record = (yield* tasks.list(chat.id)).find((item) => item.task_id === result.metadata.taskId)
+
+        expect(seen?.runtime?.stepBudget).toBe(240)
+        expect(record?.metadata?.requested_step_budget).toBe(500)
+        expect(record?.metadata?.effective_step_budget).toBe(240)
+        expect(record?.metadata?.limit_reason).toBe("step_budget_cap")
+      }),
+    ),
+  )
+
   it.live("max-step subagent result is returned as retryable partial output", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
@@ -710,7 +748,7 @@ describe("tool.task", () => {
     ),
   )
 
-  it.live("raw task prompt timeout cancels and marks task failed", () =>
+  it.live("raw task prompt timeout cancels and marks task partial", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const { chat, assistant } = yield* seed()
@@ -761,14 +799,14 @@ describe("tool.task", () => {
         const cancelledID = yield* Deferred.await(cancelled).pipe(Effect.timeout("1 second"))
         const record = (yield* tasks.list(chat.id)).find((item) => item.task_id === taskID)
 
-        expect(result.metadata.status).toBe("failed")
+        expect(result.metadata.status).toBe("partial")
         expect(result.metadata.retryable).toBe(true)
         expect(result.metadata.partialSummary).toContain("partial evidence before timeout")
-        expect(result.output).toContain('<task_result status="failed">')
-        expect(result.output).toContain('<partial_task_result status="partial">')
+        expect(result.output).toContain('<partial_task_result status="partial" reason="timeout">')
         expect(cancelledID).toBe(taskID)
-        expect(record?.status).toBe("failed")
-        expect(record?.error_summary).toContain("Subagent timed out after")
+        expect(record?.status).toBe("partial")
+        expect(record?.metadata?.limit_reason).toBe("timeout")
+        expect(record?.metadata?.result_text).toContain("partial evidence before timeout")
       }),
     ),
   )

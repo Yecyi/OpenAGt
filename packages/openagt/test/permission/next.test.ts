@@ -242,7 +242,7 @@ test("evaluate - wildcard pattern match", () => {
   expect(result.action).toBe("allow")
 })
 
-test("evaluate - last matching rule wins", () => {
+test("evaluate - specific deny wins over broad allow", () => {
   const result = Permission.evaluate("bash", "rm", [
     { permission: "bash", pattern: "*", action: "allow" },
     { permission: "bash", pattern: "rm", action: "deny" },
@@ -250,12 +250,12 @@ test("evaluate - last matching rule wins", () => {
   expect(result.action).toBe("deny")
 })
 
-test("evaluate - last matching rule wins (wildcard after specific)", () => {
+test("evaluate - specific deny wins over later broad allow", () => {
   const result = Permission.evaluate("bash", "rm", [
     { permission: "bash", pattern: "rm", action: "deny" },
     { permission: "bash", pattern: "*", action: "allow" },
   ])
-  expect(result.action).toBe("allow")
+  expect(result.action).toBe("deny")
 })
 
 test("evaluate - glob pattern match", () => {
@@ -271,7 +271,7 @@ test("evaluate - last matching glob wins", () => {
   expect(result.action).toBe("allow")
 })
 
-test("evaluate - order matters for specificity", () => {
+test("evaluate - later broader deny can lock down earlier specific allow", () => {
   const result = Permission.evaluate("edit", "src/components/Button.tsx", [
     { permission: "edit", pattern: "src/components/*", action: "allow" },
     { permission: "edit", pattern: "src/*", action: "deny" },
@@ -301,7 +301,7 @@ test("evaluate - empty rules array returns ask", () => {
   expect(result.action).toBe("ask")
 })
 
-test("evaluate - multiple matching patterns, last wins", () => {
+test("evaluate - multiple matching patterns prefer the most specific deny", () => {
   const result = Permission.evaluate("edit", "src/secret.ts", [
     { permission: "edit", pattern: "*", action: "ask" },
     { permission: "edit", pattern: "src/*", action: "allow" },
@@ -327,12 +327,12 @@ test("evaluate - exact match at end wins over earlier wildcard", () => {
   expect(result.action).toBe("deny")
 })
 
-test("evaluate - wildcard at end overrides earlier exact match", () => {
+test("evaluate - earlier exact deny wins over later wildcard allow", () => {
   const result = Permission.evaluate("bash", "/bin/rm", [
     { permission: "bash", pattern: "/bin/rm", action: "deny" },
     { permission: "bash", pattern: "*", action: "allow" },
   ])
-  expect(result.action).toBe("allow")
+  expect(result.action).toBe("deny")
 })
 
 // wildcard permission tests
@@ -387,7 +387,7 @@ test("evaluate - wildcard permission fallback for unknown tool", () => {
   expect(result.action).toBe("ask")
 })
 
-test("evaluate - permission patterns sorted by length regardless of object order", () => {
+test("evaluate - later wildcard deny can lock down earlier specific allow", () => {
   const result = Permission.evaluate("bash", "rm", [
     { permission: "bash", pattern: "*", action: "allow" },
     { permission: "*", pattern: "*", action: "deny" },

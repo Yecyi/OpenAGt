@@ -1,4 +1,6 @@
-const check = Bun.spawn(["oxlint", "--quiet", "--format", "json"], {
+const args = ["oxlint", "--quiet", "--ignore-pattern", ".claude/**"]
+
+const check = Bun.spawn([...args, "--format", "json"], {
   stdout: "ignore",
   stderr: "pipe",
 })
@@ -10,7 +12,7 @@ if (code === 0) process.exit(0)
 
 if (stderr) process.stderr.write(stderr)
 
-const report = Bun.spawn(["oxlint", "--quiet"], {
+const report = Bun.spawn(args, {
   stdout: "inherit",
   stderr: "inherit",
 })

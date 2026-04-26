@@ -136,6 +136,9 @@ export const GrepTool = Tool.define(
             metadata: {
               matches: total,
               truncated,
+              partial: result.partial,
+              skipped_count: result.partial ? undefined : 0,
+              skipped_reason_sample: result.partial ? "ripgrep reported inaccessible or skipped paths" : undefined,
             },
             output: output.join("\n"),
           }

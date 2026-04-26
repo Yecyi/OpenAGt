@@ -268,10 +268,11 @@ export const layer = Layer.effect(
         )
       }
 
+      const approvedSnapshot = [...approved]
       for (const [id, item] of pending.entries()) {
         if (item.info.sessionID !== existing.info.sessionID) continue
         const ok = item.info.patterns.every(
-          (pattern) => evaluate(item.info.permission, pattern, approved).action === "allow",
+          (pattern) => evaluate(item.info.permission, pattern, approvedSnapshot).action === "allow",
         )
         if (!ok) continue
         pending.delete(id)
@@ -399,14 +400,17 @@ interface AuditLogEntry {
 
 const AUDIT_LOG_MAX_SIZE = 10_000
 const auditLogCache: AuditLogEntry[] = []
+let auditLogCursor = 0
 
 async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
-  auditLogCache.push(entry)
-  if (auditLogCache.length > AUDIT_LOG_MAX_SIZE) {
-    auditLogCache.shift()
+  if (auditLogCache.length < AUDIT_LOG_MAX_SIZE) {
+    auditLogCache.push(entry)
+  } else {
+    auditLogCache[auditLogCursor] = entry
+    auditLogCursor = (auditLogCursor + 1) % AUDIT_LOG_MAX_SIZE
   }
   // In production, this would write to $XDG_STATE_HOME/opencode/permissions.audit.jsonl
-  log.info("permission_audit", entry)
+  log.info("permission_audit", { entry: JSON.stringify(entry) })
 }
 
 function truncateForAudit(text: string | undefined, maxLength = 256): string | undefined {
