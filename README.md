@@ -51,7 +51,7 @@ Current stable release:
 
 Current release candidate:
 
-- [v1.17.0-rc.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.2)
+- [v1.17.0-rc.3](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.3)
 
 Published assets:
 

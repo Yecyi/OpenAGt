@@ -82,7 +82,7 @@ Set-Content -Path $licenseRtfPath -Encoding ASCII -Value ("{\rtf1\ansi\deff0{\fo
 $content = @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="OpenAGt" Manufacturer="OpenAGt" Version="$msiVersion" UpgradeCode="16d54b50-66f9-4d5d-b546-1d7db0b2289a" Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of OpenAGt is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of OpenAGt is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <WixVariable Id="WixUILicenseRtf" Value="$($licenseRtfPath.Replace('\','\\'))" />
     <Property Id="ARPCONTACT" Value="OpenAGt" />
@@ -115,6 +115,9 @@ $content = @"
       <Component Directory="BIN" Guid="*">
         <RegistryValue Root="HKLM" Key="Software\OpenAGt" Name="InstallBin" Type="string" Value="[BIN]" KeyPath="yes" />
         <Environment Name="PATH" Value="[BIN]" Part="last" Action="set" System="yes" />
+        <RemoveFile Id="RemoveOldOpenAGtExe" Name="openagt.exe" On="install" />
+        <RemoveFile Id="RemoveOldOpenAGtCmd" Name="openagt.cmd" On="install" />
+        <RemoveFile Id="RemoveOldOpencodeCmd" Name="opencode.cmd" On="install" />
       </Component>
       <Component Directory="INSTALLFOLDER" Guid="*">
         <File Source="$($tutorialPath.Replace('\','\\'))" KeyPath="yes" />

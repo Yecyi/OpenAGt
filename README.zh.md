@@ -51,7 +51,7 @@ OpenAGt 当前围绕四个核心方向构建：
 
 当前候选版本：
 
-- [v1.17.0-rc.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.2)
+- [v1.17.0-rc.3](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.3)
 
 发布资产：
 

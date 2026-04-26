@@ -8,7 +8,7 @@ OpenAGt `v1.16.0` stable covers:
 
 Flutter is not part of this release line.
 
-The current candidate line is `v1.17.0-rc.2`, which contains task/subagent visibility, release automation hardening, and an improved Windows installer flow. Treat it as an RC until it is promoted to GA.
+The current candidate line is `v1.17.0-rc.3`, which contains task/subagent visibility, release automation hardening, and an improved Windows installer flow. Treat it as an RC until it is promoted to GA.
 
 ## Release Assets
 
@@ -29,6 +29,7 @@ Preferred install path:
 Installer behavior:
 
 - newer MSI versions upgrade the previous OpenAGt install that uses the same upgrade identity
+- same-version RC installers are allowed to upgrade previous RC installs
 - rerunning the same MSI version enters the standard Windows repair / maintenance flow
 - the installer lets the user choose the install folder
 - `GETTING_STARTED.txt` is installed in the OpenAGt folder and exposed through the Start Menu
