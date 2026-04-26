@@ -1,8 +1,6 @@
-function handleEPIPE(
-  stream: NodeJS.WriteStream,
-): (err: NodeJS.ErrnoException) => void {
+function handleEPIPE(stream: NodeJS.WriteStream): (err: NodeJS.ErrnoException) => void {
   return (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EPIPE') {
+    if (err.code === "EPIPE") {
       stream.destroy()
     }
   }
@@ -10,8 +8,8 @@ function handleEPIPE(
 
 // Prevents memory leak when pipe is broken (e.g., `claude -p | head -1`)
 export function registerProcessOutputErrorHandlers(): void {
-  process.stdout.on('error', handleEPIPE(process.stdout))
-  process.stderr.on('error', handleEPIPE(process.stderr))
+  process.stdout.on("error", handleEPIPE(process.stdout))
+  process.stderr.on("error", handleEPIPE(process.stderr))
 }
 
 function writeOut(stream: NodeJS.WriteStream, data: string): void {
@@ -47,22 +45,19 @@ export function exitWithError(message: string): never {
 // unconditionally (caller's accumulator needs all chunks, not just the first).
 // Returns true on timeout, false on end. Used by -p mode to distinguish a
 // real pipe producer from an inherited-but-idle parent stdin.
-export function peekForStdinData(
-  stream: NodeJS.EventEmitter,
-  ms: number,
-): Promise<boolean> {
-  return new Promise<boolean>(resolve => {
+export function peekForStdinData(stream: NodeJS.EventEmitter, ms: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     const done = (timedOut: boolean) => {
       clearTimeout(peek)
-      stream.off('end', onEnd)
-      stream.off('data', onFirstData)
+      stream.off("end", onEnd)
+      stream.off("data", onFirstData)
       void resolve(timedOut)
     }
     const onEnd = () => done(false)
     const onFirstData = () => clearTimeout(peek)
     // eslint-disable-next-line no-restricted-syntax -- not a sleep: races timeout against stream end/data events
     const peek = setTimeout(done, ms, true)
-    stream.once('end', onEnd)
-    stream.once('data', onFirstData)
+    stream.once("end", onEnd)
+    stream.once("data", onFirstData)
   })
 }

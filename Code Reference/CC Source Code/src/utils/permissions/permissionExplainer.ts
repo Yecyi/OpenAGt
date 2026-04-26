@@ -1,17 +1,17 @@
-import { z } from 'zod/v4'
-import { logEvent } from '../../services/analytics/index.js'
-import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.js'
-import type { AssistantMessage, Message } from '../../types/message.js'
-import { getGlobalConfig } from '../config.js'
-import { logForDebugging } from '../debug.js'
-import { errorMessage } from '../errors.js'
-import { lazySchema } from '../lazySchema.js'
-import { logError } from '../log.js'
-import { getMainLoopModel } from '../model/model.js'
-import { sideQuery } from '../sideQuery.js'
-import { jsonStringify } from '../slowOperations.js'
+import { z } from "zod/v4"
+import { logEvent } from "../../services/analytics/index.js"
+import { sanitizeToolNameForAnalytics } from "../../services/analytics/metadata.js"
+import type { AssistantMessage, Message } from "../../types/message.js"
+import { getGlobalConfig } from "../config.js"
+import { logForDebugging } from "../debug.js"
+import { errorMessage } from "../errors.js"
+import { lazySchema } from "../lazySchema.js"
+import { logError } from "../log.js"
+import { getMainLoopModel } from "../model/model.js"
+import { sideQuery } from "../sideQuery.js"
+import { jsonStringify } from "../slowOperations.js"
 
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH"
 
 // Map risk levels to numeric values for analytics
 const RISK_LEVEL_NUMERIC: Record<RiskLevel, number> = {
@@ -44,39 +44,37 @@ const SYSTEM_PROMPT = `Analyze shell commands and explain what they do, why you'
 
 // Tool definition for forced structured output (no beta required)
 const EXPLAIN_COMMAND_TOOL = {
-  name: 'explain_command',
-  description: 'Provide an explanation of a shell command',
+  name: "explain_command",
+  description: "Provide an explanation of a shell command",
   input_schema: {
-    type: 'object' as const,
+    type: "object" as const,
     properties: {
       explanation: {
-        type: 'string',
-        description: 'What this command does (1-2 sentences)',
+        type: "string",
+        description: "What this command does (1-2 sentences)",
       },
       reasoning: {
-        type: 'string',
-        description:
-          'Why YOU are running this command. Start with "I" - e.g. "I need to check the file contents"',
+        type: "string",
+        description: 'Why YOU are running this command. Start with "I" - e.g. "I need to check the file contents"',
       },
       risk: {
-        type: 'string',
-        description: 'What could go wrong, under 15 words',
+        type: "string",
+        description: "What could go wrong, under 15 words",
       },
       riskLevel: {
-        type: 'string',
-        enum: ['LOW', 'MEDIUM', 'HIGH'],
-        description:
-          'LOW (safe dev workflows), MEDIUM (recoverable changes), HIGH (dangerous/irreversible)',
+        type: "string",
+        enum: ["LOW", "MEDIUM", "HIGH"],
+        description: "LOW (safe dev workflows), MEDIUM (recoverable changes), HIGH (dangerous/irreversible)",
       },
     },
-    required: ['explanation', 'reasoning', 'risk', 'riskLevel'],
+    required: ["explanation", "reasoning", "risk", "riskLevel"],
   },
 }
 
 // Zod schema for parsing and validating the response
 const RiskAssessmentSchema = lazySchema(() =>
   z.object({
-    riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+    riskLevel: z.enum(["LOW", "MEDIUM", "HIGH"]),
     explanation: z.string(),
     reasoning: z.string(),
     risk: z.string(),
@@ -84,7 +82,7 @@ const RiskAssessmentSchema = lazySchema(() =>
 )
 
 function formatToolInput(input: unknown): string {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return input
   }
   try {
@@ -99,14 +97,9 @@ function formatToolInput(input: unknown): string {
  * Returns a summary of recent assistant messages to provide context
  * for "why" this command is being run.
  */
-function extractConversationContext(
-  messages: Message[],
-  maxChars = 1000,
-): string {
+function extractConversationContext(messages: Message[], maxChars = 1000): string {
   // Get recent assistant messages (they contain Claude's reasoning)
-  const assistantMessages = messages
-    .filter((m): m is AssistantMessage => m.type === 'assistant')
-    .slice(-3) // Last 3 assistant messages
+  const assistantMessages = messages.filter((m): m is AssistantMessage => m.type === "assistant").slice(-3) // Last 3 assistant messages
 
   const contextParts: string[] = []
   let totalChars = 0
@@ -114,22 +107,19 @@ function extractConversationContext(
   for (const msg of assistantMessages.reverse()) {
     // Extract text content from assistant message
     const textBlocks = msg.message.content
-      .filter(c => c.type === 'text')
-      .map(c => ('text' in c ? c.text : ''))
-      .join(' ')
+      .filter((c) => c.type === "text")
+      .map((c) => ("text" in c ? c.text : ""))
+      .join(" ")
 
     if (textBlocks && totalChars < maxChars) {
       const remaining = maxChars - totalChars
-      const truncated =
-        textBlocks.length > remaining
-          ? textBlocks.slice(0, remaining) + '...'
-          : textBlocks
+      const truncated = textBlocks.length > remaining ? textBlocks.slice(0, remaining) + "..." : textBlocks
       contextParts.unshift(truncated)
       totalChars += truncated.length
     }
   }
 
-  return contextParts.join('\n\n')
+  return contextParts.join("\n\n")
 }
 
 /**
@@ -160,15 +150,13 @@ export async function generatePermissionExplanation({
 
   try {
     const formattedInput = formatToolInput(toolInput)
-    const conversationContext = messages?.length
-      ? extractConversationContext(messages)
-      : ''
+    const conversationContext = messages?.length ? extractConversationContext(messages) : ""
 
     const userPrompt = `Tool: ${toolName}
-${toolDescription ? `Description: ${toolDescription}\n` : ''}
+${toolDescription ? `Description: ${toolDescription}\n` : ""}
 Input:
 ${formattedInput}
-${conversationContext ? `\nRecent conversation context:\n${conversationContext}` : ''}
+${conversationContext ? `\nRecent conversation context:\n${conversationContext}` : ""}
 
 Explain this command in context.`
 
@@ -178,24 +166,20 @@ Explain this command in context.`
     const response = await sideQuery({
       model,
       system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages: [{ role: "user", content: userPrompt }],
       tools: [EXPLAIN_COMMAND_TOOL],
-      tool_choice: { type: 'tool', name: 'explain_command' },
+      tool_choice: { type: "tool", name: "explain_command" },
       signal,
-      querySource: 'permission_explainer',
+      querySource: "permission_explainer",
     })
 
     const latencyMs = Date.now() - startTime
-    logForDebugging(
-      `Permission explainer: API returned in ${latencyMs}ms, stop_reason=${response.stop_reason}`,
-    )
+    logForDebugging(`Permission explainer: API returned in ${latencyMs}ms, stop_reason=${response.stop_reason}`)
 
     // Extract structured data from tool use block
-    const toolUseBlock = response.content.find(c => c.type === 'tool_use')
-    if (toolUseBlock && toolUseBlock.type === 'tool_use') {
-      logForDebugging(
-        `Permission explainer: tool input: ${jsonStringify(toolUseBlock.input).slice(0, 500)}`,
-      )
+    const toolUseBlock = response.content.find((c) => c.type === "tool_use")
+    if (toolUseBlock && toolUseBlock.type === "tool_use") {
+      logForDebugging(`Permission explainer: tool input: ${jsonStringify(toolUseBlock.input).slice(0, 500)}`)
       const result = RiskAssessmentSchema().safeParse(toolUseBlock.input)
 
       if (result.success) {
@@ -206,20 +190,18 @@ Explain this command in context.`
           risk: result.data.risk,
         }
 
-        logEvent('tengu_permission_explainer_generated', {
+        logEvent("tengu_permission_explainer_generated", {
           tool_name: sanitizeToolNameForAnalytics(toolName),
           risk_level: RISK_LEVEL_NUMERIC[explanation.riskLevel],
           latency_ms: latencyMs,
         })
-        logForDebugging(
-          `Permission explainer: ${explanation.riskLevel} risk for ${toolName} (${latencyMs}ms)`,
-        )
+        logForDebugging(`Permission explainer: ${explanation.riskLevel} risk for ${toolName} (${latencyMs}ms)`)
         return explanation
       }
     }
 
     // No valid JSON in response
-    logEvent('tengu_permission_explainer_error', {
+    logEvent("tengu_permission_explainer_error", {
       tool_name: sanitizeToolNameForAnalytics(toolName),
       error_type: ERROR_TYPE_PARSE,
       latency_ms: latencyMs,
@@ -237,12 +219,9 @@ Explain this command in context.`
 
     logForDebugging(`Permission explainer error: ${errorMessage(error)}`)
     logError(error)
-    logEvent('tengu_permission_explainer_error', {
+    logEvent("tengu_permission_explainer_error", {
       tool_name: sanitizeToolNameForAnalytics(toolName),
-      error_type:
-        error instanceof Error && error.name === 'AbortError'
-          ? ERROR_TYPE_NETWORK
-          : ERROR_TYPE_UNKNOWN,
+      error_type: error instanceof Error && error.name === "AbortError" ? ERROR_TYPE_NETWORK : ERROR_TYPE_UNKNOWN,
       latency_ms: latencyMs,
     })
     return null

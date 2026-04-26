@@ -1,24 +1,21 @@
-import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import type { TextBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import { createPatch } from 'diff'
-import { mkdir, writeFile } from 'fs/promises'
-import { join } from 'path'
-import type { AgentId } from 'src/types/ids.js'
-import type { Message } from 'src/types/message.js'
-import { logForDebugging } from 'src/utils/debug.js'
-import { djb2Hash } from 'src/utils/hash.js'
-import { logError } from 'src/utils/log.js'
-import { getClaudeTempDir } from 'src/utils/permissions/filesystem.js'
-import { jsonStringify } from 'src/utils/slowOperations.js'
-import type { QuerySource } from '../../constants/querySource.js'
-import {
-  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  logEvent,
-} from '../analytics/index.js'
+import type { BetaToolUnion } from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs"
+import type { TextBlockParam } from "@anthropic-ai/sdk/resources/index.mjs"
+import { createPatch } from "diff"
+import { mkdir, writeFile } from "fs/promises"
+import { join } from "path"
+import type { AgentId } from "src/types/ids.js"
+import type { Message } from "src/types/message.js"
+import { logForDebugging } from "src/utils/debug.js"
+import { djb2Hash } from "src/utils/hash.js"
+import { logError } from "src/utils/log.js"
+import { getClaudeTempDir } from "src/utils/permissions/filesystem.js"
+import { jsonStringify } from "src/utils/slowOperations.js"
+import type { QuerySource } from "../../constants/querySource.js"
+import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from "../analytics/index.js"
 
 function getCacheBreakDiffPath(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let suffix = ''
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+  let suffix = ""
   for (let i = 0; i < 4; i++) {
     suffix += chars[Math.floor(Math.random() * chars.length)]
   }
@@ -106,13 +103,7 @@ const previousStateBySource = new Map<string, PreviousState>()
 // agentId key) causes the map to grow indefinitely.
 const MAX_TRACKED_SOURCES = 10
 
-const TRACKED_SOURCE_PREFIXES = [
-  'repl_main_thread',
-  'sdk',
-  'agent:custom',
-  'agent:default',
-  'agent:builtin',
-]
+const TRACKED_SOURCE_PREFIXES = ["repl_main_thread", "sdk", "agent:custom", "agent:default", "agent:builtin"]
 
 // Minimum absolute token drop required to trigger a cache break warning.
 // Small drops (e.g., a few thousand tokens) can happen due to normal variation
@@ -127,7 +118,7 @@ export const CACHE_TTL_1HOUR_MS = 60 * 60 * 1000
 
 // Models to exclude from cache break detection (e.g., haiku has different caching behavior)
 function isExcludedModel(model: string): boolean {
-  return model.includes('haiku')
+  return model.includes("haiku")
 }
 
 /**
@@ -146,22 +137,17 @@ function isExcludedModel(model: string): boolean {
  * nothing meaningful to compare against. Their cache metrics are still
  * logged via tengu_api_success for analytics.
  */
-function getTrackingKey(
-  querySource: QuerySource,
-  agentId?: AgentId,
-): string | null {
-  if (querySource === 'compact') return 'repl_main_thread'
+function getTrackingKey(querySource: QuerySource, agentId?: AgentId): string | null {
+  if (querySource === "compact") return "repl_main_thread"
   for (const prefix of TRACKED_SOURCE_PREFIXES) {
     if (querySource.startsWith(prefix)) return agentId || querySource
   }
   return null
 }
 
-function stripCacheControl(
-  items: ReadonlyArray<Record<string, unknown>>,
-): unknown[] {
-  return items.map(item => {
-    if (!('cache_control' in item)) return item
+function stripCacheControl(items: ReadonlyArray<Record<string, unknown>>): unknown[] {
+  return items.map((item) => {
+    if (!("cache_control" in item)) return item
     const { cache_control: _, ...rest } = item
     return rest
   })
@@ -169,10 +155,10 @@ function stripCacheControl(
 
 function computeHash(data: unknown): number {
   const str = jsonStringify(data)
-  if (typeof Bun !== 'undefined') {
+  if (typeof Bun !== "undefined") {
     const hash = Bun.hash(str)
     // Bun.hash can return bigint for large inputs; convert to number safely
-    return typeof hash === 'bigint' ? Number(hash & 0xffffffffn) : hash
+    return typeof hash === "bigint" ? Number(hash & 0xffffffffn) : hash
   }
   // Fallback for non-Bun runtimes (e.g. Node.js via npm global install)
   return djb2Hash(str)
@@ -181,13 +167,10 @@ function computeHash(data: unknown): number {
 /** MCP tool names are user-controlled (server config) and may leak filepaths.
  *  Collapse them to 'mcp'; built-in names are a fixed vocabulary. */
 function sanitizeToolName(name: string): string {
-  return name.startsWith('mcp__') ? 'mcp' : name
+  return name.startsWith("mcp__") ? "mcp" : name
 }
 
-function computePerToolHashes(
-  strippedTools: ReadonlyArray<unknown>,
-  names: string[],
-): Record<string, number> {
+function computePerToolHashes(strippedTools: ReadonlyArray<unknown>, names: string[]): Record<string, number> {
   const hashes: Record<string, number> = {}
   for (let i = 0; i < strippedTools.length; i++) {
     hashes[names[i] ?? `__idx_${i}`] = computeHash(strippedTools[i])
@@ -203,21 +186,17 @@ function getSystemCharCount(system: TextBlockParam[]): number {
   return total
 }
 
-function buildDiffableContent(
-  system: TextBlockParam[],
-  tools: BetaToolUnion[],
-  model: string,
-): string {
-  const systemText = system.map(b => b.text).join('\n\n')
+function buildDiffableContent(system: TextBlockParam[], tools: BetaToolUnion[], model: string): string {
+  const systemText = system.map((b) => b.text).join("\n\n")
   const toolDetails = tools
-    .map(t => {
-      if (!('name' in t)) return 'unknown'
-      const desc = 'description' in t ? t.description : ''
-      const schema = 'input_schema' in t ? jsonStringify(t.input_schema) : ''
+    .map((t) => {
+      if (!("name" in t)) return "unknown"
+      const desc = "description" in t ? t.description : ""
+      const schema = "input_schema" in t ? jsonStringify(t.input_schema) : ""
       return `${t.name}\n  description: ${desc}\n  input_schema: ${schema}`
     })
     .sort()
-    .join('\n\n')
+    .join("\n\n")
   return `Model: ${model}\n\n=== System Prompt ===\n\n${systemText}\n\n=== Tools (${tools.length}) ===\n\n${toolDetails}\n`
 }
 
@@ -253,7 +232,7 @@ export function recordPromptState(snapshot: PromptStateSnapshot): void {
       model,
       agentId,
       fastMode,
-      globalCacheStrategy = '',
+      globalCacheStrategy = "",
       betas = [],
       autoModeActive = false,
       isUsingOverage = false,
@@ -264,34 +243,25 @@ export function recordPromptState(snapshot: PromptStateSnapshot): void {
     const key = getTrackingKey(querySource, agentId)
     if (!key) return
 
-    const strippedSystem = stripCacheControl(
-      system as unknown as ReadonlyArray<Record<string, unknown>>,
-    )
-    const strippedTools = stripCacheControl(
-      toolSchemas as unknown as ReadonlyArray<Record<string, unknown>>,
-    )
+    const strippedSystem = stripCacheControl(system as unknown as ReadonlyArray<Record<string, unknown>>)
+    const strippedTools = stripCacheControl(toolSchemas as unknown as ReadonlyArray<Record<string, unknown>>)
 
     const systemHash = computeHash(strippedSystem)
     const toolsHash = computeHash(strippedTools)
     // Hash the full system array INCLUDING cache_control — this catches
     // scope flips (global↔org/none) and TTL flips (1h↔5m) that the stripped
     // hash can't see because the text content is identical.
-    const cacheControlHash = computeHash(
-      system.map(b => ('cache_control' in b ? b.cache_control : null)),
-    )
-    const toolNames = toolSchemas.map(t => ('name' in t ? t.name : 'unknown'))
+    const cacheControlHash = computeHash(system.map((b) => ("cache_control" in b ? b.cache_control : null)))
+    const toolNames = toolSchemas.map((t) => ("name" in t ? t.name : "unknown"))
     // Only compute per-tool hashes when the aggregate changed — common case
     // (tools unchanged) skips N extra jsonStringify calls.
-    const computeToolHashes = () =>
-      computePerToolHashes(strippedTools, toolNames)
+    const computeToolHashes = () => computePerToolHashes(strippedTools, toolNames)
     const systemCharCount = getSystemCharCount(system)
-    const lazyDiffableContent = () =>
-      buildDiffableContent(system, toolSchemas, model)
+    const lazyDiffableContent = () => buildDiffableContent(system, toolSchemas, model)
     const isFastMode = fastMode ?? false
     const sortedBetas = [...betas].sort()
-    const effortStr = effortValue === undefined ? '' : String(effortValue)
-    const extraBodyHash =
-      extraBodyParams === undefined ? 0 : computeHash(extraBodyParams)
+    const effortStr = effortValue === undefined ? "" : String(effortValue)
+    const extraBodyHash = extraBodyParams === undefined ? 0 : computeHash(extraBodyParams)
 
     const prev = previousStateBySource.get(key)
 
@@ -334,11 +304,8 @@ export function recordPromptState(snapshot: PromptStateSnapshot): void {
     const modelChanged = model !== prev.model
     const fastModeChanged = isFastMode !== prev.fastMode
     const cacheControlChanged = cacheControlHash !== prev.cacheControlHash
-    const globalCacheStrategyChanged =
-      globalCacheStrategy !== prev.globalCacheStrategy
-    const betasChanged =
-      sortedBetas.length !== prev.betas.length ||
-      sortedBetas.some((b, i) => b !== prev.betas[i])
+    const globalCacheStrategyChanged = globalCacheStrategy !== prev.globalCacheStrategy
+    const betasChanged = sortedBetas.length !== prev.betas.length || sortedBetas.some((b, i) => b !== prev.betas[i])
     const autoModeChanged = autoModeActive !== prev.autoModeActive
     const overageChanged = isUsingOverage !== prev.isUsingOverage
     const cachedMCChanged = cachedMCEnabled !== prev.cachedMCEnabled
@@ -363,8 +330,8 @@ export function recordPromptState(snapshot: PromptStateSnapshot): void {
       const newToolSet = new Set(toolNames)
       const prevBetaSet = new Set(prev.betas)
       const newBetaSet = new Set(sortedBetas)
-      const addedTools = toolNames.filter(n => !prevToolSet.has(n))
-      const removedTools = prev.toolNames.filter(n => !newToolSet.has(n))
+      const addedTools = toolNames.filter((n) => !prevToolSet.has(n))
+      const removedTools = prev.toolNames.filter((n) => !newToolSet.has(n))
       const changedToolSchemas: string[] = []
       if (toolSchemasChanged) {
         const newHashes = computeToolHashes()
@@ -399,8 +366,8 @@ export function recordPromptState(snapshot: PromptStateSnapshot): void {
         newModel: model,
         prevGlobalCacheStrategy: prev.globalCacheStrategy,
         newGlobalCacheStrategy: globalCacheStrategy,
-        addedBetas: sortedBetas.filter(b => !prevBetaSet.has(b)),
-        removedBetas: prev.betas.filter(b => !newBetaSet.has(b)),
+        addedBetas: sortedBetas.filter((b) => !prevBetaSet.has(b)),
+        removedBetas: prev.betas.filter((b) => !newBetaSet.has(b)),
         prevEffortValue: prev.effortValue,
         newEffortValue: effortStr,
         buildPrevDiffableContent: prev.buildDiffableContent,
@@ -457,7 +424,7 @@ export async function checkResponseForCacheBreak(
 
     // Calculate time since last call for TTL detection by finding the most recent
     // assistant message timestamp in the messages array (before the current response)
-    const lastAssistantMessage = messages.findLast(m => m.type === 'assistant')
+    const lastAssistantMessage = messages.findLast((m) => m.type === "assistant")
     const timeSinceLastAssistantMsg = lastAssistantMessage
       ? Date.now() - new Date(lastAssistantMessage.timestamp).getTime()
       : null
@@ -483,10 +450,7 @@ export async function checkResponseForCacheBreak(
     // Detect a cache break: cache read dropped >5% from previous AND
     // the absolute drop exceeds the minimum threshold.
     const tokenDrop = prevCacheRead - cacheReadTokens
-    if (
-      cacheReadTokens >= prevCacheRead * 0.95 ||
-      tokenDrop < MIN_CACHE_MISS_TOKENS
-    ) {
+    if (cacheReadTokens >= prevCacheRead * 0.95 || tokenDrop < MIN_CACHE_MISS_TOKENS) {
       state.pendingChanges = null
       return
     }
@@ -495,80 +459,61 @@ export async function checkResponseForCacheBreak(
     const parts: string[] = []
     if (changes) {
       if (changes.modelChanged) {
-        parts.push(
-          `model changed (${changes.previousModel} → ${changes.newModel})`,
-        )
+        parts.push(`model changed (${changes.previousModel} → ${changes.newModel})`)
       }
       if (changes.systemPromptChanged) {
         const charDelta = changes.systemCharDelta
-        const charInfo =
-          charDelta === 0
-            ? ''
-            : charDelta > 0
-              ? ` (+${charDelta} chars)`
-              : ` (${charDelta} chars)`
+        const charInfo = charDelta === 0 ? "" : charDelta > 0 ? ` (+${charDelta} chars)` : ` (${charDelta} chars)`
         parts.push(`system prompt changed${charInfo}`)
       }
       if (changes.toolSchemasChanged) {
         const toolDiff =
           changes.addedToolCount > 0 || changes.removedToolCount > 0
             ? ` (+${changes.addedToolCount}/-${changes.removedToolCount} tools)`
-            : ' (tool prompt/schema changed, same tool set)'
+            : " (tool prompt/schema changed, same tool set)"
         parts.push(`tools changed${toolDiff}`)
       }
       if (changes.fastModeChanged) {
-        parts.push('fast mode toggled')
+        parts.push("fast mode toggled")
       }
       if (changes.globalCacheStrategyChanged) {
         parts.push(
-          `global cache strategy changed (${changes.prevGlobalCacheStrategy || 'none'} → ${changes.newGlobalCacheStrategy || 'none'})`,
+          `global cache strategy changed (${changes.prevGlobalCacheStrategy || "none"} → ${changes.newGlobalCacheStrategy || "none"})`,
         )
       }
-      if (
-        changes.cacheControlChanged &&
-        !changes.globalCacheStrategyChanged &&
-        !changes.systemPromptChanged
-      ) {
+      if (changes.cacheControlChanged && !changes.globalCacheStrategyChanged && !changes.systemPromptChanged) {
         // Only report as standalone cause if nothing else explains it —
         // otherwise the scope/TTL flip is a consequence, not the root cause.
-        parts.push('cache_control changed (scope or TTL)')
+        parts.push("cache_control changed (scope or TTL)")
       }
       if (changes.betasChanged) {
-        const added = changes.addedBetas.length
-          ? `+${changes.addedBetas.join(',')}`
-          : ''
-        const removed = changes.removedBetas.length
-          ? `-${changes.removedBetas.join(',')}`
-          : ''
-        const diff = [added, removed].filter(Boolean).join(' ')
-        parts.push(`betas changed${diff ? ` (${diff})` : ''}`)
+        const added = changes.addedBetas.length ? `+${changes.addedBetas.join(",")}` : ""
+        const removed = changes.removedBetas.length ? `-${changes.removedBetas.join(",")}` : ""
+        const diff = [added, removed].filter(Boolean).join(" ")
+        parts.push(`betas changed${diff ? ` (${diff})` : ""}`)
       }
       if (changes.autoModeChanged) {
-        parts.push('auto mode toggled')
+        parts.push("auto mode toggled")
       }
       if (changes.overageChanged) {
-        parts.push('overage state changed (TTL latched, no flip)')
+        parts.push("overage state changed (TTL latched, no flip)")
       }
       if (changes.cachedMCChanged) {
-        parts.push('cached microcompact toggled')
+        parts.push("cached microcompact toggled")
       }
       if (changes.effortChanged) {
-        parts.push(
-          `effort changed (${changes.prevEffortValue || 'default'} → ${changes.newEffortValue || 'default'})`,
-        )
+        parts.push(`effort changed (${changes.prevEffortValue || "default"} → ${changes.newEffortValue || "default"})`)
       }
       if (changes.extraBodyChanged) {
-        parts.push('extra body params changed')
+        parts.push("extra body params changed")
       }
     }
 
     // Check if time gap suggests TTL expiration
     const lastAssistantMsgOver5minAgo =
-      timeSinceLastAssistantMsg !== null &&
-      timeSinceLastAssistantMsg > CACHE_TTL_5MIN_MS
+      timeSinceLastAssistantMsg !== null && timeSinceLastAssistantMsg > CACHE_TTL_5MIN_MS
     const lastAssistantMsgOver1hAgo =
-      timeSinceLastAssistantMsg !== null &&
-      timeSinceLastAssistantMsg > CACHE_TTL_1HOUR_MS
+      timeSinceLastAssistantMsg !== null && timeSinceLastAssistantMsg > CACHE_TTL_1HOUR_MS
 
     // Post PR #19823 BQ analysis (bq-queries/prompt-caching/cache_break_pr19823_analysis.sql):
     // when all client-side flags are false and the gap is under TTL, ~90% of breaks
@@ -576,18 +521,18 @@ export async function checkResponseForCacheBreak(
     // accordingly instead of implying a CC bug hunt.
     let reason: string
     if (parts.length > 0) {
-      reason = parts.join(', ')
+      reason = parts.join(", ")
     } else if (lastAssistantMsgOver1hAgo) {
-      reason = 'possible 1h TTL expiry (prompt unchanged)'
+      reason = "possible 1h TTL expiry (prompt unchanged)"
     } else if (lastAssistantMsgOver5minAgo) {
-      reason = 'possible 5min TTL expiry (prompt unchanged)'
+      reason = "possible 5min TTL expiry (prompt unchanged)"
     } else if (timeSinceLastAssistantMsg !== null) {
-      reason = 'likely server-side (prompt unchanged, <5min gap)'
+      reason = "likely server-side (prompt unchanged, <5min gap)"
     } else {
-      reason = 'unknown cause'
+      reason = "unknown cause"
     }
 
-    logEvent('tengu_prompt_cache_break', {
+    logEvent("tengu_prompt_cache_break", {
       systemPromptChanged: changes?.systemPromptChanged ?? false,
       toolSchemasChanged: changes?.toolSchemasChanged ?? false,
       modelChanged: changes?.modelChanged ?? false,
@@ -607,31 +552,23 @@ export async function checkResponseForCacheBreak(
       // MCP tools collapse to 'mcp' (user-configured, could leak paths).
       addedTools: (changes?.addedTools ?? [])
         .map(sanitizeToolName)
-        .join(
-          ',',
-        ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        .join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       removedTools: (changes?.removedTools ?? [])
         .map(sanitizeToolName)
-        .join(
-          ',',
-        ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        .join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       changedToolSchemas: (changes?.changedToolSchemas ?? [])
         .map(sanitizeToolName)
-        .join(
-          ',',
-        ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        .join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       // Beta header names and cache strategy are fixed enum-like values,
       // not code or filepaths. requestId is an opaque server-generated ID.
-      addedBetas: (changes?.addedBetas ?? []).join(
-        ',',
-      ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      addedBetas: (changes?.addedBetas ?? []).join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       removedBetas: (changes?.removedBetas ?? []).join(
-        ',',
+        ",",
       ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       prevGlobalCacheStrategy: (changes?.prevGlobalCacheStrategy ??
-        '') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        "") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       newGlobalCacheStrategy: (changes?.newGlobalCacheStrategy ??
-        '') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        "") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       callNumber: state.callCount,
       prevCacheReadTokens: prevCacheRead,
       cacheReadTokens,
@@ -639,8 +576,7 @@ export async function checkResponseForCacheBreak(
       timeSinceLastAssistantMsg: timeSinceLastAssistantMsg ?? -1,
       lastAssistantMsgOver5minAgo,
       lastAssistantMsgOver1hAgo,
-      requestId: (requestId ??
-        '') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      requestId: (requestId ?? "") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
 
     // Write diff file for ant debugging via --debug. The path is included in
@@ -648,16 +584,13 @@ export async function checkResponseForCacheBreak(
     // flows reliably to BQ for analytics).
     let diffPath: string | undefined
     if (changes?.buildPrevDiffableContent) {
-      diffPath = await writeCacheBreakDiff(
-        changes.buildPrevDiffableContent(),
-        state.buildDiffableContent(),
-      )
+      diffPath = await writeCacheBreakDiff(changes.buildPrevDiffableContent(), state.buildDiffableContent())
     }
 
-    const diffSuffix = diffPath ? `, diff: ${diffPath}` : ''
+    const diffSuffix = diffPath ? `, diff: ${diffPath}` : ""
     const summary = `[PROMPT CACHE BREAK] ${reason} [source=${querySource}, call #${state.callCount}, cache read: ${prevCacheRead} → ${cacheReadTokens}, creation: ${cacheCreationTokens}${diffSuffix}]`
 
-    logForDebugging(summary, { level: 'warn' })
+    logForDebugging(summary, { level: "warn" })
 
     state.pendingChanges = null
   } catch (e: unknown) {
@@ -670,10 +603,7 @@ export async function checkResponseForCacheBreak(
  * The next API response will have lower cache read tokens — that's
  * expected, not a cache break.
  */
-export function notifyCacheDeletion(
-  querySource: QuerySource,
-  agentId?: AgentId,
-): void {
+export function notifyCacheDeletion(querySource: QuerySource, agentId?: AgentId): void {
   const key = getTrackingKey(querySource, agentId)
   const state = key ? previousStateBySource.get(key) : undefined
   if (state) {
@@ -686,10 +616,7 @@ export function notifyCacheDeletion(
  * Compaction legitimately reduces message count, so cache read tokens
  * will naturally drop on the next call — that's not a break.
  */
-export function notifyCompaction(
-  querySource: QuerySource,
-  agentId?: AgentId,
-): void {
+export function notifyCompaction(querySource: QuerySource, agentId?: AgentId): void {
   const key = getTrackingKey(querySource, agentId)
   const state = key ? previousStateBySource.get(key) : undefined
   if (state) {
@@ -705,20 +632,11 @@ export function resetPromptCacheBreakDetection(): void {
   previousStateBySource.clear()
 }
 
-async function writeCacheBreakDiff(
-  prevContent: string,
-  newContent: string,
-): Promise<string | undefined> {
+async function writeCacheBreakDiff(prevContent: string, newContent: string): Promise<string | undefined> {
   try {
     const diffPath = getCacheBreakDiffPath()
     await mkdir(getClaudeTempDir(), { recursive: true })
-    const patch = createPatch(
-      'prompt-state',
-      prevContent,
-      newContent,
-      'before',
-      'after',
-    )
+    const patch = createPatch("prompt-state", prevContent, newContent, "before", "after")
     await writeFile(diffPath, patch)
     return diffPath
   } catch {

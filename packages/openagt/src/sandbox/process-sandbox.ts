@@ -319,7 +319,8 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
 
   stats.currentRunning--
 
-  const timedOut = result.signal === "SIGTERM" || result.signal === "SIGKILL" || !!result.error?.message?.includes("timed out")
+  const timedOut =
+    result.signal === "SIGTERM" || result.signal === "SIGKILL" || !!result.error?.message?.includes("timed out")
   if (timedOut) stats.totalTimeouts++
   if (timedOut) stats.totalKilled++
 

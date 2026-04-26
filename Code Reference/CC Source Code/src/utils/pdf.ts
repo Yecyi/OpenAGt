@@ -1,30 +1,19 @@
-import { randomUUID } from 'crypto'
-import { mkdir, readdir, readFile } from 'fs/promises'
-import { join } from 'path'
-import {
-  PDF_MAX_EXTRACT_SIZE,
-  PDF_TARGET_RAW_SIZE,
-} from '../constants/apiLimits.js'
-import { errorMessage } from './errors.js'
-import { execFileNoThrow } from './execFileNoThrow.js'
-import { formatFileSize } from './format.js'
-import { getFsImplementation } from './fsOperations.js'
-import { getToolResultsDir } from './toolResultStorage.js'
+import { randomUUID } from "crypto"
+import { mkdir, readdir, readFile } from "fs/promises"
+import { join } from "path"
+import { PDF_MAX_EXTRACT_SIZE, PDF_TARGET_RAW_SIZE } from "../constants/apiLimits.js"
+import { errorMessage } from "./errors.js"
+import { execFileNoThrow } from "./execFileNoThrow.js"
+import { formatFileSize } from "./format.js"
+import { getFsImplementation } from "./fsOperations.js"
+import { getToolResultsDir } from "./toolResultStorage.js"
 
 export type PDFError = {
-  reason:
-    | 'empty'
-    | 'too_large'
-    | 'password_protected'
-    | 'corrupted'
-    | 'unknown'
-    | 'unavailable'
+  reason: "empty" | "too_large" | "password_protected" | "corrupted" | "unknown" | "unavailable"
   message: string
 }
 
-export type PDFResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: PDFError }
+export type PDFResult<T> = { success: true; data: T } | { success: false; error: PDFError }
 
 /**
  * Read a PDF file and return it as base64-encoded data.
@@ -33,7 +22,7 @@ export type PDFResult<T> =
  */
 export async function readPDF(filePath: string): Promise<
   PDFResult<{
-    type: 'pdf'
+    type: "pdf"
     file: {
       filePath: string
       base64: string
@@ -50,7 +39,7 @@ export async function readPDF(filePath: string): Promise<
     if (originalSize === 0) {
       return {
         success: false,
-        error: { reason: 'empty', message: `PDF file is empty: ${filePath}` },
+        error: { reason: "empty", message: `PDF file is empty: ${filePath}` },
       }
     }
 
@@ -61,7 +50,7 @@ export async function readPDF(filePath: string): Promise<
       return {
         success: false,
         error: {
-          reason: 'too_large',
+          reason: "too_large",
           message: `PDF file exceeds maximum allowed size of ${formatFileSize(PDF_TARGET_RAW_SIZE)}.`,
         },
       }
@@ -74,18 +63,18 @@ export async function readPDF(filePath: string): Promise<
     // Once an invalid PDF document block is in the message history, every subsequent
     // API call fails with 400 "The PDF specified was not valid" and the session
     // becomes unrecoverable without /clear.
-    const header = fileBuffer.subarray(0, 5).toString('ascii')
-    if (!header.startsWith('%PDF-')) {
+    const header = fileBuffer.subarray(0, 5).toString("ascii")
+    if (!header.startsWith("%PDF-")) {
       return {
         success: false,
         error: {
-          reason: 'corrupted',
+          reason: "corrupted",
           message: `File is not a valid PDF (missing %PDF- header): ${filePath}`,
         },
       }
     }
 
-    const base64 = fileBuffer.toString('base64')
+    const base64 = fileBuffer.toString("base64")
 
     // Note: We cannot check page count here without parsing the PDF
     // The API will enforce the 100-page limit and return an error if exceeded
@@ -93,7 +82,7 @@ export async function readPDF(filePath: string): Promise<
     return {
       success: true,
       data: {
-        type: 'pdf',
+        type: "pdf",
         file: {
           filePath,
           base64,
@@ -105,7 +94,7 @@ export async function readPDF(filePath: string): Promise<
     return {
       success: false,
       error: {
-        reason: 'unknown',
+        reason: "unknown",
         message: errorMessage(e),
       },
     }
@@ -116,10 +105,8 @@ export async function readPDF(filePath: string): Promise<
  * Get the number of pages in a PDF file using `pdfinfo` (from poppler-utils).
  * Returns `null` if pdfinfo is not available or if the page count cannot be determined.
  */
-export async function getPDFPageCount(
-  filePath: string,
-): Promise<number | null> {
-  const { code, stdout } = await execFileNoThrow('pdfinfo', [filePath], {
+export async function getPDFPageCount(filePath: string): Promise<number | null> {
+  const { code, stdout } = await execFileNoThrow("pdfinfo", [filePath], {
     timeout: 10_000,
     useCwd: false,
   })
@@ -135,7 +122,7 @@ export async function getPDFPageCount(
 }
 
 export type PDFExtractPagesResult = {
-  type: 'parts'
+  type: "parts"
   file: {
     filePath: string
     originalSize: number
@@ -159,7 +146,7 @@ export function resetPdftoppmCache(): void {
  */
 export async function isPdftoppmAvailable(): Promise<boolean> {
   if (pdftoppmAvailable !== undefined) return pdftoppmAvailable
-  const { code, stderr } = await execFileNoThrow('pdftoppm', ['-v'], {
+  const { code, stderr } = await execFileNoThrow("pdftoppm", ["-v"], {
     timeout: 5000,
     useCwd: false,
   })
@@ -188,7 +175,7 @@ export async function extractPDFPages(
     if (originalSize === 0) {
       return {
         success: false,
-        error: { reason: 'empty', message: `PDF file is empty: ${filePath}` },
+        error: { reason: "empty", message: `PDF file is empty: ${filePath}` },
       }
     }
 
@@ -196,7 +183,7 @@ export async function extractPDFPages(
       return {
         success: false,
         error: {
-          reason: 'too_large',
+          reason: "too_large",
           message: `PDF file exceeds maximum allowed size for text extraction (${formatFileSize(PDF_MAX_EXTRACT_SIZE)}).`,
         },
       }
@@ -207,9 +194,9 @@ export async function extractPDFPages(
       return {
         success: false,
         error: {
-          reason: 'unavailable',
+          reason: "unavailable",
           message:
-            'pdftoppm is not installed. Install poppler-utils (e.g. `brew install poppler` or `apt-get install poppler-utils`) to enable PDF page rendering.',
+            "pdftoppm is not installed. Install poppler-utils (e.g. `brew install poppler` or `apt-get install poppler-utils`) to enable PDF page rendering.",
         },
       }
     }
@@ -219,16 +206,16 @@ export async function extractPDFPages(
     await mkdir(outputDir, { recursive: true })
 
     // pdftoppm produces files like <prefix>-01.jpg, <prefix>-02.jpg, etc.
-    const prefix = join(outputDir, 'page')
-    const args = ['-jpeg', '-r', '100']
+    const prefix = join(outputDir, "page")
+    const args = ["-jpeg", "-r", "100"]
     if (options?.firstPage) {
-      args.push('-f', String(options.firstPage))
+      args.push("-f", String(options.firstPage))
     }
     if (options?.lastPage && options.lastPage !== Infinity) {
-      args.push('-l', String(options.lastPage))
+      args.push("-l", String(options.lastPage))
     }
     args.push(filePath, prefix)
-    const { code, stderr } = await execFileNoThrow('pdftoppm', args, {
+    const { code, stderr } = await execFileNoThrow("pdftoppm", args, {
       timeout: 120_000,
       useCwd: false,
     })
@@ -238,9 +225,8 @@ export async function extractPDFPages(
         return {
           success: false,
           error: {
-            reason: 'password_protected',
-            message:
-              'PDF is password-protected. Please provide an unprotected version.',
+            reason: "password_protected",
+            message: "PDF is password-protected. Please provide an unprotected version.",
           },
         }
       }
@@ -248,28 +234,28 @@ export async function extractPDFPages(
         return {
           success: false,
           error: {
-            reason: 'corrupted',
-            message: 'PDF file is corrupted or invalid.',
+            reason: "corrupted",
+            message: "PDF file is corrupted or invalid.",
           },
         }
       }
       return {
         success: false,
-        error: { reason: 'unknown', message: `pdftoppm failed: ${stderr}` },
+        error: { reason: "unknown", message: `pdftoppm failed: ${stderr}` },
       }
     }
 
     // Read generated image files and sort naturally
     const entries = await readdir(outputDir)
-    const imageFiles = entries.filter(f => f.endsWith('.jpg')).sort()
+    const imageFiles = entries.filter((f) => f.endsWith(".jpg")).sort()
     const pageCount = imageFiles.length
 
     if (pageCount === 0) {
       return {
         success: false,
         error: {
-          reason: 'corrupted',
-          message: 'pdftoppm produced no output pages. The PDF may be invalid.',
+          reason: "corrupted",
+          message: "pdftoppm produced no output pages. The PDF may be invalid.",
         },
       }
     }
@@ -279,7 +265,7 @@ export async function extractPDFPages(
     return {
       success: true,
       data: {
-        type: 'parts',
+        type: "parts",
         file: {
           filePath,
           originalSize,
@@ -292,7 +278,7 @@ export async function extractPDFPages(
     return {
       success: false,
       error: {
-        reason: 'unknown',
+        reason: "unknown",
         message: errorMessage(e),
       },
     }

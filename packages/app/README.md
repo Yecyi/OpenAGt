@@ -19,13 +19,13 @@
 
 ## 技术栈
 
-| 组件 | 技术 |
-|------|------|
-| 前端框架 | SolidJS |
-| 构建工具 | Vite |
-| 样式 | CSS Modules + CSS Variables |
-| 测试 | Playwright (E2E) |
-| 状态管理 | SolidJS createStore |
+| 组件     | 技术                        |
+| -------- | --------------------------- |
+| 前端框架 | SolidJS                     |
+| 构建工具 | Vite                        |
+| 样式     | CSS Modules + CSS Variables |
+| 测试     | Playwright (E2E)            |
+| 状态管理 | SolidJS createStore         |
 
 ## 目录结构
 
@@ -69,11 +69,11 @@ pnpm test:e2e:local
 
 ### 环境变量
 
-| 变量 | 描述 | 默认值 |
-|------|------|--------|
-| `PLAYWRIGHT_SERVER_HOST` | 后端地址 | `localhost` |
-| `PLAYWRIGHT_SERVER_PORT` | 后端端口 | `4096` |
-| `PLAYWRIGHT_PORT` | Vite 端口 | `3000` |
+| 变量                     | 描述      | 默认值      |
+| ------------------------ | --------- | ----------- |
+| `PLAYWRIGHT_SERVER_HOST` | 后端地址  | `localhost` |
+| `PLAYWRIGHT_SERVER_PORT` | 后端端口  | `4096`      |
+| `PLAYWRIGHT_PORT`        | Vite 端口 | `3000`      |
 
 ### E2E 测试
 

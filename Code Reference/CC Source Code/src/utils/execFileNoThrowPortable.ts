@@ -1,6 +1,6 @@
-import { type Options as ExecaOptions, execaSync } from 'execa'
-import { getCwd } from '../utils/cwd.js'
-import { slowLogging } from './slowOperations.js'
+import { type Options as ExecaOptions, execaSync } from "execa"
+import { getCwd } from "../utils/cwd.js"
+import { slowLogging } from "./slowOperations.js"
 
 const MS_IN_SECOND = 1000
 const SECONDS_IN_MINUTE = 60
@@ -9,7 +9,7 @@ type ExecSyncOptions = {
   abortSignal?: AbortSignal
   timeout?: number
   input?: string
-  stdio?: ExecaOptions['stdio']
+  stdio?: ExecaOptions["stdio"]
 }
 
 /**
@@ -21,10 +21,7 @@ export function execSyncWithDefaults_DEPRECATED(command: string): string | null
  * @deprecated Use `execa` directly with `{ shell: true, reject: false }` for non-blocking execution.
  * Sync exec calls block the event loop and cause performance issues.
  */
-export function execSyncWithDefaults_DEPRECATED(
-  command: string,
-  options: ExecSyncOptions,
-): string | null
+export function execSyncWithDefaults_DEPRECATED(command: string, options: ExecSyncOptions): string | null
 /**
  * @deprecated Use `execa` directly with `{ shell: true, reject: false }` for non-blocking execution.
  * Sync exec calls block the event loop and cause performance issues.
@@ -63,7 +60,7 @@ export function execSyncWithDefaults_DEPRECATED(
     abortSignal,
     timeout: finalTimeout = 10 * SECONDS_IN_MINUTE * MS_IN_SECOND,
     input,
-    stdio = ['ignore', 'pipe', 'pipe'],
+    stdio = ["ignore", "pipe", "pipe"],
   } = options
 
   abortSignal?.throwIfAborted()

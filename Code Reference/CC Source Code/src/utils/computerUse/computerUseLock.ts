@@ -1,13 +1,13 @@
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { getSessionId } from '../../bootstrap/state.js'
-import { registerCleanup } from '../../utils/cleanupRegistry.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
-import { getErrnoCode } from '../errors.js'
+import { mkdir, readFile, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { getSessionId } from "../../bootstrap/state.js"
+import { registerCleanup } from "../../utils/cleanupRegistry.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { getClaudeConfigHomeDir } from "../../utils/envUtils.js"
+import { jsonParse, jsonStringify } from "../../utils/slowOperations.js"
+import { getErrnoCode } from "../errors.js"
 
-const LOCK_FILENAME = 'computer-use.lock'
+const LOCK_FILENAME = "computer-use.lock"
 
 // Holds the unregister function for the shutdown cleanup handler.
 // Set when the lock is acquired, cleared when released.
@@ -20,25 +20,20 @@ type ComputerUseLock = {
 }
 
 export type AcquireResult =
-  | { readonly kind: 'acquired'; readonly fresh: boolean }
-  | { readonly kind: 'blocked'; readonly by: string }
+  | { readonly kind: "acquired"; readonly fresh: boolean }
+  | { readonly kind: "blocked"; readonly by: string }
 
 export type CheckResult =
-  | { readonly kind: 'free' }
-  | { readonly kind: 'held_by_self' }
-  | { readonly kind: 'blocked'; readonly by: string }
+  | { readonly kind: "free" }
+  | { readonly kind: "held_by_self" }
+  | { readonly kind: "blocked"; readonly by: string }
 
-const FRESH: AcquireResult = { kind: 'acquired', fresh: true }
-const REENTRANT: AcquireResult = { kind: 'acquired', fresh: false }
+const FRESH: AcquireResult = { kind: "acquired", fresh: true }
+const REENTRANT: AcquireResult = { kind: "acquired", fresh: false }
 
 function isComputerUseLock(value: unknown): value is ComputerUseLock {
-  if (typeof value !== 'object' || value === null) return false
-  return (
-    'sessionId' in value &&
-    typeof value.sessionId === 'string' &&
-    'pid' in value &&
-    typeof value.pid === 'number'
-  )
+  if (typeof value !== "object" || value === null) return false
+  return "sessionId" in value && typeof value.sessionId === "string" && "pid" in value && typeof value.pid === "number"
 }
 
 function getLockPath(): string {
@@ -47,7 +42,7 @@ function getLockPath(): string {
 
 async function readLock(): Promise<ComputerUseLock | undefined> {
   try {
-    const raw = await readFile(getLockPath(), 'utf8')
+    const raw = await readFile(getLockPath(), "utf8")
     const parsed: unknown = jsonParse(raw)
     return isComputerUseLock(parsed) ? parsed : undefined
   } catch {
@@ -78,10 +73,10 @@ function isProcessRunning(pid: number): boolean {
  */
 async function tryCreateExclusive(lock: ComputerUseLock): Promise<boolean> {
   try {
-    await writeFile(getLockPath(), jsonStringify(lock), { flag: 'wx' })
+    await writeFile(getLockPath(), jsonStringify(lock), { flag: "wx" })
     return true
   } catch (e: unknown) {
-    if (getErrnoCode(e) === 'EEXIST') return false
+    if (getErrnoCode(e) === "EEXIST") return false
     throw e
   }
 }
@@ -109,16 +104,14 @@ function registerLockCleanup(): void {
  */
 export async function checkComputerUseLock(): Promise<CheckResult> {
   const existing = await readLock()
-  if (!existing) return { kind: 'free' }
-  if (existing.sessionId === getSessionId()) return { kind: 'held_by_self' }
+  if (!existing) return { kind: "free" }
+  if (existing.sessionId === getSessionId()) return { kind: "held_by_self" }
   if (isProcessRunning(existing.pid)) {
-    return { kind: 'blocked', by: existing.sessionId }
+    return { kind: "blocked", by: existing.sessionId }
   }
-  logForDebugging(
-    `Recovering stale computer-use lock from session ${existing.sessionId} (PID ${existing.pid})`,
-  )
+  logForDebugging(`Recovering stale computer-use lock from session ${existing.sessionId} (PID ${existing.pid})`)
   await unlink(getLockPath()).catch(() => {})
-  return { kind: 'free' }
+  return { kind: "free" }
 }
 
 /**
@@ -170,7 +163,7 @@ export async function tryAcquireComputerUseLock(): Promise<AcquireResult> {
       registerLockCleanup()
       return FRESH
     }
-    return { kind: 'blocked', by: (await readLock())?.sessionId ?? 'unknown' }
+    return { kind: "blocked", by: (await readLock())?.sessionId ?? "unknown" }
   }
 
   // Already held by this session.
@@ -178,20 +171,18 @@ export async function tryAcquireComputerUseLock(): Promise<AcquireResult> {
 
   // Another live session holds it — blocked.
   if (isProcessRunning(existing.pid)) {
-    return { kind: 'blocked', by: existing.sessionId }
+    return { kind: "blocked", by: existing.sessionId }
   }
 
   // Stale lock — recover. Unlink then retry the exclusive create.
   // If another session is also recovering, one EEXISTs and reads the winner.
-  logForDebugging(
-    `Recovering stale computer-use lock from session ${existing.sessionId} (PID ${existing.pid})`,
-  )
+  logForDebugging(`Recovering stale computer-use lock from session ${existing.sessionId} (PID ${existing.pid})`)
   await unlink(getLockPath()).catch(() => {})
   if (await tryCreateExclusive(lock)) {
     registerLockCleanup()
     return FRESH
   }
-  return { kind: 'blocked', by: (await readLock())?.sessionId ?? 'unknown' }
+  return { kind: "blocked", by: (await readLock())?.sessionId ?? "unknown" }
 }
 
 /**
@@ -207,7 +198,7 @@ export async function releaseComputerUseLock(): Promise<boolean> {
   if (!existing || existing.sessionId !== getSessionId()) return false
   try {
     await unlink(getLockPath())
-    logForDebugging('Released computer-use lock')
+    logForDebugging("Released computer-use lock")
     return true
   } catch {
     return false

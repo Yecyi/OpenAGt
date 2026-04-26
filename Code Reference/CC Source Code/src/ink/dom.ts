@@ -1,13 +1,13 @@
-import type { FocusManager } from './focus.js'
-import { createLayoutNode } from './layout/engine.js'
-import type { LayoutNode } from './layout/node.js'
-import { LayoutDisplay, LayoutMeasureMode } from './layout/node.js'
-import measureText from './measure-text.js'
-import { addPendingClear, nodeCache } from './node-cache.js'
-import squashTextNodes from './squash-text-nodes.js'
-import type { Styles, TextStyles } from './styles.js'
-import { expandTabs } from './tabstops.js'
-import wrapText from './wrap-text.js'
+import type { FocusManager } from "./focus.js"
+import { createLayoutNode } from "./layout/engine.js"
+import type { LayoutNode } from "./layout/node.js"
+import { LayoutDisplay, LayoutMeasureMode } from "./layout/node.js"
+import measureText from "./measure-text.js"
+import { addPendingClear, nodeCache } from "./node-cache.js"
+import squashTextNodes from "./squash-text-nodes.js"
+import type { Styles, TextStyles } from "./styles.js"
+import { expandTabs } from "./tabstops.js"
+import wrapText from "./wrap-text.js"
 
 type InkNode = {
   parentNode: DOMElement | undefined
@@ -15,15 +15,15 @@ type InkNode = {
   style: Styles
 }
 
-export type TextName = '#text'
+export type TextName = "#text"
 export type ElementNames =
-  | 'ink-root'
-  | 'ink-box'
-  | 'ink-text'
-  | 'ink-virtual-text'
-  | 'ink-link'
-  | 'ink-progress'
-  | 'ink-raw-ansi'
+  | "ink-root"
+  | "ink-box"
+  | "ink-text"
+  | "ink-virtual-text"
+  | "ink-link"
+  | "ink-progress"
+  | "ink-raw-ansi"
 
 export type NodeNames = ElementNames | TextName
 
@@ -99,7 +99,7 @@ export type TextNode = {
 export type DOMNode<T = { nodeName: NodeNames }> = T extends {
   nodeName: infer U
 }
-  ? U extends '#text'
+  ? U extends "#text"
     ? TextNode
     : DOMElement
   : never
@@ -108,10 +108,7 @@ export type DOMNode<T = { nodeName: NodeNames }> = T extends {
 export type DOMNodeAttribute = boolean | string | number
 
 export const createNode = (nodeName: ElementNames): DOMElement => {
-  const needsYogaNode =
-    nodeName !== 'ink-virtual-text' &&
-    nodeName !== 'ink-link' &&
-    nodeName !== 'ink-progress'
+  const needsYogaNode = nodeName !== "ink-virtual-text" && nodeName !== "ink-link" && nodeName !== "ink-progress"
   const node: DOMElement = {
     nodeName,
     style: {},
@@ -122,19 +119,16 @@ export const createNode = (nodeName: ElementNames): DOMElement => {
     dirty: false,
   }
 
-  if (nodeName === 'ink-text') {
+  if (nodeName === "ink-text") {
     node.yogaNode?.setMeasureFunc(measureTextNode.bind(null, node))
-  } else if (nodeName === 'ink-raw-ansi') {
+  } else if (nodeName === "ink-raw-ansi") {
     node.yogaNode?.setMeasureFunc(measureRawAnsiNode.bind(null, node))
   }
 
   return node
 }
 
-export const appendChildNode = (
-  node: DOMElement,
-  childNode: DOMElement,
-): void => {
+export const appendChildNode = (node: DOMElement, childNode: DOMElement): void => {
   if (childNode.parentNode) {
     removeChildNode(childNode.parentNode, childNode)
   }
@@ -143,20 +137,13 @@ export const appendChildNode = (
   node.childNodes.push(childNode)
 
   if (childNode.yogaNode) {
-    node.yogaNode?.insertChild(
-      childNode.yogaNode,
-      node.yogaNode.getChildCount(),
-    )
+    node.yogaNode?.insertChild(childNode.yogaNode, node.yogaNode.getChildCount())
   }
 
   markDirty(node)
 }
 
-export const insertBeforeNode = (
-  node: DOMElement,
-  newChildNode: DOMNode,
-  beforeChildNode: DOMNode,
-): void => {
+export const insertBeforeNode = (node: DOMElement, newChildNode: DOMNode, beforeChildNode: DOMNode): void => {
   if (newChildNode.parentNode) {
     removeChildNode(newChildNode.parentNode, newChildNode)
   }
@@ -192,19 +179,13 @@ export const insertBeforeNode = (
   node.childNodes.push(newChildNode)
 
   if (newChildNode.yogaNode) {
-    node.yogaNode?.insertChild(
-      newChildNode.yogaNode,
-      node.yogaNode.getChildCount(),
-    )
+    node.yogaNode?.insertChild(newChildNode.yogaNode, node.yogaNode.getChildCount())
   }
 
   markDirty(node)
 }
 
-export const removeChildNode = (
-  node: DOMElement,
-  removeNode: DOMNode,
-): void => {
+export const removeChildNode = (node: DOMElement, removeNode: DOMNode): void => {
   if (removeNode.yogaNode) {
     removeNode.parentNode?.yogaNode?.removeChild(removeNode.yogaNode)
   }
@@ -222,18 +203,14 @@ export const removeChildNode = (
   markDirty(node)
 }
 
-function collectRemovedRects(
-  parent: DOMElement,
-  removed: DOMNode,
-  underAbsolute = false,
-): void {
-  if (removed.nodeName === '#text') return
+function collectRemovedRects(parent: DOMElement, removed: DOMNode, underAbsolute = false): void {
+  if (removed.nodeName === "#text") return
   const elem = removed as DOMElement
   // If this node or any ancestor in the removed subtree was absolute,
   // its painted pixels may overlap non-siblings — flag for global blit
   // disable. Normal-flow removals only affect direct siblings, which
   // hasRemovedChild already handles.
-  const isAbsolute = underAbsolute || elem.style.position === 'absolute'
+  const isAbsolute = underAbsolute || elem.style.position === "absolute"
   const cached = nodeCache.get(elem)
   if (cached) {
     addPendingClear(parent, cached, isAbsolute)
@@ -244,15 +221,11 @@ function collectRemovedRects(
   }
 }
 
-export const setAttribute = (
-  node: DOMElement,
-  key: string,
-  value: DOMNodeAttribute,
-): void => {
+export const setAttribute = (node: DOMElement, key: string, value: DOMNodeAttribute): void => {
   // Skip 'children' - React handles children via appendChild/removeChild,
   // not attributes. React always passes a new children reference, so
   // tracking it as an attribute would mark everything dirty every render.
-  if (key === 'children') {
+  if (key === "children") {
     return
   }
   // Skip if unchanged
@@ -273,10 +246,7 @@ export const setStyle = (node: DOMNode, style: Styles): void => {
   markDirty(node)
 }
 
-export const setTextStyles = (
-  node: DOMElement,
-  textStyles: TextStyles,
-): void => {
+export const setTextStyles = (node: DOMElement, textStyles: TextStyles): void => {
   // Same dirty-check guard as setStyle: React (and buildTextStyles in Text.tsx)
   // allocate a new textStyles object on every render even when values are
   // unchanged, so compare by value to avoid markDirty -> yoga re-measurement
@@ -292,10 +262,7 @@ function stylesEqual(a: Styles, b: Styles): boolean {
   return shallowEqual(a, b)
 }
 
-function shallowEqual<T extends object>(
-  a: T | undefined,
-  b: T | undefined,
-): boolean {
+function shallowEqual<T extends object>(a: T | undefined, b: T | undefined): boolean {
   // Fast path: same object reference (or both undefined)
   if (a === b) return true
   if (a === undefined || b === undefined) return false
@@ -317,7 +284,7 @@ function shallowEqual<T extends object>(
 
 export const createTextNode = (text: string): TextNode => {
   const node: TextNode = {
-    nodeName: '#text',
+    nodeName: "#text",
     nodeValue: text,
     yogaNode: undefined,
     parentNode: undefined,
@@ -334,8 +301,7 @@ const measureTextNode = function (
   width: number,
   widthMode: LayoutMeasureMode,
 ): { width: number; height: number } {
-  const rawText =
-    node.nodeName === '#text' ? node.nodeValue : squashTextNodes(node)
+  const rawText = node.nodeName === "#text" ? node.nodeValue : squashTextNodes(node)
 
   // Expand tabs for measurement (worst case: 8 spaces each).
   // Actual tab expansion happens in output.ts based on screen position.
@@ -362,12 +328,12 @@ const measureTextNode = function (
   // we must respect it and measure at that width. Otherwise, if the actual
   // rendering width is smaller than the natural width, the text will wrap to
   // more lines than layout expects, causing content to be truncated.
-  if (text.includes('\n') && widthMode === LayoutMeasureMode.Undefined) {
+  if (text.includes("\n") && widthMode === LayoutMeasureMode.Undefined) {
     const effectiveWidth = Math.max(width, dimensions.width)
     return measureText(text, effectiveWidth)
   }
 
-  const textWrap = node.style?.textWrap ?? 'wrap'
+  const textWrap = node.style?.textWrap ?? "wrap"
   const wrappedText = wrapText(text, width, textWrap)
 
   return measureText(wrappedText, width)
@@ -381,8 +347,8 @@ const measureRawAnsiNode = function (node: DOMElement): {
   height: number
 } {
   return {
-    width: node.attributes['rawWidth'] as number,
-    height: node.attributes['rawHeight'] as number,
+    width: node.attributes["rawWidth"] as number,
+    height: node.attributes["rawHeight"] as number,
   }
 }
 
@@ -395,15 +361,10 @@ export const markDirty = (node?: DOMNode): void => {
   let markedYoga = false
 
   while (current) {
-    if (current.nodeName !== '#text') {
+    if (current.nodeName !== "#text") {
       ;(current as DOMElement).dirty = true
       // Only mark yoga dirty on leaf nodes that have measure functions
-      if (
-        !markedYoga &&
-        (current.nodeName === 'ink-text' ||
-          current.nodeName === 'ink-raw-ansi') &&
-        current.yogaNode
-      ) {
+      if (!markedYoga && (current.nodeName === "ink-text" || current.nodeName === "ink-raw-ansi") && current.yogaNode) {
         current.yogaNode.markDirty()
         markedYoga = true
       }
@@ -419,11 +380,11 @@ export const markDirty = (node?: DOMNode): void => {
 export const scheduleRenderFrom = (node?: DOMNode): void => {
   let cur: DOMNode | undefined = node
   while (cur?.parentNode) cur = cur.parentNode
-  if (cur && cur.nodeName !== '#text') (cur as DOMElement).onRender?.()
+  if (cur && cur.nodeName !== "#text") (cur as DOMElement).onRender?.()
 }
 
 export const setTextNodeValue = (node: TextNode, text: string): void => {
-  if (typeof text !== 'string') {
+  if (typeof text !== "string") {
     text = String(text)
   }
 
@@ -437,14 +398,14 @@ export const setTextNodeValue = (node: TextNode, text: string): void => {
 }
 
 function isDOMElement(node: DOMElement | TextNode): node is DOMElement {
-  return node.nodeName !== '#text'
+  return node.nodeName !== "#text"
 }
 
 // Clear yogaNode references recursively before freeing.
 // freeRecursive() frees the node and ALL its children, so we must clear
 // all yogaNode references to prevent dangling pointers.
 export const clearYogaNodeReferences = (node: DOMElement | TextNode): void => {
-  if ('childNodes' in node) {
+  if ("childNodes" in node) {
     for (const child of node.childNodes) {
       clearYogaNodeReferences(child)
     }

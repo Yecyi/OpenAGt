@@ -267,7 +267,12 @@ async function getShellConfigFile(): Promise<string | null> {
     if (!exists) continue
 
     const content = await Filesystem.readText(file).catch(() => "")
-    if (content.includes("# openagt") || content.includes("# opencode") || content.includes(".openagt/bin") || content.includes(".opencode/bin")) {
+    if (
+      content.includes("# openagt") ||
+      content.includes("# opencode") ||
+      content.includes(".openagt/bin") ||
+      content.includes(".opencode/bin")
+    ) {
       return file
     }
   }

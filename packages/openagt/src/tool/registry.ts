@@ -240,7 +240,9 @@ export const layer = Layer.effect(
             withConcurrencySafety(tool.skill),
             withConcurrencySafety(tool.patch),
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [withConcurrencySafety(tool.lsp)] : []),
-            ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [withConcurrencySafety(tool.plan)] : []),
+            ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli"
+              ? [withConcurrencySafety(tool.plan)]
+              : []),
           ],
           task: tool.task,
           read: tool.read,

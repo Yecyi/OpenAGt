@@ -1,13 +1,9 @@
-import { useCallback, useEffect } from 'react'
-import type { Command } from '../commands.js'
-import {
-  clearCommandMemoizationCaches,
-  clearCommandsCache,
-  getCommands,
-} from '../commands.js'
-import { onGrowthBookRefresh } from '../services/analytics/growthbook.js'
-import { logError } from '../utils/log.js'
-import { skillChangeDetector } from '../utils/skills/skillChangeDetector.js'
+import { useCallback, useEffect } from "react"
+import type { Command } from "../commands.js"
+import { clearCommandMemoizationCaches, clearCommandsCache, getCommands } from "../commands.js"
+import { onGrowthBookRefresh } from "../services/analytics/growthbook.js"
+import { logError } from "../utils/log.js"
+import { skillChangeDetector } from "../utils/skills/skillChangeDetector.js"
 
 /**
  * Keep the commands list fresh across two triggers:
@@ -21,10 +17,7 @@ import { skillChangeDetector } from '../utils/skills/skillChangeDetector.js'
  *    showSetupScreens at :3106), so the memoized list is baked with the
  *    default. Once init populates remoteEvalFeatureValues, re-filter.
  */
-export function useSkillsChange(
-  cwd: string | undefined,
-  onCommandsChange: (commands: Command[]) => void,
-): void {
+export function useSkillsChange(cwd: string | undefined, onCommandsChange: (commands: Command[]) => void): void {
   const handleChange = useCallback(async () => {
     if (!cwd) return
     try {
@@ -55,8 +48,5 @@ export function useSkillsChange(
     }
   }, [cwd, onCommandsChange])
 
-  useEffect(
-    () => onGrowthBookRefresh(handleGrowthBookRefresh),
-    [handleGrowthBookRefresh],
-  )
+  useEffect(() => onGrowthBookRefresh(handleGrowthBookRefresh), [handleGrowthBookRefresh])
 }

@@ -86,11 +86,7 @@ function releaseReadme(input: { name: string; os: string; arch: "arm64" | "x64" 
   ].join("\n")
 }
 
-async function createReleasePackage(input: {
-  name: string
-  os: string
-  arch: "arm64" | "x64"
-}) {
+async function createReleasePackage(input: { name: string; os: string; arch: "arm64" | "x64" }) {
   const releaseDir = `dist/${input.name}/release`
   const binDir = `${releaseDir}/bin`
   await $`rm -rf ${releaseDir}`

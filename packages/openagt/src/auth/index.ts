@@ -75,9 +75,10 @@ export const layer = Layer.effect(
           return yield* decodeAll(parsed)
         }
 
-        const data = yield* fsys
-          .readJson(file)
-          .pipe(Effect.catch(() => fsys.readJson(legacyFile)), Effect.orElseSucceed(() => ({})))
+        const data = yield* fsys.readJson(file).pipe(
+          Effect.catch(() => fsys.readJson(legacyFile)),
+          Effect.orElseSucceed(() => ({})),
+        )
         return yield* decodeAll(data)
       })
 

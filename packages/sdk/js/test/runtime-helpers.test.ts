@@ -29,6 +29,7 @@ describe("runtime helpers", () => {
         pending: 0,
         running: 1,
         completed: 0,
+        partial: 0,
         failed: 0,
         cancelled: 0,
       },
@@ -199,6 +200,7 @@ describe("runtime helpers", () => {
           pending: 0,
           running: 0,
           completed: 0,
+          partial: 0,
           failed: 0,
           cancelled: 0,
         },
@@ -213,5 +215,48 @@ describe("runtime helpers", () => {
         ],
       }),
     ).toBeUndefined()
+  })
+
+  test("defaults missing coordinator groups to an empty list", () => {
+    const projection = getCoordinatorProjection({
+      run: { id: "coordinator_legacy" },
+      tasks: [],
+      counts: {
+        pending: 0,
+        running: 0,
+        completed: 0,
+        partial: 0,
+        failed: 0,
+        cancelled: 0,
+      },
+    })
+
+    expect(projection?.groups).toEqual([])
+  })
+
+  test("accepts partial coordinator group status", () => {
+    const projection = getCoordinatorProjection({
+      run: { id: "coordinator_partial" },
+      tasks: [{ task_id: "ses_1", status: "partial" }],
+      counts: {
+        pending: 0,
+        running: 0,
+        completed: 0,
+        partial: 1,
+        failed: 0,
+        cancelled: 0,
+      },
+      groups: [
+        {
+          id: "research",
+          node_ids: ["research_repo"],
+          task_ids: ["ses_1"],
+          status: "partial",
+          merge_status: "waiting",
+        },
+      ],
+    })
+
+    expect(projection?.groups[0]?.status).toBe("partial")
   })
 })

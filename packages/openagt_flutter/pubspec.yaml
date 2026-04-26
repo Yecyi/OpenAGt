@@ -1,6 +1,6 @@
 name: opencode_flutter
 description: Native mobile client for OpenCode AI coding agent
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:

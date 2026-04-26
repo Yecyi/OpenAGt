@@ -1,4 +1,4 @@
-import { getActiveTimeCounter as getActiveTimeCounterImpl } from '../bootstrap/state.js'
+import { getActiveTimeCounter as getActiveTimeCounterImpl } from "../bootstrap/state.js"
 
 type ActivityManagerOptions = {
   getNow?: () => number
@@ -27,8 +27,7 @@ export class ActivityManager {
 
   constructor(options?: ActivityManagerOptions) {
     this.getNow = options?.getNow ?? (() => Date.now())
-    this.getActiveTimeCounter =
-      options?.getActiveTimeCounter ?? getActiveTimeCounterImpl
+    this.getActiveTimeCounter = options?.getActiveTimeCounter ?? getActiveTimeCounterImpl
     this.lastCLIRecordedTime = this.getNow()
   }
 
@@ -70,7 +69,7 @@ export class ActivityManager {
 
           // Only record time if within the timeout window
           if (timeSinceLastActivity < timeoutSeconds) {
-            activeTimeCounter.add(timeSinceLastActivity, { type: 'user' })
+            activeTimeCounter.add(timeSinceLastActivity, { type: "user" })
           }
         }
       }
@@ -115,7 +114,7 @@ export class ActivityManager {
       if (timeSinceLastRecord > 0) {
         const activeTimeCounter = this.getActiveTimeCounter()
         if (activeTimeCounter) {
-          activeTimeCounter.add(timeSinceLastRecord, { type: 'cli' })
+          activeTimeCounter.add(timeSinceLastRecord, { type: "cli" })
         }
       }
 
@@ -127,10 +126,7 @@ export class ActivityManager {
   /**
    * Convenience method to track an async operation automatically (mainly for testing/debugging)
    */
-  async trackOperation<T>(
-    operationId: string,
-    fn: () => Promise<T>,
-  ): Promise<T> {
+  async trackOperation<T>(operationId: string, fn: () => Promise<T>): Promise<T> {
     this.startCLIActivity(operationId)
     try {
       return await fn()
@@ -149,8 +145,7 @@ export class ActivityManager {
   } {
     const now = this.getNow()
     const timeSinceUserActivity = (now - this.lastUserActivityTime) / 1000
-    const isUserActive =
-      timeSinceUserActivity < this.USER_ACTIVITY_TIMEOUT_MS / 1000
+    const isUserActive = timeSinceUserActivity < this.USER_ACTIVITY_TIMEOUT_MS / 1000
 
     return {
       isUserActive,

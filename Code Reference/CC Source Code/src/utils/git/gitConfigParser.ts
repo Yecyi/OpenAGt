@@ -8,8 +8,8 @@
  *   - Values: optional quoting, inline comments (# or ;), backslash escapes
  */
 
-import { readFile } from 'fs/promises'
-import { join } from 'path'
+import { readFile } from "fs/promises"
+import { join } from "path"
 
 /**
  * Parse a single value from .git/config.
@@ -22,7 +22,7 @@ export async function parseGitConfigValue(
   key: string,
 ): Promise<string | null> {
   try {
-    const config = await readFile(join(gitDir, 'config'), 'utf-8')
+    const config = await readFile(join(gitDir, "config"), "utf-8")
     return parseConfigString(config, section, subsection, key)
   } catch {
     return null
@@ -39,7 +39,7 @@ export function parseConfigString(
   subsection: string | null,
   key: string,
 ): string | null {
-  const lines = config.split('\n')
+  const lines = config.split("\n")
   const sectionLower = section.toLowerCase()
   const keyLower = key.toLowerCase()
 
@@ -48,12 +48,12 @@ export function parseConfigString(
     const trimmed = line.trim()
 
     // Skip empty lines and comment-only lines
-    if (trimmed.length === 0 || trimmed[0] === '#' || trimmed[0] === ';') {
+    if (trimmed.length === 0 || trimmed[0] === "#" || trimmed[0] === ";") {
       continue
     }
 
     // Section header
-    if (trimmed[0] === '[') {
+    if (trimmed[0] === "[") {
       inSection = matchesSectionHeader(trimmed, sectionLower, subsection)
       continue
     }
@@ -87,19 +87,19 @@ function parseKeyValue(line: string): { key: string; value: string } | null {
   const key = line.slice(0, i)
 
   // Skip whitespace
-  while (i < line.length && (line[i] === ' ' || line[i] === '\t')) {
+  while (i < line.length && (line[i] === " " || line[i] === "\t")) {
     i++
   }
 
   // Must have '='
-  if (i >= line.length || line[i] !== '=') {
+  if (i >= line.length || line[i] !== "=") {
     // Boolean key with no value — not relevant for our use cases
     return null
   }
   i++ // skip '='
 
   // Skip whitespace after '='
-  while (i < line.length && (line[i] === ' ' || line[i] === '\t')) {
+  while (i < line.length && (line[i] === " " || line[i] === "\t")) {
     i++
   }
 
@@ -112,7 +112,7 @@ function parseKeyValue(line: string): { key: string; value: string } | null {
  * Handles quoted strings, escape sequences, and inline comments.
  */
 function parseValue(line: string, start: number): string {
-  let result = ''
+  let result = ""
   let inQuote = false
   let i = start
 
@@ -120,7 +120,7 @@ function parseValue(line: string, start: number): string {
     const ch = line[i]!
 
     // Inline comments outside quotes end the value
-    if (!inQuote && (ch === '#' || ch === ';')) {
+    if (!inQuote && (ch === "#" || ch === ";")) {
       break
     }
 
@@ -130,25 +130,25 @@ function parseValue(line: string, start: number): string {
       continue
     }
 
-    if (ch === '\\' && i + 1 < line.length) {
+    if (ch === "\\" && i + 1 < line.length) {
       const next = line[i + 1]!
       if (inQuote) {
         // Inside quotes: recognize escape sequences
         switch (next) {
-          case 'n':
-            result += '\n'
+          case "n":
+            result += "\n"
             break
-          case 't':
-            result += '\t'
+          case "t":
+            result += "\t"
             break
-          case 'b':
-            result += '\b'
+          case "b":
+            result += "\b"
             break
           case '"':
             result += '"'
             break
-          case '\\':
-            result += '\\'
+          case "\\":
+            result += "\\"
             break
           default:
             // Git silently drops the backslash for unknown escapes
@@ -160,8 +160,8 @@ function parseValue(line: string, start: number): string {
       }
       // Outside quotes: backslash at end of line = continuation (we don't
       // handle multi-line since we split on \n, but handle \\ and others)
-      if (next === '\\') {
-        result += '\\'
+      if (next === "\\") {
+        result += "\\"
         i += 2
         continue
       }
@@ -185,7 +185,7 @@ function parseValue(line: string, start: number): string {
 
 function trimTrailingWhitespace(s: string): string {
   let end = s.length
-  while (end > 0 && (s[end - 1] === ' ' || s[end - 1] === '\t')) {
+  while (end > 0 && (s[end - 1] === " " || s[end - 1] === "\t")) {
     end--
   }
   return s.slice(0, end)
@@ -195,22 +195,12 @@ function trimTrailingWhitespace(s: string): string {
  * Check if a config line like `[remote "origin"]` matches the given section/subsection.
  * Section matching is case-insensitive; subsection matching is case-sensitive.
  */
-function matchesSectionHeader(
-  line: string,
-  sectionLower: string,
-  subsection: string | null,
-): boolean {
+function matchesSectionHeader(line: string, sectionLower: string, subsection: string | null): boolean {
   // line starts with '['
   let i = 1
 
   // Read section name
-  while (
-    i < line.length &&
-    line[i] !== ']' &&
-    line[i] !== ' ' &&
-    line[i] !== '\t' &&
-    line[i] !== '"'
-  ) {
+  while (i < line.length && line[i] !== "]" && line[i] !== " " && line[i] !== "\t" && line[i] !== '"') {
     i++
   }
   const foundSection = line.slice(1, i).toLowerCase()
@@ -221,11 +211,11 @@ function matchesSectionHeader(
 
   if (subsection === null) {
     // Simple section: must end with ']'
-    return i < line.length && line[i] === ']'
+    return i < line.length && line[i] === "]"
   }
 
   // Skip whitespace before subsection quote
-  while (i < line.length && (line[i] === ' ' || line[i] === '\t')) {
+  while (i < line.length && (line[i] === " " || line[i] === "\t")) {
     i++
   }
 
@@ -236,11 +226,11 @@ function matchesSectionHeader(
   i++ // skip opening quote
 
   // Read subsection — case-sensitive, handle \\ and \" escapes
-  let foundSubsection = ''
+  let foundSubsection = ""
   while (i < line.length && line[i] !== '"') {
-    if (line[i] === '\\' && i + 1 < line.length) {
+    if (line[i] === "\\" && i + 1 < line.length) {
       const next = line[i + 1]!
-      if (next === '\\' || next === '"') {
+      if (next === "\\" || next === '"') {
         foundSubsection += next
         i += 2
         continue
@@ -260,7 +250,7 @@ function matchesSectionHeader(
   }
   i++ // skip closing quote
 
-  if (i >= line.length || line[i] !== ']') {
+  if (i >= line.length || line[i] !== "]") {
     return false
   }
 
@@ -268,10 +258,5 @@ function matchesSectionHeader(
 }
 
 function isKeyChar(ch: string): boolean {
-  return (
-    (ch >= 'a' && ch <= 'z') ||
-    (ch >= 'A' && ch <= 'Z') ||
-    (ch >= '0' && ch <= '9') ||
-    ch === '-'
-  )
+  return (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch === "-"
 }

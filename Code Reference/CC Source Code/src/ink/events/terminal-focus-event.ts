@@ -1,6 +1,6 @@
-import { Event } from './event.js'
+import { Event } from "./event.js"
 
-export type TerminalFocusEventType = 'terminalfocus' | 'terminalblur'
+export type TerminalFocusEventType = "terminalfocus" | "terminalblur"
 
 /**
  * Event fired when the terminal window gains or loses focus.

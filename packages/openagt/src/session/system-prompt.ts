@@ -166,7 +166,7 @@ export async function getStaticPrompt(model?: string): Promise<string> {
   const cached = cache.get(cacheKey)
   if (cached) return cached.static
 
-  const filename = model ? PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default : PROMPT_FILES.default
+  const filename = model ? (PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default) : PROMPT_FILES.default
   const content = await loadPromptFile(filename)
 
   const segments = parsePromptSegments(content)
@@ -180,7 +180,7 @@ export function getStaticPromptSync(model?: string): string {
   const cached = cache.get(cacheKey)
   if (cached) return cached.static
 
-  const filename = model ? PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default : PROMPT_FILES.default
+  const filename = model ? (PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default) : PROMPT_FILES.default
   const content = loadPromptFileSync(filename)
 
   const segments = parsePromptSegments(content)
@@ -243,7 +243,9 @@ export async function getSystemPrompt(
 
     if (keptDynamic.length < dynamicSegs.length) {
       truncated = true
-      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")].filter(Boolean).join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
+      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")]
+        .filter(Boolean)
+        .join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
     }
   }
 
@@ -308,7 +310,9 @@ export function getSystemPromptSync(
 
     if (keptDynamic.length < dynamicSegs.length) {
       truncated = true
-      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")].filter(Boolean).join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
+      resultPrompt = [staticSegs.map((s) => s.content).join("\n\n"), keptDynamic.join("\n\n")]
+        .filter(Boolean)
+        .join(`\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n`)
     }
   }
 

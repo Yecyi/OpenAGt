@@ -1,4 +1,4 @@
-import type { ToolInput } from './useFilePermissionDialog.js'
+import type { ToolInput } from "./useFilePermissionDialog.js"
 
 export interface FileEdit {
   old_string: string
@@ -9,7 +9,7 @@ export interface FileEdit {
 export interface IDEDiffConfig {
   filePath: string
   edits?: FileEdit[]
-  editMode?: 'single' | 'multiple'
+  editMode?: "single" | "multiple"
 }
 
 export interface IDEDiffChangeInput {
@@ -37,6 +37,6 @@ export function createSingleEditDiffConfig(
         replace_all: replaceAll,
       },
     ],
-    editMode: 'single',
+    editMode: "single",
   }
 }

@@ -57,10 +57,7 @@ export function estimateToolResultTokens(output: string | undefined, hasMedia: b
 /**
  * Collect compactable tool IDs from messages (in encounter order)
  */
-export function collectCompactableToolIds(
-  messages: MessageV2.WithParts[],
-  compactableTools: Set<string>
-): string[] {
+export function collectCompactableToolIds(messages: MessageV2.WithParts[], compactableTools: Set<string>): string[] {
   const ids: string[] = []
 
   for (const msg of messages) {
@@ -82,16 +79,16 @@ export function collectCompactableToolIds(
  */
 export function evaluateTimeBasedTrigger(
   messages: MessageV2.WithParts[],
-  config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG
+  config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG,
 ): { gapMinutes: number; config: MicroCompactConfig } | null {
   if (config.enabled === false) return null
 
   // Find last assistant message
-  const lastAssistant = messages.findLast(m => m.info.role === "assistant")
+  const lastAssistant = messages.findLast((m) => m.info.role === "assistant")
   if (!lastAssistant) return null
 
   const gapMinutes = (Date.now() - lastAssistant.info.time.created) / 60_000
-  const threshold = (config.gapThresholdMinutes ?? 5) // Default 5 minutes
+  const threshold = config.gapThresholdMinutes ?? 5 // Default 5 minutes
 
   if (!Number.isFinite(gapMinutes) || gapMinutes < threshold) {
     return null
@@ -106,7 +103,7 @@ export function evaluateTimeBasedTrigger(
  */
 export function applyTimeBasedMicroCompact(
   messages: MessageV2.WithParts[],
-  config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG
+  config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG,
 ): MicroCompactResult | null {
   const trigger = evaluateTimeBasedTrigger(messages, config)
   if (!trigger) return null
@@ -119,7 +116,7 @@ export function applyTimeBasedMicroCompact(
   // Floor at 1: always keep at least the last tool result
   const keepRecent = Math.max(1, triggerConfig.preserveRecentN ?? 3)
   const keepSet = new Set(compactableIds.slice(-keepRecent))
-  const clearSet = new Set(compactableIds.filter(id => !keepSet.has(id)))
+  const clearSet = new Set(compactableIds.filter((id) => !keepSet.has(id)))
 
   if (clearSet.size === 0) return null
 
@@ -127,8 +124,8 @@ export function applyTimeBasedMicroCompact(
   let toolsCleared = 0
   let toolsKept = 0
 
-  const result = messages.map(msg => {
-    const updatedParts = msg.parts.map(part => {
+  const result = messages.map((msg) => {
+    const updatedParts = msg.parts.map((part) => {
       if (part.type !== "tool") return part
       if (!clearSet.has(part.callID ?? part.id)) {
         toolsKept++
@@ -212,10 +209,7 @@ export function shouldMicroCompact(
   return toCompact
 }
 
-export function applyMicroCompact(
-  parts: MessageV2.Part[],
-  config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG,
-) {
+export function applyMicroCompact(parts: MessageV2.Part[], config: MicroCompactConfig = DEFAULT_MICRO_COMPACT_CONFIG) {
   const now = Date.now()
   const result: MessageV2.Part[] = []
 

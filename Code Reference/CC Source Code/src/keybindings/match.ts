@@ -1,12 +1,12 @@
-import type { Key } from '../ink.js'
-import type { ParsedBinding, ParsedKeystroke } from './types.js'
+import type { Key } from "../ink.js"
+import type { ParsedBinding, ParsedKeystroke } from "./types.js"
 
 /**
  * Modifier keys from Ink's Key type that we care about for matching.
  * Note: `fn` from Key is intentionally excluded as it's rarely used and
  * not commonly configurable in terminal applications.
  */
-type InkModifiers = Pick<Key, 'ctrl' | 'shift' | 'meta' | 'super'>
+type InkModifiers = Pick<Key, "ctrl" | "shift" | "meta" | "super">
 
 /**
  * Extract modifiers from an Ink Key object.
@@ -27,21 +27,21 @@ function getInkModifiers(key: Key): InkModifiers {
  * that match our ParsedKeystroke.key format.
  */
 export function getKeyName(input: string, key: Key): string | null {
-  if (key.escape) return 'escape'
-  if (key.return) return 'enter'
-  if (key.tab) return 'tab'
-  if (key.backspace) return 'backspace'
-  if (key.delete) return 'delete'
-  if (key.upArrow) return 'up'
-  if (key.downArrow) return 'down'
-  if (key.leftArrow) return 'left'
-  if (key.rightArrow) return 'right'
-  if (key.pageUp) return 'pageup'
-  if (key.pageDown) return 'pagedown'
-  if (key.wheelUp) return 'wheelup'
-  if (key.wheelDown) return 'wheeldown'
-  if (key.home) return 'home'
-  if (key.end) return 'end'
+  if (key.escape) return "escape"
+  if (key.return) return "enter"
+  if (key.tab) return "tab"
+  if (key.backspace) return "backspace"
+  if (key.delete) return "delete"
+  if (key.upArrow) return "up"
+  if (key.downArrow) return "down"
+  if (key.leftArrow) return "left"
+  if (key.rightArrow) return "right"
+  if (key.pageUp) return "pageup"
+  if (key.pageDown) return "pagedown"
+  if (key.wheelUp) return "wheelup"
+  if (key.wheelDown) return "wheeldown"
+  if (key.home) return "home"
+  if (key.end) return "end"
   if (input.length === 1) return input.toLowerCase()
   return null
 }
@@ -57,10 +57,7 @@ export function getKeyName(input: string, key: Key): string | null {
  * keyboard protocol on supporting terminals. A `cmd`/`super` binding will
  * simply never fire on terminals that don't send it.
  */
-function modifiersMatch(
-  inkMods: InkModifiers,
-  target: ParsedKeystroke,
-): boolean {
+function modifiersMatch(inkMods: InkModifiers, target: ParsedKeystroke): boolean {
   // Check ctrl modifier
   if (inkMods.ctrl !== target.ctrl) return false
 
@@ -83,11 +80,7 @@ function modifiersMatch(
  *
  * The display text will show platform-appropriate names (opt on macOS, alt elsewhere).
  */
-export function matchesKeystroke(
-  input: string,
-  key: Key,
-  target: ParsedKeystroke,
-): boolean {
+export function matchesKeystroke(input: string, key: Key, target: ParsedKeystroke): boolean {
   const keyName = getKeyName(input, key)
   if (keyName !== target.key) return false
 
@@ -108,11 +101,7 @@ export function matchesKeystroke(
  * Check if Ink's Key + input matches a parsed binding's first keystroke.
  * For single-keystroke bindings only (Phase 1).
  */
-export function matchesBinding(
-  input: string,
-  key: Key,
-  binding: ParsedBinding,
-): boolean {
+export function matchesBinding(input: string, key: Key, binding: ParsedBinding): boolean {
   if (binding.chord.length !== 1) return false
   const keystroke = binding.chord[0]
   if (!keystroke) return false

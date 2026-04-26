@@ -1,7 +1,7 @@
-import { parseFrontmatter } from '../utils/frontmatterParser.js'
-import { parseSlashCommandToolsFromFrontmatter } from '../utils/markdownConfigLoader.js'
-import { executeShellCommandsInPrompt } from '../utils/promptShellExecution.js'
-import { createMovedToPluginCommand } from './createMovedToPluginCommand.js'
+import { parseFrontmatter } from "../utils/frontmatterParser.js"
+import { parseSlashCommandToolsFromFrontmatter } from "../utils/markdownConfigLoader.js"
+import { executeShellCommandsInPrompt } from "../utils/promptShellExecution.js"
+import { createMovedToPluginCommand } from "./createMovedToPluginCommand.js"
 
 const SECURITY_REVIEW_MARKDOWN = `---
 allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(git show:*), Bash(git remote show:*), Read, Glob, Grep, LS, Task
@@ -196,20 +196,17 @@ Begin your analysis now. Do this in 3 steps:
 Your final reply must contain the markdown report and nothing else.`
 
 export default createMovedToPluginCommand({
-  name: 'security-review',
-  description:
-    'Complete a security review of the pending changes on the current branch',
-  progressMessage: 'analyzing code changes for security risks',
-  pluginName: 'security-review',
-  pluginCommand: 'security-review',
+  name: "security-review",
+  description: "Complete a security review of the pending changes on the current branch",
+  progressMessage: "analyzing code changes for security risks",
+  pluginName: "security-review",
+  pluginCommand: "security-review",
   async getPromptWhileMarketplaceIsPrivate(_args, context) {
     // Parse frontmatter from the markdown
     const parsed = parseFrontmatter(SECURITY_REVIEW_MARKDOWN)
 
     // Parse allowed tools from frontmatter
-    const allowedTools = parseSlashCommandToolsFromFrontmatter(
-      parsed.frontmatter['allowed-tools'],
-    )
+    const allowedTools = parseSlashCommandToolsFromFrontmatter(parsed.frontmatter["allowed-tools"])
 
     // Execute bash commands in the prompt
     const processedContent = await executeShellCommandsInPrompt(
@@ -230,12 +227,12 @@ export default createMovedToPluginCommand({
           }
         },
       },
-      'security-review',
+      "security-review",
     )
 
     return [
       {
-        type: 'text',
+        type: "text",
         text: processedContent,
       },
     ]

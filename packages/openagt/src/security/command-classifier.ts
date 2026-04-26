@@ -271,7 +271,14 @@ export class CommandClassifier {
     return { matches, warnings }
   }
 
-  private checkDangerousRedirections(cmd: string, astNode?: { type: string; text: () => string; children?: readonly { type: string; text: () => string; children?: readonly unknown[] }[] }): { matches: string[]; warnings: string[] } {
+  private checkDangerousRedirections(
+    cmd: string,
+    astNode?: {
+      type: string
+      text: () => string
+      children?: readonly { type: string; text: () => string; children?: readonly unknown[] }[]
+    },
+  ): { matches: string[]; warnings: string[] } {
     const matches: string[] = []
     const warnings: string[] = []
 
@@ -279,15 +286,35 @@ export class CommandClassifier {
     // Walk pipeline nodes for pipe → command(name ∈ {sh,bash,python,...})
     if (astNode) {
       const dangerousInterpreters = new Set([
-        "sh", "bash", "zsh", "dash", "fish", "pwsh", "powershell",
-        "python", "python3", "python2", "ruby", "perl", "php", "node", "nodejs",
-        "lua", "tclsh", "wish", "expect", "python3.11", "python3.12",
+        "sh",
+        "bash",
+        "zsh",
+        "dash",
+        "fish",
+        "pwsh",
+        "powershell",
+        "python",
+        "python3",
+        "python2",
+        "ruby",
+        "perl",
+        "php",
+        "node",
+        "nodejs",
+        "lua",
+        "tclsh",
+        "wish",
+        "expect",
+        "python3.11",
+        "python3.12",
       ])
 
       const walkNode = (node: { type: string; text: () => string; children?: readonly unknown[] }): boolean => {
         // Check for pipeline
         if (node.type === "pipeline") {
-          const children = node.children as Array<{ type: string; text: () => string; children?: readonly unknown[] }> | undefined
+          const children = node.children as
+            | Array<{ type: string; text: () => string; children?: readonly unknown[] }>
+            | undefined
           if (children && children.length >= 2) {
             // Check if any command in the pipeline is an interpreter
             for (const child of children) {
@@ -296,7 +323,10 @@ export class CommandClassifier {
                 if (cmdChildren && cmdChildren.length > 0) {
                   const firstChild = cmdChildren[0]
                   if (firstChild?.type === "command_name" || firstChild?.type === "word") {
-                    const cmdName = firstChild.text().toLowerCase().replace(/^["']|["']$/g, "")
+                    const cmdName = firstChild
+                      .text()
+                      .toLowerCase()
+                      .replace(/^["']|["']$/g, "")
                     if (dangerousInterpreters.has(cmdName)) {
                       matches.push(`ast_pipe_to_interpreter: ${cmdName}`)
                       warnings.push(`Command pipes output to dangerous interpreter: ${cmdName}`)
@@ -311,7 +341,11 @@ export class CommandClassifier {
 
         // Recurse into children
         if (node.children) {
-          for (const child of node.children as Array<{ type: string; text: () => string; children?: readonly unknown[] }>) {
+          for (const child of node.children as Array<{
+            type: string
+            text: () => string
+            children?: readonly unknown[]
+          }>) {
             if (walkNode(child)) return true
           }
         }

@@ -1,23 +1,18 @@
-import { randomBytes } from 'crypto'
-import type { AppState } from './state/AppState.js'
-import type { AgentId } from './types/ids.js'
-import { getTaskOutputPath } from './utils/task/diskOutput.js'
+import { randomBytes } from "crypto"
+import type { AppState } from "./state/AppState.js"
+import type { AgentId } from "./types/ids.js"
+import { getTaskOutputPath } from "./utils/task/diskOutput.js"
 
 export type TaskType =
-  | 'local_bash'
-  | 'local_agent'
-  | 'remote_agent'
-  | 'in_process_teammate'
-  | 'local_workflow'
-  | 'monitor_mcp'
-  | 'dream'
+  | "local_bash"
+  | "local_agent"
+  | "remote_agent"
+  | "in_process_teammate"
+  | "local_workflow"
+  | "monitor_mcp"
+  | "dream"
 
-export type TaskStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'killed'
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "killed"
 
 /**
  * True when a task is in a terminal state and will not transition further.
@@ -25,7 +20,7 @@ export type TaskStatus =
  * finished tasks from AppState, and orphan-cleanup paths.
  */
 export function isTerminalTaskStatus(status: TaskStatus): boolean {
-  return status === 'completed' || status === 'failed' || status === 'killed'
+  return status === "completed" || status === "failed" || status === "killed"
 }
 
 export type TaskHandle = {
@@ -63,7 +58,7 @@ export type LocalShellSpawnInput = {
   toolUseId?: string
   agentId?: AgentId
   /** UI display variant: description-as-label, dialog title, status bar pill. */
-  kind?: 'bash' | 'monitor'
+  kind?: "bash" | "monitor"
 }
 
 // What getTaskByType dispatches for: kill. spawn/render were never
@@ -77,23 +72,23 @@ export type Task = {
 
 // Task ID prefixes
 const TASK_ID_PREFIXES: Record<string, string> = {
-  local_bash: 'b', // Keep as 'b' for backward compatibility
-  local_agent: 'a',
-  remote_agent: 'r',
-  in_process_teammate: 't',
-  local_workflow: 'w',
-  monitor_mcp: 'm',
-  dream: 'd',
+  local_bash: "b", // Keep as 'b' for backward compatibility
+  local_agent: "a",
+  remote_agent: "r",
+  in_process_teammate: "t",
+  local_workflow: "w",
+  monitor_mcp: "m",
+  dream: "d",
 }
 
 // Get task ID prefix
 function getTaskIdPrefix(type: TaskType): string {
-  return TASK_ID_PREFIXES[type] ?? 'x'
+  return TASK_ID_PREFIXES[type] ?? "x"
 }
 
 // Case-insensitive-safe alphabet (digits + lowercase) for task IDs.
 // 36^8 ≈ 2.8 trillion combinations, sufficient to resist brute-force symlink attacks.
-const TASK_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
+const TASK_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 export function generateTaskId(type: TaskType): string {
   const prefix = getTaskIdPrefix(type)
@@ -114,7 +109,7 @@ export function createTaskStateBase(
   return {
     id,
     type,
-    status: 'pending',
+    status: "pending",
     description,
     toolUseId,
     startTime: Date.now(),

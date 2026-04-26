@@ -37,38 +37,40 @@ describe("coordinator runtime", () => {
         const sessions = yield* Session.Service
         const parent = yield* sessions.create({ title: "Coordinator duplicate parent" })
 
-        const error = yield* Effect.flip(coordinator.run({
-          sessionID: parent.id,
-          goal: "Inspect duplicate nodes",
-          nodes: [
-            {
-              id: "research",
-              description: "First research",
-              prompt: "Inspect first.",
-              task_kind: "research",
-              subagent_type: "general",
-              depends_on: [],
-              write_scope: [],
-              read_scope: ["src"],
-              acceptance_checks: ["first checked"],
-              priority: "normal",
-              origin: "coordinator",
-            },
-            {
-              id: "research",
-              description: "Second research",
-              prompt: "Inspect second.",
-              task_kind: "research",
-              subagent_type: "general",
-              depends_on: [],
-              write_scope: [],
-              read_scope: ["test"],
-              acceptance_checks: ["second checked"],
-              priority: "normal",
-              origin: "coordinator",
-            },
-          ],
-        }))
+        const error = yield* Effect.flip(
+          coordinator.run({
+            sessionID: parent.id,
+            goal: "Inspect duplicate nodes",
+            nodes: [
+              {
+                id: "research",
+                description: "First research",
+                prompt: "Inspect first.",
+                task_kind: "research",
+                subagent_type: "general",
+                depends_on: [],
+                write_scope: [],
+                read_scope: ["src"],
+                acceptance_checks: ["first checked"],
+                priority: "normal",
+                origin: "coordinator",
+              },
+              {
+                id: "research",
+                description: "Second research",
+                prompt: "Inspect second.",
+                task_kind: "research",
+                subagent_type: "general",
+                depends_on: [],
+                write_scope: [],
+                read_scope: ["test"],
+                acceptance_checks: ["second checked"],
+                priority: "normal",
+                origin: "coordinator",
+              },
+            ],
+          }),
+        )
 
         expect(error.message).toContain("Coordinator plan contains duplicate node id: research")
       }),
@@ -275,7 +277,9 @@ describe("coordinator runtime", () => {
 
         expect(retried.run.state).toBe("failed")
         expect(retriedTask?.status).toBe("failed")
-        expect(retriedTask?.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
+        expect(retriedTask?.error_summary).toBe(
+          "Coordinator executor unavailable: SessionPrompt.Service is not available",
+        )
       }),
     ),
   )
@@ -337,6 +341,168 @@ describe("coordinator runtime", () => {
 
         expect(cancelled.state).toBe("cancelled")
         expect(projection.counts.cancelled).toBe(run.task_ids.length)
+      }),
+    ),
+  )
+
+  it.live("projects failed critical review verdicts as failed quality gates", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Coordinator review verdict parent" })
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "summarize runtime evidence",
+          mode: "assisted",
+          nodes: [
+            {
+              id: "research",
+              description: "Gather evidence",
+              prompt: "Gather evidence.",
+              task_kind: "research",
+              subagent_type: "explore",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src"],
+              acceptance_checks: ["Evidence gathered"],
+              priority: "high",
+              origin: "coordinator",
+            },
+          ],
+        })
+        const records = yield* tasks.list(parent.id)
+        const research = records.find((item) => item.metadata?.coordinator_node_id === "research")
+        const finalRevise = records.find((item) => item.metadata?.coordinator_node_id === "final_revise")
+        if (!research || !finalRevise) throw new Error("Expected research and final revise tasks")
+
+        yield* tasks.complete({ taskID: research.task_id, parentSessionID: parent.id, output: "evidence gathered" })
+        yield* tasks.complete({
+          taskID: finalRevise.task_id,
+          parentSessionID: parent.id,
+          output: "Summary: review found evidence gaps.\nverdict: revise\nrequired changes: add file references",
+        })
+        const projection = yield* coordinator.projection(run.id)
+
+        expect(projection.quality_gates.find((item) => item.node_id === "final_revise")?.status).toBe("failed")
+        expect(projection.revise_points.find((item) => item.node_id === "final_revise")?.status).toBe("failed")
+      }),
+    ),
+  )
+
+  it.live("keeps partial coordinator tasks out of completed state", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Coordinator partial parent" })
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Inspect partial handling",
+          mode: "assisted",
+          nodes: [
+            {
+              id: "research",
+              description: "Gather partial evidence",
+              prompt: "Gather evidence.",
+              task_kind: "research",
+              subagent_type: "explore",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src"],
+              acceptance_checks: ["Evidence gathered"],
+              priority: "high",
+              origin: "coordinator",
+            },
+          ],
+        })
+        const record = (yield* tasks.list(parent.id)).find((item) => item.metadata?.coordinator_node_id === "research")
+        if (!record) throw new Error("Expected research task")
+
+        yield* tasks.partial({
+          taskID: record.task_id,
+          parentSessionID: parent.id,
+          output: "step budget reached with partial evidence",
+          reason: "step_budget",
+        })
+        yield* coordinator.summarize(run.id)
+        const projection = yield* coordinator.projection(run.id)
+
+        expect(projection.counts.partial).toBe(1)
+        expect(projection.run.state).toBe("blocked")
+      }),
+    ),
+  )
+
+  it.live("blocks dispatch at budget ceiling and resumes after approved continuation budget", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const parent = yield* sessions.create({ title: "Coordinator budget parent" })
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Inspect budget guard",
+          mode: "assisted",
+          maxRounds: 1,
+          maxSubagents: 1,
+          nodes: [
+            {
+              id: "first",
+              description: "First task",
+              prompt: "Run first task.",
+              task_kind: "research",
+              subagent_type: "general",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src/a"],
+              acceptance_checks: ["first done"],
+              priority: "normal",
+              origin: "coordinator",
+            },
+            {
+              id: "second",
+              description: "Second task",
+              prompt: "Run second task.",
+              task_kind: "research",
+              subagent_type: "general",
+              depends_on: [],
+              write_scope: [],
+              read_scope: ["src/b"],
+              acceptance_checks: ["second done"],
+              priority: "normal",
+              origin: "coordinator",
+            },
+          ],
+        })
+
+        yield* coordinator.approve(run.id)
+        yield* Effect.sleep("100 millis")
+        const blocked = yield* coordinator.projection(run.id)
+        expect(blocked.run.state).toBe("blocked")
+        expect(blocked.budget_state.ceiling_hit).toBe(true)
+        expect(blocked.continuation_request?.requires_user_approval).toBe(true)
+
+        const continued = yield* coordinator.continueRun({
+          id: run.id,
+          budgetDelta: {
+            max_rounds: 4,
+            max_model_calls: 4,
+            max_tool_calls: 8,
+            max_subagents: 4,
+            max_wallclock_ms: 60_000,
+            max_estimated_tokens: 50_000,
+          },
+        })
+
+        expect(continued.plan.budget_profile.absolute_ceiling.max_subagents).toBeGreaterThan(
+          run.plan.budget_profile.absolute_ceiling.max_subagents,
+        )
+        expect(continued.state).toBe("active")
+        const resumed = yield* coordinator.projection(run.id)
+        expect(resumed.budget_state.ceiling_hit).toBe(false)
       }),
     ),
   )

@@ -1,39 +1,27 @@
-import { z } from 'zod/v4'
-import {
-  getOriginalCwd,
-  getProjectRoot,
-  setOriginalCwd,
-  setProjectRoot,
-} from '../../bootstrap/state.js'
-import { clearSystemPromptSections } from '../../constants/systemPromptSections.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { Tool } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { count } from '../../utils/array.js'
-import { clearMemoryFileCaches } from '../../utils/claudemd.js'
-import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
-import { updateHooksConfigSnapshot } from '../../utils/hooks/hooksConfigSnapshot.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { getPlansDirectory } from '../../utils/plans.js'
-import { setCwd } from '../../utils/Shell.js'
-import { saveWorktreeState } from '../../utils/sessionStorage.js'
-import {
-  cleanupWorktree,
-  getCurrentWorktreeSession,
-  keepWorktree,
-  killTmuxSession,
-} from '../../utils/worktree.js'
-import { EXIT_WORKTREE_TOOL_NAME } from './constants.js'
-import { getExitWorktreeToolPrompt } from './prompt.js'
-import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
+import { z } from "zod/v4"
+import { getOriginalCwd, getProjectRoot, setOriginalCwd, setProjectRoot } from "../../bootstrap/state.js"
+import { clearSystemPromptSections } from "../../constants/systemPromptSections.js"
+import { logEvent } from "../../services/analytics/index.js"
+import type { Tool } from "../../Tool.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { count } from "../../utils/array.js"
+import { clearMemoryFileCaches } from "../../utils/claudemd.js"
+import { execFileNoThrow } from "../../utils/execFileNoThrow.js"
+import { updateHooksConfigSnapshot } from "../../utils/hooks/hooksConfigSnapshot.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getPlansDirectory } from "../../utils/plans.js"
+import { setCwd } from "../../utils/Shell.js"
+import { saveWorktreeState } from "../../utils/sessionStorage.js"
+import { cleanupWorktree, getCurrentWorktreeSession, keepWorktree, killTmuxSession } from "../../utils/worktree.js"
+import { EXIT_WORKTREE_TOOL_NAME } from "./constants.js"
+import { getExitWorktreeToolPrompt } from "./prompt.js"
+import { renderToolResultMessage, renderToolUseMessage } from "./UI.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
     action: z
-      .enum(['keep', 'remove'])
-      .describe(
-        '"keep" leaves the worktree and branch on disk; "remove" deletes both.',
-      ),
+      .enum(["keep", "remove"])
+      .describe('"keep" leaves the worktree and branch on disk; "remove" deletes both.'),
     discard_changes: z
       .boolean()
       .optional()
@@ -46,7 +34,7 @@ type InputSchema = ReturnType<typeof inputSchema>
 
 const outputSchema = lazySchema(() =>
   z.object({
-    action: z.enum(['keep', 'remove']),
+    action: z.enum(["keep", "remove"]),
     originalCwd: z.string(),
     worktreePath: z.string(),
     worktreeBranch: z.string().optional(),
@@ -80,16 +68,11 @@ async function countWorktreeChanges(
   worktreePath: string,
   originalHeadCommit: string | undefined,
 ): Promise<ChangeSummary | null> {
-  const status = await execFileNoThrow('git', [
-    '-C',
-    worktreePath,
-    'status',
-    '--porcelain',
-  ])
+  const status = await execFileNoThrow("git", ["-C", worktreePath, "status", "--porcelain"])
   if (status.code !== 0) {
     return null
   }
-  const changedFiles = count(status.stdout.split('\n'), l => l.trim() !== '')
+  const changedFiles = count(status.stdout.split("\n"), (l) => l.trim() !== "")
 
   if (!originalHeadCommit) {
     // git status succeeded → this is a git repo, but without a baseline
@@ -97,11 +80,11 @@ async function countWorktreeChanges(
     return null
   }
 
-  const revList = await execFileNoThrow('git', [
-    '-C',
+  const revList = await execFileNoThrow("git", [
+    "-C",
     worktreePath,
-    'rev-list',
-    '--count',
+    "rev-list",
+    "--count",
     `${originalHeadCommit}..HEAD`,
   ])
   if (revList.code !== 0) {
@@ -119,10 +102,7 @@ async function countWorktreeChanges(
  * keepWorktree()/cleanupWorktree() handle process.chdir and currentWorktreeSession;
  * this handles everything above the worktree utility layer.
  */
-function restoreSessionToOriginalCwd(
-  originalCwd: string,
-  projectRootIsWorktree: boolean,
-): void {
+function restoreSessionToOriginalCwd(originalCwd: string, projectRootIsWorktree: boolean): void {
   setCwd(originalCwd)
   // EnterWorktree sets originalCwd to the *worktree* path (intentional — see
   // state.ts getProjectRoot comment). Reset to the real original.
@@ -147,10 +127,10 @@ function restoreSessionToOriginalCwd(
 
 export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
   name: EXIT_WORKTREE_TOOL_NAME,
-  searchHint: 'exit a worktree session and return to the original directory',
+  searchHint: "exit a worktree session and return to the original directory",
   maxResultSizeChars: 100_000,
   async description() {
-    return 'Exits a worktree session created by EnterWorktree and restores the original working directory'
+    return "Exits a worktree session created by EnterWorktree and restores the original working directory"
   },
   async prompt() {
     return getExitWorktreeToolPrompt()
@@ -162,11 +142,11 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
     return outputSchema()
   },
   userFacingName() {
-    return 'Exiting worktree'
+    return "Exiting worktree"
   },
   shouldDefer: true,
   isDestructive(input) {
-    return input.action === 'remove'
+    return input.action === "remove"
   },
   toAutoClassifierInput(input) {
     return input.action
@@ -182,16 +162,13 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
       return {
         result: false,
         message:
-          'No-op: there is no active EnterWorktree session to exit. This tool only operates on worktrees created by EnterWorktree in the current session — it will not touch worktrees created manually or in a previous session. No filesystem changes were made.',
+          "No-op: there is no active EnterWorktree session to exit. This tool only operates on worktrees created by EnterWorktree in the current session — it will not touch worktrees created manually or in a previous session. No filesystem changes were made.",
         errorCode: 1,
       }
     }
 
-    if (input.action === 'remove' && !input.discard_changes) {
-      const summary = await countWorktreeChanges(
-        session.worktreePath,
-        session.originalHeadCommit,
-      )
+    if (input.action === "remove" && !input.discard_changes) {
+      const summary = await countWorktreeChanges(session.worktreePath, session.originalHeadCommit)
       if (summary === null) {
         return {
           result: false,
@@ -203,18 +180,16 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
       if (changedFiles > 0 || commits > 0) {
         const parts: string[] = []
         if (changedFiles > 0) {
-          parts.push(
-            `${changedFiles} uncommitted ${changedFiles === 1 ? 'file' : 'files'}`,
-          )
+          parts.push(`${changedFiles} uncommitted ${changedFiles === 1 ? "file" : "files"}`)
         }
         if (commits > 0) {
           parts.push(
-            `${commits} ${commits === 1 ? 'commit' : 'commits'} on ${session.worktreeBranch ?? 'the worktree branch'}`,
+            `${commits} ${commits === 1 ? "commit" : "commits"} on ${session.worktreeBranch ?? "the worktree branch"}`,
           )
         }
         return {
           result: false,
-          message: `Worktree has ${parts.join(' and ')}. Removing will discard this work permanently. Confirm with the user, then re-invoke with discard_changes: true — or use action: "keep" to preserve the worktree.`,
+          message: `Worktree has ${parts.join(" and ")}. Removing will discard this work permanently. Confirm with the user, then re-invoke with discard_changes: true — or use action: "keep" to preserve the worktree.`,
           errorCode: 2,
         }
       }
@@ -229,17 +204,11 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
     if (!session) {
       // validateInput guards this, but the session is module-level mutable
       // state — defend against a race between validation and execution.
-      throw new Error('Not in a worktree session')
+      throw new Error("Not in a worktree session")
     }
 
     // Capture before keepWorktree/cleanupWorktree null out currentWorktreeSession.
-    const {
-      originalCwd,
-      worktreePath,
-      worktreeBranch,
-      tmuxSessionName,
-      originalHeadCommit,
-    } = session
+    const { originalCwd, worktreePath, worktreeBranch, tmuxSessionName, originalHeadCommit } = session
 
     // --worktree startup calls setOriginalCwd(getCwd()) and
     // setProjectRoot(getCwd()) back-to-back right after setCwd(worktreePath)
@@ -253,16 +222,16 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
     // worktree state at validateInput time may not match now. Null (git
     // failure) falls back to 0/0; safety gating already happened in
     // validateInput, so this only affects analytics + messaging.
-    const { changedFiles, commits } = (await countWorktreeChanges(
-      worktreePath,
-      originalHeadCommit,
-    )) ?? { changedFiles: 0, commits: 0 }
+    const { changedFiles, commits } = (await countWorktreeChanges(worktreePath, originalHeadCommit)) ?? {
+      changedFiles: 0,
+      commits: 0,
+    }
 
-    if (input.action === 'keep') {
+    if (input.action === "keep") {
       await keepWorktree()
       restoreSessionToOriginalCwd(originalCwd, projectRootIsWorktree)
 
-      logEvent('tengu_worktree_kept', {
+      logEvent("tengu_worktree_kept", {
         mid_session: true,
         commits,
         changed_files: changedFiles,
@@ -270,15 +239,15 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
 
       const tmuxNote = tmuxSessionName
         ? ` Tmux session ${tmuxSessionName} is still running; reattach with: tmux attach -t ${tmuxSessionName}`
-        : ''
+        : ""
       return {
         data: {
-          action: 'keep' as const,
+          action: "keep" as const,
           originalCwd,
           worktreePath,
           worktreeBranch,
           tmuxSessionName,
-          message: `Exited worktree. Your work is preserved at ${worktreePath}${worktreeBranch ? ` on branch ${worktreeBranch}` : ''}. Session is now back in ${originalCwd}.${tmuxNote}`,
+          message: `Exited worktree. Your work is preserved at ${worktreePath}${worktreeBranch ? ` on branch ${worktreeBranch}` : ""}. Session is now back in ${originalCwd}.${tmuxNote}`,
         },
       }
     }
@@ -290,7 +259,7 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
     await cleanupWorktree()
     restoreSessionToOriginalCwd(originalCwd, projectRootIsWorktree)
 
-    logEvent('tengu_worktree_removed', {
+    logEvent("tengu_worktree_removed", {
       mid_session: true,
       commits,
       changed_files: changedFiles,
@@ -298,18 +267,15 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
 
     const discardParts: string[] = []
     if (commits > 0) {
-      discardParts.push(`${commits} ${commits === 1 ? 'commit' : 'commits'}`)
+      discardParts.push(`${commits} ${commits === 1 ? "commit" : "commits"}`)
     }
     if (changedFiles > 0) {
-      discardParts.push(
-        `${changedFiles} uncommitted ${changedFiles === 1 ? 'file' : 'files'}`,
-      )
+      discardParts.push(`${changedFiles} uncommitted ${changedFiles === 1 ? "file" : "files"}`)
     }
-    const discardNote =
-      discardParts.length > 0 ? ` Discarded ${discardParts.join(' and ')}.` : ''
+    const discardNote = discardParts.length > 0 ? ` Discarded ${discardParts.join(" and ")}.` : ""
     return {
       data: {
-        action: 'remove' as const,
+        action: "remove" as const,
         originalCwd,
         worktreePath,
         worktreeBranch,
@@ -321,7 +287,7 @@ export const ExitWorktreeTool: Tool<InputSchema, Output> = buildTool({
   },
   mapToolResultToToolResultBlockParam({ message }, toolUseID) {
     return {
-      type: 'tool_result',
+      type: "tool_result",
       content: message,
       tool_use_id: toolUseID,
     }

@@ -1,6 +1,6 @@
-import { getCwd } from './cwd.js'
-import { logForDebugging } from './debug.js'
-import { getRemoteUrl } from './git.js'
+import { getCwd } from "./cwd.js"
+import { logForDebugging } from "./debug.js"
+import { getRemoteUrl } from "./git.js"
 
 export type ParsedRepository = {
   host: string
@@ -20,7 +20,7 @@ export async function detectCurrentRepository(): Promise<string | null> {
   // Only return results for github.com to avoid breaking downstream consumers
   // that assume the result is a github.com repository.
   // Use detectCurrentRepositoryWithHost() for GHE support.
-  if (result.host !== 'github.com') return null
+  if (result.host !== "github.com") return null
   return `${result.owner}/${result.name}`
 }
 
@@ -40,7 +40,7 @@ export async function detectCurrentRepositoryWithHost(): Promise<ParsedRepositor
     const remoteUrl = await getRemoteUrl()
     logForDebugging(`Git remote URL: ${remoteUrl}`)
     if (!remoteUrl) {
-      logForDebugging('No git remote URL found')
+      logForDebugging("No git remote URL found")
       repositoryWithHostCache.set(cwd, null)
       return null
     }
@@ -67,7 +67,7 @@ export async function detectCurrentRepositoryWithHost(): Promise<ParsedRepositor
  */
 export function getCachedRepository(): string | null {
   const parsed = repositoryWithHostCache.get(getCwd())
-  if (!parsed || parsed.host !== 'github.com') return null
+  if (!parsed || parsed.host !== "github.com") return null
   return `${parsed.owner}/${parsed.name}`
 }
 
@@ -99,20 +99,15 @@ export function parseGitRemote(input: string): ParsedRepository | null {
   }
 
   // URL format: https://host/owner/repo.git, ssh://git@host/owner/repo, git://host/owner/repo
-  const urlMatch = trimmed.match(
-    /^(https?|ssh|git):\/\/(?:[^@]+@)?([^/:]+(?::\d+)?)\/([^/]+)\/([^/]+?)(?:\.git)?$/,
-  )
+  const urlMatch = trimmed.match(/^(https?|ssh|git):\/\/(?:[^@]+@)?([^/:]+(?::\d+)?)\/([^/]+)\/([^/]+?)(?:\.git)?$/)
   if (urlMatch?.[1] && urlMatch[2] && urlMatch[3] && urlMatch[4]) {
     const protocol = urlMatch[1]
     const hostWithPort = urlMatch[2]
-    const hostWithoutPort = hostWithPort.split(':')[0] ?? ''
+    const hostWithoutPort = hostWithPort.split(":")[0] ?? ""
     if (!looksLikeRealHostname(hostWithoutPort)) return null
     // Only preserve port for HTTPS — SSH/git ports are not usable for constructing
     // web URLs (e.g. ssh://git@ghe.corp.com:2222 → port 2222 is SSH, not HTTPS).
-    const host =
-      protocol === 'https' || protocol === 'http'
-        ? hostWithPort
-        : hostWithoutPort
+    const host = protocol === "https" || protocol === "http" ? hostWithPort : hostWithoutPort
     return {
       host,
       owner: urlMatch[3],
@@ -138,20 +133,16 @@ export function parseGitHubRepository(input: string): string | null {
   // for GHE support.
   const parsed = parseGitRemote(trimmed)
   if (parsed) {
-    if (parsed.host !== 'github.com') return null
+    if (parsed.host !== "github.com") return null
     return `${parsed.owner}/${parsed.name}`
   }
 
   // If no URL pattern matched, check if it's already in owner/repo format
-  if (
-    !trimmed.includes('://') &&
-    !trimmed.includes('@') &&
-    trimmed.includes('/')
-  ) {
-    const parts = trimmed.split('/')
+  if (!trimmed.includes("://") && !trimmed.includes("@") && trimmed.includes("/")) {
+    const parts = trimmed.split("/")
     if (parts.length === 2 && parts[0] && parts[1]) {
       // Remove .git extension if present
-      const repo = parts[1].replace(/\.git$/, '')
+      const repo = parts[1].replace(/\.git$/, "")
       return `${parts[0]}/${repo}`
     }
   }
@@ -168,8 +159,8 @@ export function parseGitHubRepository(input: string): string | null {
  * never contain hyphens or digits.
  */
 function looksLikeRealHostname(host: string): boolean {
-  if (!host.includes('.')) return false
-  const lastSegment = host.split('.').pop()
+  if (!host.includes(".")) return false
+  const lastSegment = host.split(".").pop()
   if (!lastSegment) return false
   // Real TLDs are purely alphabetic (e.g., "com", "org", "io").
   // SSH aliases like "github.com-work" have a last segment "com-work" which

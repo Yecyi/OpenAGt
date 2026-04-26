@@ -1,27 +1,24 @@
-import axios, { type AxiosResponse } from 'axios'
-import { LRUCache } from 'lru-cache'
+import axios, { type AxiosResponse } from "axios"
+import { LRUCache } from "lru-cache"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../../services/analytics/index.js'
-import { queryHaiku } from '../../services/api/claude.js'
-import { AbortError } from '../../utils/errors.js'
-import { getWebFetchUserAgent } from '../../utils/http.js'
-import { logError } from '../../utils/log.js'
-import {
-  isBinaryContentType,
-  persistBinaryContent,
-} from '../../utils/mcpOutputStorage.js'
-import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
-import { asSystemPrompt } from '../../utils/systemPromptType.js'
-import { isPreapprovedHost } from './preapproved.js'
-import { makeSecondaryModelPrompt } from './prompt.js'
+} from "../../services/analytics/index.js"
+import { queryHaiku } from "../../services/api/claude.js"
+import { AbortError } from "../../utils/errors.js"
+import { getWebFetchUserAgent } from "../../utils/http.js"
+import { logError } from "../../utils/log.js"
+import { isBinaryContentType, persistBinaryContent } from "../../utils/mcpOutputStorage.js"
+import { getSettings_DEPRECATED } from "../../utils/settings/settings.js"
+import { asSystemPrompt } from "../../utils/systemPromptType.js"
+import { isPreapprovedHost } from "./preapproved.js"
+import { makeSecondaryModelPrompt } from "./prompt.js"
 
 // Custom error classes for domain blocking
 class DomainBlockedError extends Error {
   constructor(domain: string) {
     super(`Claude Code is unable to fetch from ${domain}`)
-    this.name = 'DomainBlockedError'
+    this.name = "DomainBlockedError"
   }
 }
 
@@ -30,7 +27,7 @@ class DomainCheckFailedError extends Error {
     super(
       `Unable to verify if domain ${domain} is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.`,
     )
-    this.name = 'DomainCheckFailedError'
+    this.name = "DomainCheckFailedError"
   }
 }
 
@@ -38,12 +35,12 @@ class EgressBlockedError extends Error {
   constructor(public readonly domain: string) {
     super(
       JSON.stringify({
-        error_type: 'EGRESS_BLOCKED',
+        error_type: "EGRESS_BLOCKED",
         domain,
         message: `Access to ${domain} is blocked by the network egress proxy.`,
       }),
     )
-    this.name = 'EgressBlockedError'
+    this.name = "EgressBlockedError"
   }
 }
 
@@ -87,10 +84,10 @@ export function clearWebFetchCache(): void {
 // calls (construction builds 15 rule objects; .turndown() is stateless).
 // @types/turndown ships only `export =` (no .d.mts), so TS types the import
 // as the class itself while Bun wraps CJS in { default } — hence the cast.
-type TurndownCtor = typeof import('turndown')
+type TurndownCtor = typeof import("turndown")
 let turndownServicePromise: Promise<InstanceType<TurndownCtor>> | undefined
 function getTurndownService(): Promise<InstanceType<TurndownCtor>> {
-  return (turndownServicePromise ??= import('turndown').then(m => {
+  return (turndownServicePromise ??= import("turndown").then((m) => {
     const Turndown = (m as unknown as { default: TurndownCtor }).default
     return new Turndown()
   }))
@@ -160,7 +157,7 @@ export function validateURL(url: string): boolean {
   // Initial filter that this isn't a privileged, company-internal URL
   // by checking that the hostname is publicly resolvable
   const hostname = parsed.hostname
-  const parts = hostname.split('.')
+  const parts = hostname.split(".")
   if (parts.length < 2) {
     return false
   }
@@ -168,16 +165,11 @@ export function validateURL(url: string): boolean {
   return true
 }
 
-type DomainCheckResult =
-  | { status: 'allowed' }
-  | { status: 'blocked' }
-  | { status: 'check_failed'; error: Error }
+type DomainCheckResult = { status: "allowed" } | { status: "blocked" } | { status: "check_failed"; error: Error }
 
-export async function checkDomainBlocklist(
-  domain: string,
-): Promise<DomainCheckResult> {
+export async function checkDomainBlocklist(domain: string): Promise<DomainCheckResult> {
   if (DOMAIN_CHECK_CACHE.has(domain)) {
-    return { status: 'allowed' }
+    return { status: "allowed" }
   }
   try {
     const response = await axios.get(
@@ -187,18 +179,18 @@ export async function checkDomainBlocklist(
     if (response.status === 200) {
       if (response.data.can_fetch === true) {
         DOMAIN_CHECK_CACHE.set(domain, true)
-        return { status: 'allowed' }
+        return { status: "allowed" }
       }
-      return { status: 'blocked' }
+      return { status: "blocked" }
     }
     // Non-200 status but didn't throw
     return {
-      status: 'check_failed',
+      status: "check_failed",
       error: new Error(`Domain check returned status ${response.status}`),
     }
   } catch (e) {
     logError(e)
-    return { status: 'check_failed', error: e as Error }
+    return { status: "check_failed", error: e as Error }
   }
 }
 
@@ -209,10 +201,7 @@ export async function checkDomainBlocklist(
  * - Keep the origin the same but change path/query params
  * - Or both of the above
  */
-export function isPermittedRedirect(
-  originalUrl: string,
-  redirectUrl: string,
-): boolean {
+export function isPermittedRedirect(originalUrl: string, redirectUrl: string): boolean {
   try {
     const parsedOriginal = new URL(originalUrl)
     const parsedRedirect = new URL(redirectUrl)
@@ -233,7 +222,7 @@ export function isPermittedRedirect(
     // 1. Adding www. is allowed: example.com -> www.example.com
     // 2. Removing www. is allowed: www.example.com -> example.com
     // 3. Same host (with or without www.) is allowed: paths can change
-    const stripWww = (hostname: string) => hostname.replace(/^www\./, '')
+    const stripWww = (hostname: string) => hostname.replace(/^www\./, "")
     const originalHostWithoutWww = stripWww(parsedOriginal.hostname)
     const redirectHostWithoutWww = stripWww(parsedRedirect.hostname)
     return originalHostWithoutWww === redirectHostWithoutWww
@@ -253,7 +242,7 @@ export function isPermittedRedirect(
  * unknowingly"
  */
 type RedirectInfo = {
-  type: 'redirect'
+  type: "redirect"
   originalUrl: string
   redirectUrl: string
   statusCode: number
@@ -273,22 +262,18 @@ export async function getWithPermittedRedirects(
       signal,
       timeout: FETCH_TIMEOUT_MS,
       maxRedirects: 0,
-      responseType: 'arraybuffer',
+      responseType: "arraybuffer",
       maxContentLength: MAX_HTTP_CONTENT_LENGTH,
       headers: {
-        Accept: 'text/markdown, text/html, */*',
-        'User-Agent': getWebFetchUserAgent(),
+        Accept: "text/markdown, text/html, */*",
+        "User-Agent": getWebFetchUserAgent(),
       },
     })
   } catch (error) {
-    if (
-      axios.isAxiosError(error) &&
-      error.response &&
-      [301, 302, 307, 308].includes(error.response.status)
-    ) {
+    if (axios.isAxiosError(error) && error.response && [301, 302, 307, 308].includes(error.response.status)) {
       const redirectLocation = error.response.headers.location
       if (!redirectLocation) {
-        throw new Error('Redirect missing Location header')
+        throw new Error("Redirect missing Location header")
       }
 
       // Resolve relative URLs against the original URL
@@ -296,16 +281,11 @@ export async function getWithPermittedRedirects(
 
       if (redirectChecker(url, redirectUrl)) {
         // Recursively follow the permitted redirect
-        return getWithPermittedRedirects(
-          redirectUrl,
-          signal,
-          redirectChecker,
-          depth + 1,
-        )
+        return getWithPermittedRedirects(redirectUrl, signal, redirectChecker, depth + 1)
       } else {
         // Return redirect information to the caller
         return {
-          type: 'redirect',
+          type: "redirect",
           originalUrl: url,
           redirectUrl,
           statusCode: error.response.status,
@@ -318,7 +298,7 @@ export async function getWithPermittedRedirects(
     if (
       axios.isAxiosError(error) &&
       error.response?.status === 403 &&
-      error.response.headers['x-proxy-error'] === 'blocked-by-allowlist'
+      error.response.headers["x-proxy-error"] === "blocked-by-allowlist"
     ) {
       const hostname = new URL(url).hostname
       throw new EgressBlockedError(hostname)
@@ -328,10 +308,8 @@ export async function getWithPermittedRedirects(
   }
 }
 
-function isRedirectInfo(
-  response: AxiosResponse<ArrayBuffer> | RedirectInfo,
-): response is RedirectInfo {
-  return 'type' in response && response.type === 'redirect'
+function isRedirectInfo(response: AxiosResponse<ArrayBuffer> | RedirectInfo): response is RedirectInfo {
+  return "type" in response && response.type === "redirect"
 }
 
 export type FetchedContent = {
@@ -349,7 +327,7 @@ export async function getURLMarkdownContent(
   abortController: AbortController,
 ): Promise<FetchedContent | RedirectInfo> {
   if (!validateURL(url)) {
-    throw new Error('Invalid URL')
+    throw new Error("Invalid URL")
   }
 
   // Check cache (LRUCache handles TTL automatically)
@@ -373,8 +351,8 @@ export async function getURLMarkdownContent(
     parsedUrl = new URL(url)
 
     // Upgrade http to https if needed
-    if (parsedUrl.protocol === 'http:') {
-      parsedUrl.protocol = 'https:'
+    if (parsedUrl.protocol === "http:") {
+      parsedUrl.protocol = "https:"
       upgradedUrl = parsedUrl.toString()
     }
 
@@ -387,38 +365,30 @@ export async function getURLMarkdownContent(
     if (!settings.skipWebFetchPreflight) {
       const checkResult = await checkDomainBlocklist(hostname)
       switch (checkResult.status) {
-        case 'allowed':
+        case "allowed":
           // Continue with the fetch
           break
-        case 'blocked':
+        case "blocked":
           throw new DomainBlockedError(hostname)
-        case 'check_failed':
+        case "check_failed":
           throw new DomainCheckFailedError(hostname)
       }
     }
 
-    if (process.env.USER_TYPE === 'ant') {
-      logEvent('tengu_web_fetch_host', {
-        hostname:
-          hostname as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    if (process.env.USER_TYPE === "ant") {
+      logEvent("tengu_web_fetch_host", {
+        hostname: hostname as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
     }
   } catch (e) {
-    if (
-      e instanceof DomainBlockedError ||
-      e instanceof DomainCheckFailedError
-    ) {
+    if (e instanceof DomainBlockedError || e instanceof DomainCheckFailedError) {
       // Expected user-facing failures - re-throw without logging as internal error
       throw e
     }
     logError(e)
   }
 
-  const response = await getWithPermittedRedirects(
-    upgradedUrl,
-    abortController.signal,
-    isPermittedRedirect,
-  )
+  const response = await getWithPermittedRedirects(upgradedUrl, abortController.signal, isPermittedRedirect)
 
   // Check if we got a redirect response
   if (isRedirectInfo(response)) {
@@ -430,7 +400,7 @@ export async function getURLMarkdownContent(
   // This lets GC reclaim up to MAX_HTTP_CONTENT_LENGTH (10MB) before Turndown
   // builds its DOM tree (which can be 3-5x the HTML size).
   ;(response as { data: unknown }).data = null
-  const contentType = response.headers['content-type'] ?? ''
+  const contentType = response.headers["content-type"] ?? ""
 
   // Binary content: save raw bytes to disk with a proper extension so Claude
   // can inspect the file later. We still fall through to the utf-8 decode +
@@ -442,18 +412,18 @@ export async function getURLMarkdownContent(
   if (isBinaryContentType(contentType)) {
     const persistId = `webfetch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const result = await persistBinaryContent(rawBuffer, contentType, persistId)
-    if (!('error' in result)) {
+    if (!("error" in result)) {
       persistedPath = result.filepath
       persistedSize = result.size
     }
   }
 
   const bytes = rawBuffer.length
-  const htmlContent = rawBuffer.toString('utf-8')
+  const htmlContent = rawBuffer.toString("utf-8")
 
   let markdownContent: string
   let contentBytes: number
-  if (contentType.includes('text/html')) {
+  if (contentType.includes("text/html")) {
     markdownContent = (await getTurndownService()).turndown(htmlContent)
     contentBytes = Buffer.byteLength(markdownContent)
   } else {
@@ -491,21 +461,16 @@ export async function applyPromptToMarkdown(
   // Truncate content to avoid "Prompt is too long" errors from the secondary model
   const truncatedContent =
     markdownContent.length > MAX_MARKDOWN_LENGTH
-      ? markdownContent.slice(0, MAX_MARKDOWN_LENGTH) +
-        '\n\n[Content truncated due to length...]'
+      ? markdownContent.slice(0, MAX_MARKDOWN_LENGTH) + "\n\n[Content truncated due to length...]"
       : markdownContent
 
-  const modelPrompt = makeSecondaryModelPrompt(
-    truncatedContent,
-    prompt,
-    isPreapprovedDomain,
-  )
+  const modelPrompt = makeSecondaryModelPrompt(truncatedContent, prompt, isPreapprovedDomain)
   const assistantMessage = await queryHaiku({
     systemPrompt: asSystemPrompt([]),
     userPrompt: modelPrompt,
     signal,
     options: {
-      querySource: 'web_fetch_apply',
+      querySource: "web_fetch_apply",
       agents: [],
       isNonInteractiveSession,
       hasAppendSystemPrompt: false,
@@ -522,9 +487,9 @@ export async function applyPromptToMarkdown(
   const { content } = assistantMessage.message
   if (content.length > 0) {
     const contentBlock = content[0]
-    if ('text' in contentBlock!) {
+    if ("text" in contentBlock!) {
       return contentBlock.text
     }
   }
-  return 'No response from model'
+  return "No response from model"
 }

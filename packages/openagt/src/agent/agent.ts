@@ -159,7 +159,7 @@ export const layer = Layer.effect(
             options: {},
             mode: "subagent",
             native: true,
-            steps: 12,
+            steps: 24,
           },
           explore: {
             name: "explore",
@@ -186,7 +186,7 @@ export const layer = Layer.effect(
             options: {},
             mode: "subagent",
             native: true,
-            steps: 6,
+            steps: 24,
           },
           compaction: {
             name: "compaction",

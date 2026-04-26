@@ -12,14 +12,7 @@ export const CONCURRENCY_SAFE_TOOLS = new Set([
   "skill",
 ])
 
-export const UNSAFE_PATTERNS = new Set([
-  "bash",
-  "edit",
-  "write",
-  "todo",
-  "plan",
-  "apply_patch",
-])
+export const UNSAFE_PATTERNS = new Set(["bash", "edit", "write", "todo", "plan", "apply_patch"])
 
 function stringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []

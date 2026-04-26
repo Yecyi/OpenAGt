@@ -1,38 +1,19 @@
-import { readFileSync } from '../fileRead.js'
-import { getFsImplementation, safeResolvePath } from '../fsOperations.js'
-import { safeParseJSON } from '../json.js'
-import { logError } from '../log.js'
-import {
-  type EditableSettingSource,
-  getEnabledSettingSources,
-  type SettingSource,
-} from '../settings/constants.js'
-import {
-  getSettingsFilePathForSource,
-  getSettingsForSource,
-  updateSettingsForSource,
-} from '../settings/settings.js'
-import type { SettingsJson } from '../settings/types.js'
-import type {
-  PermissionBehavior,
-  PermissionRule,
-  PermissionRuleSource,
-  PermissionRuleValue,
-} from './PermissionRule.js'
-import {
-  permissionRuleValueFromString,
-  permissionRuleValueToString,
-} from './permissionRuleParser.js'
+import { readFileSync } from "../fileRead.js"
+import { getFsImplementation, safeResolvePath } from "../fsOperations.js"
+import { safeParseJSON } from "../json.js"
+import { logError } from "../log.js"
+import { type EditableSettingSource, getEnabledSettingSources, type SettingSource } from "../settings/constants.js"
+import { getSettingsFilePathForSource, getSettingsForSource, updateSettingsForSource } from "../settings/settings.js"
+import type { SettingsJson } from "../settings/types.js"
+import type { PermissionBehavior, PermissionRule, PermissionRuleSource, PermissionRuleValue } from "./PermissionRule.js"
+import { permissionRuleValueFromString, permissionRuleValueToString } from "./permissionRuleParser.js"
 
 /**
  * Returns true if allowManagedPermissionRulesOnly is enabled in managed settings (policySettings).
  * When enabled, only permission rules from managed settings are respected.
  */
 export function shouldAllowManagedPermissionRulesOnly(): boolean {
-  return (
-    getSettingsForSource('policySettings')?.allowManagedPermissionRulesOnly ===
-    true
-  )
+  return getSettingsForSource("policySettings")?.allowManagedPermissionRulesOnly === true
 }
 
 /**
@@ -43,11 +24,7 @@ export function shouldShowAlwaysAllowOptions(): boolean {
   return !shouldAllowManagedPermissionRulesOnly()
 }
 
-const SUPPORTED_RULE_BEHAVIORS = [
-  'allow',
-  'deny',
-  'ask',
-] as const satisfies PermissionBehavior[]
+const SUPPORTED_RULE_BEHAVIORS = ["allow", "deny", "ask"] as const satisfies PermissionBehavior[]
 
 /**
  * Lenient version of getSettingsForSource that doesn't fail on ANY validation errors.
@@ -58,9 +35,7 @@ const SUPPORTED_RULE_BEHAVIORS = [
  *
  * FOR EDITING ONLY - do not use this for reading settings for execution.
  */
-function getSettingsForSourceLenient_FOR_EDITING_ONLY_NOT_FOR_READING(
-  source: SettingSource,
-): SettingsJson | null {
+function getSettingsForSourceLenient_FOR_EDITING_ONLY_NOT_FOR_READING(source: SettingSource): SettingsJson | null {
   const filePath = getSettingsFilePathForSource(source)
   if (!filePath) {
     return null
@@ -69,14 +44,14 @@ function getSettingsForSourceLenient_FOR_EDITING_ONLY_NOT_FOR_READING(
   try {
     const { resolvedPath } = safeResolvePath(getFsImplementation(), filePath)
     const content = readFileSync(resolvedPath)
-    if (content.trim() === '') {
+    if (content.trim() === "") {
       return {}
     }
 
     const data = safeParseJSON(content, false)
     // Return raw parsed JSON without validation to preserve all existing settings
     // This is safe because we're only using this for reading/appending, not for execution
-    return data && typeof data === 'object' ? (data as SettingsJson) : null
+    return data && typeof data === "object" ? (data as SettingsJson) : null
   } catch {
     return null
   }
@@ -88,10 +63,7 @@ function getSettingsForSourceLenient_FOR_EDITING_ONLY_NOT_FOR_READING(
  * @param source The source of these rules
  * @returns Array of PermissionRule objects
  */
-function settingsJsonToRules(
-  data: SettingsJson | null,
-  source: PermissionRuleSource,
-): PermissionRule[] {
+function settingsJsonToRules(data: SettingsJson | null, source: PermissionRuleSource): PermissionRule[] {
   if (!data || !data.permissions) {
     return []
   }
@@ -120,7 +92,7 @@ function settingsJsonToRules(
 export function loadAllPermissionRulesFromDisk(): PermissionRule[] {
   // If allowManagedPermissionRulesOnly is set, only use managed permission rules
   if (shouldAllowManagedPermissionRulesOnly()) {
-    return getPermissionRulesForSource('policySettings')
+    return getPermissionRulesForSource("policySettings")
   }
 
   // Otherwise, load from all enabled sources (backwards compatible)
@@ -137,9 +109,7 @@ export function loadAllPermissionRulesFromDisk(): PermissionRule[] {
  * @param source The source to load from
  * @returns Array of permission rules from that source
  */
-export function getPermissionRulesForSource(
-  source: SettingSource,
-): PermissionRule[] {
+export function getPermissionRulesForSource(source: SettingSource): PermissionRule[] {
   const settingsData = getSettingsForSource(source)
   return settingsJsonToRules(settingsData, source)
 }
@@ -149,20 +119,14 @@ export type PermissionRuleFromEditableSettings = PermissionRule & {
 }
 
 // Editable sources that can be modified (excludes policySettings and flagSettings)
-const EDITABLE_SOURCES: EditableSettingSource[] = [
-  'userSettings',
-  'projectSettings',
-  'localSettings',
-]
+const EDITABLE_SOURCES: EditableSettingSource[] = ["userSettings", "projectSettings", "localSettings"]
 
 /**
  * Deletes a rule from the project permissions file
  * @param rule The rule to delete
  * @returns Promise resolving to a boolean indicating success
  */
-export function deletePermissionRuleFromSettings(
-  rule: PermissionRuleFromEditableSettings,
-): boolean {
+export function deletePermissionRuleFromSettings(rule: PermissionRuleFromEditableSettings): boolean {
   // Runtime check to ensure source is actually editable
   if (!EDITABLE_SOURCES.includes(rule.source as EditableSettingSource)) {
     return false
@@ -183,10 +147,9 @@ export function deletePermissionRuleFromSettings(
 
   // Normalize raw settings entries via roundtrip parse→serialize so legacy
   // names (e.g. "KillShell") match their canonical form ("TaskStop").
-  const normalizeEntry = (raw: string): string =>
-    permissionRuleValueToString(permissionRuleValueFromString(raw))
+  const normalizeEntry = (raw: string): string => permissionRuleValueToString(permissionRuleValueFromString(raw))
 
-  if (!behaviorArray.some(raw => normalizeEntry(raw) === ruleString)) {
+  if (!behaviorArray.some((raw) => normalizeEntry(raw) === ruleString)) {
     return false
   }
 
@@ -196,9 +159,7 @@ export function deletePermissionRuleFromSettings(
       ...settingsData,
       permissions: {
         ...settingsData.permissions,
-        [rule.ruleBehavior]: behaviorArray.filter(
-          raw => normalizeEntry(raw) !== ruleString,
-        ),
+        [rule.ruleBehavior]: behaviorArray.filter((raw) => normalizeEntry(raw) !== ruleString),
       },
     }
 
@@ -263,11 +224,9 @@ export function addPermissionRulesToSettings(
     // Filter out duplicates - normalize existing entries via roundtrip
     // parse→serialize so legacy names match their canonical form.
     const existingRulesSet = new Set(
-      existingRules.map(raw =>
-        permissionRuleValueToString(permissionRuleValueFromString(raw)),
-      ),
+      existingRules.map((raw) => permissionRuleValueToString(permissionRuleValueFromString(raw))),
     )
-    const newRules = ruleStrings.filter(rule => !existingRulesSet.has(rule))
+    const newRules = ruleStrings.filter((rule) => !existingRulesSet.has(rule))
 
     // If no new rules to add, return success
     if (newRules.length === 0) {

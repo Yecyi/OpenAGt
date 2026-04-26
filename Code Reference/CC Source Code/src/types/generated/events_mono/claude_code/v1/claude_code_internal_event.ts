@@ -5,8 +5,8 @@
 // source: events_mono/claude_code/v1/claude_code_internal_event.proto
 
 /* eslint-disable */
-import { Timestamp } from '../../../google/protobuf/timestamp.js'
-import { PublicApiAuth } from '../../common/v1/auth.js'
+import { Timestamp } from "../../../google/protobuf/timestamp.js"
+import { PublicApiAuth } from "../../common/v1/auth.js"
 
 /** GitHubActionsMetadata contains GitHub Actions-specific environment information */
 export interface GitHubActionsMetadata {
@@ -130,21 +130,15 @@ export interface ClaudeCodeInternalEvent {
 }
 
 function createBaseGitHubActionsMetadata(): GitHubActionsMetadata {
-  return { actor_id: '', repository_id: '', repository_owner_id: '' }
+  return { actor_id: "", repository_id: "", repository_owner_id: "" }
 }
 
 export const GitHubActionsMetadata: MessageFns<GitHubActionsMetadata> = {
   fromJSON(object: any): GitHubActionsMetadata {
     return {
-      actor_id: isSet(object.actor_id)
-        ? globalThis.String(object.actor_id)
-        : '',
-      repository_id: isSet(object.repository_id)
-        ? globalThis.String(object.repository_id)
-        : '',
-      repository_owner_id: isSet(object.repository_owner_id)
-        ? globalThis.String(object.repository_owner_id)
-        : '',
+      actor_id: isSet(object.actor_id) ? globalThis.String(object.actor_id) : "",
+      repository_id: isSet(object.repository_id) ? globalThis.String(object.repository_id) : "",
+      repository_owner_id: isSet(object.repository_owner_id) ? globalThis.String(object.repository_owner_id) : "",
     }
   },
 
@@ -162,164 +156,114 @@ export const GitHubActionsMetadata: MessageFns<GitHubActionsMetadata> = {
     return obj
   },
 
-  create<I extends Exact<DeepPartial<GitHubActionsMetadata>, I>>(
-    base?: I,
-  ): GitHubActionsMetadata {
+  create<I extends Exact<DeepPartial<GitHubActionsMetadata>, I>>(base?: I): GitHubActionsMetadata {
     return GitHubActionsMetadata.fromPartial(base ?? ({} as any))
   },
-  fromPartial<I extends Exact<DeepPartial<GitHubActionsMetadata>, I>>(
-    object: I,
-  ): GitHubActionsMetadata {
+  fromPartial<I extends Exact<DeepPartial<GitHubActionsMetadata>, I>>(object: I): GitHubActionsMetadata {
     const message = createBaseGitHubActionsMetadata()
-    message.actor_id = object.actor_id ?? ''
-    message.repository_id = object.repository_id ?? ''
-    message.repository_owner_id = object.repository_owner_id ?? ''
+    message.actor_id = object.actor_id ?? ""
+    message.repository_id = object.repository_id ?? ""
+    message.repository_owner_id = object.repository_owner_id ?? ""
     return message
   },
 }
 
 function createBaseEnvironmentMetadata(): EnvironmentMetadata {
   return {
-    platform: '',
-    node_version: '',
-    terminal: '',
-    package_managers: '',
-    runtimes: '',
+    platform: "",
+    node_version: "",
+    terminal: "",
+    package_managers: "",
+    runtimes: "",
     is_running_with_bun: false,
     is_ci: false,
     is_claubbit: false,
     is_github_action: false,
     is_claude_code_action: false,
     is_claude_ai_auth: false,
-    version: '',
-    github_event_name: '',
-    github_actions_runner_environment: '',
-    github_actions_runner_os: '',
-    github_action_ref: '',
-    wsl_version: '',
+    version: "",
+    github_event_name: "",
+    github_actions_runner_environment: "",
+    github_actions_runner_os: "",
+    github_action_ref: "",
+    wsl_version: "",
     github_actions_metadata: undefined,
-    arch: '',
+    arch: "",
     is_claude_code_remote: false,
-    remote_environment_type: '',
-    claude_code_container_id: '',
-    claude_code_remote_session_id: '',
+    remote_environment_type: "",
+    claude_code_container_id: "",
+    claude_code_remote_session_id: "",
     tags: [],
-    deployment_environment: '',
+    deployment_environment: "",
     is_conductor: false,
-    version_base: '',
-    coworker_type: '',
-    build_time: '',
+    version_base: "",
+    coworker_type: "",
+    build_time: "",
     is_local_agent_mode: false,
-    linux_distro_id: '',
-    linux_distro_version: '',
-    linux_kernel: '',
-    vcs: '',
-    platform_raw: '',
+    linux_distro_id: "",
+    linux_distro_version: "",
+    linux_kernel: "",
+    vcs: "",
+    platform_raw: "",
   }
 }
 
 export const EnvironmentMetadata: MessageFns<EnvironmentMetadata> = {
   fromJSON(object: any): EnvironmentMetadata {
     return {
-      platform: isSet(object.platform)
-        ? globalThis.String(object.platform)
-        : '',
-      node_version: isSet(object.node_version)
-        ? globalThis.String(object.node_version)
-        : '',
-      terminal: isSet(object.terminal)
-        ? globalThis.String(object.terminal)
-        : '',
-      package_managers: isSet(object.package_managers)
-        ? globalThis.String(object.package_managers)
-        : '',
-      runtimes: isSet(object.runtimes)
-        ? globalThis.String(object.runtimes)
-        : '',
-      is_running_with_bun: isSet(object.is_running_with_bun)
-        ? globalThis.Boolean(object.is_running_with_bun)
-        : false,
+      platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+      node_version: isSet(object.node_version) ? globalThis.String(object.node_version) : "",
+      terminal: isSet(object.terminal) ? globalThis.String(object.terminal) : "",
+      package_managers: isSet(object.package_managers) ? globalThis.String(object.package_managers) : "",
+      runtimes: isSet(object.runtimes) ? globalThis.String(object.runtimes) : "",
+      is_running_with_bun: isSet(object.is_running_with_bun) ? globalThis.Boolean(object.is_running_with_bun) : false,
       is_ci: isSet(object.is_ci) ? globalThis.Boolean(object.is_ci) : false,
-      is_claubbit: isSet(object.is_claubbit)
-        ? globalThis.Boolean(object.is_claubbit)
-        : false,
-      is_github_action: isSet(object.is_github_action)
-        ? globalThis.Boolean(object.is_github_action)
-        : false,
+      is_claubbit: isSet(object.is_claubbit) ? globalThis.Boolean(object.is_claubbit) : false,
+      is_github_action: isSet(object.is_github_action) ? globalThis.Boolean(object.is_github_action) : false,
       is_claude_code_action: isSet(object.is_claude_code_action)
         ? globalThis.Boolean(object.is_claude_code_action)
         : false,
-      is_claude_ai_auth: isSet(object.is_claude_ai_auth)
-        ? globalThis.Boolean(object.is_claude_ai_auth)
-        : false,
-      version: isSet(object.version) ? globalThis.String(object.version) : '',
-      github_event_name: isSet(object.github_event_name)
-        ? globalThis.String(object.github_event_name)
-        : '',
-      github_actions_runner_environment: isSet(
-        object.github_actions_runner_environment,
-      )
+      is_claude_ai_auth: isSet(object.is_claude_ai_auth) ? globalThis.Boolean(object.is_claude_ai_auth) : false,
+      version: isSet(object.version) ? globalThis.String(object.version) : "",
+      github_event_name: isSet(object.github_event_name) ? globalThis.String(object.github_event_name) : "",
+      github_actions_runner_environment: isSet(object.github_actions_runner_environment)
         ? globalThis.String(object.github_actions_runner_environment)
-        : '',
+        : "",
       github_actions_runner_os: isSet(object.github_actions_runner_os)
         ? globalThis.String(object.github_actions_runner_os)
-        : '',
-      github_action_ref: isSet(object.github_action_ref)
-        ? globalThis.String(object.github_action_ref)
-        : '',
-      wsl_version: isSet(object.wsl_version)
-        ? globalThis.String(object.wsl_version)
-        : '',
+        : "",
+      github_action_ref: isSet(object.github_action_ref) ? globalThis.String(object.github_action_ref) : "",
+      wsl_version: isSet(object.wsl_version) ? globalThis.String(object.wsl_version) : "",
       github_actions_metadata: isSet(object.github_actions_metadata)
         ? GitHubActionsMetadata.fromJSON(object.github_actions_metadata)
         : undefined,
-      arch: isSet(object.arch) ? globalThis.String(object.arch) : '',
+      arch: isSet(object.arch) ? globalThis.String(object.arch) : "",
       is_claude_code_remote: isSet(object.is_claude_code_remote)
         ? globalThis.Boolean(object.is_claude_code_remote)
         : false,
       remote_environment_type: isSet(object.remote_environment_type)
         ? globalThis.String(object.remote_environment_type)
-        : '',
+        : "",
       claude_code_container_id: isSet(object.claude_code_container_id)
         ? globalThis.String(object.claude_code_container_id)
-        : '',
+        : "",
       claude_code_remote_session_id: isSet(object.claude_code_remote_session_id)
         ? globalThis.String(object.claude_code_remote_session_id)
-        : '',
-      tags: globalThis.Array.isArray(object?.tags)
-        ? object.tags.map((e: any) => globalThis.String(e))
-        : [],
+        : "",
+      tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e: any) => globalThis.String(e)) : [],
       deployment_environment: isSet(object.deployment_environment)
         ? globalThis.String(object.deployment_environment)
-        : '',
-      is_conductor: isSet(object.is_conductor)
-        ? globalThis.Boolean(object.is_conductor)
-        : false,
-      version_base: isSet(object.version_base)
-        ? globalThis.String(object.version_base)
-        : '',
-      coworker_type: isSet(object.coworker_type)
-        ? globalThis.String(object.coworker_type)
-        : '',
-      build_time: isSet(object.build_time)
-        ? globalThis.String(object.build_time)
-        : '',
-      is_local_agent_mode: isSet(object.is_local_agent_mode)
-        ? globalThis.Boolean(object.is_local_agent_mode)
-        : false,
-      linux_distro_id: isSet(object.linux_distro_id)
-        ? globalThis.String(object.linux_distro_id)
-        : '',
-      linux_distro_version: isSet(object.linux_distro_version)
-        ? globalThis.String(object.linux_distro_version)
-        : '',
-      linux_kernel: isSet(object.linux_kernel)
-        ? globalThis.String(object.linux_kernel)
-        : '',
-      vcs: isSet(object.vcs) ? globalThis.String(object.vcs) : '',
-      platform_raw: isSet(object.platform_raw)
-        ? globalThis.String(object.platform_raw)
-        : '',
+        : "",
+      is_conductor: isSet(object.is_conductor) ? globalThis.Boolean(object.is_conductor) : false,
+      version_base: isSet(object.version_base) ? globalThis.String(object.version_base) : "",
+      coworker_type: isSet(object.coworker_type) ? globalThis.String(object.coworker_type) : "",
+      build_time: isSet(object.build_time) ? globalThis.String(object.build_time) : "",
+      is_local_agent_mode: isSet(object.is_local_agent_mode) ? globalThis.Boolean(object.is_local_agent_mode) : false,
+      linux_distro_id: isSet(object.linux_distro_id) ? globalThis.String(object.linux_distro_id) : "",
+      linux_distro_version: isSet(object.linux_distro_version) ? globalThis.String(object.linux_distro_version) : "",
+      linux_kernel: isSet(object.linux_kernel) ? globalThis.String(object.linux_kernel) : "",
+      vcs: isSet(object.vcs) ? globalThis.String(object.vcs) : "",
+      platform_raw: isSet(object.platform_raw) ? globalThis.String(object.platform_raw) : "",
     }
   },
 
@@ -365,8 +309,7 @@ export const EnvironmentMetadata: MessageFns<EnvironmentMetadata> = {
       obj.github_event_name = message.github_event_name
     }
     if (message.github_actions_runner_environment !== undefined) {
-      obj.github_actions_runner_environment =
-        message.github_actions_runner_environment
+      obj.github_actions_runner_environment = message.github_actions_runner_environment
     }
     if (message.github_actions_runner_os !== undefined) {
       obj.github_actions_runner_os = message.github_actions_runner_os
@@ -378,9 +321,7 @@ export const EnvironmentMetadata: MessageFns<EnvironmentMetadata> = {
       obj.wsl_version = message.wsl_version
     }
     if (message.github_actions_metadata !== undefined) {
-      obj.github_actions_metadata = GitHubActionsMetadata.toJSON(
-        message.github_actions_metadata,
-      )
+      obj.github_actions_metadata = GitHubActionsMetadata.toJSON(message.github_actions_metadata)
     }
     if (message.arch !== undefined) {
       obj.arch = message.arch
@@ -436,82 +377,71 @@ export const EnvironmentMetadata: MessageFns<EnvironmentMetadata> = {
     return obj
   },
 
-  create<I extends Exact<DeepPartial<EnvironmentMetadata>, I>>(
-    base?: I,
-  ): EnvironmentMetadata {
+  create<I extends Exact<DeepPartial<EnvironmentMetadata>, I>>(base?: I): EnvironmentMetadata {
     return EnvironmentMetadata.fromPartial(base ?? ({} as any))
   },
-  fromPartial<I extends Exact<DeepPartial<EnvironmentMetadata>, I>>(
-    object: I,
-  ): EnvironmentMetadata {
+  fromPartial<I extends Exact<DeepPartial<EnvironmentMetadata>, I>>(object: I): EnvironmentMetadata {
     const message = createBaseEnvironmentMetadata()
-    message.platform = object.platform ?? ''
-    message.node_version = object.node_version ?? ''
-    message.terminal = object.terminal ?? ''
-    message.package_managers = object.package_managers ?? ''
-    message.runtimes = object.runtimes ?? ''
+    message.platform = object.platform ?? ""
+    message.node_version = object.node_version ?? ""
+    message.terminal = object.terminal ?? ""
+    message.package_managers = object.package_managers ?? ""
+    message.runtimes = object.runtimes ?? ""
     message.is_running_with_bun = object.is_running_with_bun ?? false
     message.is_ci = object.is_ci ?? false
     message.is_claubbit = object.is_claubbit ?? false
     message.is_github_action = object.is_github_action ?? false
     message.is_claude_code_action = object.is_claude_code_action ?? false
     message.is_claude_ai_auth = object.is_claude_ai_auth ?? false
-    message.version = object.version ?? ''
-    message.github_event_name = object.github_event_name ?? ''
-    message.github_actions_runner_environment =
-      object.github_actions_runner_environment ?? ''
-    message.github_actions_runner_os = object.github_actions_runner_os ?? ''
-    message.github_action_ref = object.github_action_ref ?? ''
-    message.wsl_version = object.wsl_version ?? ''
+    message.version = object.version ?? ""
+    message.github_event_name = object.github_event_name ?? ""
+    message.github_actions_runner_environment = object.github_actions_runner_environment ?? ""
+    message.github_actions_runner_os = object.github_actions_runner_os ?? ""
+    message.github_action_ref = object.github_action_ref ?? ""
+    message.wsl_version = object.wsl_version ?? ""
     message.github_actions_metadata =
-      object.github_actions_metadata !== undefined &&
-      object.github_actions_metadata !== null
+      object.github_actions_metadata !== undefined && object.github_actions_metadata !== null
         ? GitHubActionsMetadata.fromPartial(object.github_actions_metadata)
         : undefined
-    message.arch = object.arch ?? ''
+    message.arch = object.arch ?? ""
     message.is_claude_code_remote = object.is_claude_code_remote ?? false
-    message.remote_environment_type = object.remote_environment_type ?? ''
-    message.claude_code_container_id = object.claude_code_container_id ?? ''
-    message.claude_code_remote_session_id =
-      object.claude_code_remote_session_id ?? ''
-    message.tags = object.tags?.map(e => e) || []
-    message.deployment_environment = object.deployment_environment ?? ''
+    message.remote_environment_type = object.remote_environment_type ?? ""
+    message.claude_code_container_id = object.claude_code_container_id ?? ""
+    message.claude_code_remote_session_id = object.claude_code_remote_session_id ?? ""
+    message.tags = object.tags?.map((e) => e) || []
+    message.deployment_environment = object.deployment_environment ?? ""
     message.is_conductor = object.is_conductor ?? false
-    message.version_base = object.version_base ?? ''
-    message.coworker_type = object.coworker_type ?? ''
-    message.build_time = object.build_time ?? ''
+    message.version_base = object.version_base ?? ""
+    message.coworker_type = object.coworker_type ?? ""
+    message.build_time = object.build_time ?? ""
     message.is_local_agent_mode = object.is_local_agent_mode ?? false
-    message.linux_distro_id = object.linux_distro_id ?? ''
-    message.linux_distro_version = object.linux_distro_version ?? ''
-    message.linux_kernel = object.linux_kernel ?? ''
-    message.vcs = object.vcs ?? ''
-    message.platform_raw = object.platform_raw ?? ''
+    message.linux_distro_id = object.linux_distro_id ?? ""
+    message.linux_distro_version = object.linux_distro_version ?? ""
+    message.linux_kernel = object.linux_kernel ?? ""
+    message.vcs = object.vcs ?? ""
+    message.platform_raw = object.platform_raw ?? ""
     return message
   },
 }
 
 function createBaseSlackContext(): SlackContext {
   return {
-    slack_team_id: '',
+    slack_team_id: "",
     is_enterprise_install: false,
-    trigger: '',
-    creation_method: '',
+    trigger: "",
+    creation_method: "",
   }
 }
 
 export const SlackContext: MessageFns<SlackContext> = {
   fromJSON(object: any): SlackContext {
     return {
-      slack_team_id: isSet(object.slack_team_id)
-        ? globalThis.String(object.slack_team_id)
-        : '',
+      slack_team_id: isSet(object.slack_team_id) ? globalThis.String(object.slack_team_id) : "",
       is_enterprise_install: isSet(object.is_enterprise_install)
         ? globalThis.Boolean(object.is_enterprise_install)
         : false,
-      trigger: isSet(object.trigger) ? globalThis.String(object.trigger) : '',
-      creation_method: isSet(object.creation_method)
-        ? globalThis.String(object.creation_method)
-        : '',
+      trigger: isSet(object.trigger) ? globalThis.String(object.trigger) : "",
+      creation_method: isSet(object.creation_method) ? globalThis.String(object.creation_method) : "",
     }
   },
 
@@ -532,139 +462,85 @@ export const SlackContext: MessageFns<SlackContext> = {
     return obj
   },
 
-  create<I extends Exact<DeepPartial<SlackContext>, I>>(
-    base?: I,
-  ): SlackContext {
+  create<I extends Exact<DeepPartial<SlackContext>, I>>(base?: I): SlackContext {
     return SlackContext.fromPartial(base ?? ({} as any))
   },
-  fromPartial<I extends Exact<DeepPartial<SlackContext>, I>>(
-    object: I,
-  ): SlackContext {
+  fromPartial<I extends Exact<DeepPartial<SlackContext>, I>>(object: I): SlackContext {
     const message = createBaseSlackContext()
-    message.slack_team_id = object.slack_team_id ?? ''
+    message.slack_team_id = object.slack_team_id ?? ""
     message.is_enterprise_install = object.is_enterprise_install ?? false
-    message.trigger = object.trigger ?? ''
-    message.creation_method = object.creation_method ?? ''
+    message.trigger = object.trigger ?? ""
+    message.creation_method = object.creation_method ?? ""
     return message
   },
 }
 
 function createBaseClaudeCodeInternalEvent(): ClaudeCodeInternalEvent {
   return {
-    event_name: '',
+    event_name: "",
     client_timestamp: undefined,
-    model: '',
-    session_id: '',
-    user_type: '',
-    betas: '',
+    model: "",
+    session_id: "",
+    user_type: "",
+    betas: "",
     env: undefined,
-    entrypoint: '',
-    agent_sdk_version: '',
+    entrypoint: "",
+    agent_sdk_version: "",
     is_interactive: false,
-    client_type: '',
-    process: '',
-    additional_metadata: '',
+    client_type: "",
+    process: "",
+    additional_metadata: "",
     auth: undefined,
     server_timestamp: undefined,
-    event_id: '',
-    device_id: '',
-    swe_bench_run_id: '',
-    swe_bench_instance_id: '',
-    swe_bench_task_id: '',
-    email: '',
-    agent_id: '',
-    parent_session_id: '',
-    agent_type: '',
+    event_id: "",
+    device_id: "",
+    swe_bench_run_id: "",
+    swe_bench_instance_id: "",
+    swe_bench_task_id: "",
+    email: "",
+    agent_id: "",
+    parent_session_id: "",
+    agent_type: "",
     slack: undefined,
-    team_name: '',
-    skill_name: '',
-    plugin_name: '',
-    marketplace_name: '',
+    team_name: "",
+    skill_name: "",
+    plugin_name: "",
+    marketplace_name: "",
   }
 }
 
 export const ClaudeCodeInternalEvent: MessageFns<ClaudeCodeInternalEvent> = {
   fromJSON(object: any): ClaudeCodeInternalEvent {
     return {
-      event_name: isSet(object.event_name)
-        ? globalThis.String(object.event_name)
-        : '',
-      client_timestamp: isSet(object.client_timestamp)
-        ? fromJsonTimestamp(object.client_timestamp)
-        : undefined,
-      model: isSet(object.model) ? globalThis.String(object.model) : '',
-      session_id: isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : '',
-      user_type: isSet(object.user_type)
-        ? globalThis.String(object.user_type)
-        : '',
-      betas: isSet(object.betas) ? globalThis.String(object.betas) : '',
-      env: isSet(object.env)
-        ? EnvironmentMetadata.fromJSON(object.env)
-        : undefined,
-      entrypoint: isSet(object.entrypoint)
-        ? globalThis.String(object.entrypoint)
-        : '',
-      agent_sdk_version: isSet(object.agent_sdk_version)
-        ? globalThis.String(object.agent_sdk_version)
-        : '',
-      is_interactive: isSet(object.is_interactive)
-        ? globalThis.Boolean(object.is_interactive)
-        : false,
-      client_type: isSet(object.client_type)
-        ? globalThis.String(object.client_type)
-        : '',
-      process: isSet(object.process) ? globalThis.String(object.process) : '',
-      additional_metadata: isSet(object.additional_metadata)
-        ? globalThis.String(object.additional_metadata)
-        : '',
-      auth: isSet(object.auth)
-        ? PublicApiAuth.fromJSON(object.auth)
-        : undefined,
-      server_timestamp: isSet(object.server_timestamp)
-        ? fromJsonTimestamp(object.server_timestamp)
-        : undefined,
-      event_id: isSet(object.event_id)
-        ? globalThis.String(object.event_id)
-        : '',
-      device_id: isSet(object.device_id)
-        ? globalThis.String(object.device_id)
-        : '',
-      swe_bench_run_id: isSet(object.swe_bench_run_id)
-        ? globalThis.String(object.swe_bench_run_id)
-        : '',
-      swe_bench_instance_id: isSet(object.swe_bench_instance_id)
-        ? globalThis.String(object.swe_bench_instance_id)
-        : '',
-      swe_bench_task_id: isSet(object.swe_bench_task_id)
-        ? globalThis.String(object.swe_bench_task_id)
-        : '',
-      email: isSet(object.email) ? globalThis.String(object.email) : '',
-      agent_id: isSet(object.agent_id)
-        ? globalThis.String(object.agent_id)
-        : '',
-      parent_session_id: isSet(object.parent_session_id)
-        ? globalThis.String(object.parent_session_id)
-        : '',
-      agent_type: isSet(object.agent_type)
-        ? globalThis.String(object.agent_type)
-        : '',
-      slack: isSet(object.slack)
-        ? SlackContext.fromJSON(object.slack)
-        : undefined,
-      team_name: isSet(object.team_name)
-        ? globalThis.String(object.team_name)
-        : '',
-      skill_name: isSet(object.skill_name)
-        ? globalThis.String(object.skill_name)
-        : '',
-      plugin_name: isSet(object.plugin_name)
-        ? globalThis.String(object.plugin_name)
-        : '',
-      marketplace_name: isSet(object.marketplace_name)
-        ? globalThis.String(object.marketplace_name)
-        : '',
+      event_name: isSet(object.event_name) ? globalThis.String(object.event_name) : "",
+      client_timestamp: isSet(object.client_timestamp) ? fromJsonTimestamp(object.client_timestamp) : undefined,
+      model: isSet(object.model) ? globalThis.String(object.model) : "",
+      session_id: isSet(object.session_id) ? globalThis.String(object.session_id) : "",
+      user_type: isSet(object.user_type) ? globalThis.String(object.user_type) : "",
+      betas: isSet(object.betas) ? globalThis.String(object.betas) : "",
+      env: isSet(object.env) ? EnvironmentMetadata.fromJSON(object.env) : undefined,
+      entrypoint: isSet(object.entrypoint) ? globalThis.String(object.entrypoint) : "",
+      agent_sdk_version: isSet(object.agent_sdk_version) ? globalThis.String(object.agent_sdk_version) : "",
+      is_interactive: isSet(object.is_interactive) ? globalThis.Boolean(object.is_interactive) : false,
+      client_type: isSet(object.client_type) ? globalThis.String(object.client_type) : "",
+      process: isSet(object.process) ? globalThis.String(object.process) : "",
+      additional_metadata: isSet(object.additional_metadata) ? globalThis.String(object.additional_metadata) : "",
+      auth: isSet(object.auth) ? PublicApiAuth.fromJSON(object.auth) : undefined,
+      server_timestamp: isSet(object.server_timestamp) ? fromJsonTimestamp(object.server_timestamp) : undefined,
+      event_id: isSet(object.event_id) ? globalThis.String(object.event_id) : "",
+      device_id: isSet(object.device_id) ? globalThis.String(object.device_id) : "",
+      swe_bench_run_id: isSet(object.swe_bench_run_id) ? globalThis.String(object.swe_bench_run_id) : "",
+      swe_bench_instance_id: isSet(object.swe_bench_instance_id) ? globalThis.String(object.swe_bench_instance_id) : "",
+      swe_bench_task_id: isSet(object.swe_bench_task_id) ? globalThis.String(object.swe_bench_task_id) : "",
+      email: isSet(object.email) ? globalThis.String(object.email) : "",
+      agent_id: isSet(object.agent_id) ? globalThis.String(object.agent_id) : "",
+      parent_session_id: isSet(object.parent_session_id) ? globalThis.String(object.parent_session_id) : "",
+      agent_type: isSet(object.agent_type) ? globalThis.String(object.agent_type) : "",
+      slack: isSet(object.slack) ? SlackContext.fromJSON(object.slack) : undefined,
+      team_name: isSet(object.team_name) ? globalThis.String(object.team_name) : "",
+      skill_name: isSet(object.skill_name) ? globalThis.String(object.skill_name) : "",
+      plugin_name: isSet(object.plugin_name) ? globalThis.String(object.plugin_name) : "",
+      marketplace_name: isSet(object.marketplace_name) ? globalThis.String(object.marketplace_name) : "",
     }
   },
 
@@ -760,65 +636,48 @@ export const ClaudeCodeInternalEvent: MessageFns<ClaudeCodeInternalEvent> = {
     return obj
   },
 
-  create<I extends Exact<DeepPartial<ClaudeCodeInternalEvent>, I>>(
-    base?: I,
-  ): ClaudeCodeInternalEvent {
+  create<I extends Exact<DeepPartial<ClaudeCodeInternalEvent>, I>>(base?: I): ClaudeCodeInternalEvent {
     return ClaudeCodeInternalEvent.fromPartial(base ?? ({} as any))
   },
-  fromPartial<I extends Exact<DeepPartial<ClaudeCodeInternalEvent>, I>>(
-    object: I,
-  ): ClaudeCodeInternalEvent {
+  fromPartial<I extends Exact<DeepPartial<ClaudeCodeInternalEvent>, I>>(object: I): ClaudeCodeInternalEvent {
     const message = createBaseClaudeCodeInternalEvent()
-    message.event_name = object.event_name ?? ''
+    message.event_name = object.event_name ?? ""
     message.client_timestamp = object.client_timestamp ?? undefined
-    message.model = object.model ?? ''
-    message.session_id = object.session_id ?? ''
-    message.user_type = object.user_type ?? ''
-    message.betas = object.betas ?? ''
+    message.model = object.model ?? ""
+    message.session_id = object.session_id ?? ""
+    message.user_type = object.user_type ?? ""
+    message.betas = object.betas ?? ""
     message.env =
-      object.env !== undefined && object.env !== null
-        ? EnvironmentMetadata.fromPartial(object.env)
-        : undefined
-    message.entrypoint = object.entrypoint ?? ''
-    message.agent_sdk_version = object.agent_sdk_version ?? ''
+      object.env !== undefined && object.env !== null ? EnvironmentMetadata.fromPartial(object.env) : undefined
+    message.entrypoint = object.entrypoint ?? ""
+    message.agent_sdk_version = object.agent_sdk_version ?? ""
     message.is_interactive = object.is_interactive ?? false
-    message.client_type = object.client_type ?? ''
-    message.process = object.process ?? ''
-    message.additional_metadata = object.additional_metadata ?? ''
+    message.client_type = object.client_type ?? ""
+    message.process = object.process ?? ""
+    message.additional_metadata = object.additional_metadata ?? ""
     message.auth =
-      object.auth !== undefined && object.auth !== null
-        ? PublicApiAuth.fromPartial(object.auth)
-        : undefined
+      object.auth !== undefined && object.auth !== null ? PublicApiAuth.fromPartial(object.auth) : undefined
     message.server_timestamp = object.server_timestamp ?? undefined
-    message.event_id = object.event_id ?? ''
-    message.device_id = object.device_id ?? ''
-    message.swe_bench_run_id = object.swe_bench_run_id ?? ''
-    message.swe_bench_instance_id = object.swe_bench_instance_id ?? ''
-    message.swe_bench_task_id = object.swe_bench_task_id ?? ''
-    message.email = object.email ?? ''
-    message.agent_id = object.agent_id ?? ''
-    message.parent_session_id = object.parent_session_id ?? ''
-    message.agent_type = object.agent_type ?? ''
+    message.event_id = object.event_id ?? ""
+    message.device_id = object.device_id ?? ""
+    message.swe_bench_run_id = object.swe_bench_run_id ?? ""
+    message.swe_bench_instance_id = object.swe_bench_instance_id ?? ""
+    message.swe_bench_task_id = object.swe_bench_task_id ?? ""
+    message.email = object.email ?? ""
+    message.agent_id = object.agent_id ?? ""
+    message.parent_session_id = object.parent_session_id ?? ""
+    message.agent_type = object.agent_type ?? ""
     message.slack =
-      object.slack !== undefined && object.slack !== null
-        ? SlackContext.fromPartial(object.slack)
-        : undefined
-    message.team_name = object.team_name ?? ''
-    message.skill_name = object.skill_name ?? ''
-    message.plugin_name = object.plugin_name ?? ''
-    message.marketplace_name = object.marketplace_name ?? ''
+      object.slack !== undefined && object.slack !== null ? SlackContext.fromPartial(object.slack) : undefined
+    message.team_name = object.team_name ?? ""
+    message.skill_name = object.skill_name ?? ""
+    message.plugin_name = object.plugin_name ?? ""
+    message.marketplace_name = object.marketplace_name ?? ""
     return message
   },
 }
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined
 
 type DeepPartial<T> = T extends Builtin
   ? T
@@ -846,7 +705,7 @@ function fromTimestamp(t: Timestamp): Date {
 function fromJsonTimestamp(o: any): Date {
   if (o instanceof globalThis.Date) {
     return o
-  } else if (typeof o === 'string') {
+  } else if (typeof o === "string") {
     return new globalThis.Date(o)
   } else {
     return fromTimestamp(Timestamp.fromJSON(o))

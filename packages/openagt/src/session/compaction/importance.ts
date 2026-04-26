@@ -203,11 +203,7 @@ export function getPreservationReason(content: string): string | undefined {
  * @param age - Age of the tool call in milliseconds
  * @returns A priority score where higher = more important to preserve
  */
-export function calculateCompressionPriority(
-  toolName: string,
-  content: string,
-  age: number,
-): number {
+export function calculateCompressionPriority(toolName: string, content: string, age: number): number {
   const toolImportance = calculateToolImportance(toolName)
   const contentWeight = getContentPreservationWeight(content)
 

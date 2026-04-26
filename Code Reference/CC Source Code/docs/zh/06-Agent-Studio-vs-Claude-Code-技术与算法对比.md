@@ -13,17 +13,17 @@
 
 ## 快速对比表
 
-| 维度 | 谁更强 | 为什么 | 代价 |
-| --- | --- | --- | --- |
-| Prompt 架构 | Claude Code | 分层清晰，且显式做了静态/动态边界与 cache control | 实现分散，理解成本高 |
-| Prompt 可解释性 | Agent Studio | `PromptSection` 编译器把来源、channel、priority、cacheScope 全都显式化 | cache 策略还不够成熟 |
-| Context governance | Claude Code | prompt、compaction、session memory、bridge continuity 是联动体系 | 工程复杂度高，很多逻辑跨模块分散 |
-| History / timeline recall | Agent Studio | SQLite materialized index + FTS5 + scope-aware recall，真相源明确 | 仍偏本地单机体系，远程 continuity 较弱 |
-| Memory 机制 | 各有优劣 | Claude 强在后台抽取与低打扰；Agent Studio 强在 thread/workspace/timeline 分层 | Claude 不透明；Agent Studio 还缺统一治理层 |
-| Tool loop | Agent Studio | continuation、repair、synthetic result、stall detection 都写成显式状态机 | 生产经验积累还不如 Claude 深 |
-| 权限与安全 | Agent Studio | 本地策略引擎更确定，Windows PowerShell AST 分析更扎实 | 灵活性和远程管理能力较弱 |
-| 远程连续性 | Claude Code | bridge、session ingress、keep-alive、pointer refresh 更成熟 | 系统更重，也更难本地审计 |
-| 可审计与可恢复 | Agent Studio | transcript、history、sidecar、timeline 都是本地持久化真相源 | 需要额外治理来避免上下文碎片化 |
+| 维度                      | 谁更强       | 为什么                                                                        | 代价                                       |
+| ------------------------- | ------------ | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| Prompt 架构               | Claude Code  | 分层清晰，且显式做了静态/动态边界与 cache control                             | 实现分散，理解成本高                       |
+| Prompt 可解释性           | Agent Studio | `PromptSection` 编译器把来源、channel、priority、cacheScope 全都显式化        | cache 策略还不够成熟                       |
+| Context governance        | Claude Code  | prompt、compaction、session memory、bridge continuity 是联动体系              | 工程复杂度高，很多逻辑跨模块分散           |
+| History / timeline recall | Agent Studio | SQLite materialized index + FTS5 + scope-aware recall，真相源明确             | 仍偏本地单机体系，远程 continuity 较弱     |
+| Memory 机制               | 各有优劣     | Claude 强在后台抽取与低打扰；Agent Studio 强在 thread/workspace/timeline 分层 | Claude 不透明；Agent Studio 还缺统一治理层 |
+| Tool loop                 | Agent Studio | continuation、repair、synthetic result、stall detection 都写成显式状态机      | 生产经验积累还不如 Claude 深               |
+| 权限与安全                | Agent Studio | 本地策略引擎更确定，Windows PowerShell AST 分析更扎实                         | 灵活性和远程管理能力较弱                   |
+| 远程连续性                | Claude Code  | bridge、session ingress、keep-alive、pointer refresh 更成熟                   | 系统更重，也更难本地审计                   |
+| 可审计与可恢复            | Agent Studio | transcript、history、sidecar、timeline 都是本地持久化真相源                   | 需要额外治理来避免上下文碎片化             |
 
 ## 1. Prompt System 对比
 

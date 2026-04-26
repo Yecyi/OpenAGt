@@ -1,15 +1,12 @@
-import { mkdir, readFile, stat, unlink, writeFile } from 'fs/promises'
-import { dirname, join } from 'path'
-import { z } from 'zod/v4'
-import { logForDebugging } from '../utils/debug.js'
-import { isENOENT } from '../utils/errors.js'
-import { getWorktreePathsPortable } from '../utils/getWorktreePathsPortable.js'
-import { lazySchema } from '../utils/lazySchema.js'
-import {
-  getProjectsDir,
-  sanitizePath,
-} from '../utils/sessionStoragePortable.js'
-import { jsonParse, jsonStringify } from '../utils/slowOperations.js'
+import { mkdir, readFile, stat, unlink, writeFile } from "fs/promises"
+import { dirname, join } from "path"
+import { z } from "zod/v4"
+import { logForDebugging } from "../utils/debug.js"
+import { isENOENT } from "../utils/errors.js"
+import { getWorktreePathsPortable } from "../utils/getWorktreePathsPortable.js"
+import { lazySchema } from "../utils/lazySchema.js"
+import { getProjectsDir, sanitizePath } from "../utils/sessionStoragePortable.js"
+import { jsonParse, jsonStringify } from "../utils/slowOperations.js"
 
 /**
  * Upper bound on worktree fanout. git worktree list is naturally bounded
@@ -43,14 +40,14 @@ const BridgePointerSchema = lazySchema(() =>
   z.object({
     sessionId: z.string(),
     environmentId: z.string(),
-    source: z.enum(['standalone', 'repl']),
+    source: z.enum(["standalone", "repl"]),
   }),
 )
 
 export type BridgePointer = z.infer<ReturnType<typeof BridgePointerSchema>>
 
 export function getBridgePointerPath(dir: string): string {
-  return join(getProjectsDir(), sanitizePath(dir), 'bridge-pointer.json')
+  return join(getProjectsDir(), sanitizePath(dir), "bridge-pointer.json")
 }
 
 /**
@@ -59,17 +56,14 @@ export function getBridgePointerPath(dir: string): string {
  * the staleness clock. Best-effort — a crash-recovery file must never
  * itself cause a crash. Logs and swallows on error.
  */
-export async function writeBridgePointer(
-  dir: string,
-  pointer: BridgePointer,
-): Promise<void> {
+export async function writeBridgePointer(dir: string, pointer: BridgePointer): Promise<void> {
   const path = getBridgePointerPath(dir)
   try {
     await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, jsonStringify(pointer), 'utf8')
+    await writeFile(path, jsonStringify(pointer), "utf8")
     logForDebugging(`[bridge:pointer] wrote ${path}`)
   } catch (err: unknown) {
-    logForDebugging(`[bridge:pointer] write failed: ${err}`, { level: 'warn' })
+    logForDebugging(`[bridge:pointer] write failed: ${err}`, { level: "warn" })
   }
 }
 
@@ -80,9 +74,7 @@ export async function writeBridgePointer(
  * stale (mtime > 4h ago). Stale/invalid pointers are deleted so they don't
  * keep re-prompting after the backend has already GC'd the env.
  */
-export async function readBridgePointer(
-  dir: string,
-): Promise<(BridgePointer & { ageMs: number }) | null> {
+export async function readBridgePointer(dir: string): Promise<(BridgePointer & { ageMs: number }) | null> {
   const path = getBridgePointerPath(dir)
   let raw: string
   let mtimeMs: number
@@ -90,7 +82,7 @@ export async function readBridgePointer(
     // stat for mtime (staleness anchor), then read. Two syscalls, but both
     // are needed — mtime IS the data we return, not a TOCTOU guard.
     mtimeMs = (await stat(path)).mtimeMs
-    raw = await readFile(path, 'utf8')
+    raw = await readFile(path, "utf8")
   } catch {
     return null
   }
@@ -151,13 +143,13 @@ export async function readBridgePointerAcrossWorktrees(
   // case/separators so worktree-list output matches our fast-path key even
   // on Windows where git may emit C:/ vs stored c:/.
   const dirKey = sanitizePath(dir)
-  const candidates = worktrees.filter(wt => sanitizePath(wt) !== dirKey)
+  const candidates = worktrees.filter((wt) => sanitizePath(wt) !== dirKey)
 
   // Parallel stat+read. Each readBridgePointer is a stat() that ENOENTs
   // for worktrees with no pointer (cheap) plus a ~100-byte read for the
   // rare ones that have one. Promise.all → latency ≈ slowest single stat.
   const results = await Promise.all(
-    candidates.map(async wt => {
+    candidates.map(async (wt) => {
       const p = await readBridgePointer(wt)
       return p ? { pointer: p, dir: wt } : null
     }),
@@ -195,7 +187,7 @@ export async function clearBridgePointer(dir: string): Promise<void> {
   } catch (err: unknown) {
     if (!isENOENT(err)) {
       logForDebugging(`[bridge:pointer] clear failed: ${err}`, {
-        level: 'warn',
+        level: "warn",
       })
     }
   }

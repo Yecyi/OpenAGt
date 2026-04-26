@@ -32,7 +32,7 @@ function expandField(field: string, range: FieldRange): number[] | null {
   const { min, max } = range
   const out = new Set<number>()
 
-  for (const part of field.split(',')) {
+  for (const part of field.split(",")) {
     // wildcard or star-slash-N
     const stepMatch = part.match(/^\*(?:\/(\d+))?$/)
     if (stepMatch) {
@@ -116,10 +116,7 @@ export function parseCronExpression(expr: string): CronFields | null {
  * the gap. Fall-back repeats fire once (the step-forward logic jumps past
  * the second occurrence). This matches vixie-cron behavior.
  */
-export function computeNextCronRun(
-  fields: CronFields,
-  from: Date,
-): Date | null {
+export function computeNextCronRun(fields: CronFields, from: Date): Date | null {
   const minuteSet = new Set(fields.minute)
   const hourSet = new Set(fields.hour)
   const domSet = new Set(fields.dayOfMonth)
@@ -187,31 +184,23 @@ export function computeNextCronRun(
 // — that path translates UTC→local for display and needs midnight-crossing
 // logic for the weekday case. Local scheduled tasks (the default) need neither.
 
-const DAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-]
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 function formatLocalTime(minute: number, hour: number): string {
   // January 1 — no DST gap anywhere. Using `new Date()` (today) would roll
   // 2am→3am on the one spring-forward day per year.
   const d = new Date(2000, 0, 1, hour, minute)
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 }
 
 function formatUtcTimeAsLocal(minute: number, hour: number): string {
   // Create a date in UTC and format in user's local timezone
   const d = new Date()
   d.setUTCHours(hour, minute, 0, 0)
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
   })
 }
 
@@ -220,52 +209,28 @@ export function cronToHuman(cron: string, opts?: { utc?: boolean }): string {
   const parts = cron.trim().split(/\s+/)
   if (parts.length !== 5) return cron
 
-  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts as [
-    string,
-    string,
-    string,
-    string,
-    string,
-  ]
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts as [string, string, string, string, string]
 
   // Every N minutes: step/N * * * *
   const everyMinMatch = minute.match(/^\*\/(\d+)$/)
-  if (
-    everyMinMatch &&
-    hour === '*' &&
-    dayOfMonth === '*' &&
-    month === '*' &&
-    dayOfWeek === '*'
-  ) {
+  if (everyMinMatch && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
     const n = parseInt(everyMinMatch[1]!, 10)
-    return n === 1 ? 'Every minute' : `Every ${n} minutes`
+    return n === 1 ? "Every minute" : `Every ${n} minutes`
   }
 
   // Every hour: 0 * * * *
-  if (
-    minute.match(/^\d+$/) &&
-    hour === '*' &&
-    dayOfMonth === '*' &&
-    month === '*' &&
-    dayOfWeek === '*'
-  ) {
+  if (minute.match(/^\d+$/) && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
     const m = parseInt(minute, 10)
-    if (m === 0) return 'Every hour'
-    return `Every hour at :${m.toString().padStart(2, '0')}`
+    if (m === 0) return "Every hour"
+    return `Every hour at :${m.toString().padStart(2, "0")}`
   }
 
   // Every N hours: 0 step/N * * *
   const everyHourMatch = hour.match(/^\*\/(\d+)$/)
-  if (
-    minute.match(/^\d+$/) &&
-    everyHourMatch &&
-    dayOfMonth === '*' &&
-    month === '*' &&
-    dayOfWeek === '*'
-  ) {
+  if (minute.match(/^\d+$/) && everyHourMatch && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
     const n = parseInt(everyHourMatch[1]!, 10)
     const m = parseInt(minute, 10)
-    const suffix = m === 0 ? '' : ` at :${m.toString().padStart(2, '0')}`
+    const suffix = m === 0 ? "" : ` at :${m.toString().padStart(2, "0")}`
     return n === 1 ? `Every hour${suffix}` : `Every ${n} hours${suffix}`
   }
 
@@ -277,12 +242,12 @@ export function cronToHuman(cron: string, opts?: { utc?: boolean }): string {
   const fmtTime = utc ? formatUtcTimeAsLocal : formatLocalTime
 
   // Daily at specific time: M H * * *
-  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+  if (dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
     return `Every day at ${fmtTime(m, h)}`
   }
 
   // Specific day of week: M H * * D
-  if (dayOfMonth === '*' && month === '*' && dayOfWeek.match(/^\d$/)) {
+  if (dayOfMonth === "*" && month === "*" && dayOfWeek.match(/^\d$/)) {
     const dayIndex = parseInt(dayOfWeek, 10) % 7 // normalize 7 (Sunday alias) -> 0
     let dayName: string | undefined
     if (utc) {
@@ -300,7 +265,7 @@ export function cronToHuman(cron: string, opts?: { utc?: boolean }): string {
   }
 
   // Weekdays: M H * * 1-5
-  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '1-5') {
+  if (dayOfMonth === "*" && month === "*" && dayOfWeek === "1-5") {
     return `Weekdays at ${fmtTime(m, h)}`
   }
 

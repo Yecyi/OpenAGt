@@ -266,10 +266,7 @@ export function classifyApprovalKind(input: {
 }
 
 export function isPrivilegeEscalationCommand(command: string) {
-  return (
-    /\b(sudo|su|doas|runas)\b/i.test(command) ||
-    /start-process\s+-verb\s+runas/i.test(command)
-  )
+  return /\b(sudo|su|doas|runas)\b/i.test(command) || /start-process\s+-verb\s+runas/i.test(command)
 }
 
 export function formatShellSafety(input: ShellSafetyInput): ShellSafety {
@@ -359,9 +356,8 @@ export const layer = Layer.effect(
       const riskLevels: Record<string, number> = { safe: 0, low: 1, medium: 2, high: 3 }
       const originalRisk = riskLevels[originalClassification.riskLevel] ?? 0
       const strippedRisk = riskLevels[strippedClassification.riskLevel] ?? 0
-      const finalRisk = originalRisk >= strippedRisk
-        ? originalClassification.riskLevel
-        : strippedClassification.riskLevel
+      const finalRisk =
+        originalRisk >= strippedRisk ? originalClassification.riskLevel : strippedClassification.riskLevel
       const finalWarnings = [...originalClassification.warnings, ...strippedClassification.warnings]
       const finalPatterns = [...originalClassification.matchedPatterns, ...strippedClassification.matchedPatterns]
 
@@ -369,7 +365,12 @@ export const layer = Layer.effect(
       const becomesDangerous = wrapperStripper.becomesDangerousAfterStrip(input.command)
       const finalRiskForDecision = becomesDangerous ? "high" : finalRisk
 
-      const features = buildFeatures(input.command, wrapperStripper.getWrapperNames(input.command), stripped, finalWarnings)
+      const features = buildFeatures(
+        input.command,
+        wrapperStripper.getWrapperNames(input.command),
+        stripped,
+        finalWarnings,
+      )
       const findings = buildFindings({
         warnings: finalWarnings,
         matchedPatterns: finalPatterns,
@@ -417,9 +418,7 @@ export const layer = Layer.effect(
       workdir: string
       externalPaths: string[]
     }): ShellPermissionMetadata => {
-      const privilegeEscalation = isPrivilegeEscalationCommand(
-        input.result.normalized_command || input.result.command,
-      )
+      const privilegeEscalation = isPrivilegeEscalationCommand(input.result.normalized_command || input.result.command)
       const shellSafety = formatShellSafety({
         decision: input.result.decision,
         riskLevel: input.result.risk_level,

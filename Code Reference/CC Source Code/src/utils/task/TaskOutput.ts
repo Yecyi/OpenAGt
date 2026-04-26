@@ -1,10 +1,10 @@
-import { unlink } from 'fs/promises'
-import { CircularBuffer } from '../CircularBuffer.js'
-import { logForDebugging } from '../debug.js'
-import { readFileRange, tailFile } from '../fsOperations.js'
-import { getMaxOutputLength } from '../shell/outputLimits.js'
-import { safeJoinLines } from '../stringUtils.js'
-import { DiskTaskOutput, getTaskOutputPath } from './diskOutput.js'
+import { unlink } from "fs/promises"
+import { CircularBuffer } from "../CircularBuffer.js"
+import { logForDebugging } from "../debug.js"
+import { readFileRange, tailFile } from "../fsOperations.js"
+import { getMaxOutputLength } from "../shell/outputLimits.js"
+import { safeJoinLines } from "../stringUtils.js"
+import { DiskTaskOutput, getTaskOutputPath } from "./diskOutput.js"
 
 const DEFAULT_MAX_MEMORY = 8 * 1024 * 1024 // 8MB
 const POLL_INTERVAL_MS = 1000
@@ -34,8 +34,8 @@ export class TaskOutput {
   readonly path: string
   /** True when stdout goes to a file fd (bypassing JS). False for pipe mode (hooks). */
   readonly stdoutToFile: boolean
-  #stdoutBuffer = ''
-  #stderrBuffer = ''
+  #stdoutBuffer = ""
+  #stderrBuffer = ""
   #disk: DiskTaskOutput | null = null
   #recentLines = new CircularBuffer<string>(1000)
   #totalLines = 0
@@ -120,7 +120,7 @@ export class TaskOutput {
           // progress loop wakes up and can check for backgrounding.
           // Commands like `git log -S` produce no output for long periods.
           if (!content) {
-            entry.#onProgress('', '', entry.#totalLines, bytesTotal, false)
+            entry.#onProgress("", "", entry.#totalLines, bytesTotal, false)
             return
           }
           // Count all newlines in the tail and capture slice points for the
@@ -131,7 +131,7 @@ export class TaskOutput {
           let n100 = 0
           let lineCount = 0
           while (pos > 0) {
-            pos = content.lastIndexOf('\n', pos - 1)
+            pos = content.lastIndexOf("\n", pos - 1)
             lineCount++
             if (lineCount === 5) n5 = pos <= 0 ? 0 : pos + 1
             if (lineCount === 100) n100 = pos <= 0 ? 0 : pos + 1
@@ -142,19 +142,10 @@ export class TaskOutput {
           const totalLines =
             bytesRead >= bytesTotal
               ? lineCount
-              : Math.max(
-                  entry.#totalLines,
-                  Math.round((bytesTotal / bytesRead) * lineCount),
-                )
+              : Math.max(entry.#totalLines, Math.round((bytesTotal / bytesRead) * lineCount))
           entry.#totalLines = totalLines
           entry.#totalBytes = bytesTotal
-          entry.#onProgress(
-            content.slice(n5),
-            content.slice(n100),
-            totalLines,
-            bytesTotal,
-            bytesRead < bytesTotal,
-          )
+          entry.#onProgress(content.slice(n5), content.slice(n100), totalLines, bytesTotal, bytesRead < bytesTotal)
         },
         () => {
           // File may not exist yet
@@ -185,8 +176,7 @@ export class TaskOutput {
     }
 
     // Check if this chunk would exceed the in-memory limit
-    const totalMem =
-      this.#stdoutBuffer.length + this.#stderrBuffer.length + data.length
+    const totalMem = this.#stdoutBuffer.length + this.#stderrBuffer.length + data.length
     if (totalMem > this.#maxMemory) {
       this.#spillToDisk(isStderr ? data : null, isStderr ? null : data)
       return
@@ -214,15 +204,12 @@ export class TaskOutput {
     let pos = data.length
 
     while (pos > 0) {
-      const prev = data.lastIndexOf('\n', pos - 1)
+      const prev = data.lastIndexOf("\n", pos - 1)
       if (prev === -1) {
         break
       }
       lineCount++
-      if (
-        lines.length < MAX_PROGRESS_LINES &&
-        extractedBytes < MAX_PROGRESS_BYTES
-      ) {
+      if (lines.length < MAX_PROGRESS_LINES && extractedBytes < MAX_PROGRESS_BYTES) {
         const lineLen = pos - prev - 1
         if (lineLen > 0 && lineLen <= MAX_PROGRESS_BYTES - extractedBytes) {
           const line = data.slice(prev + 1, pos)
@@ -244,8 +231,8 @@ export class TaskOutput {
     if (this.#onProgress && lines.length > 0) {
       const recent = this.#recentLines.getRecent(5)
       this.#onProgress(
-        safeJoinLines(recent, '\n'),
-        safeJoinLines(this.#recentLines.getRecent(100), '\n'),
+        safeJoinLines(recent, "\n"),
+        safeJoinLines(this.#recentLines.getRecent(100), "\n"),
         this.#totalLines,
         this.#totalBytes,
         this.#disk !== null,
@@ -259,11 +246,11 @@ export class TaskOutput {
     // Flush existing buffers
     if (this.#stdoutBuffer) {
       this.#disk.append(this.#stdoutBuffer)
-      this.#stdoutBuffer = ''
+      this.#stdoutBuffer = ""
     }
     if (this.#stderrBuffer) {
       this.#disk.append(`[stderr] ${this.#stderrBuffer}`)
-      this.#stderrBuffer = ''
+      this.#stderrBuffer = ""
     }
 
     // Write the chunk that triggered overflow
@@ -286,7 +273,7 @@ export class TaskOutput {
     // Pipe mode (hooks) — use in-memory data
     if (this.#disk) {
       const recent = this.#recentLines.getRecent(5)
-      const tail = safeJoinLines(recent, '\n')
+      const tail = safeJoinLines(recent, "\n")
       const sizeKB = Math.round(this.#totalBytes / 1024)
       const notice = `\nOutput truncated (${sizeKB}KB total). Full output saved to: ${this.path}`
       return tail ? tail + notice : notice.trimStart()
@@ -300,7 +287,7 @@ export class TaskOutput {
       const result = await readFileRange(this.path, 0, maxBytes)
       if (!result) {
         this.#outputFileRedundant = true
-        return ''
+        return ""
       }
       const { content, bytesRead, bytesTotal } = result
       // If the file fits, it's fully captured inline and can be deleted.
@@ -316,11 +303,8 @@ export class TaskOutput {
       // Returning a diagnostic string keeps the tool_result non-empty, which
       // avoids reminder-only-at-tail confusion downstream and tells the model
       // (and us, via the transcript) what actually happened.
-      const code =
-        err instanceof Error && 'code' in err ? String(err.code) : 'unknown'
-      logForDebugging(
-        `TaskOutput.#readStdoutFromFile: failed to read ${this.path} (${code}): ${err}`,
-      )
+      const code = err instanceof Error && "code" in err ? String(err.code) : "unknown"
+      logForDebugging(`TaskOutput.#readStdoutFromFile: failed to read ${this.path} (${code}): ${err}`)
       return `<bash output unavailable: output file ${this.path} could not be read (${code}). This usually means another Claude Code process in the same project deleted it during startup cleanup.>`
     }
   }
@@ -328,7 +312,7 @@ export class TaskOutput {
   /** Sync getter for ExecResult.stderr */
   getStderr(): string {
     if (this.#disk) {
-      return ''
+      return ""
     }
     return this.#stderrBuffer
   }
@@ -379,8 +363,8 @@ export class TaskOutput {
   }
 
   clear(): void {
-    this.#stdoutBuffer = ''
-    this.#stderrBuffer = ''
+    this.#stdoutBuffer = ""
+    this.#stderrBuffer = ""
     this.#recentLines.clear()
     this.#onProgress = null
     this.#disk?.cancel()

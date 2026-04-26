@@ -1,27 +1,19 @@
-import { type StructuredPatchHunk, structuredPatch } from 'diff'
-import { logError } from 'src/utils/log.js'
-import { expandPath } from 'src/utils/path.js'
-import { countCharInString } from 'src/utils/stringUtils.js'
-import {
-  DIFF_TIMEOUT_MS,
-  getPatchForDisplay,
-  getPatchFromContents,
-} from '../../utils/diff.js'
-import { errorMessage, isENOENT } from '../../utils/errors.js'
-import {
-  addLineNumbers,
-  convertLeadingTabsToSpaces,
-  readFileSyncCached,
-} from '../../utils/file.js'
-import type { EditInput, FileEdit } from './types.js'
+import { type StructuredPatchHunk, structuredPatch } from "diff"
+import { logError } from "src/utils/log.js"
+import { expandPath } from "src/utils/path.js"
+import { countCharInString } from "src/utils/stringUtils.js"
+import { DIFF_TIMEOUT_MS, getPatchForDisplay, getPatchFromContents } from "../../utils/diff.js"
+import { errorMessage, isENOENT } from "../../utils/errors.js"
+import { addLineNumbers, convertLeadingTabsToSpaces, readFileSyncCached } from "../../utils/file.js"
+import type { EditInput, FileEdit } from "./types.js"
 
 // Claude can't output curly quotes, so we define them as constants here for Claude to use
 // in the code. We do this because we normalize curly quotes to straight quotes
 // when applying edits.
-export const LEFT_SINGLE_CURLY_QUOTE = '‘'
-export const RIGHT_SINGLE_CURLY_QUOTE = '’'
-export const LEFT_DOUBLE_CURLY_QUOTE = '“'
-export const RIGHT_DOUBLE_CURLY_QUOTE = '”'
+export const LEFT_SINGLE_CURLY_QUOTE = "‘"
+export const RIGHT_SINGLE_CURLY_QUOTE = "’"
+export const LEFT_DOUBLE_CURLY_QUOTE = "“"
+export const RIGHT_DOUBLE_CURLY_QUOTE = "”"
 
 /**
  * Normalizes quotes in a string by converting curly quotes to straight quotes
@@ -46,13 +38,13 @@ export function stripTrailingWhitespace(str: string): string {
   // Use a regex that matches line endings and captures them
   const lines = str.split(/(\r\n|\n|\r)/)
 
-  let result = ''
+  let result = ""
   for (let i = 0; i < lines.length; i++) {
     const part = lines[i]
     if (part !== undefined) {
       if (i % 2 === 0) {
         // Even indices are line content
-        result += part.replace(/\s+$/, '')
+        result += part.replace(/\s+$/, "")
       } else {
         // Odd indices are line endings
         result += part
@@ -70,10 +62,7 @@ export function stripTrailingWhitespace(str: string): string {
  * @param searchString The string to search for
  * @returns The actual string found in the file, or null if not found
  */
-export function findActualString(
-  fileContent: string,
-  searchString: string,
-): string | null {
+export function findActualString(fileContent: string, searchString: string): string | null {
   // First try exact match
   if (fileContent.includes(searchString)) {
     return searchString
@@ -101,11 +90,7 @@ export function findActualString(
  * start of string, or opening punctuation is treated as an opening quote;
  * otherwise it's a closing quote.
  */
-export function preserveQuoteStyle(
-  oldString: string,
-  actualOldString: string,
-  newString: string,
-): string {
+export function preserveQuoteStyle(oldString: string, actualOldString: string, newString: string): string {
   // If they're the same, no normalization happened
   if (oldString === actualOldString) {
     return newString
@@ -113,11 +98,9 @@ export function preserveQuoteStyle(
 
   // Detect which curly quote types were in the file
   const hasDoubleQuotes =
-    actualOldString.includes(LEFT_DOUBLE_CURLY_QUOTE) ||
-    actualOldString.includes(RIGHT_DOUBLE_CURLY_QUOTE)
+    actualOldString.includes(LEFT_DOUBLE_CURLY_QUOTE) || actualOldString.includes(RIGHT_DOUBLE_CURLY_QUOTE)
   const hasSingleQuotes =
-    actualOldString.includes(LEFT_SINGLE_CURLY_QUOTE) ||
-    actualOldString.includes(RIGHT_SINGLE_CURLY_QUOTE)
+    actualOldString.includes(LEFT_SINGLE_CURLY_QUOTE) || actualOldString.includes(RIGHT_SINGLE_CURLY_QUOTE)
 
   if (!hasDoubleQuotes && !hasSingleQuotes) {
     return newString
@@ -141,15 +124,15 @@ function isOpeningContext(chars: string[], index: number): boolean {
   }
   const prev = chars[index - 1]
   return (
-    prev === ' ' ||
-    prev === '\t' ||
-    prev === '\n' ||
-    prev === '\r' ||
-    prev === '(' ||
-    prev === '[' ||
-    prev === '{' ||
-    prev === '\u2014' || // em dash
-    prev === '\u2013' // en dash
+    prev === " " ||
+    prev === "\t" ||
+    prev === "\n" ||
+    prev === "\r" ||
+    prev === "(" ||
+    prev === "[" ||
+    prev === "{" ||
+    prev === "\u2014" || // em dash
+    prev === "\u2013" // en dash
   )
 }
 
@@ -158,16 +141,12 @@ function applyCurlyDoubleQuotes(str: string): string {
   const result: string[] = []
   for (let i = 0; i < chars.length; i++) {
     if (chars[i] === '"') {
-      result.push(
-        isOpeningContext(chars, i)
-          ? LEFT_DOUBLE_CURLY_QUOTE
-          : RIGHT_DOUBLE_CURLY_QUOTE,
-      )
+      result.push(isOpeningContext(chars, i) ? LEFT_DOUBLE_CURLY_QUOTE : RIGHT_DOUBLE_CURLY_QUOTE)
     } else {
       result.push(chars[i]!)
     }
   }
-  return result.join('')
+  return result.join("")
 }
 
 function applyCurlySingleQuotes(str: string): string {
@@ -185,17 +164,13 @@ function applyCurlySingleQuotes(str: string): string {
         // Apostrophe in a contraction — use right single curly quote
         result.push(RIGHT_SINGLE_CURLY_QUOTE)
       } else {
-        result.push(
-          isOpeningContext(chars, i)
-            ? LEFT_SINGLE_CURLY_QUOTE
-            : RIGHT_SINGLE_CURLY_QUOTE,
-        )
+        result.push(isOpeningContext(chars, i) ? LEFT_SINGLE_CURLY_QUOTE : RIGHT_SINGLE_CURLY_QUOTE)
       }
     } else {
       result.push(chars[i]!)
     }
   }
-  return result.join('')
+  return result.join("")
 }
 
 /**
@@ -210,20 +185,17 @@ export function applyEditToFile(
   replaceAll: boolean = false,
 ): string {
   const f = replaceAll
-    ? (content: string, search: string, replace: string) =>
-        content.replaceAll(search, () => replace)
-    : (content: string, search: string, replace: string) =>
-        content.replace(search, () => replace)
+    ? (content: string, search: string, replace: string) => content.replaceAll(search, () => replace)
+    : (content: string, search: string, replace: string) => content.replace(search, () => replace)
 
-  if (newString !== '') {
+  if (newString !== "") {
     return f(originalContent, oldString, newString)
   }
 
-  const stripTrailingNewline =
-    !oldString.endsWith('\n') && originalContent.includes(oldString + '\n')
+  const stripTrailingNewline = !oldString.endsWith("\n") && originalContent.includes(oldString + "\n")
 
   return stripTrailingNewline
-    ? f(originalContent, oldString + '\n', newString)
+    ? f(originalContent, oldString + "\n", newString)
     : f(originalContent, oldString, newString)
 }
 
@@ -247,9 +219,7 @@ export function getPatchForEdit({
   return getPatchForEdits({
     filePath,
     fileContents,
-    edits: [
-      { old_string: oldString, new_string: newString, replace_all: replaceAll },
-    ],
+    edits: [{ old_string: oldString, new_string: newString, replace_all: replaceAll }],
   })
 }
 
@@ -272,13 +242,7 @@ export function getPatchForEdits({
   const appliedNewStrings: string[] = []
 
   // Special case for empty files.
-  if (
-    !fileContents &&
-    edits.length === 1 &&
-    edits[0] &&
-    edits[0].old_string === '' &&
-    edits[0].new_string === ''
-  ) {
+  if (!fileContents && edits.length === 1 && edits[0] && edits[0].old_string === "" && edits[0].new_string === "") {
     const patch = getPatchForDisplay({
       filePath,
       fileContents,
@@ -290,40 +254,30 @@ export function getPatchForEdits({
         },
       ],
     })
-    return { patch, updatedFile: '' }
+    return { patch, updatedFile: "" }
   }
 
   // Apply each edit and check if it actually changes the file
   for (const edit of edits) {
     // Strip trailing newlines from old_string before checking
-    const oldStringToCheck = edit.old_string.replace(/\n+$/, '')
+    const oldStringToCheck = edit.old_string.replace(/\n+$/, "")
 
     // Check if old_string is a substring of any previously applied new_string
     for (const previousNewString of appliedNewStrings) {
-      if (
-        oldStringToCheck !== '' &&
-        previousNewString.includes(oldStringToCheck)
-      ) {
-        throw new Error(
-          'Cannot edit file: old_string is a substring of a new_string from a previous edit.',
-        )
+      if (oldStringToCheck !== "" && previousNewString.includes(oldStringToCheck)) {
+        throw new Error("Cannot edit file: old_string is a substring of a new_string from a previous edit.")
       }
     }
 
     const previousContent = updatedFile
     updatedFile =
-      edit.old_string === ''
+      edit.old_string === ""
         ? edit.new_string
-        : applyEditToFile(
-            updatedFile,
-            edit.old_string,
-            edit.new_string,
-            edit.replace_all,
-          )
+        : applyEditToFile(updatedFile, edit.old_string, edit.new_string, edit.replace_all)
 
     // If this edit didn't change anything, throw an error
     if (updatedFile === previousContent) {
-      throw new Error('String not found in file. Failed to apply edit.')
+      throw new Error("String not found in file. Failed to apply edit.")
     }
 
     // Track the new string that was applied
@@ -331,9 +285,7 @@ export function getPatchForEdits({
   }
 
   if (updatedFile === fileContents) {
-    throw new Error(
-      'Original and edited file match exactly. Failed to apply edit.',
-    )
+    throw new Error("Original and edited file match exactly. Failed to apply edit.")
   }
 
   // We already have before/after content, so call getPatchFromContents directly.
@@ -359,38 +311,27 @@ const DIFF_SNIPPET_MAX_BYTES = 8192
  *
  * TODO: Unify this with the other snippet logic.
  */
-export function getSnippetForTwoFileDiff(
-  fileAContents: string,
-  fileBContents: string,
-): string {
-  const patch = structuredPatch(
-    'file.txt',
-    'file.txt',
-    fileAContents,
-    fileBContents,
-    undefined,
-    undefined,
-    {
-      context: 8,
-      timeout: DIFF_TIMEOUT_MS,
-    },
-  )
+export function getSnippetForTwoFileDiff(fileAContents: string, fileBContents: string): string {
+  const patch = structuredPatch("file.txt", "file.txt", fileAContents, fileBContents, undefined, undefined, {
+    context: 8,
+    timeout: DIFF_TIMEOUT_MS,
+  })
 
   if (!patch) {
-    return ''
+    return ""
   }
 
   const full = patch.hunks
-    .map(_ => ({
+    .map((_) => ({
       startLine: _.oldStart,
       content: _.lines
         // Filter out deleted lines AND diff metadata lines
-        .filter(_ => !_.startsWith('-') && !_.startsWith('\\'))
-        .map(_ => _.slice(1))
-        .join('\n'),
+        .filter((_) => !_.startsWith("-") && !_.startsWith("\\"))
+        .map((_) => _.slice(1))
+        .join("\n"),
     }))
     .map(addLineNumbers)
-    .join('\n...\n')
+    .join("\n...\n")
 
   if (full.length <= DIFF_SNIPPET_MAX_BYTES) {
     return full
@@ -398,10 +339,9 @@ export function getSnippetForTwoFileDiff(
 
   // Truncate at the last line boundary that fits within the cap.
   // Marker format matches BashTool/utils.ts.
-  const cutoff = full.lastIndexOf('\n', DIFF_SNIPPET_MAX_BYTES)
-  const kept =
-    cutoff > 0 ? full.slice(0, cutoff) : full.slice(0, DIFF_SNIPPET_MAX_BYTES)
-  const remaining = countCharInString(full, '\n', kept.length) + 1
+  const cutoff = full.lastIndexOf("\n", DIFF_SNIPPET_MAX_BYTES)
+  const kept = cutoff > 0 ? full.slice(0, cutoff) : full.slice(0, DIFF_SNIPPET_MAX_BYTES)
+  const remaining = countCharInString(full, "\n", kept.length) + 1
   return `${kept}\n\n... [${remaining} lines truncated] ...`
 }
 
@@ -420,7 +360,7 @@ export function getSnippetForPatch(
 ): { formattedSnippet: string; startLine: number } {
   if (patch.length === 0) {
     // No changes, return empty snippet
-    return { formattedSnippet: '', startLine: 1 }
+    return { formattedSnippet: "", startLine: 1 }
   }
 
   // Find the first and last changed lines across all hunks
@@ -445,7 +385,7 @@ export function getSnippetForPatch(
   // Split the new file into lines and get the snippet
   const fileLines = newFile.split(/\r?\n/)
   const snippetLines = fileLines.slice(startLine - 1, endLine)
-  const snippet = snippetLines.join('\n')
+  const snippet = snippetLines.join("\n")
 
   // Add line numbers
   const formattedSnippet = addLineNumbers({
@@ -472,28 +412,23 @@ export function getSnippet(
   contextLines: number = 4,
 ): { snippet: string; startLine: number } {
   // Use the original algorithm from FileEditTool.tsx
-  const before = originalFile.split(oldString)[0] ?? ''
+  const before = originalFile.split(oldString)[0] ?? ""
   const replacementLine = before.split(/\r?\n/).length - 1
-  const newFileLines = applyEditToFile(
-    originalFile,
-    oldString,
-    newString,
-  ).split(/\r?\n/)
+  const newFileLines = applyEditToFile(originalFile, oldString, newString).split(/\r?\n/)
 
   // Calculate the start and end line numbers for the snippet
   const startLine = Math.max(0, replacementLine - contextLines)
-  const endLine =
-    replacementLine + contextLines + newString.split(/\r?\n/).length
+  const endLine = replacementLine + contextLines + newString.split(/\r?\n/).length
 
   // Get snippet
   const snippetLines = newFileLines.slice(startLine, endLine)
-  const snippet = snippetLines.join('\n')
+  const snippet = snippetLines.join("\n")
 
   return { snippet, startLine: startLine + 1 }
 }
 
 export function getEditsForPatch(patch: StructuredPatchHunk[]): FileEdit[] {
-  return patch.map(hunk => {
+  return patch.map((hunk) => {
     // Extract the changes from this hunk
     const contextLines: string[] = []
     const oldLines: string[] = []
@@ -501,23 +436,23 @@ export function getEditsForPatch(patch: StructuredPatchHunk[]): FileEdit[] {
 
     // Parse each line and categorize it
     for (const line of hunk.lines) {
-      if (line.startsWith(' ')) {
+      if (line.startsWith(" ")) {
         // Context line - appears in both versions
         contextLines.push(line.slice(1))
         oldLines.push(line.slice(1))
         newLines.push(line.slice(1))
-      } else if (line.startsWith('-')) {
+      } else if (line.startsWith("-")) {
         // Deleted line - only in old version
         oldLines.push(line.slice(1))
-      } else if (line.startsWith('+')) {
+      } else if (line.startsWith("+")) {
         // Added line - only in new version
         newLines.push(line.slice(1))
       }
     }
 
     return {
-      old_string: oldLines.join('\n'),
-      new_string: newLines.join('\n'),
+      old_string: oldLines.join("\n"),
+      new_string: newLines.join("\n"),
       replace_all: false,
     }
   })
@@ -529,24 +464,24 @@ export function getEditsForPatch(patch: StructuredPatchHunk[]): FileEdit[] {
  * It'll output the sanitized versions in the edit response
  */
 const DESANITIZATIONS: Record<string, string> = {
-  '<fnr>': '<function_results>',
-  '<n>': '<name>',
-  '</n>': '</name>',
-  '<o>': '<output>',
-  '</o>': '</output>',
-  '<e>': '<error>',
-  '</e>': '</error>',
-  '<s>': '<system>',
-  '</s>': '</system>',
-  '<r>': '<result>',
-  '</r>': '</result>',
-  '< META_START >': '<META_START>',
-  '< META_END >': '<META_END>',
-  '< EOT >': '<EOT>',
-  '< META >': '<META>',
-  '< SOS >': '<SOS>',
-  '\n\nH:': '\n\nHuman:',
-  '\n\nA:': '\n\nAssistant:',
+  "<fnr>": "<function_results>",
+  "<n>": "<name>",
+  "</n>": "</name>",
+  "<o>": "<output>",
+  "</o>": "</output>",
+  "<e>": "<error>",
+  "</e>": "</error>",
+  "<s>": "<system>",
+  "</s>": "</system>",
+  "<r>": "<result>",
+  "</r>": "</result>",
+  "< META_START >": "<META_START>",
+  "< META_END >": "<META_END>",
+  "< EOT >": "<EOT>",
+  "< META >": "<META>",
+  "< SOS >": "<SOS>",
+  "\n\nH:": "\n\nHuman:",
+  "\n\nA:": "\n\nAssistant:",
 }
 
 /**
@@ -578,13 +513,7 @@ function desanitizeMatchString(matchString: string): {
  * If the string to replace is not found in the file, try with a normalized version
  * Returns the normalized input if successful, or the original input if not
  */
-export function normalizeFileEditInput({
-  file_path,
-  edits,
-}: {
-  file_path: string
-  edits: EditInput[]
-}): {
+export function normalizeFileEditInput({ file_path, edits }: { file_path: string; edits: EditInput[] }): {
   file_path: string
   edits: EditInput[]
 } {
@@ -607,9 +536,7 @@ export function normalizeFileEditInput({
     return {
       file_path,
       edits: edits.map(({ old_string, new_string, replace_all }) => {
-        const normalizedNewString = isMarkdown
-          ? new_string
-          : stripTrailingWhitespace(new_string)
+        const normalizedNewString = isMarkdown ? new_string : stripTrailingWhitespace(new_string)
 
         // If exact string match works, keep it as is
         if (fileContent.includes(old_string)) {
@@ -621,8 +548,7 @@ export function normalizeFileEditInput({
         }
 
         // Try de-sanitize string if exact match fails
-        const { result: desanitizedOldString, appliedReplacements } =
-          desanitizeMatchString(old_string)
+        const { result: desanitizedOldString, appliedReplacements } = desanitizeMatchString(old_string)
 
         if (fileContent.includes(desanitizedOldString)) {
           // Apply the same exact replacements to new_string
@@ -661,11 +587,7 @@ export function normalizeFileEditInput({
  * by applying both sets to the original content and comparing results.
  * This handles cases where edits might be different but produce the same outcome.
  */
-export function areFileEditsEquivalent(
-  edits1: FileEdit[],
-  edits2: FileEdit[],
-  originalContent: string,
-): boolean {
+export function areFileEditsEquivalent(edits1: FileEdit[], edits2: FileEdit[], originalContent: string): boolean {
   // Fast path: check if edits are literally identical
   if (
     edits1.length === edits2.length &&
@@ -683,16 +605,14 @@ export function areFileEditsEquivalent(
   }
 
   // Try applying both sets of edits
-  let result1: { patch: StructuredPatchHunk[]; updatedFile: string } | null =
-    null
+  let result1: { patch: StructuredPatchHunk[]; updatedFile: string } | null = null
   let error1: string | null = null
-  let result2: { patch: StructuredPatchHunk[]; updatedFile: string } | null =
-    null
+  let result2: { patch: StructuredPatchHunk[]; updatedFile: string } | null = null
   let error2: string | null = null
 
   try {
     result1 = getPatchForEdits({
-      filePath: 'temp',
+      filePath: "temp",
       fileContents: originalContent,
       edits: edits1,
     })
@@ -702,7 +622,7 @@ export function areFileEditsEquivalent(
 
   try {
     result2 = getPatchForEdits({
-      filePath: 'temp',
+      filePath: "temp",
       fileContents: originalContent,
       edits: edits2,
     })
@@ -762,7 +682,7 @@ export function areFileEditsInputsEquivalent(
 
   // Semantic comparison (requires file read). If the file doesn't exist,
   // compare against empty content (no TOCTOU pre-check).
-  let fileContent = ''
+  let fileContent = ""
   try {
     fileContent = readFileSyncCached(input1.file_path)
   } catch (error) {

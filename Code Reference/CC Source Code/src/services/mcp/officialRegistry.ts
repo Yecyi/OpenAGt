@@ -1,6 +1,6 @@
-import axios from 'axios'
-import { logForDebugging } from '../../utils/debug.js'
-import { errorMessage } from '../../utils/errors.js'
+import axios from "axios"
+import { logForDebugging } from "../../utils/debug.js"
+import { errorMessage } from "../../utils/errors.js"
 
 type RegistryServer = {
   server: {
@@ -19,8 +19,8 @@ let officialUrls: Set<string> | undefined = undefined
 function normalizeUrl(url: string): string | undefined {
   try {
     const u = new URL(url)
-    u.search = ''
-    return u.toString().replace(/\/$/, '')
+    u.search = ""
+    return u.toString().replace(/\/$/, "")
   } catch {
     return undefined
   }
@@ -37,7 +37,7 @@ export async function prefetchOfficialMcpUrls(): Promise<void> {
 
   try {
     const response = await axios.get<RegistryResponse>(
-      'https://api.anthropic.com/mcp-registry/v0/servers?version=latest&visibility=commercial',
+      "https://api.anthropic.com/mcp-registry/v0/servers?version=latest&visibility=commercial",
       { timeout: 5000 },
     )
 
@@ -54,7 +54,7 @@ export async function prefetchOfficialMcpUrls(): Promise<void> {
     logForDebugging(`[mcp-registry] Loaded ${urls.size} official MCP URLs`)
   } catch (error) {
     logForDebugging(`Failed to fetch MCP registry: ${errorMessage(error)}`, {
-      level: 'error',
+      level: "error",
     })
   }
 }

@@ -1,40 +1,31 @@
-import { feature } from 'bun:bundle'
-import { stat } from 'fs/promises'
-import { getClientType } from '../bootstrap/state.js'
-import {
-  getRemoteSessionUrl,
-  isRemoteSessionLocal,
-  PRODUCT_URL,
-} from '../constants/product.js'
-import { TERMINAL_OUTPUT_TAGS } from '../constants/xml.js'
-import type { AppState } from '../state/AppState.js'
-import { FILE_EDIT_TOOL_NAME } from '../tools/FileEditTool/constants.js'
-import { FILE_READ_TOOL_NAME } from '../tools/FileReadTool/prompt.js'
-import { FILE_WRITE_TOOL_NAME } from '../tools/FileWriteTool/prompt.js'
-import { GLOB_TOOL_NAME } from '../tools/GlobTool/prompt.js'
-import { GREP_TOOL_NAME } from '../tools/GrepTool/prompt.js'
-import type { Entry } from '../types/logs.js'
+import { feature } from "bun:bundle"
+import { stat } from "fs/promises"
+import { getClientType } from "../bootstrap/state.js"
+import { getRemoteSessionUrl, isRemoteSessionLocal, PRODUCT_URL } from "../constants/product.js"
+import { TERMINAL_OUTPUT_TAGS } from "../constants/xml.js"
+import type { AppState } from "../state/AppState.js"
+import { FILE_EDIT_TOOL_NAME } from "../tools/FileEditTool/constants.js"
+import { FILE_READ_TOOL_NAME } from "../tools/FileReadTool/prompt.js"
+import { FILE_WRITE_TOOL_NAME } from "../tools/FileWriteTool/prompt.js"
+import { GLOB_TOOL_NAME } from "../tools/GlobTool/prompt.js"
+import { GREP_TOOL_NAME } from "../tools/GrepTool/prompt.js"
+import type { Entry } from "../types/logs.js"
 import {
   type AttributionData,
   calculateCommitAttribution,
   isInternalModelRepo,
   isInternalModelRepoCached,
   sanitizeModelName,
-} from './commitAttribution.js'
-import { logForDebugging } from './debug.js'
-import { parseJSONL } from './json.js'
-import { logError } from './log.js'
-import {
-  getCanonicalName,
-  getMainLoopModel,
-  getPublicModelDisplayName,
-  getPublicModelName,
-} from './model/model.js'
-import { isMemoryFileAccess } from './sessionFileAccessHooks.js'
-import { getTranscriptPath } from './sessionStorage.js'
-import { readTranscriptForLoad } from './sessionStoragePortable.js'
-import { getInitialSettings } from './settings/settings.js'
-import { isUndercover } from './undercover.js'
+} from "./commitAttribution.js"
+import { logForDebugging } from "./debug.js"
+import { parseJSONL } from "./json.js"
+import { logError } from "./log.js"
+import { getCanonicalName, getMainLoopModel, getPublicModelDisplayName, getPublicModelName } from "./model/model.js"
+import { isMemoryFileAccess } from "./sessionFileAccessHooks.js"
+import { getTranscriptPath } from "./sessionStorage.js"
+import { readTranscriptForLoad } from "./sessionStoragePortable.js"
+import { getInitialSettings } from "./settings/settings.js"
+import { isUndercover } from "./undercover.js"
 
 export type AttributionTexts = {
   commit: string
@@ -50,11 +41,11 @@ export type AttributionTexts = {
  * - Remote mode: returns session URL for attribution
  */
 export function getAttributionTexts(): AttributionTexts {
-  if (process.env.USER_TYPE === 'ant' && isUndercover()) {
-    return { commit: '', pr: '' }
+  if (process.env.USER_TYPE === "ant" && isUndercover()) {
+    return { commit: "", pr: "" }
   }
 
-  if (getClientType() === 'remote') {
+  if (getClientType() === "remote") {
     const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
     if (remoteSessionId) {
       const ingressUrl = process.env.SESSION_INGRESS_URL
@@ -64,7 +55,7 @@ export function getAttributionTexts(): AttributionTexts {
         return { commit: sessionUrl, pr: sessionUrl }
       }
     }
-    return { commit: '', pr: '' }
+    return { commit: "", pr: "" }
   }
 
   // @[MODEL LAUNCH]: Update the hardcoded fallback model name below (guards against codename leaks).
@@ -72,10 +63,7 @@ export function getAttributionTexts(): AttributionTexts {
   // fall back to "Claude Opus 4.6" for unrecognized models to avoid leaking codenames.
   const model = getMainLoopModel()
   const isKnownPublicModel = getPublicModelDisplayName(model) !== null
-  const modelName =
-    isInternalModelRepoCached() || isKnownPublicModel
-      ? getPublicModelName(model)
-      : 'Claude Opus 4.6'
+  const modelName = isInternalModelRepoCached() || isKnownPublicModel ? getPublicModelName(model) : "Claude Opus 4.6"
   const defaultAttribution = `🤖 Generated with [Claude Code](${PRODUCT_URL})`
   const defaultCommit = `Co-Authored-By: ${modelName} <noreply@anthropic.com>`
 
@@ -91,7 +79,7 @@ export function getAttributionTexts(): AttributionTexts {
 
   // Backward compatibility: deprecated includeCoAuthoredBy setting
   if (settings.includeCoAuthoredBy === false) {
-    return { commit: '', pr: '' }
+    return { commit: "", pr: "" }
   }
 
   return { commit: defaultCommit, pr: defaultAttribution }
@@ -122,7 +110,7 @@ export function countUserPromptsInMessages(
   let count = 0
 
   for (const message of messages) {
-    if (message.type !== 'user') {
+    if (message.type !== "user") {
       continue
     }
 
@@ -133,22 +121,20 @@ export function countUserPromptsInMessages(
 
     let hasUserText = false
 
-    if (typeof content === 'string') {
+    if (typeof content === "string") {
       if (isTerminalOutput(content)) {
         continue
       }
       hasUserText = content.trim().length > 0
     } else if (Array.isArray(content)) {
-      hasUserText = content.some(block => {
-        if (!block || typeof block !== 'object' || !('type' in block)) {
+      hasUserText = content.some((block) => {
+        if (!block || typeof block !== "object" || !("type" in block)) {
           return false
         }
         return (
-          (block.type === 'text' &&
-            typeof block.text === 'string' &&
-            !isTerminalOutput(block.text)) ||
-          block.type === 'image' ||
-          block.type === 'document'
+          (block.type === "text" && typeof block.text === "string" && !isTerminalOutput(block.text)) ||
+          block.type === "image" ||
+          block.type === "document"
         )
       })
     }
@@ -170,8 +156,7 @@ export function countUserPromptsInMessages(
  */
 function countUserPromptsFromEntries(entries: ReadonlyArray<Entry>): number {
   const nonSidechain = entries.filter(
-    entry =>
-      entry.type === 'user' && !('isSidechain' in entry && entry.isSidechain),
+    (entry) => entry.type === "user" && !("isSidechain" in entry && entry.isSidechain),
   )
   return countUserPromptsInMessages(nonSidechain)
 }
@@ -182,9 +167,7 @@ function countUserPromptsFromEntries(entries: ReadonlyArray<Entry>): number {
  * because for PR attribution, files may not be staged yet.
  * Returns null if no attribution data is available.
  */
-async function getPRAttributionData(
-  appState: AppState,
-): Promise<AttributionData | null> {
+async function getPRAttributionData(appState: AppState): Promise<AttributionData | null> {
   const attribution = appState.attribution
 
   if (!attribution) {
@@ -194,9 +177,7 @@ async function getPRAttributionData(
   // Handle both Map and plain object (in case of serialization)
   const fileStates = attribution.fileStates
   const isMap = fileStates instanceof Map
-  const trackedFiles = isMap
-    ? Array.from(fileStates.keys())
-    : Object.keys(fileStates)
+  const trackedFiles = isMap ? Array.from(fileStates.keys()) : Object.keys(fileStates)
 
   if (trackedFiles.length === 0) {
     return null
@@ -222,20 +203,14 @@ const MEMORY_ACCESS_TOOL_NAMES = new Set([
  * Count memory file accesses in transcript entries.
  * Uses the same detection conditions as the PostToolUse session file access hooks.
  */
-function countMemoryFileAccessFromEntries(
-  entries: ReadonlyArray<Entry>,
-): number {
+function countMemoryFileAccessFromEntries(entries: ReadonlyArray<Entry>): number {
   let count = 0
   for (const entry of entries) {
-    if (entry.type !== 'assistant') continue
+    if (entry.type !== "assistant") continue
     const content = entry.message?.content
     if (!Array.isArray(content)) continue
     for (const block of content) {
-      if (
-        block.type !== 'tool_use' ||
-        !MEMORY_ACCESS_TOOL_NAMES.has(block.name)
-      )
-        continue
+      if (block.type !== "tool_use" || !MEMORY_ACCESS_TOOL_NAMES.has(block.name)) continue
       if (isMemoryFileAccess(block.name, block.input)) count++
     }
   }
@@ -265,13 +240,9 @@ async function getTranscriptStats(): Promise<{
     const buf = scan.postBoundaryBuf
     const entries = parseJSONL<Entry>(buf)
     const lastBoundaryIdx = entries.findLastIndex(
-      e =>
-        e.type === 'system' &&
-        'subtype' in e &&
-        e.subtype === 'compact_boundary',
+      (e) => e.type === "system" && "subtype" in e && e.subtype === "compact_boundary",
     )
-    const postBoundary =
-      lastBoundaryIdx >= 0 ? entries.slice(lastBoundaryIdx + 1) : entries
+    const postBoundary = lastBoundaryIdx >= 0 ? entries.slice(lastBoundaryIdx + 1) : entries
     return {
       promptCount: countUserPromptsFromEntries(postBoundary),
       memoryAccessCount: countMemoryFileAccessFromEntries(postBoundary),
@@ -294,14 +265,12 @@ async function getTranscriptStats(): Promise<{
  *
  * @param getAppState Function to get the current AppState (from command context)
  */
-export async function getEnhancedPRAttribution(
-  getAppState: () => AppState,
-): Promise<string> {
-  if (process.env.USER_TYPE === 'ant' && isUndercover()) {
-    return ''
+export async function getEnhancedPRAttribution(getAppState: () => AppState): Promise<string> {
+  if (process.env.USER_TYPE === "ant" && isUndercover()) {
+    return ""
   }
 
-  if (getClientType() === 'remote') {
+  if (getClientType() === "remote") {
     const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
     if (remoteSessionId) {
       const ingressUrl = process.env.SESSION_INGRESS_URL
@@ -310,7 +279,7 @@ export async function getEnhancedPRAttribution(
         return getRemoteSessionUrl(remoteSessionId, ingressUrl)
       }
     }
-    return ''
+    return ""
   }
 
   const settings = getInitialSettings()
@@ -322,7 +291,7 @@ export async function getEnhancedPRAttribution(
 
   // Backward compatibility: deprecated includeCoAuthoredBy setting
   if (settings.includeCoAuthoredBy === false) {
-    return ''
+    return ""
   }
 
   const defaultAttribution = `🤖 Generated with [Claude Code](${PRODUCT_URL})`
@@ -330,9 +299,7 @@ export async function getEnhancedPRAttribution(
   // Get AppState first
   const appState = getAppState()
 
-  logForDebugging(
-    `PR Attribution: appState.attribution exists: ${!!appState.attribution}`,
-  )
+  logForDebugging(`PR Attribution: appState.attribution exists: ${!!appState.attribution}`)
   if (appState.attribution) {
     const fileStates = appState.attribution.fileStates
     const isMap = fileStates instanceof Map
@@ -341,12 +308,11 @@ export async function getEnhancedPRAttribution(
   }
 
   // Get attribution stats (transcript is read once for both prompt count and memory access)
-  const [attributionData, { promptCount, memoryAccessCount }, isInternal] =
-    await Promise.all([
-      getPRAttributionData(appState),
-      getTranscriptStats(),
-      isInternalModelRepo(),
-    ])
+  const [attributionData, { promptCount, memoryAccessCount }, isInternal] = await Promise.all([
+    getPRAttributionData(appState),
+    getTranscriptStats(),
+    isInternalModelRepo(),
+  ])
 
   const claudePercent = attributionData?.summary.claudePercent ?? 0
 
@@ -356,21 +322,17 @@ export async function getEnhancedPRAttribution(
 
   // Get short model name, sanitized for non-internal repos
   const rawModelName = getCanonicalName(getMainLoopModel())
-  const shortModelName = isInternal
-    ? rawModelName
-    : sanitizeModelName(rawModelName)
+  const shortModelName = isInternal ? rawModelName : sanitizeModelName(rawModelName)
 
   // If no attribution data, return default
   if (claudePercent === 0 && promptCount === 0 && memoryAccessCount === 0) {
-    logForDebugging('PR Attribution: returning default (no data)')
+    logForDebugging("PR Attribution: returning default (no data)")
     return defaultAttribution
   }
 
   // Build the enhanced attribution: "🤖 Generated with Claude Code (93% 3-shotted by claude-opus-4-5, 2 memories recalled)"
   const memSuffix =
-    memoryAccessCount > 0
-      ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? 'memory' : 'memories'} recalled`
-      : ''
+    memoryAccessCount > 0 ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? "memory" : "memories"} recalled` : ""
   const summary = `🤖 Generated with [Claude Code](${PRODUCT_URL}) (${claudePercent}% ${promptCount}-shotted by ${shortModelName}${memSuffix})`
 
   // Append trailer lines for squash-merge survival. Only for allowlisted repos
@@ -380,10 +342,10 @@ export async function getEnhancedPRAttribution(
   // squash_merge_commit_message=PR_BODY (cli, apps), the PR body becomes the
   // squash commit body verbatim — trailer lines at the end become proper git
   // trailers on the squash commit.
-  if (feature('COMMIT_ATTRIBUTION') && isInternal && attributionData) {
-    const { buildPRTrailers } = await import('./attributionTrailer.js')
+  if (feature("COMMIT_ATTRIBUTION") && isInternal && attributionData) {
+    const { buildPRTrailers } = await import("./attributionTrailer.js")
     const trailers = buildPRTrailers(attributionData, appState.attribution)
-    const result = `${summary}\n\n${trailers.join('\n')}`
+    const result = `${summary}\n\n${trailers.join("\n")}`
     logForDebugging(`PR Attribution: returning with trailers: ${result}`)
     return result
   }

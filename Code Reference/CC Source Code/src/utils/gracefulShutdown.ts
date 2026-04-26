@@ -1,48 +1,39 @@
-import chalk from 'chalk'
-import { writeSync } from 'fs'
-import memoize from 'lodash-es/memoize.js'
-import { onExit } from 'signal-exit'
-import type { ExitReason } from 'src/entrypoints/agentSdkTypes.js'
+import chalk from "chalk"
+import { writeSync } from "fs"
+import memoize from "lodash-es/memoize.js"
+import { onExit } from "signal-exit"
+import type { ExitReason } from "src/entrypoints/agentSdkTypes.js"
 import {
   getIsInteractive,
   getIsScrollDraining,
   getLastMainRequestId,
   getSessionId,
   isSessionPersistenceDisabled,
-} from '../bootstrap/state.js'
-import instances from '../ink/instances.js'
-import {
-  DISABLE_KITTY_KEYBOARD,
-  DISABLE_MODIFY_OTHER_KEYS,
-} from '../ink/termio/csi.js'
-import {
-  DBP,
-  DFE,
-  DISABLE_MOUSE_TRACKING,
-  EXIT_ALT_SCREEN,
-  SHOW_CURSOR,
-} from '../ink/termio/dec.js'
+} from "../bootstrap/state.js"
+import instances from "../ink/instances.js"
+import { DISABLE_KITTY_KEYBOARD, DISABLE_MODIFY_OTHER_KEYS } from "../ink/termio/csi.js"
+import { DBP, DFE, DISABLE_MOUSE_TRACKING, EXIT_ALT_SCREEN, SHOW_CURSOR } from "../ink/termio/dec.js"
 import {
   CLEAR_ITERM2_PROGRESS,
   CLEAR_TAB_STATUS,
   CLEAR_TERMINAL_TITLE,
   supportsTabStatus,
   wrapForMultiplexer,
-} from '../ink/termio/osc.js'
-import { shutdownDatadog } from '../services/analytics/datadog.js'
-import { shutdown1PEventLogging } from '../services/analytics/firstPartyEventLogger.js'
+} from "../ink/termio/osc.js"
+import { shutdownDatadog } from "../services/analytics/datadog.js"
+import { shutdown1PEventLogging } from "../services/analytics/firstPartyEventLogger.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import type { AppState } from '../state/AppState.js'
-import { runCleanupFunctions } from './cleanupRegistry.js'
-import { logForDebugging } from './debug.js'
-import { logForDiagnosticsNoPII } from './diagLogs.js'
-import { isEnvTruthy } from './envUtils.js'
-import { getCurrentSessionTitle, sessionIdExists } from './sessionStorage.js'
-import { sleep } from './sleep.js'
-import { profileReport } from './startupProfiler.js'
+} from "../services/analytics/index.js"
+import type { AppState } from "../state/AppState.js"
+import { runCleanupFunctions } from "./cleanupRegistry.js"
+import { logForDebugging } from "./debug.js"
+import { logForDiagnosticsNoPII } from "./diagLogs.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { getCurrentSessionTitle, sessionIdExists } from "./sessionStorage.js"
+import { sleep } from "./sleep.js"
+import { profileReport } from "./startupProfiler.js"
 
 /**
  * Clean up terminal modes synchronously before process exit.
@@ -123,8 +114,8 @@ function cleanupTerminalModes(): void {
     // Respect CLAUDE_CODE_DISABLE_TERMINAL_TITLE — if the user opted out of
     // title changes, don't clear their existing title on exit either.
     if (!isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE)) {
-      if (process.platform === 'win32') {
-        process.title = ''
+      if (process.platform === "win32") {
+        process.title = ""
       } else {
         writeSync(1, CLEAR_TERMINAL_TITLE)
       }
@@ -147,11 +138,7 @@ function printResumeHint(): void {
     return
   }
   // Only show with TTY, interactive sessions, and persistence
-  if (
-    process.stdout.isTTY &&
-    getIsInteractive() &&
-    !isSessionPersistenceDisabled()
-  ) {
+  if (process.stdout.isTTY && getIsInteractive() && !isSessionPersistenceDisabled()) {
     try {
       const sessionId = getSessionId()
       // Don't show resume hint if no session file exists (e.g., subcommands like `claude update`)
@@ -164,18 +151,13 @@ function printResumeHint(): void {
       let resumeArg: string
       if (customTitle) {
         // Wrap in double quotes, escape backslashes first then quotes
-        const escaped = customTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        const escaped = customTitle.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
         resumeArg = `"${escaped}"`
       } else {
         resumeArg = sessionId
       }
 
-      writeSync(
-        1,
-        chalk.dim(
-          `\nResume this session with:\nclaude --resume ${resumeArg}\n`,
-        ),
-      )
+      writeSync(1, chalk.dim(`\nResume this session with:\nclaude --resume ${resumeArg}\n`))
       resumeHintPrinted = true
     } catch {
       // Ignore write errors
@@ -215,16 +197,16 @@ function forceExit(exitCode: number): never {
   } catch (e) {
     // process.exit() threw. In tests, it's mocked to throw - re-throw so test sees it.
     // In production, it's likely EIO from dead terminal - use SIGKILL.
-    if ((process.env.NODE_ENV as string) === 'test') {
+    if ((process.env.NODE_ENV as string) === "test") {
       throw e
     }
     // Fall back to SIGKILL which doesn't try to flush anything.
-    process.kill(process.pid, 'SIGKILL')
+    process.kill(process.pid, "SIGKILL")
   }
   // In tests, process.exit may be mocked to return instead of exiting.
   // In production, we should never reach here.
-  if ((process.env.NODE_ENV as string) !== 'test') {
-    throw new Error('unreachable')
+  if ((process.env.NODE_ENV as string) !== "test") {
+    throw new Error("unreachable")
   }
   // TypeScript trick: cast to never since we know this only happens in tests
   // where the mock returns instead of exiting
@@ -253,25 +235,25 @@ export const setupGracefulShutdown = memoize(() => {
   // active for Ink cleanup.
   onExit(() => {})
 
-  process.on('SIGINT', () => {
+  process.on("SIGINT", () => {
     // In print mode, print.ts registers its own SIGINT handler that aborts
     // the in-flight query and calls gracefulShutdown(0); skip here to
     // avoid racing with it. Only check print mode — other non-interactive
     // sessions (--sdk-url, --init-only, non-TTY) don't register their own
     // SIGINT handler and need gracefulShutdown to run.
-    if (process.argv.includes('-p') || process.argv.includes('--print')) {
+    if (process.argv.includes("-p") || process.argv.includes("--print")) {
       return
     }
-    logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGINT' })
+    logForDiagnosticsNoPII("info", "shutdown_signal", { signal: "SIGINT" })
     void gracefulShutdown(0)
   })
-  process.on('SIGTERM', () => {
-    logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGTERM' })
+  process.on("SIGTERM", () => {
+    logForDiagnosticsNoPII("info", "shutdown_signal", { signal: "SIGTERM" })
     void gracefulShutdown(143) // Exit code 143 (128 + 15) for SIGTERM
   })
-  if (process.platform !== 'win32') {
-    process.on('SIGHUP', () => {
-      logForDiagnosticsNoPII('info', 'shutdown_signal', { signal: 'SIGHUP' })
+  if (process.platform !== "win32") {
+    process.on("SIGHUP", () => {
+      logForDiagnosticsNoPII("info", "shutdown_signal", { signal: "SIGHUP" })
       void gracefulShutdown(129) // Exit code 129 (128 + 1) for SIGHUP
     })
 
@@ -286,8 +268,8 @@ export const setupGracefulShutdown = memoize(() => {
         // process.stdout.writable becomes false when the TTY is revoked
         if (!process.stdout.writable || !process.stdin.readable) {
           clearInterval(orphanCheckInterval)
-          logForDiagnosticsNoPII('info', 'shutdown_signal', {
-            signal: 'orphan_detected',
+          logForDiagnosticsNoPII("info", "shutdown_signal", {
+            signal: "orphan_detected",
           })
           void gracefulShutdown(129)
         }
@@ -298,25 +280,19 @@ export const setupGracefulShutdown = memoize(() => {
 
   // Log uncaught exceptions for container observability and analytics
   // Error names (e.g., "TypeError") are not sensitive - safe to log
-  process.on('uncaughtException', error => {
-    logForDiagnosticsNoPII('error', 'uncaught_exception', {
+  process.on("uncaughtException", (error) => {
+    logForDiagnosticsNoPII("error", "uncaught_exception", {
       error_name: error.name,
       error_message: error.message.slice(0, 2000),
     })
-    logEvent('tengu_uncaught_exception', {
-      error_name:
-        error.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_uncaught_exception", {
+      error_name: error.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   })
 
   // Log unhandled promise rejections for container observability and analytics
-  process.on('unhandledRejection', reason => {
-    const errorName =
-      reason instanceof Error
-        ? reason.name
-        : typeof reason === 'string'
-          ? 'string'
-          : 'unknown'
+  process.on("unhandledRejection", (reason) => {
+    const errorName = reason instanceof Error ? reason.name : typeof reason === "string" ? "string" : "unknown"
     const errorInfo =
       reason instanceof Error
         ? {
@@ -325,17 +301,16 @@ export const setupGracefulShutdown = memoize(() => {
             error_stack: reason.stack?.slice(0, 4000),
           }
         : { error_message: String(reason).slice(0, 2000) }
-    logForDiagnosticsNoPII('error', 'unhandled_rejection', errorInfo)
-    logEvent('tengu_unhandled_rejection', {
-      error_name:
-        errorName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logForDiagnosticsNoPII("error", "unhandled_rejection", errorInfo)
+    logEvent("tengu_unhandled_rejection", {
+      error_name: errorName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   })
 })
 
 export function gracefulShutdownSync(
   exitCode = 0,
-  reason: ExitReason = 'other',
+  reason: ExitReason = "other",
   options?: {
     getAppState?: () => AppState
     setAppState?: (f: (prev: AppState) => AppState) => void
@@ -347,8 +322,8 @@ export function gracefulShutdownSync(
   process.exitCode = exitCode
 
   pendingShutdown = gracefulShutdown(exitCode, reason, options)
-    .catch(error => {
-      logForDebugging(`Graceful shutdown failed: ${error}`, { level: 'error' })
+    .catch((error) => {
+      logForDebugging(`Graceful shutdown failed: ${error}`, { level: "error" })
       cleanupTerminalModes()
       printResumeHint()
       forceExit(exitCode)
@@ -390,7 +365,7 @@ export function getPendingShutdownForTesting(): Promise<void> | undefined {
 // Graceful shutdown function that drains the event loop
 export async function gracefulShutdown(
   exitCode = 0,
-  reason: ExitReason = 'other',
+  reason: ExitReason = "other",
   options?: {
     getAppState?: () => AppState
     setAppState?: (f: (prev: AppState) => AppState) => void
@@ -406,16 +381,14 @@ export async function gracefulShutdown(
   // Resolve the SessionEnd hook budget before arming the failsafe so the
   // failsafe can scale with it. Without this, a user-configured 10s hook
   // budget is silently truncated by the 5s failsafe (gh-32712 follow-up).
-  const { executeSessionEndHooks, getSessionEndHookTimeoutMs } = await import(
-    './hooks.js'
-  )
+  const { executeSessionEndHooks, getSessionEndHookTimeoutMs } = await import("./hooks.js")
   const sessionEndTimeoutMs = getSessionEndHookTimeoutMs()
 
   // Failsafe: guarantee process exits even if cleanup hangs (e.g., MCP connections).
   // Runs cleanupTerminalModes first so a hung cleanup doesn't leave the terminal dirty.
   // Budget = max(5s, hook budget + 3.5s headroom for cleanup + analytics flush).
   failsafeTimer = setTimeout(
-    code => {
+    (code) => {
       cleanupTerminalModes()
       printResumeHint()
       forceExit(code)
@@ -453,11 +426,7 @@ export async function gracefulShutdown(
     await Promise.race([
       cleanupPromise,
       new Promise((_, reject) => {
-        cleanupTimeoutId = setTimeout(
-          rej => rej(new CleanupTimeoutError()),
-          2000,
-          reject,
-        )
+        cleanupTimeoutId = setTimeout((rej) => rej(new CleanupTimeoutError()), 2000, reject)
       }),
     ])
     clearTimeout(cleanupTimeoutId)
@@ -490,11 +459,9 @@ export async function gracefulShutdown(
   // Fires before analytics flush so the event makes it to the pipeline.
   const lastRequestId = getLastMainRequestId()
   if (lastRequestId) {
-    logEvent('tengu_cache_eviction_hint', {
-      scope:
-        'session_end' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      last_request_id:
-        lastRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_cache_eviction_hint", {
+      scope: "session_end" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      last_request_id: lastRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
 
@@ -502,10 +469,7 @@ export async function gracefulShutdown(
   // awaits all pending axios POSTs (10s each), eating the full failsafe budget.
   // Lost analytics on slow networks are acceptable; a hanging exit is not.
   try {
-    await Promise.race([
-      Promise.all([shutdown1PEventLogging(), shutdownDatadog()]),
-      sleep(500),
-    ])
+    await Promise.race([Promise.all([shutdown1PEventLogging(), shutdownDatadog()]), sleep(500)])
   } catch {
     // Ignore analytics shutdown errors
   }
@@ -513,7 +477,7 @@ export async function gracefulShutdown(
   if (options?.finalMessage) {
     try {
       // eslint-disable-next-line custom-rules/no-sync-fs -- must flush before forceExit
-      writeSync(2, options.finalMessage + '\n')
+      writeSync(2, options.finalMessage + "\n")
     } catch {
       // stderr may be closed (e.g., SSH disconnect). Ignore write errors.
     }
@@ -524,6 +488,6 @@ export async function gracefulShutdown(
 
 class CleanupTimeoutError extends Error {
   constructor() {
-    super('Cleanup timeout')
+    super("Cleanup timeout")
   }
 }

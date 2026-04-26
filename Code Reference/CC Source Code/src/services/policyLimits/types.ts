@@ -1,5 +1,5 @@
-import { z } from 'zod/v4'
-import { lazySchema } from '../../utils/lazySchema.js'
+import { z } from "zod/v4"
+import { lazySchema } from "../../utils/lazySchema.js"
 
 /**
  * Schema for the policy limits API response
@@ -11,16 +11,14 @@ export const PolicyLimitsResponseSchema = lazySchema(() =>
   }),
 )
 
-export type PolicyLimitsResponse = z.infer<
-  ReturnType<typeof PolicyLimitsResponseSchema>
->
+export type PolicyLimitsResponse = z.infer<ReturnType<typeof PolicyLimitsResponseSchema>>
 
 /**
  * Result of fetching policy limits
  */
 export type PolicyLimitsFetchResult = {
   success: boolean
-  restrictions?: PolicyLimitsResponse['restrictions'] | null // null means 304 Not Modified (cache is valid)
+  restrictions?: PolicyLimitsResponse["restrictions"] | null // null means 304 Not Modified (cache is valid)
   etag?: string
   error?: string
   skipRetry?: boolean // If true, don't retry on failure (e.g., auth errors)

@@ -4,19 +4,13 @@
 // Plan mode is set via set_permission_mode control_request in
 // teleportToRemote's CreateSession events array.
 
-import type {
-  ToolResultBlockParam,
-  ToolUseBlock,
-} from '@anthropic-ai/sdk/resources'
-import type { SDKMessage } from '../../entrypoints/agentSdkTypes.js'
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../../tools/ExitPlanModeTool/constants.js'
-import { logForDebugging } from '../debug.js'
-import { sleep } from '../sleep.js'
-import { isTransientNetworkError } from '../teleport/api.js'
-import {
-  type PollRemoteSessionResponse,
-  pollRemoteSessionEvents,
-} from '../teleport.js'
+import type { ToolResultBlockParam, ToolUseBlock } from "@anthropic-ai/sdk/resources"
+import type { SDKMessage } from "../../entrypoints/agentSdkTypes.js"
+import { EXIT_PLAN_MODE_V2_TOOL_NAME } from "../../tools/ExitPlanModeTool/constants.js"
+import { logForDebugging } from "../debug.js"
+import { sleep } from "../sleep.js"
+import { isTransientNetworkError } from "../teleport/api.js"
+import { type PollRemoteSessionResponse, pollRemoteSessionEvents } from "../teleport.js"
 
 const POLL_INTERVAL_MS = 3000
 // pollRemoteSessionEvents doesn't retry. A 30min poll makes ~600 calls;
@@ -24,12 +18,12 @@ const POLL_INTERVAL_MS = 3000
 const MAX_CONSECUTIVE_FAILURES = 5
 
 export type PollFailReason =
-  | 'terminated'
-  | 'timeout_pending'
-  | 'timeout_no_plan'
-  | 'extract_marker_missing'
-  | 'network_or_unknown'
-  | 'stopped'
+  | "terminated"
+  | "timeout_pending"
+  | "timeout_no_plan"
+  | "extract_marker_missing"
+  | "network_or_unknown"
+  | "stopped"
 
 export class UltraplanPollError extends Error {
   constructor(
@@ -39,21 +33,21 @@ export class UltraplanPollError extends Error {
     options?: ErrorOptions,
   ) {
     super(message, options)
-    this.name = 'UltraplanPollError'
+    this.name = "UltraplanPollError"
   }
 }
 
 // Sentinel string the browser PlanModal includes in the feedback when the user
 // clicks "teleport back to terminal". Plan text follows on the next line.
-export const ULTRAPLAN_TELEPORT_SENTINEL = '__ULTRAPLAN_TELEPORT_LOCAL__'
+export const ULTRAPLAN_TELEPORT_SENTINEL = "__ULTRAPLAN_TELEPORT_LOCAL__"
 
 export type ScanResult =
-  | { kind: 'approved'; plan: string }
-  | { kind: 'teleport'; plan: string }
-  | { kind: 'rejected'; id: string }
-  | { kind: 'pending' }
-  | { kind: 'terminated'; subtype: string }
-  | { kind: 'unchanged' }
+  | { kind: "approved"; plan: string }
+  | { kind: "teleport"; plan: string }
+  | { kind: "rejected"; id: string }
+  | { kind: "pending" }
+  | { kind: "terminated"; subtype: string }
+  | { kind: "unchanged" }
 
 /**
  * Pill/detail-view state derived from the event stream. Transitions:
@@ -63,7 +57,7 @@ export type ScanResult =
  *   plan_ready → (rejected) → running
  *   plan_ready → (approved) → poll resolves, pill removed
  */
-export type UltraplanPhase = 'running' | 'needs_input' | 'plan_ready'
+export type UltraplanPhase = "running" | "needs_input" | "plan_ready"
 
 /**
  * Pure stateful classifier for the CCR event stream. Ingests SDKMessage[]
@@ -94,29 +88,29 @@ export class ExitPlanModeScanner {
    * the remote is showing the approval dialog in the browser.
    */
   get hasPendingPlan(): boolean {
-    const id = this.exitPlanCalls.findLast(c => !this.rejectedIds.has(c))
+    const id = this.exitPlanCalls.findLast((c) => !this.rejectedIds.has(c))
     return id !== undefined && !this.results.has(id)
   }
 
   ingest(newEvents: SDKMessage[]): ScanResult {
     for (const m of newEvents) {
-      if (m.type === 'assistant') {
+      if (m.type === "assistant") {
         for (const block of m.message.content) {
-          if (block.type !== 'tool_use') continue
+          if (block.type !== "tool_use") continue
           const tu = block as ToolUseBlock
           if (tu.name === EXIT_PLAN_MODE_V2_TOOL_NAME) {
             this.exitPlanCalls.push(tu.id)
           }
         }
-      } else if (m.type === 'user') {
+      } else if (m.type === "user") {
         const content = m.message.content
         if (!Array.isArray(content)) continue
         for (const block of content) {
-          if (block.type === 'tool_result') {
+          if (block.type === "tool_result") {
             this.results.set(block.tool_use_id, block)
           }
         }
-      } else if (m.type === 'result' && m.subtype !== 'success') {
+      } else if (m.type === "result" && m.subtype !== "success") {
         // result(success) fires after EVERY CCR turn
         // If the remote asks a clarifying question (turn ends without
         // ExitPlanMode), we must keep polling — the user can reply in
@@ -133,10 +127,10 @@ export class ExitPlanModeScanner {
     this.rescanAfterRejection = false
 
     let found:
-      | { kind: 'approved'; plan: string }
-      | { kind: 'teleport'; plan: string }
-      | { kind: 'rejected'; id: string }
-      | { kind: 'pending' }
+      | { kind: "approved"; plan: string }
+      | { kind: "teleport"; plan: string }
+      | { kind: "rejected"; id: string }
+      | { kind: "pending" }
       | null = null
     if (shouldScan) {
       for (let i = this.exitPlanCalls.length - 1; i >= 0; i--) {
@@ -144,39 +138,36 @@ export class ExitPlanModeScanner {
         if (this.rejectedIds.has(id)) continue
         const tr = this.results.get(id)
         if (!tr) {
-          found = { kind: 'pending' }
+          found = { kind: "pending" }
         } else if (tr.is_error === true) {
           const teleportPlan = extractTeleportPlan(tr.content)
-          found =
-            teleportPlan !== null
-              ? { kind: 'teleport', plan: teleportPlan }
-              : { kind: 'rejected', id }
+          found = teleportPlan !== null ? { kind: "teleport", plan: teleportPlan } : { kind: "rejected", id }
         } else {
-          found = { kind: 'approved', plan: extractApprovedPlan(tr.content) }
+          found = { kind: "approved", plan: extractApprovedPlan(tr.content) }
         }
         break
       }
-      if (found?.kind === 'approved' || found?.kind === 'teleport') return found
+      if (found?.kind === "approved" || found?.kind === "teleport") return found
     }
 
     // Bookkeeping before the terminated check — a batch can contain BOTH a
     // rejected tool_result and a {type:'result'}; rejectCount must reflect
     // the rejection even though terminated takes return precedence.
-    if (found?.kind === 'rejected') {
+    if (found?.kind === "rejected") {
       this.rejectedIds.add(found.id)
       this.rescanAfterRejection = true
     }
     if (this.terminated) {
-      return { kind: 'terminated', subtype: this.terminated.subtype }
+      return { kind: "terminated", subtype: this.terminated.subtype }
     }
-    if (found?.kind === 'rejected') {
+    if (found?.kind === "rejected") {
       return found
     }
-    if (found?.kind === 'pending') {
+    if (found?.kind === "pending") {
       this.everSeenPending = true
       return found
     }
-    return { kind: 'unchanged' }
+    return { kind: "unchanged" }
   }
 }
 
@@ -184,7 +175,7 @@ export type PollResult = {
   plan: string
   rejectCount: number
   /** 'local' = user clicked teleport (execute here, archive remote). 'remote' = user approved in-CCR execution (don't archive). */
-  executionTarget: 'local' | 'remote'
+  executionTarget: "local" | "remote"
 }
 
 // Returns the approved plan text and where the user wants it executed.
@@ -205,18 +196,14 @@ export async function pollForApprovedExitPlanMode(
   const scanner = new ExitPlanModeScanner()
   let cursor: string | null = null
   let failures = 0
-  let lastPhase: UltraplanPhase = 'running'
+  let lastPhase: UltraplanPhase = "running"
 
   while (Date.now() < deadline) {
     if (shouldStop?.()) {
-      throw new UltraplanPollError(
-        'poll stopped by caller',
-        'stopped',
-        scanner.rejectCount,
-      )
+      throw new UltraplanPollError("poll stopped by caller", "stopped", scanner.rejectCount)
     }
     let newEvents: SDKMessage[]
-    let sessionStatus: PollRemoteSessionResponse['sessionStatus']
+    let sessionStatus: PollRemoteSessionResponse["sessionStatus"]
     try {
       // Metadata fetch (session_status) is the needs_input signal —
       // threadstore doesn't persist result(success) turn-end events, so
@@ -231,7 +218,7 @@ export async function pollForApprovedExitPlanMode(
       if (!transient || ++failures >= MAX_CONSECUTIVE_FAILURES) {
         throw new UltraplanPollError(
           e instanceof Error ? e.message : String(e),
-          'network_or_unknown',
+          "network_or_unknown",
           scanner.rejectCount,
           { cause: e },
         )
@@ -246,28 +233,28 @@ export async function pollForApprovedExitPlanMode(
     } catch (e) {
       throw new UltraplanPollError(
         e instanceof Error ? e.message : String(e),
-        'extract_marker_missing',
+        "extract_marker_missing",
         scanner.rejectCount,
       )
     }
-    if (result.kind === 'approved') {
+    if (result.kind === "approved") {
       return {
         plan: result.plan,
         rejectCount: scanner.rejectCount,
-        executionTarget: 'remote',
+        executionTarget: "remote",
       }
     }
-    if (result.kind === 'teleport') {
+    if (result.kind === "teleport") {
       return {
         plan: result.plan,
         rejectCount: scanner.rejectCount,
-        executionTarget: 'local',
+        executionTarget: "local",
       }
     }
-    if (result.kind === 'terminated') {
+    if (result.kind === "terminated") {
       throw new UltraplanPollError(
         `remote session ended (${result.subtype}) before plan approval`,
-        'terminated',
+        "terminated",
         scanner.rejectCount,
       )
     }
@@ -280,14 +267,8 @@ export async function pollForApprovedExitPlanMode(
     // events flowing means the session is working regardless of the status
     // snapshot. This also makes needs_input → running snap back on the first
     // poll that sees the user's reply event, even if session_status lags.
-    const quietIdle =
-      (sessionStatus === 'idle' || sessionStatus === 'requires_action') &&
-      newEvents.length === 0
-    const phase: UltraplanPhase = scanner.hasPendingPlan
-      ? 'plan_ready'
-      : quietIdle
-        ? 'needs_input'
-        : 'running'
+    const quietIdle = (sessionStatus === "idle" || sessionStatus === "requires_action") && newEvents.length === 0
+    const phase: UltraplanPhase = scanner.hasPendingPlan ? "plan_ready" : quietIdle ? "needs_input" : "running"
     if (phase !== lastPhase) {
       logForDebugging(`[ultraplan] phase ${lastPhase} → ${phase}`)
       lastPhase = phase
@@ -300,27 +281,25 @@ export async function pollForApprovedExitPlanMode(
     scanner.everSeenPending
       ? `no approval after ${timeoutMs / 1000}s`
       : `ExitPlanMode never reached after ${timeoutMs / 1000}s (the remote container failed to start, or session ID mismatch?)`,
-    scanner.everSeenPending ? 'timeout_pending' : 'timeout_no_plan',
+    scanner.everSeenPending ? "timeout_pending" : "timeout_no_plan",
     scanner.rejectCount,
   )
 }
 
 // tool_result content may be string or [{type:'text',text}] depending on
 // threadstore encoding.
-function contentToText(content: ToolResultBlockParam['content']): string {
-  return typeof content === 'string'
+function contentToText(content: ToolResultBlockParam["content"]): string {
+  return typeof content === "string"
     ? content
     : Array.isArray(content)
-      ? content.map(b => ('text' in b ? b.text : '')).join('')
-      : ''
+      ? content.map((b) => ("text" in b ? b.text : "")).join("")
+      : ""
 }
 
 // Extracts the plan text after the ULTRAPLAN_TELEPORT_SENTINEL marker.
 // Returns null when the sentinel is absent — callers treat null as a normal
 // user rejection (scanner falls through to { kind: 'rejected' }).
-function extractTeleportPlan(
-  content: ToolResultBlockParam['content'],
-): string | null {
+function extractTeleportPlan(content: ToolResultBlockParam["content"]): string | null {
   const text = contentToText(content)
   const marker = `${ULTRAPLAN_TELEPORT_SENTINEL}\n`
   const idx = text.indexOf(marker)
@@ -330,13 +309,10 @@ function extractTeleportPlan(
 
 // Plan is echoed in tool_result content as "## Approved Plan:\n<text>" or
 // "## Approved Plan (edited by user):\n<text>" (ExitPlanModeV2Tool).
-function extractApprovedPlan(content: ToolResultBlockParam['content']): string {
+function extractApprovedPlan(content: ToolResultBlockParam["content"]): string {
   const text = contentToText(content)
   // Try both markers — edited plans use a different label.
-  const markers = [
-    '## Approved Plan (edited by user):\n',
-    '## Approved Plan:\n',
-  ]
+  const markers = ["## Approved Plan (edited by user):\n", "## Approved Plan:\n"]
   for (const marker of markers) {
     const idx = text.indexOf(marker)
     if (idx !== -1) {

@@ -1,7 +1,7 @@
-import { homedir } from 'os'
-import { join } from 'path'
-import { logForDebugging } from './debug.js'
-import { getPlatform, type Platform } from './platform.js'
+import { homedir } from "os"
+import { join } from "path"
+import { logForDebugging } from "./debug.js"
+import { getPlatform, type Platform } from "./platform.js"
 
 export type SystemDirectories = {
   HOME: string
@@ -24,9 +24,7 @@ type SystemDirectoriesOptions = {
  * Handles differences between Windows, macOS, Linux, and WSL
  * @param options Optional overrides for testing (env, homedir, platform)
  */
-export function getSystemDirectories(
-  options?: SystemDirectoriesOptions,
-): SystemDirectories {
+export function getSystemDirectories(options?: SystemDirectoriesOptions): SystemDirectories {
   const platform = options?.platform ?? getPlatform()
   const homeDir = options?.homedir ?? homedir()
   const env = options?.env ?? process.env
@@ -34,25 +32,25 @@ export function getSystemDirectories(
   // Default paths used by most platforms
   const defaults: SystemDirectories = {
     HOME: homeDir,
-    DESKTOP: join(homeDir, 'Desktop'),
-    DOCUMENTS: join(homeDir, 'Documents'),
-    DOWNLOADS: join(homeDir, 'Downloads'),
+    DESKTOP: join(homeDir, "Desktop"),
+    DOCUMENTS: join(homeDir, "Documents"),
+    DOWNLOADS: join(homeDir, "Downloads"),
   }
 
   switch (platform) {
-    case 'windows': {
+    case "windows": {
       // Windows: Use USERPROFILE if available (handles localized folder names)
       const userProfile = env.USERPROFILE || homeDir
       return {
         HOME: homeDir,
-        DESKTOP: join(userProfile, 'Desktop'),
-        DOCUMENTS: join(userProfile, 'Documents'),
-        DOWNLOADS: join(userProfile, 'Downloads'),
+        DESKTOP: join(userProfile, "Desktop"),
+        DOCUMENTS: join(userProfile, "Documents"),
+        DOWNLOADS: join(userProfile, "Downloads"),
       }
     }
 
-    case 'linux':
-    case 'wsl': {
+    case "linux":
+    case "wsl": {
       // Linux/WSL: Check XDG Base Directory specification first
       return {
         HOME: homeDir,
@@ -62,10 +60,10 @@ export function getSystemDirectories(
       }
     }
 
-    case 'macos':
+    case "macos":
     default: {
       // macOS and unknown platforms use standard paths
-      if (platform === 'unknown') {
+      if (platform === "unknown") {
         logForDebugging(`Unknown platform detected, using default paths`)
       }
       return defaults

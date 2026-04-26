@@ -1,56 +1,49 @@
-import { feature } from 'bun:bundle'
-import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs'
+import { feature } from "bun:bundle"
+import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages.mjs"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from 'src/services/analytics/index.js'
-import { sanitizeToolNameForAnalytics } from 'src/services/analytics/metadata.js'
-import type { ToolUseConfirm } from '../../components/permissions/PermissionRequest.js'
-import type {
-  ToolPermissionContext,
-  Tool as ToolType,
-  ToolUseContext,
-} from '../../Tool.js'
-import { awaitClassifierAutoApproval } from '../../tools/BashTool/bashPermissions.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
-import type { AssistantMessage } from '../../types/message.js'
+} from "src/services/analytics/index.js"
+import { sanitizeToolNameForAnalytics } from "src/services/analytics/metadata.js"
+import type { ToolUseConfirm } from "../../components/permissions/PermissionRequest.js"
+import type { ToolPermissionContext, Tool as ToolType, ToolUseContext } from "../../Tool.js"
+import { awaitClassifierAutoApproval } from "../../tools/BashTool/bashPermissions.js"
+import { BASH_TOOL_NAME } from "../../tools/BashTool/toolName.js"
+import type { AssistantMessage } from "../../types/message.js"
 import type {
   PendingClassifierCheck,
   PermissionAllowDecision,
   PermissionDecisionReason,
   PermissionDenyDecision,
-} from '../../types/permissions.js'
-import { setClassifierApproval } from '../../utils/classifierApprovals.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { executePermissionRequestHooks } from '../../utils/hooks.js'
+} from "../../types/permissions.js"
+import { setClassifierApproval } from "../../utils/classifierApprovals.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { executePermissionRequestHooks } from "../../utils/hooks.js"
 import {
   REJECT_MESSAGE,
   REJECT_MESSAGE_WITH_REASON_PREFIX,
   SUBAGENT_REJECT_MESSAGE,
   SUBAGENT_REJECT_MESSAGE_WITH_REASON_PREFIX,
   withMemoryCorrectionHint,
-} from '../../utils/messages.js'
-import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
+} from "../../utils/messages.js"
+import type { PermissionDecision } from "../../utils/permissions/PermissionResult.js"
 import {
   applyPermissionUpdates,
   persistPermissionUpdates,
   supportsPersistence,
-} from '../../utils/permissions/PermissionUpdate.js'
-import type { PermissionUpdate } from '../../utils/permissions/PermissionUpdateSchema.js'
-import {
-  logPermissionDecision,
-  type PermissionDecisionArgs,
-} from './permissionLogging.js'
+} from "../../utils/permissions/PermissionUpdate.js"
+import type { PermissionUpdate } from "../../utils/permissions/PermissionUpdateSchema.js"
+import { logPermissionDecision, type PermissionDecisionArgs } from "./permissionLogging.js"
 
 type PermissionApprovalSource =
-  | { type: 'hook'; permanent?: boolean }
-  | { type: 'user'; permanent: boolean }
-  | { type: 'classifier' }
+  | { type: "hook"; permanent?: boolean }
+  | { type: "user"; permanent: boolean }
+  | { type: "classifier" }
 
 type PermissionRejectionSource =
-  | { type: 'hook' }
-  | { type: 'user_abort' }
-  | { type: 'user_reject'; hasFeedback: boolean }
+  | { type: "hook" }
+  | { type: "user_abort" }
+  | { type: "user_reject"; hasFeedback: boolean }
 
 // Generic interface for permission queue operations, decoupled from React.
 // In the REPL, these are backed by React state.
@@ -130,9 +123,8 @@ function createPermissionContext(
       )
     },
     logCancelled() {
-      logEvent('tengu_tool_use_cancelled', {
-        messageID:
-          messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      logEvent("tengu_tool_use_cancelled", {
+        messageID: messageId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         toolName: sanitizeToolNameForAnalytics(tool.name),
       })
     },
@@ -140,10 +132,8 @@ function createPermissionContext(
       if (updates.length === 0) return false
       persistPermissionUpdates(updates)
       const appState = toolUseContext.getAppState()
-      setToolPermissionContext(
-        applyPermissionUpdates(appState.toolPermissionContext, updates),
-      )
-      return updates.some(update => supportsPersistence(update.destination))
+      setToolPermissionContext(applyPermissionUpdates(appState.toolPermissionContext, updates))
+      return updates.some((update) => supportsPersistence(update.destination))
     },
     resolveIfAborted(resolve: (decision: PermissionDecision) => void) {
       if (!toolUseContext.abortController.signal.aborted) return false
@@ -151,11 +141,7 @@ function createPermissionContext(
       resolve(this.cancelAndAbort(undefined, true))
       return true
     },
-    cancelAndAbort(
-      feedback?: string,
-      isAbort?: boolean,
-      contentBlocks?: ContentBlockParam[],
-    ): PermissionDecision {
+    cancelAndAbort(feedback?: string, isAbort?: boolean, contentBlocks?: ContentBlockParam[]): PermissionDecision {
       const sub = !!toolUseContext.agentId
       const baseMessage = feedback
         ? `${sub ? SUBAGENT_REJECT_MESSAGE_WITH_REASON_PREFIX : REJECT_MESSAGE_WITH_REASON_PREFIX}${feedback}`
@@ -164,14 +150,12 @@ function createPermissionContext(
           : REJECT_MESSAGE
       const message = sub ? baseMessage : withMemoryCorrectionHint(baseMessage)
       if (isAbort || (!feedback && !contentBlocks?.length && !sub)) {
-        logForDebugging(
-          `Aborting: tool=${tool.name} isAbort=${isAbort} hasFeedback=${!!feedback} isSubagent=${sub}`,
-        )
+        logForDebugging(`Aborting: tool=${tool.name} isAbort=${isAbort} hasFeedback=${!!feedback} isSubagent=${sub}`)
         toolUseContext.abortController.abort()
       }
-      return { behavior: 'ask', message, contentBlocks }
+      return { behavior: "ask", message, contentBlocks }
     },
-    ...(feature('BASH_CLASSIFIER')
+    ...(feature("BASH_CLASSIFIER")
       ? {
           async tryClassifier(
             pendingClassifierCheck: PendingClassifierCheck | undefined,
@@ -188,24 +172,19 @@ function createPermissionContext(
             if (!classifierDecision) {
               return null
             }
-            if (
-              feature('TRANSCRIPT_CLASSIFIER') &&
-              classifierDecision.type === 'classifier'
-            ) {
-              const matchedRule = classifierDecision.reason.match(
-                /^Allowed by prompt rule: "(.+)"$/,
-              )?.[1]
+            if (feature("TRANSCRIPT_CLASSIFIER") && classifierDecision.type === "classifier") {
+              const matchedRule = classifierDecision.reason.match(/^Allowed by prompt rule: "(.+)"$/)?.[1]
               if (matchedRule) {
                 setClassifierApproval(toolUseID, matchedRule)
               }
             }
             logPermissionDecision(
               { tool, input, toolUseContext, messageId, toolUseID },
-              { decision: 'accept', source: { type: 'classifier' } },
+              { decision: "accept", source: { type: "classifier" } },
               undefined,
             )
             return {
-              behavior: 'allow' as const,
+              behavior: "allow" as const,
               updatedInput: updatedInput ?? input,
               userModified: false,
               decisionReason: classifierDecision,
@@ -230,32 +209,24 @@ function createPermissionContext(
       )) {
         if (hookResult.permissionRequestResult) {
           const decision = hookResult.permissionRequestResult
-          if (decision.behavior === 'allow') {
+          if (decision.behavior === "allow") {
             const finalInput = decision.updatedInput ?? updatedInput ?? input
             return await this.handleHookAllow(
               finalInput,
               decision.updatedPermissions ?? [],
               permissionPromptStartTimeMs,
             )
-          } else if (decision.behavior === 'deny') {
-            this.logDecision(
-              { decision: 'reject', source: { type: 'hook' } },
-              { permissionPromptStartTimeMs },
-            )
+          } else if (decision.behavior === "deny") {
+            this.logDecision({ decision: "reject", source: { type: "hook" } }, { permissionPromptStartTimeMs })
             if (decision.interrupt) {
-              logForDebugging(
-                `Hook interrupt: tool=${tool.name} hookMessage=${decision.message}`,
-              )
+              logForDebugging(`Hook interrupt: tool=${tool.name} hookMessage=${decision.message}`)
               toolUseContext.abortController.abort()
             }
-            return this.buildDeny(
-              decision.message || 'Permission denied by hook',
-              {
-                type: 'hook',
-                hookName: 'PermissionRequest',
-                reason: decision.message,
-              },
-            )
+            return this.buildDeny(decision.message || "Permission denied by hook", {
+              type: "hook",
+              hookName: "PermissionRequest",
+              reason: decision.message,
+            })
           }
         }
       }
@@ -271,7 +242,7 @@ function createPermissionContext(
       },
     ): PermissionAllowDecision {
       return {
-        behavior: 'allow' as const,
+        behavior: "allow" as const,
         updatedInput,
         userModified: opts?.userModified ?? false,
         ...(opts?.decisionReason && { decisionReason: opts.decisionReason }),
@@ -282,11 +253,8 @@ function createPermissionContext(
           }),
       }
     },
-    buildDeny(
-      message: string,
-      decisionReason: PermissionDecisionReason,
-    ): PermissionDenyDecision {
-      return { behavior: 'deny' as const, message, decisionReason }
+    buildDeny(message: string, decisionReason: PermissionDecisionReason): PermissionDenyDecision {
+      return { behavior: "deny" as const, message, decisionReason }
     },
     async handleUserAllow(
       updatedInput: Record<string, unknown>,
@@ -296,18 +264,15 @@ function createPermissionContext(
       contentBlocks?: ContentBlockParam[],
       decisionReason?: PermissionDecisionReason,
     ): Promise<PermissionAllowDecision> {
-      const acceptedPermanentUpdates =
-        await this.persistPermissions(permissionUpdates)
+      const acceptedPermanentUpdates = await this.persistPermissions(permissionUpdates)
       this.logDecision(
         {
-          decision: 'accept',
-          source: { type: 'user', permanent: acceptedPermanentUpdates },
+          decision: "accept",
+          source: { type: "user", permanent: acceptedPermanentUpdates },
         },
         { input: updatedInput, permissionPromptStartTimeMs },
       )
-      const userModified = tool.inputsEquivalent
-        ? !tool.inputsEquivalent(input, updatedInput)
-        : false
+      const userModified = tool.inputsEquivalent ? !tool.inputsEquivalent(input, updatedInput) : false
       const trimmedFeedback = feedback?.trim()
       return this.buildAllow(updatedInput, {
         userModified,
@@ -321,17 +286,16 @@ function createPermissionContext(
       permissionUpdates: PermissionUpdate[],
       permissionPromptStartTimeMs?: number,
     ): Promise<PermissionAllowDecision> {
-      const acceptedPermanentUpdates =
-        await this.persistPermissions(permissionUpdates)
+      const acceptedPermanentUpdates = await this.persistPermissions(permissionUpdates)
       this.logDecision(
         {
-          decision: 'accept',
-          source: { type: 'hook', permanent: acceptedPermanentUpdates },
+          decision: "accept",
+          source: { type: "hook", permanent: acceptedPermanentUpdates },
         },
         { input: finalInput, permissionPromptStartTimeMs },
       )
       return this.buildAllow(finalInput, {
-        decisionReason: { type: 'hook', hookName: 'PermissionRequest' },
+        decisionReason: { type: "hook", hookName: "PermissionRequest" },
       })
     },
     pushToQueue(item: ToolUseConfirm) {
@@ -355,34 +319,22 @@ type PermissionContext = ReturnType<typeof createPermissionContext>
  * generic queue interface used by PermissionContext.
  */
 function createPermissionQueueOps(
-  setToolUseConfirmQueue: React.Dispatch<
-    React.SetStateAction<ToolUseConfirm[]>
-  >,
+  setToolUseConfirmQueue: React.Dispatch<React.SetStateAction<ToolUseConfirm[]>>,
 ): PermissionQueueOps {
   return {
     push(item: ToolUseConfirm) {
-      setToolUseConfirmQueue(queue => [...queue, item])
+      setToolUseConfirmQueue((queue) => [...queue, item])
     },
     remove(toolUseID: string) {
-      setToolUseConfirmQueue(queue =>
-        queue.filter(item => item.toolUseID !== toolUseID),
-      )
+      setToolUseConfirmQueue((queue) => queue.filter((item) => item.toolUseID !== toolUseID))
     },
     update(toolUseID: string, patch: Partial<ToolUseConfirm>) {
-      setToolUseConfirmQueue(queue =>
-        queue.map(item =>
-          item.toolUseID === toolUseID ? { ...item, ...patch } : item,
-        ),
+      setToolUseConfirmQueue((queue) =>
+        queue.map((item) => (item.toolUseID === toolUseID ? { ...item, ...patch } : item)),
       )
     },
   }
 }
 
 export { createPermissionContext, createPermissionQueueOps, createResolveOnce }
-export type {
-  PermissionContext,
-  PermissionApprovalSource,
-  PermissionQueueOps,
-  PermissionRejectionSource,
-  ResolveOnce,
-}
+export type { PermissionContext, PermissionApprovalSource, PermissionQueueOps, PermissionRejectionSource, ResolveOnce }

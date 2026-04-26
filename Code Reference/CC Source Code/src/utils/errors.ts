@@ -1,4 +1,4 @@
-import { APIUserAbortError } from '@anthropic-ai/sdk'
+import { APIUserAbortError } from "@anthropic-ai/sdk"
 
 export class ClaudeError extends Error {
   constructor(message: string) {
@@ -12,7 +12,7 @@ export class MalformedCommandError extends Error {}
 export class AbortError extends Error {
   constructor(message?: string) {
     super(message)
-    this.name = 'AbortError'
+    this.name = "AbortError"
   }
 }
 
@@ -25,11 +25,7 @@ export class AbortError extends Error {
  * this.name, so string matching silently fails in production.
  */
 export function isAbortError(e: unknown): boolean {
-  return (
-    e instanceof AbortError ||
-    e instanceof APIUserAbortError ||
-    (e instanceof Error && e.name === 'AbortError')
-  )
+  return e instanceof AbortError || e instanceof APIUserAbortError || (e instanceof Error && e.name === "AbortError")
 }
 
 /**
@@ -42,7 +38,7 @@ export class ConfigParseError extends Error {
 
   constructor(message: string, filePath: string, defaultConfig: unknown) {
     super(message)
-    this.name = 'ConfigParseError'
+    this.name = "ConfigParseError"
     this.filePath = filePath
     this.defaultConfig = defaultConfig
   }
@@ -55,8 +51,8 @@ export class ShellError extends Error {
     public readonly code: number,
     public readonly interrupted: boolean,
   ) {
-    super('Shell command failed')
-    this.name = 'ShellError'
+    super("Shell command failed")
+    this.name = "ShellError"
   }
 }
 
@@ -66,7 +62,7 @@ export class TeleportOperationError extends Error {
     public readonly formattedMessage: string,
   ) {
     super(message)
-    this.name = 'TeleportOperationError'
+    this.name = "TeleportOperationError"
   }
 }
 
@@ -95,7 +91,7 @@ export class TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS extends
 
   constructor(message: string, telemetryMessage?: string) {
     super(message)
-    this.name = 'TelemetrySafeError'
+    this.name = "TelemetrySafeError"
     this.telemetryMessage = telemetryMessage ?? message
   }
 }
@@ -126,7 +122,7 @@ export function errorMessage(e: unknown): string {
  * Replaces the `(e as NodeJS.ErrnoException).code` cast pattern.
  */
 export function getErrnoCode(e: unknown): string | undefined {
-  if (e && typeof e === 'object' && 'code' in e && typeof e.code === 'string') {
+  if (e && typeof e === "object" && "code" in e && typeof e.code === "string") {
     return e.code
   }
   return undefined
@@ -137,7 +133,7 @@ export function getErrnoCode(e: unknown): string | undefined {
  * Replaces `(e as NodeJS.ErrnoException).code === 'ENOENT'`.
  */
 export function isENOENT(e: unknown): boolean {
-  return getErrnoCode(e) === 'ENOENT'
+  return getErrnoCode(e) === "ENOENT"
 }
 
 /**
@@ -146,7 +142,7 @@ export function isENOENT(e: unknown): boolean {
  * Replaces the `(e as NodeJS.ErrnoException).path` cast pattern.
  */
 export function getErrnoPath(e: unknown): string | undefined {
-  if (e && typeof e === 'object' && 'path' in e && typeof e.path === 'string') {
+  if (e && typeof e === "object" && "path" in e && typeof e.path === "string") {
     return e.path
   }
   return undefined
@@ -163,11 +159,11 @@ export function shortErrorStack(e: unknown, maxFrames = 5): string {
   if (!e.stack) return e.message
   // V8/Bun stack format: "Name: message\n    at frame1\n    at frame2..."
   // First line is the message; subsequent "    at " lines are frames.
-  const lines = e.stack.split('\n')
+  const lines = e.stack.split("\n")
   const header = lines[0] ?? e.message
-  const frames = lines.slice(1).filter(l => l.trim().startsWith('at '))
+  const frames = lines.slice(1).filter((l) => l.trim().startsWith("at "))
   if (frames.length <= maxFrames) return e.stack
-  return [header, ...frames.slice(0, maxFrames)].join('\n')
+  return [header, ...frames.slice(0, maxFrames)].join("\n")
 }
 
 /**
@@ -185,21 +181,15 @@ export function shortErrorStack(e: unknown, maxFrames = 5): string {
  */
 export function isFsInaccessible(e: unknown): e is NodeJS.ErrnoException {
   const code = getErrnoCode(e)
-  return (
-    code === 'ENOENT' ||
-    code === 'EACCES' ||
-    code === 'EPERM' ||
-    code === 'ENOTDIR' ||
-    code === 'ELOOP'
-  )
+  return code === "ENOENT" || code === "EACCES" || code === "EPERM" || code === "ENOTDIR" || code === "ELOOP"
 }
 
 export type AxiosErrorKind =
-  | 'auth' // 401/403 — caller typically sets skipRetry
-  | 'timeout' // ECONNABORTED
-  | 'network' // ECONNREFUSED/ENOTFOUND
-  | 'http' // other axios error (may have status)
-  | 'other' // not an axios error
+  | "auth" // 401/403 — caller typically sets skipRetry
+  | "timeout" // ECONNABORTED
+  | "network" // ECONNREFUSED/ENOTFOUND
+  | "http" // other axios error (may have status)
+  | "other" // not an axios error
 
 /**
  * Classify a caught error from an axios request into one of a few buckets.
@@ -216,23 +206,18 @@ export function classifyAxiosError(e: unknown): {
   message: string
 } {
   const message = errorMessage(e)
-  if (
-    !e ||
-    typeof e !== 'object' ||
-    !('isAxiosError' in e) ||
-    !e.isAxiosError
-  ) {
-    return { kind: 'other', message }
+  if (!e || typeof e !== "object" || !("isAxiosError" in e) || !e.isAxiosError) {
+    return { kind: "other", message }
   }
   const err = e as {
     response?: { status?: number }
     code?: string
   }
   const status = err.response?.status
-  if (status === 401 || status === 403) return { kind: 'auth', status, message }
-  if (err.code === 'ECONNABORTED') return { kind: 'timeout', status, message }
-  if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
-    return { kind: 'network', status, message }
+  if (status === 401 || status === 403) return { kind: "auth", status, message }
+  if (err.code === "ECONNABORTED") return { kind: "timeout", status, message }
+  if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND") {
+    return { kind: "network", status, message }
   }
-  return { kind: 'http', status, message }
+  return { kind: "http", status, message }
 }

@@ -7,7 +7,7 @@
  * pattern in a RegExp constructor.
  */
 export function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 /**
@@ -29,11 +29,7 @@ export function capitalize(str: string): string {
  * @example plural(3, 'file') → 'files'
  * @example plural(2, 'entry', 'entries') → 'entries'
  */
-export function plural(
-  n: number,
-  word: string,
-  pluralWord = word + 's',
-): string {
+export function plural(n: number, word: string, pluralWord = word + "s"): string {
   return n === 1 ? word : pluralWord
 }
 
@@ -42,7 +38,7 @@ export function plural(
  * Used for shebang detection in diff rendering.
  */
 export function firstLineOf(s: string): string {
-  const nl = s.indexOf('\n')
+  const nl = s.indexOf("\n")
   return nl === -1 ? s : s.slice(0, nl)
 }
 
@@ -70,9 +66,7 @@ export function countCharInString(
  * Useful for accepting input from Japanese/CJK IMEs.
  */
 export function normalizeFullWidthDigits(input: string): string {
-  return input.replace(/[０-９]/g, ch =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
-  )
+  return input.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
 }
 
 /**
@@ -80,7 +74,7 @@ export function normalizeFullWidthDigits(input: string): string {
  * Useful for accepting input from Japanese/CJK IMEs (U+3000 → U+0020).
  */
 export function normalizeFullWidthSpace(input: string): string {
-  return input.replace(/\u3000/g, ' ')
+  return input.replace(/\u3000/g, " ")
 }
 
 // Keep in-memory accumulation modest to avoid blowing up RSS.
@@ -95,16 +89,12 @@ const MAX_STRING_LENGTH = 2 ** 25
  * @param maxSize Maximum size of the resulting string
  * @returns The joined string, truncated if necessary
  */
-export function safeJoinLines(
-  lines: string[],
-  delimiter: string = ',',
-  maxSize: number = MAX_STRING_LENGTH,
-): string {
-  const truncationMarker = '...[truncated]'
-  let result = ''
+export function safeJoinLines(lines: string[], delimiter: string = ",", maxSize: number = MAX_STRING_LENGTH): string {
+  const truncationMarker = "...[truncated]"
+  let result = ""
 
   for (const line of lines) {
-    const delimiterToAdd = result ? delimiter : ''
+    const delimiterToAdd = result ? delimiter : ""
     const fullAddition = delimiterToAdd + line
 
     if (result.length + fullAddition.length <= maxSize) {
@@ -112,16 +102,11 @@ export function safeJoinLines(
       result += fullAddition
     } else {
       // Need to truncate
-      const remainingSpace =
-        maxSize -
-        result.length -
-        delimiterToAdd.length -
-        truncationMarker.length
+      const remainingSpace = maxSize - result.length - delimiterToAdd.length - truncationMarker.length
 
       if (remainingSpace > 0) {
         // Add delimiter and as much of the line as will fit
-        result +=
-          delimiterToAdd + line.slice(0, remainingSpace) + truncationMarker
+        result += delimiterToAdd + line.slice(0, remainingSpace) + truncationMarker
       } else {
         // No room for any of this line, just add truncation marker
         result += truncationMarker
@@ -138,7 +123,7 @@ export function safeJoinLines(
  * the beginning of the output.
  */
 export class EndTruncatingAccumulator {
-  private content: string = ''
+  private content: string = ""
   private isTruncated = false
   private totalBytesReceived = 0
 
@@ -154,7 +139,7 @@ export class EndTruncatingAccumulator {
    * @param data The string data to append
    */
   append(data: string | Buffer): void {
-    const str = typeof data === 'string' ? data : data.toString()
+    const str = typeof data === "string" ? data : data.toString()
     this.totalBytesReceived += str.length
 
     // If already at capacity and truncated, don't modify content
@@ -192,7 +177,7 @@ export class EndTruncatingAccumulator {
    * Clears all accumulated data
    */
   clear(): void {
-    this.content = ''
+    this.content = ""
     this.isTruncated = false
     this.totalBytesReceived = 0
   }
@@ -227,9 +212,9 @@ export class EndTruncatingAccumulator {
  * @returns The truncated text with ellipsis if truncated
  */
 export function truncateToLines(text: string, maxLines: number): string {
-  const lines = text.split('\n')
+  const lines = text.split("\n")
   if (lines.length <= maxLines) {
     return text
   }
-  return lines.slice(0, maxLines).join('\n') + '…'
+  return lines.slice(0, maxLines).join("\n") + "…"
 }

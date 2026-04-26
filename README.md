@@ -32,16 +32,16 @@ Technical documentation:
 
 This comparison is based on the public OpenCode repository and README, not branding alone.
 
-| Topic | OpenCode | OpenAGt |
-| --- | --- | --- |
-| Runtime center | Client/server coding agent with a strong TUI emphasis | Backend-first session runtime that can be consumed by CLI, TUI, server, and SDK |
-| Agent loop | General coding agent with built-in `build` and `plan` agents plus subagent support | Session-centric iterative tool loop with task runtime, coordinator graph, and personal-agent primitives |
-| Provider strategy | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK |
-| LSP integration | Official README highlights out-of-the-box LSP support | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools |
-| Safety model | Agent modes and permission prompts are central to the CLI experience | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy |
-| Orchestration focus | Terminal-first coding flow with client/server remote-control potential | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory |
-| Frontend surface | TUI-first, plus desktop app beta in the official project | Stable release currently centers on CLI, TUI, headless server, and JavaScript SDK; Flutter is deferred |
-| Migration / compatibility | Native source project | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration |
+| Topic                     | OpenCode                                                                                      | OpenAGt                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Runtime center            | Client/server coding agent with a strong TUI emphasis                                         | Backend-first session runtime that can be consumed by CLI, TUI, server, and SDK                                             |
+| Agent loop                | General coding agent with built-in `build` and `plan` agents plus subagent support            | Session-centric iterative tool loop with task runtime, coordinator graph, and personal-agent primitives                     |
+| Provider strategy         | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK                                |
+| LSP integration           | Official README highlights out-of-the-box LSP support                                         | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools |
+| Safety model              | Agent modes and permission prompts are central to the CLI experience                          | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy         |
+| Orchestration focus       | Terminal-first coding flow with client/server remote-control potential                        | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory                |
+| Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, and JavaScript SDK; Flutter is deferred                      |
+| Migration / compatibility | Native source project                                                                         | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration                                            |
 
 ## Release
 
@@ -74,15 +74,15 @@ The current stable runtime is centered around these backend capabilities:
 
 ## Verification Matrix
 
-| Capability | Status |
-| --- | --- |
-| Session runtime and tool loop | stable in v1.16 |
-| Approval and Safety Envelope | stable in v1.16 with versioned `shell_safety` |
-| Coordinator Runtime | stable in v1.16 for graph projection, dispatch, retry, and cancellation |
-| Personal Agent Core | implemented; backend contracts stabilized in v1.16 |
-| Debug doctor / repro bundle | stable diagnostics surface in v1.16 |
-| Release verification automation | `bun run verify:v1.16` |
-| Flutter frontend | roadmap; backend contracts first |
+| Capability                      | Status                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| Session runtime and tool loop   | stable in v1.16                                                         |
+| Approval and Safety Envelope    | stable in v1.16 with versioned `shell_safety`                           |
+| Coordinator Runtime             | stable in v1.16 for graph projection, dispatch, retry, and cancellation |
+| Personal Agent Core             | implemented; backend contracts stabilized in v1.16                      |
+| Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                     |
+| Release verification automation | `bun run verify:v1.16`                                                  |
+| Flutter frontend                | roadmap; backend contracts first                                        |
 
 ## Key Features
 
@@ -229,31 +229,31 @@ Shell permission requests also expose structured `shell_safety` metadata.
 
 ## Main Commands
 
-| Command | Purpose |
-| --- | --- |
-| `openagt` | Start the default interactive CLI / TUI |
-| `openagt run [message..]` | Run a one-off task |
-| `openagt serve` | Start the headless server |
-| `openagt web` | Start the server and web UI flow |
-| `openagt session list` | List sessions |
-| `openagt providers login` | Add or refresh provider credentials |
-| `openagt mcp list` | Inspect MCP configuration |
-| `openagt debug paths` | Print effective runtime paths |
-| `openagt debug doctor` | Run environment and runtime diagnostics |
-| `openagt debug bundle --session <id>` | Export a sanitized repro bundle |
+| Command                               | Purpose                                 |
+| ------------------------------------- | --------------------------------------- |
+| `openagt`                             | Start the default interactive CLI / TUI |
+| `openagt run [message..]`             | Run a one-off task                      |
+| `openagt serve`                       | Start the headless server               |
+| `openagt web`                         | Start the server and web UI flow        |
+| `openagt session list`                | List sessions                           |
+| `openagt providers login`             | Add or refresh provider credentials     |
+| `openagt mcp list`                    | Inspect MCP configuration               |
+| `openagt debug paths`                 | Print effective runtime paths           |
+| `openagt debug doctor`                | Run environment and runtime diagnostics |
+| `openagt debug bundle --session <id>` | Export a sanitized repro bundle         |
 
 ## Repository Structure
 
-| Path | Purpose |
-| --- | --- |
-| `packages/openagt` | Core runtime, CLI, server, tools, session engine |
-| `packages/app` | Solid/Vite web client |
-| `packages/sdk/js` | Generated JavaScript SDK |
-| `packages/openagt_flutter` | Flutter mobile MVP |
-| `packages/console/*` | Console and control-plane packages |
-| `packages/opencode` | Compatibility leftovers, not the main runtime |
-| `.opencode/` | Local examples for agents, commands, plugins, skills, tools, themes |
-| `docs/` | Release docs, install docs, technical notes |
+| Path                       | Purpose                                                             |
+| -------------------------- | ------------------------------------------------------------------- |
+| `packages/openagt`         | Core runtime, CLI, server, tools, session engine                    |
+| `packages/app`             | Solid/Vite web client                                               |
+| `packages/sdk/js`          | Generated JavaScript SDK                                            |
+| `packages/openagt_flutter` | Flutter mobile MVP                                                  |
+| `packages/console/*`       | Console and control-plane packages                                  |
+| `packages/opencode`        | Compatibility leftovers, not the main runtime                       |
+| `.opencode/`               | Local examples for agents, commands, plugins, skills, tools, themes |
+| `docs/`                    | Release docs, install docs, technical notes                         |
 
 ## Compatibility
 
@@ -320,19 +320,19 @@ bun run verify:v1.16
 
 Useful runtime variables:
 
-| Variable | Purpose |
-| --- | --- |
-| `OPENAGT_CONFIG` | Use a specific config file |
-| `OPENAGT_CONFIG_DIR` | Add an explicit config directory |
-| `OPENAGT_CONFIG_CONTENT` | Inject config content directly |
-| `OPENAGT_DISABLE_PROJECT_CONFIG` | Ignore project-local config discovery |
-| `OPENAGT_SERVER_PASSWORD` | Protect `serve` / `web` server endpoints |
-| `OPENAGT_SERVER_USERNAME` | Basic auth username for the server |
-| `OPENAGT_PERMISSION` | Inject permission rules via env |
-| `OPENAGT_PURE` | Disable external plugins |
-| `OPENAGT_EXPERIMENTAL` | Enable experimental feature bundle |
-| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling |
-| `OPENAGT_DB` | Override database path |
+| Variable                         | Purpose                                  |
+| -------------------------------- | ---------------------------------------- |
+| `OPENAGT_CONFIG`                 | Use a specific config file               |
+| `OPENAGT_CONFIG_DIR`             | Add an explicit config directory         |
+| `OPENAGT_CONFIG_CONTENT`         | Inject config content directly           |
+| `OPENAGT_DISABLE_PROJECT_CONFIG` | Ignore project-local config discovery    |
+| `OPENAGT_SERVER_PASSWORD`        | Protect `serve` / `web` server endpoints |
+| `OPENAGT_SERVER_USERNAME`        | Basic auth username for the server       |
+| `OPENAGT_PERMISSION`             | Inject permission rules via env          |
+| `OPENAGT_PURE`                   | Disable external plugins                 |
+| `OPENAGT_EXPERIMENTAL`           | Enable experimental feature bundle       |
+| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling        |
+| `OPENAGT_DB`                     | Override database path                   |
 
 ## Extending OpenAGt
 

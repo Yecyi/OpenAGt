@@ -1,6 +1,6 @@
-import { feature } from 'bun:bundle'
-import type { UUID } from 'crypto'
-import { dirname } from 'path'
+import { feature } from "bun:bundle"
+import type { UUID } from "crypto"
+import { dirname } from "path"
 import {
   getMainLoopModelOverride,
   getSessionId,
@@ -8,42 +8,42 @@ import {
   setMainThreadAgentType,
   setOriginalCwd,
   switchSession,
-} from '../bootstrap/state.js'
-import { clearSystemPromptSections } from '../constants/systemPromptSections.js'
-import { restoreCostStateForSession } from '../cost-tracker.js'
-import type { AppState } from '../state/AppState.js'
-import type { AgentColorName } from '../tools/AgentTool/agentColorManager.js'
+} from "../bootstrap/state.js"
+import { clearSystemPromptSections } from "../constants/systemPromptSections.js"
+import { restoreCostStateForSession } from "../cost-tracker.js"
+import type { AppState } from "../state/AppState.js"
+import type { AgentColorName } from "../tools/AgentTool/agentColorManager.js"
 import {
   type AgentDefinition,
   type AgentDefinitionsResult,
   getActiveAgentsFromList,
   getAgentDefinitionsWithOverrides,
-} from '../tools/AgentTool/loadAgentsDir.js'
-import { TODO_WRITE_TOOL_NAME } from '../tools/TodoWriteTool/constants.js'
-import { asSessionId } from '../types/ids.js'
+} from "../tools/AgentTool/loadAgentsDir.js"
+import { TODO_WRITE_TOOL_NAME } from "../tools/TodoWriteTool/constants.js"
+import { asSessionId } from "../types/ids.js"
 import type {
   AttributionSnapshotMessage,
   ContextCollapseCommitEntry,
   ContextCollapseSnapshotEntry,
   PersistedWorktreeSession,
-} from '../types/logs.js'
-import type { Message } from '../types/message.js'
-import { renameRecordingForSession } from './asciicast.js'
-import { clearMemoryFileCaches } from './claudemd.js'
+} from "../types/logs.js"
+import type { Message } from "../types/message.js"
+import { renameRecordingForSession } from "./asciicast.js"
+import { clearMemoryFileCaches } from "./claudemd.js"
 import {
   type AttributionState,
   attributionRestoreStateFromLog,
   restoreAttributionStateFromSnapshots,
-} from './commitAttribution.js'
-import { updateSessionName } from './concurrentSessions.js'
-import { getCwd } from './cwd.js'
-import { logForDebugging } from './debug.js'
-import type { FileHistorySnapshot } from './fileHistory.js'
-import { fileHistoryRestoreStateFromLog } from './fileHistory.js'
-import { createSystemMessage } from './messages.js'
-import { parseUserSpecifiedModel } from './model/model.js'
-import { getPlansDirectory } from './plans.js'
-import { setCwd } from './Shell.js'
+} from "./commitAttribution.js"
+import { updateSessionName } from "./concurrentSessions.js"
+import { getCwd } from "./cwd.js"
+import { logForDebugging } from "./debug.js"
+import type { FileHistorySnapshot } from "./fileHistory.js"
+import { fileHistoryRestoreStateFromLog } from "./fileHistory.js"
+import { createSystemMessage } from "./messages.js"
+import { parseUserSpecifiedModel } from "./model/model.js"
+import { getPlansDirectory } from "./plans.js"
+import { setCwd } from "./Shell.js"
 import {
   adoptResumedSessionFile,
   recordContentReplacement,
@@ -51,15 +51,12 @@ import {
   restoreSessionMetadata,
   saveMode,
   saveWorktreeState,
-} from './sessionStorage.js'
-import { isTodoV2Enabled } from './tasks.js'
-import type { TodoList } from './todo/types.js'
-import { TodoListSchema } from './todo/types.js'
-import type { ContentReplacementRecord } from './toolResultStorage.js'
-import {
-  getCurrentWorktreeSession,
-  restoreWorktreeSession,
-} from './worktree.js'
+} from "./sessionStorage.js"
+import { isTodoV2Enabled } from "./tasks.js"
+import type { TodoList } from "./todo/types.js"
+import { TodoListSchema } from "./todo/types.js"
+import type { ContentReplacementRecord } from "./toolResultStorage.js"
+import { getCurrentWorktreeSession, restoreWorktreeSession } from "./worktree.js"
 
 type ResumeResult = {
   messages?: Message[]
@@ -77,16 +74,14 @@ type ResumeResult = {
 function extractTodosFromTranscript(messages: Message[]): TodoList {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
-    if (msg?.type !== 'assistant') continue
+    if (msg?.type !== "assistant") continue
     const toolUse = msg.message.content.find(
-      block => block.type === 'tool_use' && block.name === TODO_WRITE_TOOL_NAME,
+      (block) => block.type === "tool_use" && block.name === TODO_WRITE_TOOL_NAME,
     )
-    if (!toolUse || toolUse.type !== 'tool_use') continue
+    if (!toolUse || toolUse.type !== "tool_use") continue
     const input = toolUse.input
-    if (input === null || typeof input !== 'object') return []
-    const parsed = TodoListSchema().safeParse(
-      (input as Record<string, unknown>).todos,
-    )
+    if (input === null || typeof input !== "object") return []
+    const parsed = TodoListSchema().safeParse((input as Record<string, unknown>).todos)
     return parsed.success ? parsed.data : []
   }
   return []
@@ -102,19 +97,15 @@ export function restoreSessionStateFromLog(
 ): void {
   // Restore file history state
   if (result.fileHistorySnapshots && result.fileHistorySnapshots.length > 0) {
-    fileHistoryRestoreStateFromLog(result.fileHistorySnapshots, newState => {
-      setAppState(prev => ({ ...prev, fileHistory: newState }))
+    fileHistoryRestoreStateFromLog(result.fileHistorySnapshots, (newState) => {
+      setAppState((prev) => ({ ...prev, fileHistory: newState }))
     })
   }
 
   // Restore attribution state (ant-only feature)
-  if (
-    feature('COMMIT_ATTRIBUTION') &&
-    result.attributionSnapshots &&
-    result.attributionSnapshots.length > 0
-  ) {
-    attributionRestoreStateFromLog(result.attributionSnapshots, newState => {
-      setAppState(prev => ({ ...prev, attribution: newState }))
+  if (feature("COMMIT_ATTRIBUTION") && result.attributionSnapshots && result.attributionSnapshots.length > 0) {
+    attributionRestoreStateFromLog(result.attributionSnapshots, (newState) => {
+      setAppState((prev) => ({ ...prev, attribution: newState }))
     })
   }
 
@@ -124,14 +115,11 @@ export function restoreSessionStateFromLog(
   // undefined/empty entries) because restoreFromEntries resets the store
   // first — without that, an in-session /resume into a session with no
   // commits would leave the prior session's stale commit log intact.
-  if (feature('CONTEXT_COLLAPSE')) {
+  if (feature("CONTEXT_COLLAPSE")) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     ;(
-      require('../services/contextCollapse/persist.js') as typeof import('../services/contextCollapse/persist.js')
-    ).restoreFromEntries(
-      result.contextCollapseCommits ?? [],
-      result.contextCollapseSnapshot,
-    )
+      require("../services/contextCollapse/persist.js") as typeof import("../services/contextCollapse/persist.js")
+    ).restoreFromEntries(result.contextCollapseCommits ?? [], result.contextCollapseSnapshot)
     /* eslint-enable @typescript-eslint/no-require-imports */
   }
 
@@ -141,7 +129,7 @@ export function restoreSessionStateFromLog(
     const todos = extractTodosFromTranscript(result.messages)
     if (todos.length > 0) {
       const agentId = getSessionId()
-      setAppState(prev => ({
+      setAppState((prev) => ({
         ...prev,
         todos: { ...prev.todos, [agentId]: todos },
       }))
@@ -154,14 +142,8 @@ export function restoreSessionStateFromLog(
  * Used for computing initial state before render (e.g., main.tsx --continue).
  * Returns undefined if attribution feature is disabled or no snapshots exist.
  */
-export function computeRestoredAttributionState(
-  result: ResumeResult,
-): AttributionState | undefined {
-  if (
-    feature('COMMIT_ATTRIBUTION') &&
-    result.attributionSnapshots &&
-    result.attributionSnapshots.length > 0
-  ) {
+export function computeRestoredAttributionState(result: ResumeResult): AttributionState | undefined {
+  if (feature("COMMIT_ATTRIBUTION") && result.attributionSnapshots && result.attributionSnapshots.length > 0) {
     return restoreAttributionStateFromSnapshots(result.attributionSnapshots)
   }
   return undefined
@@ -175,15 +157,13 @@ export function computeRestoredAttributionState(
 export function computeStandaloneAgentContext(
   agentName: string | undefined,
   agentColor: string | undefined,
-): AppState['standaloneAgentContext'] | undefined {
+): AppState["standaloneAgentContext"] | undefined {
   if (!agentName && !agentColor) {
     return undefined
   }
   return {
-    name: agentName ?? '',
-    color: (agentColor === 'default' ? undefined : agentColor) as
-      | AgentColorName
-      | undefined,
+    name: agentName ?? "",
+    color: (agentColor === "default" ? undefined : agentColor) as AgentColorName | undefined,
   }
 }
 
@@ -216,9 +196,7 @@ export function restoreAgentFromSession(
     return { agentDefinition: undefined, agentType: undefined }
   }
 
-  const resumedAgent = agentDefinitions.activeAgents.find(
-    agent => agent.agentType === agentSetting,
-  )
+  const resumedAgent = agentDefinitions.activeAgents.find((agent) => agent.agentType === agentSetting)
   if (!resumedAgent) {
     logForDebugging(
       `Resumed session had agent "${agentSetting}" but it is no longer available. Using default behavior.`,
@@ -230,11 +208,7 @@ export function restoreAgentFromSession(
   setMainThreadAgentType(resumedAgent.agentType)
 
   // Apply agent's model if user didn't specify one
-  if (
-    !getMainLoopModelOverride() &&
-    resumedAgent.model &&
-    resumedAgent.model !== 'inherit'
-  ) {
+  if (!getMainLoopModelOverride() && resumedAgent.model && resumedAgent.model !== "inherit") {
     setMainLoopModelOverride(parseUserSpecifiedModel(resumedAgent.model))
   }
 
@@ -254,7 +228,7 @@ export async function refreshAgentDefinitionsForModeSwitch(
   cliAgents: AgentDefinition[],
   currentAgentDefinitions: AgentDefinitionsResult,
 ): Promise<AgentDefinitionsResult> {
-  if (!feature('COORDINATOR_MODE') || !modeWasSwitched) {
+  if (!feature("COORDINATOR_MODE") || !modeWasSwitched) {
     return currentAgentDefinitions
   }
 
@@ -307,7 +281,7 @@ type ResumeLoadResult = {
   agentSetting?: string
   customTitle?: string
   tag?: string
-  mode?: 'coordinator' | 'normal'
+  mode?: "coordinator" | "normal"
   worktreeSession?: PersistedWorktreeSession | null
   prNumber?: number
   prUrl?: string
@@ -329,9 +303,7 @@ type ResumeLoadResult = {
  * re-assert the fresh worktree here before adoptResumedSessionFile writes
  * it back to disk.
  */
-export function restoreWorktreeForResume(
-  worktreeSession: PersistedWorktreeSession | null | undefined,
-): void {
+export function restoreWorktreeForResume(worktreeSession: PersistedWorktreeSession | null | undefined): void {
   const fresh = getCurrentWorktreeSession()
   if (fresh) {
     saveWorktreeState(fresh)
@@ -425,10 +397,10 @@ export async function processResumedConversation(
 ): Promise<ProcessedResume> {
   // Match coordinator/normal mode to the resumed session
   let modeWarning: string | undefined
-  if (feature('COORDINATOR_MODE')) {
+  if (feature("COORDINATOR_MODE")) {
     modeWarning = context.modeApi?.matchSessionMode(result.mode)
     if (modeWarning) {
-      result.messages.push(createSystemMessage(modeWarning, 'warning'))
+      result.messages.push(createSystemMessage(modeWarning, "warning"))
     }
   }
 
@@ -439,10 +411,7 @@ export async function processResumedConversation(
       // When resuming from a different project directory (git worktrees,
       // cross-project), transcriptPath points to the actual file; its dirname
       // is the project dir. Otherwise the session lives in the current project.
-      switchSession(
-        asSessionId(sid),
-        opts.transcriptPath ? dirname(opts.transcriptPath) : null,
-      )
+      switchSession(asSessionId(sid), opts.transcriptPath ? dirname(opts.transcriptPath) : null)
       // Rename asciicast recording to match the resumed session ID so
       // getSessionRecordingPaths() can discover it during /share
       await renameRecordingForSession()
@@ -467,9 +436,7 @@ export async function processResumedConversation(
   // original session's worktree — a "Remove" on the fork's exit dialog
   // would delete a worktree the original session still references — so
   // strip worktreeSession from the fork path so the cache stays unset.
-  restoreSessionMetadata(
-    opts.forkSession ? { ...result, worktreeSession: undefined } : result,
-  )
+  restoreSessionMetadata(opts.forkSession ? { ...result, worktreeSession: undefined } : result)
 
   if (!opts.forkSession) {
     // Cd back into the worktree the session was in when it last exited.
@@ -491,38 +458,29 @@ export async function processResumedConversation(
   // /resume path goes through restoreSessionStateFromLog (REPL.tsx); CLI
   // --continue/--resume goes through here instead. Called unconditionally
   // — see the restoreSessionStateFromLog callsite above for why.
-  if (feature('CONTEXT_COLLAPSE')) {
+  if (feature("CONTEXT_COLLAPSE")) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     ;(
-      require('../services/contextCollapse/persist.js') as typeof import('../services/contextCollapse/persist.js')
-    ).restoreFromEntries(
-      result.contextCollapseCommits ?? [],
-      result.contextCollapseSnapshot,
-    )
+      require("../services/contextCollapse/persist.js") as typeof import("../services/contextCollapse/persist.js")
+    ).restoreFromEntries(result.contextCollapseCommits ?? [], result.contextCollapseSnapshot)
     /* eslint-enable @typescript-eslint/no-require-imports */
   }
 
   // Restore agent setting from resumed session
-  const { agentDefinition: restoredAgent, agentType: resumedAgentType } =
-    restoreAgentFromSession(
-      result.agentSetting,
-      context.mainThreadAgentDefinition,
-      context.agentDefinitions,
-    )
+  const { agentDefinition: restoredAgent, agentType: resumedAgentType } = restoreAgentFromSession(
+    result.agentSetting,
+    context.mainThreadAgentDefinition,
+    context.agentDefinitions,
+  )
 
   // Persist the current mode so future resumes know what mode this session was in
-  if (feature('COORDINATOR_MODE')) {
-    saveMode(context.modeApi?.isCoordinatorMode() ? 'coordinator' : 'normal')
+  if (feature("COORDINATOR_MODE")) {
+    saveMode(context.modeApi?.isCoordinatorMode() ? "coordinator" : "normal")
   }
 
   // Compute initial state before render (per CLAUDE.md guidelines)
-  const restoredAttribution = opts.includeAttribution
-    ? computeRestoredAttributionState(result)
-    : undefined
-  const standaloneAgentContext = computeStandaloneAgentContext(
-    result.agentName,
-    result.agentColor,
-  )
+  const restoredAttribution = opts.includeAttribution ? computeRestoredAttributionState(result) : undefined
+  const standaloneAgentContext = computeStandaloneAgentContext(result.agentName, result.agentColor)
   void updateSessionName(result.agentName)
   const refreshedAgentDefs = await refreshAgentDefinitionsForModeSwitch(
     !!modeWarning,
@@ -536,9 +494,7 @@ export async function processResumedConversation(
     fileHistorySnapshots: result.fileHistorySnapshots,
     contentReplacements: result.contentReplacements,
     agentName: result.agentName,
-    agentColor: (result.agentColor === 'default'
-      ? undefined
-      : result.agentColor) as AgentColorName | undefined,
+    agentColor: (result.agentColor === "default" ? undefined : result.agentColor) as AgentColorName | undefined,
     restoredAgentDef: restoredAgent,
     initialState: {
       ...context.initialState,

@@ -1,8 +1,8 @@
-import { useCallback, useEffect } from 'react'
-import type { InputEvent } from '../ink/events/input-event.js'
-import { type Key, useInput } from '../ink.js'
-import { useOptionalKeybindingContext } from './KeybindingContext.js'
-import type { KeybindingContextName } from './types.js'
+import { useCallback, useEffect } from "react"
+import type { InputEvent } from "../ink/events/input-event.js"
+import { type Key, useInput } from "../ink.js"
+import { useOptionalKeybindingContext } from "./KeybindingContext.js"
+import type { KeybindingContextName } from "./types.js"
 
 type Options = {
   /** Which context this binding belongs to (default: 'Global') */
@@ -35,7 +35,7 @@ export function useKeybinding(
   handler: () => void | false | Promise<void>,
   options: Options = {},
 ): void {
-  const { context = 'Global', isActive = true } = options
+  const { context = "Global", isActive = true } = options
   const keybindingContext = useOptionalKeybindingContext()
 
   // Register handler with the context for ChordInterceptor to invoke
@@ -51,18 +51,14 @@ export function useKeybinding(
 
       // Build context list: registered active contexts + this context + Global
       // More specific contexts (registered ones) take precedence over Global
-      const contextsToCheck: KeybindingContextName[] = [
-        ...keybindingContext.activeContexts,
-        context,
-        'Global',
-      ]
+      const contextsToCheck: KeybindingContextName[] = [...keybindingContext.activeContexts, context, "Global"]
       // Deduplicate while preserving order (first occurrence wins for priority)
       const uniqueContexts = [...new Set(contextsToCheck)]
 
       const result = keybindingContext.resolve(input, key, uniqueContexts)
 
       switch (result.type) {
-        case 'match':
+        case "match":
           // Chord completed (if any) - clear pending state
           keybindingContext.setPendingChord(null)
           if (result.action === action) {
@@ -71,21 +67,21 @@ export function useKeybinding(
             }
           }
           break
-        case 'chord_started':
+        case "chord_started":
           // User started a chord sequence - update pending state
           keybindingContext.setPendingChord(result.pending)
           event.stopImmediatePropagation()
           break
-        case 'chord_cancelled':
+        case "chord_cancelled":
           // Chord was cancelled (escape or invalid key)
           keybindingContext.setPendingChord(null)
           break
-        case 'unbound':
+        case "unbound":
           // Explicitly unbound - clear any pending chord
           keybindingContext.setPendingChord(null)
           event.stopImmediatePropagation()
           break
-        case 'none':
+        case "none":
           // No match - let other handlers try
           break
       }
@@ -121,7 +117,7 @@ export function useKeybindings(
   handlers: Record<string, () => void | false | Promise<void>>,
   options: Options = {},
 ): void {
-  const { context = 'Global', isActive = true } = options
+  const { context = "Global", isActive = true } = options
   const keybindingContext = useOptionalKeybindingContext()
 
   // Register all handlers with the context for ChordInterceptor to invoke
@@ -130,9 +126,7 @@ export function useKeybindings(
 
     const unregisterFns: Array<() => void> = []
     for (const [action, handler] of Object.entries(handlers)) {
-      unregisterFns.push(
-        keybindingContext.registerHandler({ action, context, handler }),
-      )
+      unregisterFns.push(keybindingContext.registerHandler({ action, context, handler }))
     }
 
     return () => {
@@ -149,18 +143,14 @@ export function useKeybindings(
 
       // Build context list: registered active contexts + this context + Global
       // More specific contexts (registered ones) take precedence over Global
-      const contextsToCheck: KeybindingContextName[] = [
-        ...keybindingContext.activeContexts,
-        context,
-        'Global',
-      ]
+      const contextsToCheck: KeybindingContextName[] = [...keybindingContext.activeContexts, context, "Global"]
       // Deduplicate while preserving order (first occurrence wins for priority)
       const uniqueContexts = [...new Set(contextsToCheck)]
 
       const result = keybindingContext.resolve(input, key, uniqueContexts)
 
       switch (result.type) {
-        case 'match':
+        case "match":
           // Chord completed (if any) - clear pending state
           keybindingContext.setPendingChord(null)
           if (result.action in handlers) {
@@ -170,21 +160,21 @@ export function useKeybindings(
             }
           }
           break
-        case 'chord_started':
+        case "chord_started":
           // User started a chord sequence - update pending state
           keybindingContext.setPendingChord(result.pending)
           event.stopImmediatePropagation()
           break
-        case 'chord_cancelled':
+        case "chord_cancelled":
           // Chord was cancelled (escape or invalid key)
           keybindingContext.setPendingChord(null)
           break
-        case 'unbound':
+        case "unbound":
           // Explicitly unbound - clear any pending chord
           keybindingContext.setPendingChord(null)
           event.stopImmediatePropagation()
           break
-        case 'none':
+        case "none":
           // No match - let other handlers try
           break
       }

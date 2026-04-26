@@ -1,49 +1,23 @@
-import { feature } from 'bun:bundle'
-import chalk from 'chalk'
-import { spawnSync } from 'child_process'
-import {
-  copyFile,
-  mkdir,
-  readdir,
-  readFile,
-  stat,
-  symlink,
-  utimes,
-} from 'fs/promises'
-import ignore from 'ignore'
-import { basename, dirname, join } from 'path'
-import { saveCurrentProjectConfig } from './config.js'
-import { getCwd } from './cwd.js'
-import { logForDebugging } from './debug.js'
-import { errorMessage, getErrnoCode } from './errors.js'
-import { execFileNoThrow, execFileNoThrowWithCwd } from './execFileNoThrow.js'
-import { parseGitConfigValue } from './git/gitConfigParser.js'
-import {
-  getCommonDir,
-  readWorktreeHeadSha,
-  resolveGitDir,
-  resolveRef,
-} from './git/gitFilesystem.js'
-import {
-  findCanonicalGitRoot,
-  findGitRoot,
-  getBranch,
-  getDefaultBranch,
-  gitExe,
-} from './git.js'
-import {
-  executeWorktreeCreateHook,
-  executeWorktreeRemoveHook,
-  hasWorktreeCreateHook,
-} from './hooks.js'
-import { containsPathTraversal } from './path.js'
-import { getPlatform } from './platform.js'
-import {
-  getInitialSettings,
-  getRelativeSettingsFilePathForSource,
-} from './settings/settings.js'
-import { sleep } from './sleep.js'
-import { isInITerm2 } from './swarm/backends/detection.js'
+import { feature } from "bun:bundle"
+import chalk from "chalk"
+import { spawnSync } from "child_process"
+import { copyFile, mkdir, readdir, readFile, stat, symlink, utimes } from "fs/promises"
+import ignore from "ignore"
+import { basename, dirname, join } from "path"
+import { saveCurrentProjectConfig } from "./config.js"
+import { getCwd } from "./cwd.js"
+import { logForDebugging } from "./debug.js"
+import { errorMessage, getErrnoCode } from "./errors.js"
+import { execFileNoThrow, execFileNoThrowWithCwd } from "./execFileNoThrow.js"
+import { parseGitConfigValue } from "./git/gitConfigParser.js"
+import { getCommonDir, readWorktreeHeadSha, resolveGitDir, resolveRef } from "./git/gitFilesystem.js"
+import { findCanonicalGitRoot, findGitRoot, getBranch, getDefaultBranch, gitExe } from "./git.js"
+import { executeWorktreeCreateHook, executeWorktreeRemoveHook, hasWorktreeCreateHook } from "./hooks.js"
+import { containsPathTraversal } from "./path.js"
+import { getPlatform } from "./platform.js"
+import { getInitialSettings, getRelativeSettingsFilePathForSource } from "./settings/settings.js"
+import { sleep } from "./sleep.js"
+import { isInITerm2 } from "./swarm/backends/detection.js"
 
 const VALID_WORKTREE_SLUG_SEGMENT = /^[a-zA-Z0-9._-]+$/
 const MAX_WORKTREE_SLUG_LENGTH = 64
@@ -72,11 +46,9 @@ export function validateWorktreeSlug(slug: string): void {
   // Leading or trailing `/` would make path.join produce an absolute path
   // or a dangling segment. Splitting and validating each segment rejects
   // both (empty segments fail the regex) while allowing `user/feature`.
-  for (const segment of slug.split('/')) {
-    if (segment === '.' || segment === '..') {
-      throw new Error(
-        `Invalid worktree name "${slug}": must not contain "." or ".." path segments`,
-      )
+  for (const segment of slug.split("/")) {
+    if (segment === "." || segment === "..") {
+      throw new Error(`Invalid worktree name "${slug}": must not contain "." or ".." path segments`)
     }
     if (!VALID_WORKTREE_SLUG_SEGMENT.test(segment)) {
       throw new Error(
@@ -99,18 +71,11 @@ async function mkdirRecursive(dirPath: string): Promise<void> {
  * @param worktreePath - Path to the worktree directory
  * @param dirsToSymlink - Array of directory names to symlink (e.g., ['node_modules'])
  */
-async function symlinkDirectories(
-  repoRootPath: string,
-  worktreePath: string,
-  dirsToSymlink: string[],
-): Promise<void> {
+async function symlinkDirectories(repoRootPath: string, worktreePath: string, dirsToSymlink: string[]): Promise<void> {
   for (const dir of dirsToSymlink) {
     // Validate directory doesn't escape repository boundaries
     if (containsPathTraversal(dir)) {
-      logForDebugging(
-        `Skipping symlink for "${dir}": path traversal detected`,
-        { level: 'warn' },
-      )
+      logForDebugging(`Skipping symlink for "${dir}": path traversal detected`, { level: "warn" })
       continue
     }
 
@@ -118,20 +83,15 @@ async function symlinkDirectories(
     const destPath = join(worktreePath, dir)
 
     try {
-      await symlink(sourcePath, destPath, 'dir')
-      logForDebugging(
-        `Symlinked ${dir} from main repository to worktree to avoid disk bloat`,
-      )
+      await symlink(sourcePath, destPath, "dir")
+      logForDebugging(`Symlinked ${dir} from main repository to worktree to avoid disk bloat`)
     } catch (error) {
       const code = getErrnoCode(error)
       // ENOENT: source doesn't exist yet (expected - skip silently)
       // EEXIST: destination already exists (expected - skip silently)
-      if (code !== 'ENOENT' && code !== 'EEXIST') {
+      if (code !== "ENOENT" && code !== "EEXIST") {
         // Unexpected error (e.g., permission denied, unsupported platform)
-        logForDebugging(
-          `Failed to symlink ${dir} (${code ?? 'unknown'}): ${errorMessage(error)}`,
-          { level: 'warn' },
-        )
+        logForDebugging(`Failed to symlink ${dir} (${code ?? "unknown"}): ${errorMessage(error)}`, { level: "warn" })
       }
     }
   }
@@ -168,13 +128,10 @@ export function restoreWorktreeSession(session: WorktreeSession | null): void {
   currentWorktreeSession = session
 }
 
-export function generateTmuxSessionName(
-  repoPath: string,
-  branch: string,
-): string {
+export function generateTmuxSessionName(repoPath: string, branch: string): string {
   const repoName = basename(repoPath)
   const combined = `${repoName}_${branch}`
-  return combined.replace(/[/.]/g, '_')
+  return combined.replace(/[/.]/g, "_")
 }
 
 type WorktreeCreateResult =
@@ -197,12 +154,12 @@ type WorktreeCreateResult =
 // GIT_ASKPASS='' disables askpass GUI programs.
 // stdin: 'ignore' closes stdin so interactive prompts can't block.
 const GIT_NO_PROMPT_ENV = {
-  GIT_TERMINAL_PROMPT: '0',
-  GIT_ASKPASS: '',
+  GIT_TERMINAL_PROMPT: "0",
+  GIT_ASKPASS: "",
 }
 
 function worktreesDir(repoRoot: string): string {
-  return join(repoRoot, '.claude', 'worktrees')
+  return join(repoRoot, ".claude", "worktrees")
 }
 
 // Flatten nested slugs (`user/feature` → `user+feature`) for both the branch
@@ -215,7 +172,7 @@ function worktreesDir(repoRoot: string): string {
 // `+` is valid in git branch names and filesystem paths but NOT in the
 // slug-segment allowlist ([a-zA-Z0-9._-]), so the mapping is injective.
 function flattenSlug(slug: string): string {
-  return slug.replaceAll('/', '+')
+  return slug.replaceAll("/", "+")
 }
 
 export function worktreeBranchName(slug: string): string {
@@ -262,18 +219,17 @@ async function getOrCreateWorktree(
   let baseBranch: string
   let baseSha: string | null = null
   if (options?.prNumber) {
-    const { code: prFetchCode, stderr: prFetchStderr } =
-      await execFileNoThrowWithCwd(
-        gitExe(),
-        ['fetch', 'origin', `pull/${options.prNumber}/head`],
-        { cwd: repoRoot, stdin: 'ignore', env: fetchEnv },
-      )
+    const { code: prFetchCode, stderr: prFetchStderr } = await execFileNoThrowWithCwd(
+      gitExe(),
+      ["fetch", "origin", `pull/${options.prNumber}/head`],
+      { cwd: repoRoot, stdin: "ignore", env: fetchEnv },
+    )
     if (prFetchCode !== 0) {
       throw new Error(
         `Failed to fetch PR #${options.prNumber}: ${prFetchStderr.trim() || 'PR may not exist or the repository may not have a remote named "origin"'}`,
       )
     }
-    baseBranch = 'FETCH_HEAD'
+    baseBranch = "FETCH_HEAD"
   } else {
     // If origin/<branch> already exists locally, skip fetch. In large repos
     // (210k files, 16M objects) fetch burns ~6-8s on a local commit-graph
@@ -281,54 +237,44 @@ async function getOrCreateWorktree(
     // the user can pull in the worktree if they want latest.
     // resolveRef reads the loose/packed ref directly; when it succeeds we
     // already have the SHA, so the later rev-parse is skipped entirely.
-    const [defaultBranch, gitDir] = await Promise.all([
-      getDefaultBranch(),
-      resolveGitDir(repoRoot),
-    ])
+    const [defaultBranch, gitDir] = await Promise.all([getDefaultBranch(), resolveGitDir(repoRoot)])
     const originRef = `origin/${defaultBranch}`
-    const originSha = gitDir
-      ? await resolveRef(gitDir, `refs/remotes/origin/${defaultBranch}`)
-      : null
+    const originSha = gitDir ? await resolveRef(gitDir, `refs/remotes/origin/${defaultBranch}`) : null
     if (originSha) {
       baseBranch = originRef
       baseSha = originSha
     } else {
-      const { code: fetchCode } = await execFileNoThrowWithCwd(
-        gitExe(),
-        ['fetch', 'origin', defaultBranch],
-        { cwd: repoRoot, stdin: 'ignore', env: fetchEnv },
-      )
-      baseBranch = fetchCode === 0 ? originRef : 'HEAD'
+      const { code: fetchCode } = await execFileNoThrowWithCwd(gitExe(), ["fetch", "origin", defaultBranch], {
+        cwd: repoRoot,
+        stdin: "ignore",
+        env: fetchEnv,
+      })
+      baseBranch = fetchCode === 0 ? originRef : "HEAD"
     }
   }
 
   // For the fetch/PR-fetch paths we still need the SHA — the fs-only resolveRef
   // above only covers the "origin/<branch> already exists locally" case.
   if (!baseSha) {
-    const { stdout, code: shaCode } = await execFileNoThrowWithCwd(
-      gitExe(),
-      ['rev-parse', baseBranch],
-      { cwd: repoRoot },
-    )
+    const { stdout, code: shaCode } = await execFileNoThrowWithCwd(gitExe(), ["rev-parse", baseBranch], {
+      cwd: repoRoot,
+    })
     if (shaCode !== 0) {
-      throw new Error(
-        `Failed to resolve base branch "${baseBranch}": git rev-parse failed`,
-      )
+      throw new Error(`Failed to resolve base branch "${baseBranch}": git rev-parse failed`)
     }
     baseSha = stdout.trim()
   }
 
   const sparsePaths = getInitialSettings().worktree?.sparsePaths
-  const addArgs = ['worktree', 'add']
+  const addArgs = ["worktree", "add"]
   if (sparsePaths?.length) {
-    addArgs.push('--no-checkout')
+    addArgs.push("--no-checkout")
   }
   // -B (not -b): reset any orphan branch left behind by a removed worktree dir.
   // Saves a `git branch -D` subprocess (~15ms spawn overhead) on every create.
-  addArgs.push('-B', worktreeBranch, worktreePath, baseBranch)
+  addArgs.push("-B", worktreeBranch, worktreePath, baseBranch)
 
-  const { code: createCode, stderr: createStderr } =
-    await execFileNoThrowWithCwd(gitExe(), addArgs, { cwd: repoRoot })
+  const { code: createCode, stderr: createStderr } = await execFileNoThrowWithCwd(gitExe(), addArgs, { cwd: repoRoot })
   if (createCode !== 0) {
     throw new Error(`Failed to create worktree: ${createStderr}`)
   }
@@ -339,27 +285,20 @@ async function getOrCreateWorktree(
     // fast-resume (rev-parse HEAD) would succeed and present a broken worktree
     // as "resumed". Tear it down before propagating the error.
     const tearDown = async (msg: string): Promise<never> => {
-      await execFileNoThrowWithCwd(
-        gitExe(),
-        ['worktree', 'remove', '--force', worktreePath],
-        { cwd: repoRoot },
-      )
+      await execFileNoThrowWithCwd(gitExe(), ["worktree", "remove", "--force", worktreePath], { cwd: repoRoot })
       throw new Error(msg)
     }
-    const { code: sparseCode, stderr: sparseErr } =
-      await execFileNoThrowWithCwd(
-        gitExe(),
-        ['sparse-checkout', 'set', '--cone', '--', ...sparsePaths],
-        { cwd: worktreePath },
-      )
+    const { code: sparseCode, stderr: sparseErr } = await execFileNoThrowWithCwd(
+      gitExe(),
+      ["sparse-checkout", "set", "--cone", "--", ...sparsePaths],
+      { cwd: worktreePath },
+    )
     if (sparseCode !== 0) {
       await tearDown(`Failed to configure sparse-checkout: ${sparseErr}`)
     }
-    const { code: coCode, stderr: coErr } = await execFileNoThrowWithCwd(
-      gitExe(),
-      ['checkout', 'HEAD'],
-      { cwd: worktreePath },
-    )
+    const { code: coCode, stderr: coErr } = await execFileNoThrowWithCwd(gitExe(), ["checkout", "HEAD"], {
+      cwd: worktreePath,
+    })
     if (coCode !== 0) {
       await tearDown(`Failed to checkout sparse worktree: ${coErr}`)
     }
@@ -388,21 +327,18 @@ async function getOrCreateWorktree(
  * .worktreeinclude pattern explicitly targets a path inside a collapsed directory,
  * that directory is expanded with a second scoped `ls-files` call.
  */
-export async function copyWorktreeIncludeFiles(
-  repoRoot: string,
-  worktreePath: string,
-): Promise<string[]> {
+export async function copyWorktreeIncludeFiles(repoRoot: string, worktreePath: string): Promise<string[]> {
   let includeContent: string
   try {
-    includeContent = await readFile(join(repoRoot, '.worktreeinclude'), 'utf-8')
+    includeContent = await readFile(join(repoRoot, ".worktreeinclude"), "utf-8")
   } catch {
     return []
   }
 
   const patterns = includeContent
     .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.startsWith('#'))
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
   if (patterns.length === 0) {
     return []
   }
@@ -412,20 +348,20 @@ export async function copyWorktreeIncludeFiles(
   // In a large repo this cuts ~500k entries/~7s down to ~hundreds of entries/~100ms.
   const gitignored = await execFileNoThrowWithCwd(
     gitExe(),
-    ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory'],
+    ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
     { cwd: repoRoot },
   )
   if (gitignored.code !== 0 || !gitignored.stdout.trim()) {
     return []
   }
 
-  const entries = gitignored.stdout.trim().split('\n').filter(Boolean)
+  const entries = gitignored.stdout.trim().split("\n").filter(Boolean)
   const matcher = ignore().add(includeContent)
 
   // --directory emits collapsed dirs with a trailing slash; everything else is
   // an individual file.
-  const collapsedDirs = entries.filter(e => e.endsWith('/'))
-  const files = entries.filter(e => !e.endsWith('/') && matcher.ignores(e))
+  const collapsedDirs = entries.filter((e) => e.endsWith("/"))
+  const files = entries.filter((e) => !e.endsWith("/") && matcher.ignores(e))
 
   // Edge case: a .worktreeinclude pattern targets a path inside a collapsed dir
   // (e.g. pattern `config/secrets/api.key` when all of `config/secrets/` is
@@ -436,10 +372,10 @@ export async function copyWorktreeIncludeFiles(
   // expand for `**/` or anchorless patterns -- those match files in tracked dirs
   // (already listed individually) and expanding every collapsed dir for them
   // would defeat the perf win.
-  const dirsToExpand = collapsedDirs.filter(dir => {
+  const dirsToExpand = collapsedDirs.filter((dir) => {
     if (
-      patterns.some(p => {
-        const normalized = p.startsWith('/') ? p.slice(1) : p
+      patterns.some((p) => {
+        const normalized = p.startsWith("/") ? p.slice(1) : p
         // Literal prefix match: pattern starts with the collapsed dir path
         if (normalized.startsWith(dir)) return true
         // Anchored glob: dir falls under the pattern's literal (non-glob) prefix
@@ -459,18 +395,11 @@ export async function copyWorktreeIncludeFiles(
   if (dirsToExpand.length > 0) {
     const expanded = await execFileNoThrowWithCwd(
       gitExe(),
-      [
-        'ls-files',
-        '--others',
-        '--ignored',
-        '--exclude-standard',
-        '--',
-        ...dirsToExpand,
-      ],
+      ["ls-files", "--others", "--ignored", "--exclude-standard", "--", ...dirsToExpand],
       { cwd: repoRoot },
     )
     if (expanded.code === 0 && expanded.stdout.trim()) {
-      for (const f of expanded.stdout.trim().split('\n').filter(Boolean)) {
+      for (const f of expanded.stdout.trim().split("\n").filter(Boolean)) {
         if (matcher.ignores(f)) {
           files.push(f)
         }
@@ -487,17 +416,12 @@ export async function copyWorktreeIncludeFiles(
       await copyFile(srcPath, destPath)
       copied.push(relativePath)
     } catch (e: unknown) {
-      logForDebugging(
-        `Failed to copy ${relativePath} to worktree: ${(e as Error).message}`,
-        { level: 'warn' },
-      )
+      logForDebugging(`Failed to copy ${relativePath} to worktree: ${(e as Error).message}`, { level: "warn" })
     }
   }
 
   if (copied.length > 0) {
-    logForDebugging(
-      `Copied ${copied.length} files from .worktreeinclude: ${copied.join(', ')}`,
-    )
+    logForDebugging(`Copied ${copied.length} files from .worktreeinclude: ${copied.join(", ")}`)
   }
 
   return copied
@@ -507,36 +431,27 @@ export async function copyWorktreeIncludeFiles(
  * Post-creation setup for a newly created worktree.
  * Propagates settings.local.json, configures git hooks, and symlinks directories.
  */
-async function performPostCreationSetup(
-  repoRoot: string,
-  worktreePath: string,
-): Promise<void> {
+async function performPostCreationSetup(repoRoot: string, worktreePath: string): Promise<void> {
   // Copy settings.local.json to the worktree's .claude directory
   // This propagates local settings (which may contain secrets) to the worktree
-  const localSettingsRelativePath =
-    getRelativeSettingsFilePathForSource('localSettings')
+  const localSettingsRelativePath = getRelativeSettingsFilePathForSource("localSettings")
   const sourceSettingsLocal = join(repoRoot, localSettingsRelativePath)
   try {
     const destSettingsLocal = join(worktreePath, localSettingsRelativePath)
     await mkdirRecursive(dirname(destSettingsLocal))
     await copyFile(sourceSettingsLocal, destSettingsLocal)
-    logForDebugging(
-      `Copied settings.local.json to worktree: ${destSettingsLocal}`,
-    )
+    logForDebugging(`Copied settings.local.json to worktree: ${destSettingsLocal}`)
   } catch (e: unknown) {
     const code = getErrnoCode(e)
-    if (code !== 'ENOENT') {
-      logForDebugging(
-        `Failed to copy settings.local.json: ${(e as Error).message}`,
-        { level: 'warn' },
-      )
+    if (code !== "ENOENT") {
+      logForDebugging(`Failed to copy settings.local.json: ${(e as Error).message}`, { level: "warn" })
     }
   }
 
   // Configure the worktree to use hooks from the main repository
   // This solves issues with .husky and other git hooks that use relative paths
-  const huskyPath = join(repoRoot, '.husky')
-  const gitHooksPath = join(repoRoot, '.git', 'hooks')
+  const huskyPath = join(repoRoot, ".husky")
+  const gitHooksPath = join(repoRoot, ".git", "hooks")
   let hooksPath: string | null = null
   for (const candidatePath of [huskyPath, gitHooksPath]) {
     try {
@@ -555,23 +470,18 @@ async function performPostCreationSetup(
     // no-op — skip the subprocess (~14ms spawn) when the value already matches.
     const gitDir = await resolveGitDir(repoRoot)
     const configDir = gitDir ? ((await getCommonDir(gitDir)) ?? gitDir) : null
-    const existing = configDir
-      ? await parseGitConfigValue(configDir, 'core', null, 'hooksPath')
-      : null
+    const existing = configDir ? await parseGitConfigValue(configDir, "core", null, "hooksPath") : null
     if (existing !== hooksPath) {
-      const { code: configCode, stderr: configError } =
-        await execFileNoThrowWithCwd(
-          gitExe(),
-          ['config', 'core.hooksPath', hooksPath],
-          { cwd: worktreePath },
-        )
+      const { code: configCode, stderr: configError } = await execFileNoThrowWithCwd(
+        gitExe(),
+        ["config", "core.hooksPath", hooksPath],
+        { cwd: worktreePath },
+      )
       if (configCode === 0) {
-        logForDebugging(
-          `Configured worktree to use hooks from main repository: ${hooksPath}`,
-        )
+        logForDebugging(`Configured worktree to use hooks from main repository: ${hooksPath}`)
       } else {
         logForDebugging(`Failed to configure hooks path: ${configError}`, {
-          level: 'error',
+          level: "error",
         })
       }
     }
@@ -600,20 +510,15 @@ async function performPostCreationSetup(
   // the absolute core.hooksPath we just set above (main repo's .husky),
   // not the worktree's — `git rev-parse --git-path hooks` echoes the config
   // value verbatim when it's absolute.
-  if (feature('COMMIT_ATTRIBUTION')) {
-    const worktreeHooksDir =
-      hooksPath === huskyPath ? join(worktreePath, '.husky') : undefined
-    void import('./postCommitAttribution.js')
-      .then(m =>
-        m
-          .installPrepareCommitMsgHook(worktreePath, worktreeHooksDir)
-          .catch(error => {
-            logForDebugging(
-              `Failed to install attribution hook in worktree: ${error}`,
-            )
-          }),
+  if (feature("COMMIT_ATTRIBUTION")) {
+    const worktreeHooksDir = hooksPath === huskyPath ? join(worktreePath, ".husky") : undefined
+    void import("./postCommitAttribution.js")
+      .then((m) =>
+        m.installPrepareCommitMsgHook(worktreePath, worktreeHooksDir).catch((error) => {
+          logForDebugging(`Failed to install attribution hook in worktree: ${error}`)
+        }),
       )
-      .catch(error => {
+      .catch((error) => {
         // Dynamic import() itself rejected (module load failure). The inner
         // .catch above only handles installPrepareCommitMsgHook rejection —
         // without this outer handler an import failure would surface as an
@@ -634,9 +539,7 @@ export function parsePRReference(input: string): number | null {
   // GitHub-style PR URL: https://<host>/owner/repo/pull/123 (with optional trailing slash, query, hash)
   // The /pull/N path shape is specific to GitHub — GitLab uses /-/merge_requests/N,
   // Bitbucket uses /pull-requests/N — so matching any host here is safe.
-  const urlMatch = input.match(
-    /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)\/?(?:[?#].*)?$/i,
-  )
+  const urlMatch = input.match(/^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)\/?(?:[?#].*)?$/i)
   if (urlMatch?.[1]) {
     return parseInt(urlMatch[1], 10)
   }
@@ -651,22 +554,22 @@ export function parsePRReference(input: string): number | null {
 }
 
 export async function isTmuxAvailable(): Promise<boolean> {
-  const { code } = await execFileNoThrow('tmux', ['-V'])
+  const { code } = await execFileNoThrow("tmux", ["-V"])
   return code === 0
 }
 
 export function getTmuxInstallInstructions(): string {
   const platform = getPlatform()
   switch (platform) {
-    case 'macos':
-      return 'Install tmux with: brew install tmux'
-    case 'linux':
-    case 'wsl':
-      return 'Install tmux with: sudo apt install tmux (Debian/Ubuntu) or sudo dnf install tmux (Fedora/RHEL)'
-    case 'windows':
-      return 'tmux is not natively available on Windows. Consider using WSL or Cygwin.'
+    case "macos":
+      return "Install tmux with: brew install tmux"
+    case "linux":
+    case "wsl":
+      return "Install tmux with: sudo apt install tmux (Debian/Ubuntu) or sudo dnf install tmux (Fedora/RHEL)"
+    case "windows":
+      return "tmux is not natively available on Windows. Consider using WSL or Cygwin."
     default:
-      return 'Install tmux using your system package manager.'
+      return "Install tmux using your system package manager."
   }
 }
 
@@ -674,14 +577,7 @@ export async function createTmuxSessionForWorktree(
   sessionName: string,
   worktreePath: string,
 ): Promise<{ created: boolean; error?: string }> {
-  const { code, stderr } = await execFileNoThrow('tmux', [
-    'new-session',
-    '-d',
-    '-s',
-    sessionName,
-    '-c',
-    worktreePath,
-  ])
+  const { code, stderr } = await execFileNoThrow("tmux", ["new-session", "-d", "-s", sessionName, "-c", worktreePath])
 
   if (code !== 0) {
     return { created: false, error: stderr }
@@ -691,11 +587,7 @@ export async function createTmuxSessionForWorktree(
 }
 
 export async function killTmuxSession(sessionName: string): Promise<boolean> {
-  const { code } = await execFileNoThrow('tmux', [
-    'kill-session',
-    '-t',
-    sessionName,
-  ])
+  const { code } = await execFileNoThrow("tmux", ["kill-session", "-t", sessionName])
   return code === 0
 }
 
@@ -714,9 +606,7 @@ export async function createWorktreeForSession(
   // Try hook-based worktree creation first (allows user-configured VCS)
   if (hasWorktreeCreateHook()) {
     const hookResult = await executeWorktreeCreateHook(slug)
-    logForDebugging(
-      `Created hook-based worktree at: ${hookResult.worktreePath}`,
-    )
+    logForDebugging(`Created hook-based worktree at: ${hookResult.worktreePath}`)
 
     currentWorktreeSession = {
       originalCwd,
@@ -731,24 +621,21 @@ export async function createWorktreeForSession(
     const gitRoot = findGitRoot(getCwd())
     if (!gitRoot) {
       throw new Error(
-        'Cannot create a worktree: not in a git repository and no WorktreeCreate hooks are configured. ' +
-          'Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.',
+        "Cannot create a worktree: not in a git repository and no WorktreeCreate hooks are configured. " +
+          "Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.",
       )
     }
 
     const originalBranch = await getBranch()
 
     const createStart = Date.now()
-    const { worktreePath, worktreeBranch, headCommit, existed } =
-      await getOrCreateWorktree(gitRoot, slug, options)
+    const { worktreePath, worktreeBranch, headCommit, existed } = await getOrCreateWorktree(gitRoot, slug, options)
 
     let creationDurationMs: number | undefined
     if (existed) {
       logForDebugging(`Resuming existing worktree at: ${worktreePath}`)
     } else {
-      logForDebugging(
-        `Created worktree at: ${worktreePath} on branch: ${worktreeBranch}`,
-      )
+      logForDebugging(`Created worktree at: ${worktreePath} on branch: ${worktreeBranch}`)
       await performPostCreationSetup(gitRoot, worktreePath)
       creationDurationMs = Date.now() - createStart
     }
@@ -763,13 +650,12 @@ export async function createWorktreeForSession(
       sessionId,
       tmuxSessionName,
       creationDurationMs,
-      usedSparsePaths:
-        (getInitialSettings().worktree?.sparsePaths?.length ?? 0) > 0,
+      usedSparsePaths: (getInitialSettings().worktree?.sparsePaths?.length ?? 0) > 0,
     }
   }
 
   // Save to project config for persistence
-  saveCurrentProjectConfig(current => ({
+  saveCurrentProjectConfig((current) => ({
     ...current,
     activeWorktreeSession: currentWorktreeSession ?? undefined,
   }))
@@ -792,20 +678,18 @@ export async function keepWorktree(): Promise<void> {
     currentWorktreeSession = null
 
     // Update config
-    saveCurrentProjectConfig(current => ({
+    saveCurrentProjectConfig((current) => ({
       ...current,
       activeWorktreeSession: undefined,
     }))
 
     logForDebugging(
-      `Linked worktree preserved at: ${worktreePath}${worktreeBranch ? ` on branch: ${worktreeBranch}` : ''}`,
+      `Linked worktree preserved at: ${worktreePath}${worktreeBranch ? ` on branch: ${worktreeBranch}` : ""}`,
     )
-    logForDebugging(
-      `You can continue working there by running: cd ${worktreePath}`,
-    )
+    logForDebugging(`You can continue working there by running: cd ${worktreePath}`)
   } catch (error) {
     logForDebugging(`Error keeping worktree: ${error}`, {
-      level: 'error',
+      level: "error",
     })
   }
 }
@@ -816,8 +700,7 @@ export async function cleanupWorktree(): Promise<void> {
   }
 
   try {
-    const { worktreePath, originalCwd, worktreeBranch, hookBased } =
-      currentWorktreeSession
+    const { worktreePath, originalCwd, worktreeBranch, hookBased } = currentWorktreeSession
 
     // Change back to original directory first
     process.chdir(originalCwd)
@@ -828,26 +711,24 @@ export async function cleanupWorktree(): Promise<void> {
       if (hookRan) {
         logForDebugging(`Removed hook-based worktree at: ${worktreePath}`)
       } else {
-        logForDebugging(
-          `No WorktreeRemove hook configured, hook-based worktree left at: ${worktreePath}`,
-          { level: 'warn' },
-        )
+        logForDebugging(`No WorktreeRemove hook configured, hook-based worktree left at: ${worktreePath}`, {
+          level: "warn",
+        })
       }
     } else {
       // Git-based worktree: use git worktree remove.
       // Explicit cwd: process.chdir above does NOT update getCwd() (the state
       // CWD that execFileNoThrow defaults to). If the model cd'd to a non-repo
       // dir, the bare execFileNoThrow variant would fail silently here.
-      const { code: removeCode, stderr: removeError } =
-        await execFileNoThrowWithCwd(
-          gitExe(),
-          ['worktree', 'remove', '--force', worktreePath],
-          { cwd: originalCwd },
-        )
+      const { code: removeCode, stderr: removeError } = await execFileNoThrowWithCwd(
+        gitExe(),
+        ["worktree", "remove", "--force", worktreePath],
+        { cwd: originalCwd },
+      )
 
       if (removeCode !== 0) {
         logForDebugging(`Failed to remove linked worktree: ${removeError}`, {
-          level: 'error',
+          level: "error",
         })
       } else {
         logForDebugging(`Removed linked worktree at: ${worktreePath}`)
@@ -858,7 +739,7 @@ export async function cleanupWorktree(): Promise<void> {
     currentWorktreeSession = null
 
     // Update config
-    saveCurrentProjectConfig(current => ({
+    saveCurrentProjectConfig((current) => ({
       ...current,
       activeWorktreeSession: undefined,
     }))
@@ -868,27 +749,23 @@ export async function cleanupWorktree(): Promise<void> {
       // Wait a bit to ensure git has released all locks
       await sleep(100)
 
-      const { code: deleteBranchCode, stderr: deleteBranchError } =
-        await execFileNoThrowWithCwd(
-          gitExe(),
-          ['branch', '-D', worktreeBranch],
-          { cwd: originalCwd },
-        )
+      const { code: deleteBranchCode, stderr: deleteBranchError } = await execFileNoThrowWithCwd(
+        gitExe(),
+        ["branch", "-D", worktreeBranch],
+        { cwd: originalCwd },
+      )
 
       if (deleteBranchCode !== 0) {
-        logForDebugging(
-          `Could not delete worktree branch: ${deleteBranchError}`,
-          { level: 'error' },
-        )
+        logForDebugging(`Could not delete worktree branch: ${deleteBranchError}`, { level: "error" })
       } else {
         logForDebugging(`Deleted worktree branch: ${worktreeBranch}`)
       }
     }
 
-    logForDebugging('Linked worktree cleaned up completely')
+    logForDebugging("Linked worktree cleaned up completely")
   } catch (error) {
     logForDebugging(`Error cleaning up worktree: ${error}`, {
-      level: 'error',
+      level: "error",
     })
   }
 }
@@ -911,9 +788,7 @@ export async function createAgentWorktree(slug: string): Promise<{
   // Try hook-based worktree creation first (allows user-configured VCS)
   if (hasWorktreeCreateHook()) {
     const hookResult = await executeWorktreeCreateHook(slug)
-    logForDebugging(
-      `Created hook-based agent worktree at: ${hookResult.worktreePath}`,
-    )
+    logForDebugging(`Created hook-based agent worktree at: ${hookResult.worktreePath}`)
 
     return { worktreePath: hookResult.worktreePath, hookBased: true }
   }
@@ -926,18 +801,15 @@ export async function createAgentWorktree(slug: string): Promise<{
   const gitRoot = findCanonicalGitRoot(getCwd())
   if (!gitRoot) {
     throw new Error(
-      'Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured. ' +
-        'Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.',
+      "Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured. " +
+        "Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.",
     )
   }
 
-  const { worktreePath, worktreeBranch, headCommit, existed } =
-    await getOrCreateWorktree(gitRoot, slug)
+  const { worktreePath, worktreeBranch, headCommit, existed } = await getOrCreateWorktree(gitRoot, slug)
 
   if (!existed) {
-    logForDebugging(
-      `Created agent worktree at: ${worktreePath} on branch: ${worktreeBranch}`,
-    )
+    logForDebugging(`Created agent worktree at: ${worktreePath} on branch: ${worktreeBranch}`)
     await performPostCreationSetup(gitRoot, worktreePath)
   } else {
     // Bump mtime so the periodic stale-worktree cleanup doesn't consider this
@@ -969,32 +841,30 @@ export async function removeAgentWorktree(
     if (hookRan) {
       logForDebugging(`Removed hook-based agent worktree at: ${worktreePath}`)
     } else {
-      logForDebugging(
-        `No WorktreeRemove hook configured, hook-based agent worktree left at: ${worktreePath}`,
-        { level: 'warn' },
-      )
+      logForDebugging(`No WorktreeRemove hook configured, hook-based agent worktree left at: ${worktreePath}`, {
+        level: "warn",
+      })
     }
     return hookRan
   }
 
   if (!gitRoot) {
-    logForDebugging('Cannot remove agent worktree: no git root provided', {
-      level: 'error',
+    logForDebugging("Cannot remove agent worktree: no git root provided", {
+      level: "error",
     })
     return false
   }
 
   // Run from the main repo root, not the worktree (which we're about to delete)
-  const { code: removeCode, stderr: removeError } =
-    await execFileNoThrowWithCwd(
-      gitExe(),
-      ['worktree', 'remove', '--force', worktreePath],
-      { cwd: gitRoot },
-    )
+  const { code: removeCode, stderr: removeError } = await execFileNoThrowWithCwd(
+    gitExe(),
+    ["worktree", "remove", "--force", worktreePath],
+    { cwd: gitRoot },
+  )
 
   if (removeCode !== 0) {
     logForDebugging(`Failed to remove agent worktree: ${removeError}`, {
-      level: 'error',
+      level: "error",
     })
     return false
   }
@@ -1005,16 +875,16 @@ export async function removeAgentWorktree(
   }
 
   // Delete the temporary worktree branch from the main repo
-  const { code: deleteBranchCode, stderr: deleteBranchError } =
-    await execFileNoThrowWithCwd(gitExe(), ['branch', '-D', worktreeBranch], {
+  const { code: deleteBranchCode, stderr: deleteBranchError } = await execFileNoThrowWithCwd(
+    gitExe(),
+    ["branch", "-D", worktreeBranch],
+    {
       cwd: gitRoot,
-    })
+    },
+  )
 
   if (deleteBranchCode !== 0) {
-    logForDebugging(
-      `Could not delete agent worktree branch: ${deleteBranchError}`,
-      { level: 'error' },
-    )
+    logForDebugging(`Could not delete agent worktree branch: ${deleteBranchError}`, { level: "error" })
   }
   return true
 }
@@ -1055,9 +925,7 @@ const EPHEMERAL_WORKTREE_PATTERNS = [
  * worktree tracking. If git doesn't recognize the path as a worktree (orphaned
  * dir), it's left in place — a later readdir finding it stale again is harmless.
  */
-export async function cleanupStaleAgentWorktrees(
-  cutoffDate: Date,
-): Promise<number> {
+export async function cleanupStaleAgentWorktrees(cutoffDate: Date): Promise<number> {
   const gitRoot = findCanonicalGitRoot(getCwd())
   if (!gitRoot) {
     return 0
@@ -1076,7 +944,7 @@ export async function cleanupStaleAgentWorktrees(
   let removed = 0
 
   for (const slug of entries) {
-    if (!EPHEMERAL_WORKTREE_PATTERNS.some(p => p.test(slug))) {
+    if (!EPHEMERAL_WORKTREE_PATTERNS.some((p) => p.test(slug))) {
       continue
     }
 
@@ -1099,16 +967,10 @@ export async function cleanupStaleAgentWorktrees(
     // worktree, git not recognizing it, etc.) means skip — we don't know
     // what's in there.
     const [status, unpushed] = await Promise.all([
-      execFileNoThrowWithCwd(
-        gitExe(),
-        ['--no-optional-locks', 'status', '--porcelain', '-uno'],
-        { cwd: worktreePath },
-      ),
-      execFileNoThrowWithCwd(
-        gitExe(),
-        ['rev-list', '--max-count=1', 'HEAD', '--not', '--remotes'],
-        { cwd: worktreePath },
-      ),
+      execFileNoThrowWithCwd(gitExe(), ["--no-optional-locks", "status", "--porcelain", "-uno"], { cwd: worktreePath }),
+      execFileNoThrowWithCwd(gitExe(), ["rev-list", "--max-count=1", "HEAD", "--not", "--remotes"], {
+        cwd: worktreePath,
+      }),
     ])
     if (status.code !== 0 || status.stdout.trim().length > 0) {
       continue
@@ -1117,20 +979,16 @@ export async function cleanupStaleAgentWorktrees(
       continue
     }
 
-    if (
-      await removeAgentWorktree(worktreePath, worktreeBranchName(slug), gitRoot)
-    ) {
+    if (await removeAgentWorktree(worktreePath, worktreeBranchName(slug), gitRoot)) {
       removed++
     }
   }
 
   if (removed > 0) {
-    await execFileNoThrowWithCwd(gitExe(), ['worktree', 'prune'], {
+    await execFileNoThrowWithCwd(gitExe(), ["worktree", "prune"], {
       cwd: gitRoot,
     })
-    logForDebugging(
-      `cleanupStaleAgentWorktrees: removed ${removed} stale worktree(s)`,
-    )
+    logForDebugging(`cleanupStaleAgentWorktrees: removed ${removed} stale worktree(s)`)
   }
   return removed
 }
@@ -1141,14 +999,10 @@ export async function cleanupStaleAgentWorktrees(
  * were made on the worktree branch since `headCommit`, or if git commands fail
  * — callers use this to decide whether to remove a worktree, so fail-closed.
  */
-export async function hasWorktreeChanges(
-  worktreePath: string,
-  headCommit: string,
-): Promise<boolean> {
-  const { code: statusCode, stdout: statusOutput } =
-    await execFileNoThrowWithCwd(gitExe(), ['status', '--porcelain'], {
-      cwd: worktreePath,
-    })
+export async function hasWorktreeChanges(worktreePath: string, headCommit: string): Promise<boolean> {
+  const { code: statusCode, stdout: statusOutput } = await execFileNoThrowWithCwd(gitExe(), ["status", "--porcelain"], {
+    cwd: worktreePath,
+  })
   if (statusCode !== 0) {
     return true
   }
@@ -1156,12 +1010,11 @@ export async function hasWorktreeChanges(
     return true
   }
 
-  const { code: revListCode, stdout: revListOutput } =
-    await execFileNoThrowWithCwd(
-      gitExe(),
-      ['rev-list', '--count', `${headCommit}..HEAD`],
-      { cwd: worktreePath },
-    )
+  const { code: revListCode, stdout: revListOutput } = await execFileNoThrowWithCwd(
+    gitExe(),
+    ["rev-list", "--count", `${headCommit}..HEAD`],
+    { cwd: worktreePath },
+  )
   if (revListCode !== 0) {
     return true
   }
@@ -1182,20 +1035,20 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
   error?: string
 }> {
   // Check platform - tmux doesn't work on Windows
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     return {
       handled: false,
-      error: 'Error: --tmux is not supported on Windows',
+      error: "Error: --tmux is not supported on Windows",
     }
   }
 
   // Check if tmux is available
-  const tmuxCheck = spawnSync('tmux', ['-V'], { encoding: 'utf-8' })
+  const tmuxCheck = spawnSync("tmux", ["-V"], { encoding: "utf-8" })
   if (tmuxCheck.status !== 0) {
     const installHint =
-      process.platform === 'darwin'
-        ? 'Install tmux with: brew install tmux'
-        : 'Install tmux with: sudo apt install tmux'
+      process.platform === "darwin"
+        ? "Install tmux with: brew install tmux"
+        : "Install tmux with: sudo apt install tmux"
     return {
       handled: false,
       error: `Error: tmux is not installed. ${installHint}`,
@@ -1208,15 +1061,15 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
     if (!arg) continue
-    if (arg === '-w' || arg === '--worktree') {
+    if (arg === "-w" || arg === "--worktree") {
       // Check if next arg exists and isn't another flag
       const next = args[i + 1]
-      if (next && !next.startsWith('-')) {
+      if (next && !next.startsWith("-")) {
         worktreeName = next
       }
-    } else if (arg.startsWith('--worktree=')) {
-      worktreeName = arg.slice('--worktree='.length)
-    } else if (arg === '--tmux=classic') {
+    } else if (arg.startsWith("--worktree=")) {
+      worktreeName = arg.slice("--worktree=".length)
+    } else if (arg === "--tmux=classic") {
       forceClassicTmux = true
     }
   }
@@ -1232,8 +1085,8 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
 
   // Generate a slug if no name provided
   if (!worktreeName) {
-    const adjectives = ['swift', 'bright', 'calm', 'keen', 'bold']
-    const nouns = ['fox', 'owl', 'elm', 'oak', 'ray']
+    const adjectives = ["swift", "bright", "calm", "keen", "bold"]
+    const nouns = ["fox", "owl", "elm", "oak", "ray"]
     const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
     const noun = nouns[Math.floor(Math.random() * nouns.length)]
     const suffix = Math.random().toString(36).slice(2, 6)
@@ -1276,7 +1129,7 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
     if (!repoRoot) {
       return {
         handled: false,
-        error: 'Error: --worktree requires a git repository',
+        error: "Error: --worktree requires a git repository",
       }
     }
 
@@ -1285,16 +1138,10 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
 
     // Create or resume worktree
     try {
-      const result = await getOrCreateWorktree(
-        repoRoot,
-        worktreeName,
-        prNumber !== null ? { prNumber } : undefined,
-      )
+      const result = await getOrCreateWorktree(repoRoot, worktreeName, prNumber !== null ? { prNumber } : undefined)
       if (!result.existed) {
         // biome-ignore lint/suspicious/noConsole: intentional console output
-        console.log(
-          `Created worktree: ${worktreeDir} (based on ${result.baseBranch})`,
-        )
+        console.log(`Created worktree: ${worktreeDir} (based on ${result.baseBranch})`)
         await performPostCreationSetup(repoRoot, worktreeDir)
       }
     } catch (error) {
@@ -1306,31 +1153,30 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
   }
 
   // Sanitize for tmux session name (replace / and . with _)
-  const tmuxSessionName =
-    `${repoName}_${worktreeBranchName(worktreeName)}`.replace(/[/.]/g, '_')
+  const tmuxSessionName = `${repoName}_${worktreeBranchName(worktreeName)}`.replace(/[/.]/g, "_")
 
   // Build new args without --tmux and --worktree (we're already in the worktree)
   const newArgs: string[] = []
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
     if (!arg) continue
-    if (arg === '--tmux' || arg === '--tmux=classic') continue
-    if (arg === '-w' || arg === '--worktree') {
+    if (arg === "--tmux" || arg === "--tmux=classic") continue
+    if (arg === "-w" || arg === "--worktree") {
       // Skip the flag and its value if present
       const next = args[i + 1]
-      if (next && !next.startsWith('-')) {
+      if (next && !next.startsWith("-")) {
         i++ // Skip the value too
       }
       continue
     }
-    if (arg.startsWith('--worktree=')) continue
+    if (arg.startsWith("--worktree=")) continue
     newArgs.push(arg)
   }
 
   // Get tmux prefix for user guidance
-  let tmuxPrefix = 'C-b' // default
-  const prefixResult = spawnSync('tmux', ['show-options', '-g', 'prefix'], {
-    encoding: 'utf-8',
+  let tmuxPrefix = "C-b" // default
+  const prefixResult = spawnSync("tmux", ["show-options", "-g", "prefix"], {
+    encoding: "utf-8",
   })
   if (prefixResult.status === 0 && prefixResult.stdout) {
     const match = prefixResult.stdout.match(/prefix\s+(\S+)/)
@@ -1341,17 +1187,7 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
 
   // Check if tmux prefix conflicts with Claude keybindings
   // Claude binds: ctrl+b (task:background), ctrl+c, ctrl+d, ctrl+t, ctrl+o, ctrl+r, ctrl+s, ctrl+g, ctrl+e
-  const claudeBindings = [
-    'C-b',
-    'C-c',
-    'C-d',
-    'C-t',
-    'C-o',
-    'C-r',
-    'C-s',
-    'C-g',
-    'C-e',
-  ]
+  const claudeBindings = ["C-b", "C-c", "C-d", "C-t", "C-o", "C-r", "C-s", "C-g", "C-e"]
   const prefixConflicts = claudeBindings.includes(tmuxPrefix)
 
   // Set env vars for the inner Claude to display tmux info in welcome message
@@ -1359,15 +1195,11 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
     ...process.env,
     CLAUDE_CODE_TMUX_SESSION: tmuxSessionName,
     CLAUDE_CODE_TMUX_PREFIX: tmuxPrefix,
-    CLAUDE_CODE_TMUX_PREFIX_CONFLICTS: prefixConflicts ? '1' : '',
+    CLAUDE_CODE_TMUX_PREFIX_CONFLICTS: prefixConflicts ? "1" : "",
   }
 
   // Check if session already exists
-  const hasSessionResult = spawnSync(
-    'tmux',
-    ['has-session', '-t', tmuxSessionName],
-    { encoding: 'utf-8' },
-  )
+  const hasSessionResult = spawnSync("tmux", ["has-session", "-t", tmuxSessionName], { encoding: "utf-8" })
   const sessionExists = hasSessionResult.status === 0
 
   // Check if we're already inside a tmux session
@@ -1378,37 +1210,37 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
   // Use --tmux=classic to force traditional tmux even in iTerm2
   // Control mode doesn't make sense when already in tmux (would need to switch-client)
   const useControlMode = isInITerm2() && !forceClassicTmux && !isAlreadyInTmux
-  const tmuxGlobalArgs = useControlMode ? ['-CC'] : []
+  const tmuxGlobalArgs = useControlMode ? ["-CC"] : []
 
   // Print hint about iTerm2 preferences when using control mode
   if (useControlMode && !sessionExists) {
     const y = chalk.yellow
     // biome-ignore lint/suspicious/noConsole: intentional user guidance
     console.log(
-      `\n${y('╭─ iTerm2 Tip ────────────────────────────────────────────────────────╮')}\n` +
-        `${y('│')} To open as a tab instead of a new window:                           ${y('│')}\n` +
-        `${y('│')} iTerm2 > Settings > General > tmux > "Tabs in attaching window"     ${y('│')}\n` +
-        `${y('╰─────────────────────────────────────────────────────────────────────╯')}\n`,
+      `\n${y("╭─ iTerm2 Tip ────────────────────────────────────────────────────────╮")}\n` +
+        `${y("│")} To open as a tab instead of a new window:                           ${y("│")}\n` +
+        `${y("│")} iTerm2 > Settings > General > tmux > "Tabs in attaching window"     ${y("│")}\n` +
+        `${y("╰─────────────────────────────────────────────────────────────────────╯")}\n`,
     )
   }
 
   // For ants in claude-cli-internal, set up dev panes (watch + start)
-  const isAnt = process.env.USER_TYPE === 'ant'
-  const isClaudeCliInternal = repoName === 'claude-cli-internal'
+  const isAnt = process.env.USER_TYPE === "ant"
+  const isClaudeCliInternal = repoName === "claude-cli-internal"
   const shouldSetupDevPanes = isAnt && isClaudeCliInternal && !sessionExists
 
   if (shouldSetupDevPanes) {
     // Create detached session with Claude in first pane
     spawnSync(
-      'tmux',
+      "tmux",
       [
-        'new-session',
-        '-d', // detached
-        '-s',
+        "new-session",
+        "-d", // detached
+        "-s",
         tmuxSessionName,
-        '-c',
+        "-c",
         worktreeDir,
-        '--',
+        "--",
         process.execPath,
         ...newArgs,
       ],
@@ -1416,48 +1248,32 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
     )
 
     // Split horizontally and run watch
-    spawnSync(
-      'tmux',
-      ['split-window', '-h', '-t', tmuxSessionName, '-c', worktreeDir],
-      { cwd: worktreeDir },
-    )
-    spawnSync(
-      'tmux',
-      ['send-keys', '-t', tmuxSessionName, 'bun run watch', 'Enter'],
-      { cwd: worktreeDir },
-    )
+    spawnSync("tmux", ["split-window", "-h", "-t", tmuxSessionName, "-c", worktreeDir], { cwd: worktreeDir })
+    spawnSync("tmux", ["send-keys", "-t", tmuxSessionName, "bun run watch", "Enter"], { cwd: worktreeDir })
 
     // Split vertically and run start
-    spawnSync(
-      'tmux',
-      ['split-window', '-v', '-t', tmuxSessionName, '-c', worktreeDir],
-      { cwd: worktreeDir },
-    )
-    spawnSync('tmux', ['send-keys', '-t', tmuxSessionName, 'bun run start'], {
+    spawnSync("tmux", ["split-window", "-v", "-t", tmuxSessionName, "-c", worktreeDir], { cwd: worktreeDir })
+    spawnSync("tmux", ["send-keys", "-t", tmuxSessionName, "bun run start"], {
       cwd: worktreeDir,
     })
 
     // Select the first pane (Claude)
-    spawnSync('tmux', ['select-pane', '-t', `${tmuxSessionName}:0.0`], {
+    spawnSync("tmux", ["select-pane", "-t", `${tmuxSessionName}:0.0`], {
       cwd: worktreeDir,
     })
 
     // Attach or switch to the session
     if (isAlreadyInTmux) {
       // Switch to sibling session (avoid nesting)
-      spawnSync('tmux', ['switch-client', '-t', tmuxSessionName], {
-        stdio: 'inherit',
+      spawnSync("tmux", ["switch-client", "-t", tmuxSessionName], {
+        stdio: "inherit",
       })
     } else {
       // Attach to the session
-      spawnSync(
-        'tmux',
-        [...tmuxGlobalArgs, 'attach-session', '-t', tmuxSessionName],
-        {
-          stdio: 'inherit',
-          cwd: worktreeDir,
-        },
-      )
+      spawnSync("tmux", [...tmuxGlobalArgs, "attach-session", "-t", tmuxSessionName], {
+        stdio: "inherit",
+        cwd: worktreeDir,
+      })
     }
   } else {
     // Standard behavior: create or attach
@@ -1466,21 +1282,21 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
       // Check if session already exists first
       if (sessionExists) {
         // Just switch to existing session
-        spawnSync('tmux', ['switch-client', '-t', tmuxSessionName], {
-          stdio: 'inherit',
+        spawnSync("tmux", ["switch-client", "-t", tmuxSessionName], {
+          stdio: "inherit",
         })
       } else {
         // Create new detached session
         spawnSync(
-          'tmux',
+          "tmux",
           [
-            'new-session',
-            '-d', // detached
-            '-s',
+            "new-session",
+            "-d", // detached
+            "-s",
             tmuxSessionName,
-            '-c',
+            "-c",
             worktreeDir,
-            '--',
+            "--",
             process.execPath,
             ...newArgs,
           ],
@@ -1488,27 +1304,27 @@ export async function execIntoTmuxWorktree(args: string[]): Promise<{
         )
 
         // Switch to the new session
-        spawnSync('tmux', ['switch-client', '-t', tmuxSessionName], {
-          stdio: 'inherit',
+        spawnSync("tmux", ["switch-client", "-t", tmuxSessionName], {
+          stdio: "inherit",
         })
       }
     } else {
       // Not in tmux - create and attach (original behavior)
       const tmuxArgs = [
         ...tmuxGlobalArgs,
-        'new-session',
-        '-A', // Attach if exists, create if not
-        '-s',
+        "new-session",
+        "-A", // Attach if exists, create if not
+        "-s",
         tmuxSessionName,
-        '-c',
+        "-c",
         worktreeDir,
-        '--', // Separator before command
+        "--", // Separator before command
         process.execPath,
         ...newArgs,
       ]
 
-      spawnSync('tmux', tmuxArgs, {
-        stdio: 'inherit',
+      spawnSync("tmux", tmuxArgs, {
+        stdio: "inherit",
         cwd: worktreeDir,
         env: tmuxEnv,
       })

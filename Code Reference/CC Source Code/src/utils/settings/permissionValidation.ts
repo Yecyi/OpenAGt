@@ -1,13 +1,9 @@
-import { z } from 'zod/v4'
-import { mcpInfoFromString } from '../../services/mcp/mcpStringUtils.js'
-import { lazySchema } from '../lazySchema.js'
-import { permissionRuleValueFromString } from '../permissions/permissionRuleParser.js'
-import { capitalize } from '../stringUtils.js'
-import {
-  getCustomValidation,
-  isBashPrefixTool,
-  isFilePatternTool,
-} from './toolValidationConfig.js'
+import { z } from "zod/v4"
+import { mcpInfoFromString } from "../../services/mcp/mcpStringUtils.js"
+import { lazySchema } from "../lazySchema.js"
+import { permissionRuleValueFromString } from "../permissions/permissionRuleParser.js"
+import { capitalize } from "../stringUtils.js"
+import { getCustomValidation, isBashPrefixTool, isFilePatternTool } from "./toolValidationConfig.js"
 
 /**
  * Checks if a character at a given index is escaped (preceded by odd number of backslashes).
@@ -15,7 +11,7 @@ import {
 function isEscaped(str: string, index: number): boolean {
   let backslashCount = 0
   let j = index - 1
-  while (j >= 0 && str[j] === '\\') {
+  while (j >= 0 && str[j] === "\\") {
     backslashCount++
     j--
   }
@@ -42,7 +38,7 @@ function countUnescapedChar(str: string, char: string): number {
  */
 function hasUnescapedEmptyParens(str: string): boolean {
   for (let i = 0; i < str.length - 1; i++) {
-    if (str[i] === '(' && str[i + 1] === ')') {
+    if (str[i] === "(" && str[i + 1] === ")") {
       // Check if the opening paren is unescaped
       if (!isEscaped(str, i)) {
         return true
@@ -62,35 +58,34 @@ export function validatePermissionRule(rule: string): {
   examples?: string[]
 } {
   // Empty rule check
-  if (!rule || rule.trim() === '') {
-    return { valid: false, error: 'Permission rule cannot be empty' }
+  if (!rule || rule.trim() === "") {
+    return { valid: false, error: "Permission rule cannot be empty" }
   }
 
   // Check parentheses matching first (only count unescaped parens)
-  const openCount = countUnescapedChar(rule, '(')
-  const closeCount = countUnescapedChar(rule, ')')
+  const openCount = countUnescapedChar(rule, "(")
+  const closeCount = countUnescapedChar(rule, ")")
   if (openCount !== closeCount) {
     return {
       valid: false,
-      error: 'Mismatched parentheses',
-      suggestion:
-        'Ensure all opening parentheses have matching closing parentheses',
+      error: "Mismatched parentheses",
+      suggestion: "Ensure all opening parentheses have matching closing parentheses",
     }
   }
 
   // Check for empty parentheses (escape-aware)
   if (hasUnescapedEmptyParens(rule)) {
-    const toolName = rule.substring(0, rule.indexOf('('))
+    const toolName = rule.substring(0, rule.indexOf("("))
     if (!toolName) {
       return {
         valid: false,
-        error: 'Empty parentheses with no tool name',
-        suggestion: 'Specify a tool name before the parentheses',
+        error: "Empty parentheses with no tool name",
+        suggestion: "Specify a tool name before the parentheses",
       }
     }
     return {
       valid: false,
-      error: 'Empty parentheses',
+      error: "Empty parentheses",
       suggestion: `Either specify a pattern or use just "${toolName}" without parentheses`,
       examples: [`${toolName}`, `${toolName}(some-pattern)`],
     }
@@ -111,17 +106,15 @@ export function validatePermissionRule(rule: string): {
     // MCP rules cannot have any pattern/content (parentheses)
     // Check both parsed content and raw string since the parser normalizes
     // standalone wildcards (e.g., "mcp__server(*)") to undefined ruleContent
-    if (parsed.ruleContent !== undefined || countUnescapedChar(rule, '(') > 0) {
+    if (parsed.ruleContent !== undefined || countUnescapedChar(rule, "(") > 0) {
       return {
         valid: false,
-        error: 'MCP rules do not support patterns in parentheses',
+        error: "MCP rules do not support patterns in parentheses",
         suggestion: `Use "${parsed.toolName}" without parentheses, or use "mcp__${mcpInfo.serverName}__*" for all tools`,
         examples: [
           `mcp__${mcpInfo.serverName}`,
           `mcp__${mcpInfo.serverName}__*`,
-          mcpInfo.toolName && mcpInfo.toolName !== '*'
-            ? `mcp__${mcpInfo.serverName}__${mcpInfo.toolName}`
-            : undefined,
+          mcpInfo.toolName && mcpInfo.toolName !== "*" ? `mcp__${mcpInfo.serverName}__${mcpInfo.toolName}` : undefined,
         ].filter(Boolean) as string[],
       }
     }
@@ -131,14 +124,14 @@ export function validatePermissionRule(rule: string): {
 
   // Tool name validation (for non-MCP tools)
   if (!parsed.toolName || parsed.toolName.length === 0) {
-    return { valid: false, error: 'Tool name cannot be empty' }
+    return { valid: false, error: "Tool name cannot be empty" }
   }
 
   // Check tool name starts with uppercase (standard tools)
   if (parsed.toolName[0] !== parsed.toolName[0]?.toUpperCase()) {
     return {
       valid: false,
-      error: 'Tool names must start with uppercase',
+      error: "Tool names must start with uppercase",
       suggestion: `Use "${capitalize(String(parsed.toolName))}"`,
     }
   }
@@ -157,26 +150,22 @@ export function validatePermissionRule(rule: string): {
     const content = parsed.ruleContent
 
     // Check for common :* mistakes - :* must be at the end (legacy prefix syntax)
-    if (content.includes(':*') && !content.endsWith(':*')) {
+    if (content.includes(":*") && !content.endsWith(":*")) {
       return {
         valid: false,
-        error: 'The :* pattern must be at the end',
-        suggestion:
-          'Move :* to the end for prefix matching, or use * for wildcard matching',
-        examples: [
-          'Bash(npm run:*) - prefix matching (legacy)',
-          'Bash(npm run *) - wildcard matching',
-        ],
+        error: "The :* pattern must be at the end",
+        suggestion: "Move :* to the end for prefix matching, or use * for wildcard matching",
+        examples: ["Bash(npm run:*) - prefix matching (legacy)", "Bash(npm run *) - wildcard matching"],
       }
     }
 
     // Check for :* without a prefix
-    if (content === ':*') {
+    if (content === ":*") {
       return {
         valid: false,
-        error: 'Prefix cannot be empty before :*',
-        suggestion: 'Specify a command prefix before :*',
-        examples: ['Bash(npm:*)', 'Bash(git:*)'],
+        error: "Prefix cannot be empty before :*",
+        suggestion: "Specify a command prefix before :*",
+        examples: ["Bash(npm:*)", "Bash(git:*)"],
       }
     }
 
@@ -201,7 +190,7 @@ export function validatePermissionRule(rule: string): {
     const content = parsed.ruleContent
 
     // Check for :* in file patterns (common mistake from Bash patterns)
-    if (content.includes(':*')) {
+    if (content.includes(":*")) {
       return {
         valid: false,
         error: 'The ":*" syntax is only for Bash prefix rules',
@@ -215,17 +204,13 @@ export function validatePermissionRule(rule: string): {
     }
 
     // Warn about wildcards not at boundaries
-    if (
-      content.includes('*') &&
-      !content.match(/^\*|\*$|\*\*|\/\*|\*\.|\*\)/) &&
-      !content.includes('**')
-    ) {
+    if (content.includes("*") && !content.match(/^\*|\*$|\*\*|\/\*|\*\.|\*\)/) && !content.includes("**")) {
       // This is a loose check - wildcards in the middle might be valid in some cases
       // but often indicate confusion
       return {
         valid: false,
-        error: 'Wildcard placement might be incorrect',
-        suggestion: 'Wildcards are typically used at path boundaries',
+        error: "Wildcard placement might be incorrect",
+        suggestion: "Wildcards are typically used at path boundaries",
         examples: [
           `${parsed.toolName}(*.js) - all .js files`,
           `${parsed.toolName}(src/*) - all files directly in src`,
@@ -250,7 +235,7 @@ export const PermissionRuleSchema = lazySchema(() =>
         message += `. ${result.suggestion}`
       }
       if (result.examples && result.examples.length > 0) {
-        message += `. Examples: ${result.examples.join(', ')}`
+        message += `. Examples: ${result.examples.join(", ")}`
       }
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

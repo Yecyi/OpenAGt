@@ -11,9 +11,9 @@
  * updated by the watcher once the OSC 11 response arrives.
  */
 
-import type { ThemeName, ThemeSetting } from './theme.js'
+import type { ThemeName, ThemeSetting } from "./theme.js"
 
-export type SystemTheme = 'dark' | 'light'
+export type SystemTheme = "dark" | "light"
 
 let cachedSystemTheme: SystemTheme | undefined
 
@@ -23,7 +23,7 @@ let cachedSystemTheme: SystemTheme | undefined
  */
 export function getSystemThemeName(): SystemTheme {
   if (cachedSystemTheme === undefined) {
-    cachedSystemTheme = detectFromColorFgBg() ?? 'dark'
+    cachedSystemTheme = detectFromColorFgBg() ?? "dark"
   }
   return cachedSystemTheme
 }
@@ -40,7 +40,7 @@ export function setCachedSystemTheme(theme: SystemTheme): void {
  * Resolve a ThemeSetting (which may be 'auto') to a concrete ThemeName.
  */
 export function resolveThemeSetting(setting: ThemeSetting): ThemeName {
-  if (setting === 'auto') {
+  if (setting === "auto") {
     return getSystemThemeName()
   }
   return setting
@@ -62,7 +62,7 @@ export function themeFromOscColor(data: string): SystemTheme | undefined {
   if (!rgb) return undefined
   // ITU-R BT.709 relative luminance. Midpoint split: > 0.5 is light.
   const luminance = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b
-  return luminance > 0.5 ? 'light' : 'dark'
+  return luminance > 0.5 ? "light" : "dark"
 }
 
 type Rgb = { r: number; g: number; b: number }
@@ -70,8 +70,7 @@ type Rgb = { r: number; g: number; b: number }
 function parseOscRgb(data: string): Rgb | undefined {
   // rgb:RRRR/GGGG/BBBB — each component is 1–4 hex digits.
   // Some terminals append an alpha component (rgba:…/…/…/…); ignore it.
-  const rgbMatch =
-    /^rgba?:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})/i.exec(data)
+  const rgbMatch = /^rgba?:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})/i.exec(data)
   if (rgbMatch) {
     return {
       r: hexComponent(rgbMatch[1]!),
@@ -107,13 +106,13 @@ function hexComponent(hex: string): number {
  * iTerm2 with the option enabled), so this is a best-effort hint.
  */
 function detectFromColorFgBg(): SystemTheme | undefined {
-  const colorfgbg = process.env['COLORFGBG']
+  const colorfgbg = process.env["COLORFGBG"]
   if (!colorfgbg) return undefined
-  const parts = colorfgbg.split(';')
+  const parts = colorfgbg.split(";")
   const bg = parts[parts.length - 1]
-  if (bg === undefined || bg === '') return undefined
+  if (bg === undefined || bg === "") return undefined
   const bgNum = Number(bg)
   if (!Number.isInteger(bgNum) || bgNum < 0 || bgNum > 15) return undefined
   // 0–6 and 8 are dark ANSI colors; 7 (white) and 9–15 (bright) are light.
-  return bgNum <= 6 || bgNum === 8 ? 'dark' : 'light'
+  return bgNum <= 6 || bgNum === 8 ? "dark" : "light"
 }

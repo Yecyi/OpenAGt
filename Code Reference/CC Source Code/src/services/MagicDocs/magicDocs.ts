@@ -6,27 +6,21 @@
  * See docs/magic-docs.md for more information.
  */
 
-import type { Tool, ToolUseContext } from '../../Tool.js'
-import type { BuiltInAgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js'
-import { runAgent } from '../../tools/AgentTool/runAgent.js'
-import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
+import type { Tool, ToolUseContext } from "../../Tool.js"
+import type { BuiltInAgentDefinition } from "../../tools/AgentTool/loadAgentsDir.js"
+import { runAgent } from "../../tools/AgentTool/runAgent.js"
+import { FILE_EDIT_TOOL_NAME } from "../../tools/FileEditTool/constants.js"
 import {
   FileReadTool,
   type Output as FileReadToolOutput,
   registerFileReadListener,
-} from '../../tools/FileReadTool/FileReadTool.js'
-import { isFsInaccessible } from '../../utils/errors.js'
-import { cloneFileStateCache } from '../../utils/fileStateCache.js'
-import {
-  type REPLHookContext,
-  registerPostSamplingHook,
-} from '../../utils/hooks/postSamplingHooks.js'
-import {
-  createUserMessage,
-  hasToolCallsInLastAssistantTurn,
-} from '../../utils/messages.js'
-import { sequential } from '../../utils/sequential.js'
-import { buildMagicDocsUpdatePrompt } from './prompts.js'
+} from "../../tools/FileReadTool/FileReadTool.js"
+import { isFsInaccessible } from "../../utils/errors.js"
+import { cloneFileStateCache } from "../../utils/fileStateCache.js"
+import { type REPLHookContext, registerPostSamplingHook } from "../../utils/hooks/postSamplingHooks.js"
+import { createUserMessage, hasToolCallsInLastAssistantTurn } from "../../utils/messages.js"
+import { sequential } from "../../utils/sequential.js"
+import { buildMagicDocsUpdatePrompt } from "./prompts.js"
 
 // Magic Doc header pattern: # MAGIC DOC: [title]
 // Matches at the start of the file (first line)
@@ -49,9 +43,7 @@ export function clearTrackedMagicDocs(): void {
  * Detect if a file content contains a Magic Doc header
  * Returns an object with title and optional instructions, or null if not a magic doc
  */
-export function detectMagicDocHeader(
-  content: string,
-): { title: string; instructions?: string } | null {
+export function detectMagicDocHeader(content: string): { title: string; instructions?: string } | null {
   const match = content.match(MAGIC_DOC_HEADER_PATTERN)
   if (!match || !match[1]) {
     return null
@@ -98,25 +90,21 @@ export function registerMagicDoc(filePath: string): void {
  */
 function getMagicDocsAgent(): BuiltInAgentDefinition {
   return {
-    agentType: 'magic-docs',
-    whenToUse: 'Update Magic Docs',
+    agentType: "magic-docs",
+    whenToUse: "Update Magic Docs",
     tools: [FILE_EDIT_TOOL_NAME], // Only allow Edit
-    model: 'sonnet',
-    source: 'built-in',
-    baseDir: 'built-in',
-    getSystemPrompt: () => '', // Will use override systemPrompt
+    model: "sonnet",
+    source: "built-in",
+    baseDir: "built-in",
+    getSystemPrompt: () => "", // Will use override systemPrompt
   }
 }
 
 /**
  * Update a single Magic Doc
  */
-async function updateMagicDoc(
-  docInfo: MagicDocInfo,
-  context: REPLHookContext,
-): Promise<void> {
-  const { messages, systemPrompt, userContext, systemContext, toolUseContext } =
-    context
+async function updateMagicDoc(docInfo: MagicDocInfo, context: REPLHookContext): Promise<void> {
+  const { messages, systemPrompt, userContext, systemContext, toolUseContext } = context
 
   // Clone the FileStateCache to isolate Magic Docs operations. Delete this
   // doc's entry so FileReadTool's dedup doesn't return a file_unchanged
@@ -129,23 +117,17 @@ async function updateMagicDoc(
   }
 
   // Read the document; if deleted or unreadable, remove from tracking
-  let currentDoc = ''
+  let currentDoc = ""
   try {
-    const result = await FileReadTool.call(
-      { file_path: docInfo.path },
-      clonedToolUseContext,
-    )
+    const result = await FileReadTool.call({ file_path: docInfo.path }, clonedToolUseContext)
     const output = result.data as FileReadToolOutput
-    if (output.type === 'text') {
+    if (output.type === "text") {
       currentDoc = output.file.content
     }
   } catch (e: unknown) {
     // FileReadTool wraps ENOENT in a plain Error("File does not exist...") with
     // no .code, so check the message in addition to isFsInaccessible (EACCES/EPERM).
-    if (
-      isFsInaccessible(e) ||
-      (e instanceof Error && e.message.startsWith('File does not exist'))
-    ) {
+    if (isFsInaccessible(e) || (e instanceof Error && e.message.startsWith("File does not exist"))) {
       trackedMagicDocs.delete(docInfo.path)
       return
     }
@@ -161,31 +143,21 @@ async function updateMagicDoc(
   }
 
   // Build update prompt with latest title and instructions
-  const userPrompt = await buildMagicDocsUpdatePrompt(
-    currentDoc,
-    docInfo.path,
-    detected.title,
-    detected.instructions,
-  )
+  const userPrompt = await buildMagicDocsUpdatePrompt(currentDoc, docInfo.path, detected.title, detected.instructions)
 
   // Create a custom canUseTool that only allows Edit for magic doc files
   const canUseTool = async (tool: Tool, input: unknown) => {
-    if (
-      tool.name === FILE_EDIT_TOOL_NAME &&
-      typeof input === 'object' &&
-      input !== null &&
-      'file_path' in input
-    ) {
+    if (tool.name === FILE_EDIT_TOOL_NAME && typeof input === "object" && input !== null && "file_path" in input) {
       const filePath = input.file_path
-      if (typeof filePath === 'string' && filePath === docInfo.path) {
-        return { behavior: 'allow' as const, updatedInput: input }
+      if (typeof filePath === "string" && filePath === docInfo.path) {
+        return { behavior: "allow" as const, updatedInput: input }
       }
     }
     return {
-      behavior: 'deny' as const,
+      behavior: "deny" as const,
       message: `only ${FILE_EDIT_TOOL_NAME} is allowed for ${docInfo.path}`,
       decisionReason: {
-        type: 'other' as const,
+        type: "other" as const,
         reason: `only ${FILE_EDIT_TOOL_NAME} is allowed`,
       },
     }
@@ -199,7 +171,7 @@ async function updateMagicDoc(
     canUseTool,
     isAsync: true,
     forkContextMessages: messages,
-    querySource: 'magic_docs',
+    querySource: "magic_docs",
     override: {
       systemPrompt,
       userContext,
@@ -214,12 +186,10 @@ async function updateMagicDoc(
 /**
  * Magic Docs post-sampling hook that updates all tracked Magic Docs
  */
-const updateMagicDocs = sequential(async function (
-  context: REPLHookContext,
-): Promise<void> {
+const updateMagicDocs = sequential(async function (context: REPLHookContext): Promise<void> {
   const { messages, querySource } = context
 
-  if (querySource !== 'repl_main_thread') {
+  if (querySource !== "repl_main_thread") {
     return
   }
 
@@ -240,7 +210,7 @@ const updateMagicDocs = sequential(async function (
 })
 
 export async function initMagicDocs(): Promise<void> {
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     // Register listener to detect magic docs when files are read
     registerFileReadListener((filePath: string, content: string) => {
       const result = detectMagicDocHeader(content)

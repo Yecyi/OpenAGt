@@ -6,8 +6,8 @@
  * (which would defeat LODESTONE tree-shaking).
  */
 
-import { getGlobalConfig, saveGlobalConfig } from '../config.js'
-import { logForDebugging } from '../debug.js'
+import { getGlobalConfig, saveGlobalConfig } from "../config.js"
+import { logForDebugging } from "../debug.js"
 
 /**
  * Map TERM_PROGRAM env var values (lowercased) to the `app` name used by
@@ -16,13 +16,13 @@ import { logForDebugging } from '../debug.js'
  * "iTerm.app" → "iTerm", "Apple_Terminal" → "Terminal").
  */
 const TERM_PROGRAM_TO_APP: Record<string, string> = {
-  iterm: 'iTerm',
-  'iterm.app': 'iTerm',
-  ghostty: 'Ghostty',
-  kitty: 'kitty',
-  alacritty: 'Alacritty',
-  wezterm: 'WezTerm',
-  apple_terminal: 'Terminal',
+  iterm: "iTerm",
+  "iterm.app": "iTerm",
+  ghostty: "Ghostty",
+  kitty: "kitty",
+  alacritty: "Alacritty",
+  wezterm: "WezTerm",
+  apple_terminal: "Terminal",
 }
 
 /**
@@ -38,7 +38,7 @@ const TERM_PROGRAM_TO_APP: Record<string, string> = {
 export function updateDeepLinkTerminalPreference(): void {
   // Only detectMacosTerminal reads the stored value — skip the write on
   // other platforms.
-  if (process.platform !== 'darwin') return
+  if (process.platform !== "darwin") return
 
   const termProgram = process.env.TERM_PROGRAM
   if (!termProgram) return
@@ -49,6 +49,6 @@ export function updateDeepLinkTerminalPreference(): void {
   const config = getGlobalConfig()
   if (config.deepLinkTerminal === app) return
 
-  saveGlobalConfig(current => ({ ...current, deepLinkTerminal: app }))
+  saveGlobalConfig((current) => ({ ...current, deepLinkTerminal: app }))
   logForDebugging(`Stored deep link terminal preference: ${app}`)
 }

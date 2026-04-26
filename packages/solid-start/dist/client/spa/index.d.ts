@@ -1,4 +1,4 @@
-import type { JSX } from "solid-js";
-import { type MountableElement } from "solid-js/web";
-export declare function mount(fn: () => JSX.Element, el: MountableElement): void;
-export { StartClient } from "../StartClient.tsx";
+import type { JSX } from "solid-js"
+import { type MountableElement } from "solid-js/web"
+export declare function mount(fn: () => JSX.Element, el: MountableElement): void
+export { StartClient } from "../StartClient.tsx"

@@ -1,11 +1,11 @@
-import { createHash } from 'crypto'
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { logForDebugging } from './debug.js'
-import { getClaudeConfigHomeDir } from './envUtils.js'
-import { isENOENT } from './errors.js'
+import { createHash } from "crypto"
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { logForDebugging } from "./debug.js"
+import { getClaudeConfigHomeDir } from "./envUtils.js"
+import { isENOENT } from "./errors.js"
 
-const PASTE_STORE_DIR = 'paste-cache'
+const PASTE_STORE_DIR = "paste-cache"
 
 /**
  * Get the paste store directory (persistent across sessions).
@@ -19,7 +19,7 @@ function getPasteStoreDir(): string {
  * Exported so callers can get the hash synchronously before async storage.
  */
 export function hashPastedText(content: string): string {
-  return createHash('sha256').update(content).digest('hex').slice(0, 16)
+  return createHash("sha256").update(content).digest("hex").slice(0, 16)
 }
 
 /**
@@ -34,10 +34,7 @@ function getPastePath(hash: string): string {
  * The hash should be pre-computed with hashPastedText() so the caller
  * can use it immediately without waiting for the async disk write.
  */
-export async function storePastedText(
-  hash: string,
-  content: string,
-): Promise<void> {
+export async function storePastedText(hash: string, content: string): Promise<void> {
   try {
     const dir = getPasteStoreDir()
     await mkdir(dir, { recursive: true })
@@ -45,7 +42,7 @@ export async function storePastedText(
     const pastePath = getPastePath(hash)
 
     // Content-addressable: same hash = same content, so overwriting is safe
-    await writeFile(pastePath, content, { encoding: 'utf8', mode: 0o600 })
+    await writeFile(pastePath, content, { encoding: "utf8", mode: 0o600 })
     logForDebugging(`Stored paste ${hash} to ${pastePath}`)
   } catch (error) {
     logForDebugging(`Failed to store paste: ${error}`)
@@ -59,7 +56,7 @@ export async function storePastedText(
 export async function retrievePastedText(hash: string): Promise<string | null> {
   try {
     const pastePath = getPastePath(hash)
-    return await readFile(pastePath, { encoding: 'utf8' })
+    return await readFile(pastePath, { encoding: "utf8" })
   } catch (error) {
     // ENOENT is expected when paste doesn't exist
     if (!isENOENT(error)) {
@@ -86,7 +83,7 @@ export async function cleanupOldPastes(cutoffDate: Date): Promise<void> {
 
   const cutoffTime = cutoffDate.getTime()
   for (const file of files) {
-    if (!file.endsWith('.txt')) {
+    if (!file.endsWith(".txt")) {
       continue
     }
 

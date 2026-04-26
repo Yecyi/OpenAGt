@@ -59,6 +59,13 @@ function unavailable(name: SandboxBackendName, reason: string) {
   } satisfies SandboxBackend
 }
 
+export function autoBackendName(platform = process.platform): SandboxBackendName {
+  if (platform === "darwin") return "seatbelt"
+  if (platform === "win32") return "process"
+  if (platform === "linux") return "landlock"
+  return "process"
+}
+
 function shellArgs(request: SandboxExecRequest) {
   if (process.platform === "win32") {
     if (request.shell_family === "powershell") {
@@ -138,10 +145,7 @@ function processBackend(): SandboxBackend {
       child.exited
         .then(async (exitCode) => {
           clearTimeout(timer)
-          await Promise.race([
-            Promise.allSettled([stdout, stderr]),
-            new Promise((resolve) => setTimeout(resolve, 100)),
-          ])
+          await Promise.race([Promise.allSettled([stdout, stderr]), new Promise((resolve) => setTimeout(resolve, 100))])
           exit({
             request_id: input.request.request_id,
             exit_code: terminationReason === "exit" ? exitCode : null,

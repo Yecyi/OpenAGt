@@ -74,35 +74,36 @@
 
 管理会话状态、消息和上下文压缩，是 Agent 的核心驱动模块。
 
-| 文件 | 描述 |
-|------|------|
-| `session.ts` | Session Service，CRUD 操作 |
-| `message-v2.ts` | 消息模型，Part/Info 类型系统 |
-| `message.ts` | 消息基础类型定义 |
-| `schema.ts` | Session 相关 Schema 定义 |
-| `prompt.ts` | 主循环：模型调用、工具调度、压缩触发 |
-| `processor.ts` | 消息处理器 |
-| `compaction.ts` | 压缩调度器 |
-| `compaction/micro.ts` | MicroCompact — 时间阈值压缩 |
-| `compaction/auto.ts` | AutoCompact + CircuitBreaker |
-| `compaction/full.ts` | Full Compact — LLM 摘要 |
-| `compaction/importance.ts` | 工具重要性计算 |
-| `summary.ts` | 会话摘要生成 |
-| `retry.ts` | 请求重试逻辑 |
-| `overflow.ts` | 上下文溢出处理 |
-| `task-runtime.ts` | Task 工具运行时 |
-| `system.ts` | 系统配置加载 |
-| `system-prompt.ts` | 系统提示词构建 |
-| `memory.ts` / `memory-service.ts` | 记忆管理 |
-| `memory-context.ts` | 记忆上下文注入 |
-| `instruction.ts` | 指令管理 |
-| `run-state.ts` | 运行状态追踪 |
-| `status.ts` | Session 状态 |
-| `projectors.ts` | 事件投影器 |
-| `todo.ts` | Todo 列表管理 |
-| `revert.ts` | 修改回退 |
+| 文件                              | 描述                                 |
+| --------------------------------- | ------------------------------------ |
+| `session.ts`                      | Session Service，CRUD 操作           |
+| `message-v2.ts`                   | 消息模型，Part/Info 类型系统         |
+| `message.ts`                      | 消息基础类型定义                     |
+| `schema.ts`                       | Session 相关 Schema 定义             |
+| `prompt.ts`                       | 主循环：模型调用、工具调度、压缩触发 |
+| `processor.ts`                    | 消息处理器                           |
+| `compaction.ts`                   | 压缩调度器                           |
+| `compaction/micro.ts`             | MicroCompact — 时间阈值压缩          |
+| `compaction/auto.ts`              | AutoCompact + CircuitBreaker         |
+| `compaction/full.ts`              | Full Compact — LLM 摘要              |
+| `compaction/importance.ts`        | 工具重要性计算                       |
+| `summary.ts`                      | 会话摘要生成                         |
+| `retry.ts`                        | 请求重试逻辑                         |
+| `overflow.ts`                     | 上下文溢出处理                       |
+| `task-runtime.ts`                 | Task 工具运行时                      |
+| `system.ts`                       | 系统配置加载                         |
+| `system-prompt.ts`                | 系统提示词构建                       |
+| `memory.ts` / `memory-service.ts` | 记忆管理                             |
+| `memory-context.ts`               | 记忆上下文注入                       |
+| `instruction.ts`                  | 指令管理                             |
+| `run-state.ts`                    | 运行状态追踪                         |
+| `status.ts`                       | Session 状态                         |
+| `projectors.ts`                   | 事件投影器                           |
+| `todo.ts`                         | Todo 列表管理                        |
+| `revert.ts`                       | 修改回退                             |
 
 **关键类型：**
+
 ```typescript
 type Info = User | Assistant
 type Part = TextPart | ReasoningPart | ToolPart | FilePart | SnapshotPart | CompactionPart | StepFinishPart
@@ -112,17 +113,18 @@ type Part = TextPart | ReasoningPart | ToolPart | FilePart | SnapshotPart | Comp
 
 支持 25+ LLM Provider 的动态加载和降级。
 
-| 文件 | 描述 |
-|------|------|
-| `provider.ts` | Provider 初始化、模型加载 |
-| `fallback.ts` | 旧版降级链 |
+| 文件                  | 描述                       |
+| --------------------- | -------------------------- |
+| `provider.ts`         | Provider 初始化、模型加载  |
+| `fallback.ts`         | 旧版降级链                 |
 | `fallback-service.ts` | 新版 Fallback Service 实现 |
-| `error.ts` | API 错误解析 |
-| `schema.ts` | Provider/Model 类型定义 |
-| `models.ts` | 内置模型数据库 |
-| `index.ts` | 导出入口 |
+| `error.ts`            | API 错误解析               |
+| `schema.ts`           | Provider/Model 类型定义    |
+| `models.ts`           | 内置模型数据库             |
+| `index.ts`            | 导出入口                   |
 
 **支持 Provider：**
+
 - Anthropic, OpenAI, Google Vertex, Amazon Bedrock
 - Azure, OpenRouter, GitLab, Cloudflare Workers AI
 - Mistral, Groq, DeepInfra, Cerebras, Cohere
@@ -134,37 +136,38 @@ type Part = TextPart | ReasoningPart | ToolPart | FilePart | SnapshotPart | Comp
 
 工具注册、执行和并发控制。
 
-| 文件 | 描述 |
-|------|------|
-| `index.ts` | 工具导出入口 |
-| `registry.ts` | 工具定义注册表 |
-| `tool.ts` | 工具执行器 |
-| `partition.ts` | Safe/Unsafe 工具分区 (并发控制) |
-| `path-overlap.ts` | 路径冲突检测 |
-| `truncate.ts` | 工具结果截断 |
-| `truncation-dir.ts` | 目录级截断策略 |
-| `bash.ts` | Bash 工具实现 |
-| `edit.ts` | Edit 工具实现 |
-| `write.ts` | Write 工具实现 |
-| `read.ts` | Read 工具实现 |
-| `glob.ts` | Glob 工具实现 |
-| `grep.ts` | Grep 工具实现 |
-| `codesearch.ts` | 代码搜索工具 |
-| `webfetch.ts` | WebFetch 工具 |
-| `websearch.ts` | WebSearch 工具 |
-| `task.ts` / `task_list.ts` / `task_get.ts` / `task_stop.ts` / `task_wait.ts` | Task 工具族 |
-| `lsp.ts` | LSP 工具 |
-| `question.ts` | Question 工具 |
-| `skill.ts` | Skill 工具 |
-| `plan.ts` | Plan 工具 |
-| `todo.ts` | Todo 工具 |
-| `apply_patch.ts` | Patch 应用工具 |
-| `multiedit.ts` | 多文件编辑 |
-| `mcp-exa.ts` | MCP 集成 |
-| `invalid.ts` | 无效工具处理 |
-| `external-directory.ts` | 外部目录支持 |
+| 文件                                                                         | 描述                            |
+| ---------------------------------------------------------------------------- | ------------------------------- |
+| `index.ts`                                                                   | 工具导出入口                    |
+| `registry.ts`                                                                | 工具定义注册表                  |
+| `tool.ts`                                                                    | 工具执行器                      |
+| `partition.ts`                                                               | Safe/Unsafe 工具分区 (并发控制) |
+| `path-overlap.ts`                                                            | 路径冲突检测                    |
+| `truncate.ts`                                                                | 工具结果截断                    |
+| `truncation-dir.ts`                                                          | 目录级截断策略                  |
+| `bash.ts`                                                                    | Bash 工具实现                   |
+| `edit.ts`                                                                    | Edit 工具实现                   |
+| `write.ts`                                                                   | Write 工具实现                  |
+| `read.ts`                                                                    | Read 工具实现                   |
+| `glob.ts`                                                                    | Glob 工具实现                   |
+| `grep.ts`                                                                    | Grep 工具实现                   |
+| `codesearch.ts`                                                              | 代码搜索工具                    |
+| `webfetch.ts`                                                                | WebFetch 工具                   |
+| `websearch.ts`                                                               | WebSearch 工具                  |
+| `task.ts` / `task_list.ts` / `task_get.ts` / `task_stop.ts` / `task_wait.ts` | Task 工具族                     |
+| `lsp.ts`                                                                     | LSP 工具                        |
+| `question.ts`                                                                | Question 工具                   |
+| `skill.ts`                                                                   | Skill 工具                      |
+| `plan.ts`                                                                    | Plan 工具                       |
+| `todo.ts`                                                                    | Todo 工具                       |
+| `apply_patch.ts`                                                             | Patch 应用工具                  |
+| `multiedit.ts`                                                               | 多文件编辑                      |
+| `mcp-exa.ts`                                                                 | MCP 集成                        |
+| `invalid.ts`                                                                 | 无效工具处理                    |
+| `external-directory.ts`                                                      | 外部目录支持                    |
 
 **工具分类：**
+
 - **Safe (可并发)**：`read`, `glob`, `grep`, `codesearch`, `webfetch`, `websearch`, `lsp`, `question`, `skill`
 - **Unsafe (需串行)**：`bash`, `edit`, `write`, `task`, `todo`, `plan`, `apply_patch`, `multiedit`
 
@@ -172,21 +175,22 @@ type Part = TextPart | ReasoningPart | ToolPart | FilePart | SnapshotPart | Comp
 
 Shell 命令安全分析，防护 prompt injection 和命令注入攻击。
 
-| 文件 | 描述 |
-|------|------|
-| `shell-security.ts` | Shell 命令安全分析入口 |
-| `command-classifier.ts` | 风险模式匹配分类器 |
-| `wrapper-stripper.ts` | Wrapper 移除 (noglob, semicolons 等) |
-| `injection.ts` | Prompt injection 扫描与净化 |
-| `dangers.ts` | 危险命令定义 |
-| `dangerous-command-detector.ts` | 危险命令检测器 |
-| `shell-review.ts` | Shell 审查逻辑 |
-| `validators.ts` | 输入验证器 |
-| `env-sanitizer.ts` | 环境变量净化 |
-| `powershell.ts` | PowerShell 命令分析 |
-| `powershell-ast.ts` | PowerShell AST 分析 |
+| 文件                            | 描述                                 |
+| ------------------------------- | ------------------------------------ |
+| `shell-security.ts`             | Shell 命令安全分析入口               |
+| `command-classifier.ts`         | 风险模式匹配分类器                   |
+| `wrapper-stripper.ts`           | Wrapper 移除 (noglob, semicolons 等) |
+| `injection.ts`                  | Prompt injection 扫描与净化          |
+| `dangers.ts`                    | 危险命令定义                         |
+| `dangerous-command-detector.ts` | 危险命令检测器                       |
+| `shell-review.ts`               | Shell 审查逻辑                       |
+| `validators.ts`                 | 输入验证器                           |
+| `env-sanitizer.ts`              | 环境变量净化                         |
+| `powershell.ts`                 | PowerShell 命令分析                  |
+| `powershell-ast.ts`             | PowerShell AST 分析                  |
 
 **检测类别：**
+
 - `injection` — 注入攻击
 - `obfuscation` — 命令混淆
 - `parse_integrity` — 解析完整性破坏
@@ -207,21 +211,21 @@ Shell 命令安全分析，防护 prompt injection 和命令注入攻击。
 
 基于 PubSub 的进程内事件总线。
 
-| 文件 | 描述 |
-|------|------|
-| `index.ts` | Bus Service 定义与 Layer |
-| `bus-event.ts` | 事件定义 |
-| `global.ts` | GlobalBus 全局事件 |
+| 文件           | 描述                     |
+| -------------- | ------------------------ |
+| `index.ts`     | Bus Service 定义与 Layer |
+| `bus-event.ts` | 事件定义                 |
+| `global.ts`    | GlobalBus 全局事件       |
 
 ```typescript
 // 发布事件
-yield* Bus.publish(SessionCreated, { sessionID, info })
+yield * Bus.publish(SessionCreated, { sessionID, info })
 
 // 订阅事件
-yield* Bus.subscribe(SessionCreated)
+yield * Bus.subscribe(SessionCreated)
 
 // 全局事件
-yield* GlobalBus.publish(Event)
+yield * GlobalBus.publish(Event)
 ```
 
 ### SyncEvent 模块
@@ -234,7 +238,7 @@ const Created = SyncEvent.define({
   type: "session.created",
   version: 1,
   aggregate: "sessionID",
-  schema: z.object({ sessionID, info })
+  schema: z.object({ sessionID, info }),
 })
 
 // 运行事件
@@ -253,50 +257,50 @@ SyncEvent.replayAll(events)
 
 隔离的命令执行，通过 IPC Broker 实现进程级沙箱。
 
-| 文件 | 描述 |
-|------|------|
-| `broker.ts` | IPC Broker — 进程间通信管理 |
-| `broker-main.ts` | Broker 主进程入口 |
-| `policy.ts` | 沙箱策略解析 |
-| `protocol.ts` | 通信协议定义 |
-| `types.ts` | 类型定义 |
-| `backends.ts` | 后端支持 |
-| `process-sandbox.ts` | 进程沙箱实现 |
+| 文件                 | 描述                        |
+| -------------------- | --------------------------- |
+| `broker.ts`          | IPC Broker — 进程间通信管理 |
+| `broker-main.ts`     | Broker 主进程入口           |
+| `policy.ts`          | 沙箱策略解析                |
+| `protocol.ts`        | 通信协议定义                |
+| `types.ts`           | 类型定义                    |
+| `backends.ts`        | 后端支持                    |
+| `process-sandbox.ts` | 进程沙箱实现                |
 
 ### Storage 模块
 
 SQLite 数据库管理，使用 Drizzle ORM。
 
-| 文件 | 描述 |
-|------|------|
-| `storage.ts` | Storage Service |
-| `schema.ts` | Schema 类型定义 |
-| `schema.sql.ts` | Drizzle SQL Schema |
-| `db.ts` | 数据库初始化 |
-| `db.bun.ts` | Bun SQLite 实现 |
-| `db.node.ts` | Node.js SQLite 实现 |
-| `index.ts` | 导出入口 |
-| `json-migration.ts` | JSON 迁移工具 |
+| 文件                | 描述                |
+| ------------------- | ------------------- |
+| `storage.ts`        | Storage Service     |
+| `schema.ts`         | Schema 类型定义     |
+| `schema.sql.ts`     | Drizzle SQL Schema  |
+| `db.ts`             | 数据库初始化        |
+| `db.bun.ts`         | Bun SQLite 实现     |
+| `db.node.ts`        | Node.js SQLite 实现 |
+| `index.ts`          | 导出入口            |
+| `json-migration.ts` | JSON 迁移工具       |
 
 ### Config 模块
 
 配置管理，支持 `opencode.json` 和环境变量。
 
-| 文件 | 描述 |
-|------|------|
-| `config.ts` | 主配置入口 |
-| `agent.ts` | Agent 配置 |
-| `provider.ts` | Provider 配置 |
-| `command.ts` | 命令配置 |
-| `model-id.ts` | 模型 ID 类型 |
-| `permission.ts` | 权限配置 |
-| `lsp.ts` | LSP 配置 |
-| `mcp.ts` | MCP 配置 |
-| `skills.ts` | Skills 配置 |
-| `formatter.ts` | 格式化器配置 |
-| `keybinds.ts` | 快捷键配置 |
-| `parse.ts` | 配置解析 |
-| `index.ts` | 导出入口 |
+| 文件            | 描述          |
+| --------------- | ------------- |
+| `config.ts`     | 主配置入口    |
+| `agent.ts`      | Agent 配置    |
+| `provider.ts`   | Provider 配置 |
+| `command.ts`    | 命令配置      |
+| `model-id.ts`   | 模型 ID 类型  |
+| `permission.ts` | 权限配置      |
+| `lsp.ts`        | LSP 配置      |
+| `mcp.ts`        | MCP 配置      |
+| `skills.ts`     | Skills 配置   |
+| `formatter.ts`  | 格式化器配置  |
+| `keybinds.ts`   | 快捷键配置    |
+| `parse.ts`      | 配置解析      |
+| `index.ts`      | 导出入口      |
 
 ### Effect 集成
 
@@ -327,6 +331,7 @@ yield* SessionService
 ```
 
 **关键模式：**
+
 - `makeRuntime` — 创建 Effect 运行时
 - `InstanceState` — 每实例作用域状态
 - `MemoMap` — Layer 去重缓存
@@ -352,13 +357,14 @@ Token 使用量
 │     简单丢弃  内存瑶佺       LLM 摘要
 ```
 
-| 层级 | 触发条件 | 成本 | 描述 |
-|------|---------|------|------|
-| **MicroCompact** | 工具结果超过 5 分钟 | $0 | 基于时间阈值丢弃旧结果 |
-| **AutoCompact** | 剩余 token < bufferTokens | $0 | 基于 token 预算评估，电路熔断器保护 |
-| **Full Compact** | 压缩比 > 1 (溢出) | ~$0.03-0.09 | LLM 摘要，需重建时重新读取 |
+| 层级             | 触发条件                  | 成本        | 描述                                |
+| ---------------- | ------------------------- | ----------- | ----------------------------------- |
+| **MicroCompact** | 工具结果超过 5 分钟       | $0          | 基于时间阈值丢弃旧结果              |
+| **AutoCompact**  | 剩余 token < bufferTokens | $0          | 基于 token 预算评估，电路熔断器保护 |
+| **Full Compact** | 压缩比 > 1 (溢出)         | ~$0.03-0.09 | LLM 摘要，需重建时重新读取          |
 
 **压缩优先级公式：**
+
 ```
 priority = log(age_minutes + 1) × (11 - importance) + contentWeight × 0.5
 ```
@@ -390,6 +396,7 @@ priority = log(age_minutes + 1) × (11 - importance) + contentWeight × 0.5
 ```
 
 **路径冲突检测：**
+
 - 提取工具输入中的文件路径
 - 检测同目录或相同文件的访问冲突
 - 冲突的 unsafe 工具等待 blocker 完成

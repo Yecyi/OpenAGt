@@ -1,29 +1,29 @@
-import { feature } from 'bun:bundle'
-import { markPostCompaction } from 'src/bootstrap/state.js'
-import { getSdkBetas } from '../../bootstrap/state.js'
-import type { QuerySource } from '../../constants/querySource.js'
-import type { ToolUseContext } from '../../Tool.js'
-import type { Message } from '../../types/message.js'
-import { getGlobalConfig } from '../../utils/config.js'
-import { getContextWindowForModel } from '../../utils/context.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
-import { hasExactErrorMessage } from '../../utils/errors.js'
-import type { CacheSafeParams } from '../../utils/forkedAgent.js'
-import { logError } from '../../utils/log.js'
-import { tokenCountWithEstimation } from '../../utils/tokens.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../analytics/growthbook.js'
-import { getMaxOutputTokensForModel } from '../api/claude.js'
-import { notifyCompaction } from '../api/promptCacheBreakDetection.js'
-import { setLastSummarizedMessageId } from '../SessionMemory/sessionMemoryUtils.js'
+import { feature } from "bun:bundle"
+import { markPostCompaction } from "src/bootstrap/state.js"
+import { getSdkBetas } from "../../bootstrap/state.js"
+import type { QuerySource } from "../../constants/querySource.js"
+import type { ToolUseContext } from "../../Tool.js"
+import type { Message } from "../../types/message.js"
+import { getGlobalConfig } from "../../utils/config.js"
+import { getContextWindowForModel } from "../../utils/context.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { isEnvTruthy } from "../../utils/envUtils.js"
+import { hasExactErrorMessage } from "../../utils/errors.js"
+import type { CacheSafeParams } from "../../utils/forkedAgent.js"
+import { logError } from "../../utils/log.js"
+import { tokenCountWithEstimation } from "../../utils/tokens.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../analytics/growthbook.js"
+import { getMaxOutputTokensForModel } from "../api/claude.js"
+import { notifyCompaction } from "../api/promptCacheBreakDetection.js"
+import { setLastSummarizedMessageId } from "../SessionMemory/sessionMemoryUtils.js"
 import {
   type CompactionResult,
   compactConversation,
   ERROR_MESSAGE_USER_ABORT,
   type RecompactionInfo,
-} from './compact.js'
-import { runPostCompactCleanup } from './postCompactCleanup.js'
-import { trySessionMemoryCompaction } from './sessionMemoryCompact.js'
+} from "./compact.js"
+import { runPostCompactCleanup } from "./postCompactCleanup.js"
+import { trySessionMemoryCompaction } from "./sessionMemoryCompact.js"
 
 // Reserve this many tokens for output during compaction
 // Based on p99.99 of compact summary output being 17,387 tokens.
@@ -31,10 +31,7 @@ const MAX_OUTPUT_TOKENS_FOR_SUMMARY = 20_000
 
 // Returns the context window size minus the max output tokens for the model
 export function getEffectiveContextWindowSize(model: string): number {
-  const reservedTokensForSummary = Math.min(
-    getMaxOutputTokensForModel(model),
-    MAX_OUTPUT_TOKENS_FOR_SUMMARY,
-  )
+  const reservedTokensForSummary = Math.min(getMaxOutputTokensForModel(model), MAX_OUTPUT_TOKENS_FOR_SUMMARY)
   let contextWindow = getContextWindowForModel(model, getSdkBetas())
 
   const autoCompactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW
@@ -72,17 +69,14 @@ const MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES = 3
 export function getAutoCompactThreshold(model: string): number {
   const effectiveContextWindow = getEffectiveContextWindowSize(model)
 
-  const autocompactThreshold =
-    effectiveContextWindow - AUTOCOMPACT_BUFFER_TOKENS
+  const autocompactThreshold = effectiveContextWindow - AUTOCOMPACT_BUFFER_TOKENS
 
   // Override for easier testing of autocompact
   const envPercent = process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE
   if (envPercent) {
     const parsed = parseFloat(envPercent)
     if (!isNaN(parsed) && parsed > 0 && parsed <= 100) {
-      const percentageThreshold = Math.floor(
-        effectiveContextWindow * (parsed / 100),
-      )
+      const percentageThreshold = Math.floor(effectiveContextWindow * (parsed / 100))
       return Math.min(percentageThreshold, autocompactThreshold)
     }
   }
@@ -101,14 +95,9 @@ export function calculateTokenWarningState(
   isAtBlockingLimit: boolean
 } {
   const autoCompactThreshold = getAutoCompactThreshold(model)
-  const threshold = isAutoCompactEnabled()
-    ? autoCompactThreshold
-    : getEffectiveContextWindowSize(model)
+  const threshold = isAutoCompactEnabled() ? autoCompactThreshold : getEffectiveContextWindowSize(model)
 
-  const percentLeft = Math.max(
-    0,
-    Math.round(((threshold - tokenUsage) / threshold) * 100),
-  )
+  const percentLeft = Math.max(0, Math.round(((threshold - tokenUsage) / threshold) * 100))
 
   const warningThreshold = threshold - WARNING_THRESHOLD_BUFFER_TOKENS
   const errorThreshold = threshold - ERROR_THRESHOLD_BUFFER_TOKENS
@@ -116,22 +105,15 @@ export function calculateTokenWarningState(
   const isAboveWarningThreshold = tokenUsage >= warningThreshold
   const isAboveErrorThreshold = tokenUsage >= errorThreshold
 
-  const isAboveAutoCompactThreshold =
-    isAutoCompactEnabled() && tokenUsage >= autoCompactThreshold
+  const isAboveAutoCompactThreshold = isAutoCompactEnabled() && tokenUsage >= autoCompactThreshold
 
   const actualContextWindow = getEffectiveContextWindowSize(model)
-  const defaultBlockingLimit =
-    actualContextWindow - MANUAL_COMPACT_BUFFER_TOKENS
+  const defaultBlockingLimit = actualContextWindow - MANUAL_COMPACT_BUFFER_TOKENS
 
   // Allow override for testing
   const blockingLimitOverride = process.env.CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE
-  const parsedOverride = blockingLimitOverride
-    ? parseInt(blockingLimitOverride, 10)
-    : NaN
-  const blockingLimit =
-    !isNaN(parsedOverride) && parsedOverride > 0
-      ? parsedOverride
-      : defaultBlockingLimit
+  const parsedOverride = blockingLimitOverride ? parseInt(blockingLimitOverride, 10) : NaN
+  const blockingLimit = !isNaN(parsedOverride) && parsedOverride > 0 ? parsedOverride : defaultBlockingLimit
 
   const isAtBlockingLimit = tokenUsage >= blockingLimit
 
@@ -168,7 +150,7 @@ export async function shouldAutoCompact(
 ): Promise<boolean> {
   // Recursion guards. session_memory and compact are forked agents that
   // would deadlock.
-  if (querySource === 'session_memory' || querySource === 'compact') {
+  if (querySource === "session_memory" || querySource === "compact") {
     return false
   }
   // marble_origami is the ctx-agent — if ITS context blows up and
@@ -176,8 +158,8 @@ export async function shouldAutoCompact(
   // which destroys the MAIN thread's committed log (module-level state
   // shared across forks). Inside feature() so the string DCEs from
   // external builds (it's in excluded-strings.txt).
-  if (feature('CONTEXT_COLLAPSE')) {
-    if (querySource === 'marble_origami') {
+  if (feature("CONTEXT_COLLAPSE")) {
+    if (querySource === "marble_origami") {
       return false
     }
   }
@@ -192,8 +174,8 @@ export async function shouldAutoCompact(
   // Note: returning false here also means autoCompactIfNeeded never reaches
   // trySessionMemoryCompaction in the query loop — the /compact call site
   // still tries session memory first. Revisit if reactive-only graduates.
-  if (feature('REACTIVE_COMPACT')) {
-    if (getFeatureValue_CACHED_MAY_BE_STALE('tengu_cobalt_raccoon', false)) {
+  if (feature("REACTIVE_COMPACT")) {
+    if (getFeatureValue_CACHED_MAY_BE_STALE("tengu_cobalt_raccoon", false)) {
       return false
     }
   }
@@ -212,10 +194,10 @@ export async function shouldAutoCompact(
   // CLAUDE_CONTEXT_COLLAPSE env override is honored here too. require()
   // inside the block breaks the init-time cycle (this file exports
   // getEffectiveContextWindowSize which collapse's index imports).
-  if (feature('CONTEXT_COLLAPSE')) {
+  if (feature("CONTEXT_COLLAPSE")) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const { isContextCollapseEnabled } =
-      require('../contextCollapse/index.js') as typeof import('../contextCollapse/index.js')
+      require("../contextCollapse/index.js") as typeof import("../contextCollapse/index.js")
     /* eslint-enable @typescript-eslint/no-require-imports */
     if (isContextCollapseEnabled()) {
       return false
@@ -227,13 +209,10 @@ export async function shouldAutoCompact(
   const effectiveWindow = getEffectiveContextWindowSize(model)
 
   logForDebugging(
-    `autocompact: tokens=${tokenCount} threshold=${threshold} effectiveWindow=${effectiveWindow}${snipTokensFreed > 0 ? ` snipFreed=${snipTokensFreed}` : ''}`,
+    `autocompact: tokens=${tokenCount} threshold=${threshold} effectiveWindow=${effectiveWindow}${snipTokensFreed > 0 ? ` snipFreed=${snipTokensFreed}` : ""}`,
   )
 
-  const { isAboveAutoCompactThreshold } = calculateTokenWarningState(
-    tokenCount,
-    model,
-  )
+  const { isAboveAutoCompactThreshold } = calculateTokenWarningState(tokenCount, model)
 
   return isAboveAutoCompactThreshold
 }
@@ -265,12 +244,7 @@ export async function autoCompactIfNeeded(
   }
 
   const model = toolUseContext.options.mainLoopModel
-  const shouldCompact = await shouldAutoCompact(
-    messages,
-    model,
-    querySource,
-    snipTokensFreed,
-  )
+  const shouldCompact = await shouldAutoCompact(messages, model, querySource, snipTokensFreed)
 
   if (!shouldCompact) {
     return { wasCompacted: false }
@@ -299,8 +273,8 @@ export async function autoCompactIfNeeded(
     // break. compactConversation does this internally; SM-compact doesn't.
     // BQ 2026-03-01: missing this made 20% of tengu_prompt_cache_break events
     // false positives (systemPromptChanged=true, timeSinceLastAssistantMsg=-1).
-    if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
-      notifyCompaction(querySource ?? 'compact', toolUseContext.agentId)
+    if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
+      notifyCompaction(querySource ?? "compact", toolUseContext.agentId)
     }
     markPostCompaction()
     return {
@@ -343,7 +317,7 @@ export async function autoCompactIfNeeded(
     if (nextFailures >= MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES) {
       logForDebugging(
         `autocompact: circuit breaker tripped after ${nextFailures} consecutive failures — skipping future attempts this session`,
-        { level: 'warn' },
+        { level: "warn" },
       )
     }
     return { wasCompacted: false, consecutiveFailures: nextFailures }

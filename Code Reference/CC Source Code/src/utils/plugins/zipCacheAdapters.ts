@@ -10,23 +10,23 @@
  * for extracted plugins used during a single session.
  */
 
-import { readFile } from 'fs/promises'
-import { join } from 'path'
-import { logForDebugging } from '../debug.js'
-import { jsonParse, jsonStringify } from '../slowOperations.js'
-import { loadKnownMarketplacesConfigSafe } from './marketplaceManager.js'
+import { readFile } from "fs/promises"
+import { join } from "path"
+import { logForDebugging } from "../debug.js"
+import { jsonParse, jsonStringify } from "../slowOperations.js"
+import { loadKnownMarketplacesConfigSafe } from "./marketplaceManager.js"
 import {
   type KnownMarketplacesFile,
   KnownMarketplacesFileSchema,
   type PluginMarketplace,
   PluginMarketplaceSchema,
-} from './schemas.js'
+} from "./schemas.js"
 import {
   atomicWriteToZipCache,
   getMarketplaceJsonRelativePath,
   getPluginZipCachePath,
   getZipCacheKnownMarketplacesPath,
-} from './zipCache.js'
+} from "./zipCache.js"
 
 // ── Metadata I/O ──
 
@@ -37,13 +37,10 @@ import {
  */
 export async function readZipCacheKnownMarketplaces(): Promise<KnownMarketplacesFile> {
   try {
-    const content = await readFile(getZipCacheKnownMarketplacesPath(), 'utf-8')
+    const content = await readFile(getZipCacheKnownMarketplacesPath(), "utf-8")
     const parsed = KnownMarketplacesFileSchema().safeParse(jsonParse(content))
     if (!parsed.success) {
-      logForDebugging(
-        `Invalid known_marketplaces.json in zip cache: ${parsed.error.message}`,
-        { level: 'error' },
-      )
+      logForDebugging(`Invalid known_marketplaces.json in zip cache: ${parsed.error.message}`, { level: "error" })
       return {}
     }
     return parsed.data
@@ -55,13 +52,8 @@ export async function readZipCacheKnownMarketplaces(): Promise<KnownMarketplaces
 /**
  * Write known_marketplaces.json to the zip cache atomically.
  */
-export async function writeZipCacheKnownMarketplaces(
-  data: KnownMarketplacesFile,
-): Promise<void> {
-  await atomicWriteToZipCache(
-    getZipCacheKnownMarketplacesPath(),
-    jsonStringify(data, null, 2),
-  )
+export async function writeZipCacheKnownMarketplaces(data: KnownMarketplacesFile): Promise<void> {
+  await atomicWriteToZipCache(getZipCacheKnownMarketplacesPath(), jsonStringify(data, null, 2))
 }
 
 // ── Marketplace JSON ──
@@ -69,9 +61,7 @@ export async function writeZipCacheKnownMarketplaces(
 /**
  * Read a marketplace JSON file from the zip cache.
  */
-export async function readMarketplaceJson(
-  marketplaceName: string,
-): Promise<PluginMarketplace | null> {
+export async function readMarketplaceJson(marketplaceName: string): Promise<PluginMarketplace | null> {
   const zipCachePath = getPluginZipCachePath()
   if (!zipCachePath) {
     return null
@@ -79,15 +69,13 @@ export async function readMarketplaceJson(
   const relPath = getMarketplaceJsonRelativePath(marketplaceName)
   const fullPath = join(zipCachePath, relPath)
   try {
-    const content = await readFile(fullPath, 'utf-8')
+    const content = await readFile(fullPath, "utf-8")
     const parsed = jsonParse(content)
     const result = PluginMarketplaceSchema().safeParse(parsed)
     if (result.success) {
       return result.data
     }
-    logForDebugging(
-      `Invalid marketplace JSON for ${marketplaceName}: ${result.error}`,
-    )
+    logForDebugging(`Invalid marketplace JSON for ${marketplaceName}: ${result.error}`)
     return null
   } catch {
     return null
@@ -97,10 +85,7 @@ export async function readMarketplaceJson(
 /**
  * Save a marketplace JSON to the zip cache from its install location.
  */
-export async function saveMarketplaceJsonToZipCache(
-  marketplaceName: string,
-  installLocation: string,
-): Promise<void> {
+export async function saveMarketplaceJsonToZipCache(marketplaceName: string, installLocation: string): Promise<void> {
   const zipCachePath = getPluginZipCachePath()
   if (!zipCachePath) {
     return
@@ -119,13 +104,13 @@ export async function saveMarketplaceJsonToZipCache(
  */
 async function readMarketplaceJsonContent(dir: string): Promise<string | null> {
   const candidates = [
-    join(dir, '.claude-plugin', 'marketplace.json'),
-    join(dir, 'marketplace.json'),
+    join(dir, ".claude-plugin", "marketplace.json"),
+    join(dir, "marketplace.json"),
     dir, // For URL sources, installLocation IS the marketplace JSON file
   ]
   for (const candidate of candidates) {
     try {
-      return await readFile(candidate, 'utf-8')
+      return await readFile(candidate, "utf-8")
     } catch {
       // ENOENT (doesn't exist) or EISDIR (directory) — try next
     }

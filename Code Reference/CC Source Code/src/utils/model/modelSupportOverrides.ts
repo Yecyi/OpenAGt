@@ -1,25 +1,25 @@
-import memoize from 'lodash-es/memoize.js'
-import { getAPIProvider } from './providers.js'
+import memoize from "lodash-es/memoize.js"
+import { getAPIProvider } from "./providers.js"
 
 export type ModelCapabilityOverride =
-  | 'effort'
-  | 'max_effort'
-  | 'thinking'
-  | 'adaptive_thinking'
-  | 'interleaved_thinking'
+  | "effort"
+  | "max_effort"
+  | "thinking"
+  | "adaptive_thinking"
+  | "interleaved_thinking"
 
 const TIERS = [
   {
-    modelEnvVar: 'ANTHROPIC_DEFAULT_OPUS_MODEL',
-    capabilitiesEnvVar: 'ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES',
+    modelEnvVar: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    capabilitiesEnvVar: "ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES",
   },
   {
-    modelEnvVar: 'ANTHROPIC_DEFAULT_SONNET_MODEL',
-    capabilitiesEnvVar: 'ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES',
+    modelEnvVar: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    capabilitiesEnvVar: "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES",
   },
   {
-    modelEnvVar: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-    capabilitiesEnvVar: 'ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES',
+    modelEnvVar: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    capabilitiesEnvVar: "ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES",
   },
 ] as const
 
@@ -29,7 +29,7 @@ const TIERS = [
  */
 export const get3PModelCapabilityOverride = memoize(
   (model: string, capability: ModelCapabilityOverride): boolean | undefined => {
-    if (getAPIProvider() === 'firstParty') {
+    if (getAPIProvider() === "firstParty") {
       return undefined
     }
     const m = model.toLowerCase()
@@ -40,8 +40,8 @@ export const get3PModelCapabilityOverride = memoize(
       if (m !== pinned.toLowerCase()) continue
       return capabilities
         .toLowerCase()
-        .split(',')
-        .map(s => s.trim())
+        .split(",")
+        .map((s) => s.trim())
         .includes(capability)
     }
     return undefined

@@ -3,14 +3,11 @@ import type {
   MultiSelectEnumSchema,
   PrimitiveSchemaDefinition,
   StringSchema,
-} from '@modelcontextprotocol/sdk/types.js'
-import { z } from 'zod/v4'
-import { jsonStringify } from '../slowOperations.js'
-import { plural } from '../stringUtils.js'
-import {
-  looksLikeISO8601,
-  parseNaturalLanguageDateTime,
-} from './dateTimeParser.js'
+} from "@modelcontextprotocol/sdk/types.js"
+import { z } from "zod/v4"
+import { jsonStringify } from "../slowOperations.js"
+import { plural } from "../stringUtils.js"
+import { looksLikeISO8601, parseNaturalLanguageDateTime } from "./dateTimeParser.js"
 
 export type ValidationResult = {
   value?: string | number | boolean
@@ -20,44 +17,40 @@ export type ValidationResult = {
 
 const STRING_FORMATS = {
   email: {
-    description: 'email address',
-    example: 'user@example.com',
+    description: "email address",
+    example: "user@example.com",
   },
   uri: {
-    description: 'URI',
-    example: 'https://example.com',
+    description: "URI",
+    example: "https://example.com",
   },
   date: {
-    description: 'date',
-    example: '2024-03-15',
+    description: "date",
+    example: "2024-03-15",
   },
-  'date-time': {
-    description: 'date-time',
-    example: '2024-03-15T14:30:00Z',
+  "date-time": {
+    description: "date-time",
+    example: "2024-03-15T14:30:00Z",
   },
 }
 
 /**
  * Check if schema is a single-select enum (either legacy `enum` format or new `oneOf` format)
  */
-export const isEnumSchema = (
-  schema: PrimitiveSchemaDefinition,
-): schema is EnumSchema => {
-  return schema.type === 'string' && ('enum' in schema || 'oneOf' in schema)
+export const isEnumSchema = (schema: PrimitiveSchemaDefinition): schema is EnumSchema => {
+  return schema.type === "string" && ("enum" in schema || "oneOf" in schema)
 }
 
 /**
  * Check if schema is a multi-select enum (`type: "array"` with `items.enum` or `items.anyOf`)
  */
-export function isMultiSelectEnumSchema(
-  schema: PrimitiveSchemaDefinition,
-): schema is MultiSelectEnumSchema {
+export function isMultiSelectEnumSchema(schema: PrimitiveSchemaDefinition): schema is MultiSelectEnumSchema {
   return (
-    schema.type === 'array' &&
-    'items' in schema &&
-    typeof schema.items === 'object' &&
+    schema.type === "array" &&
+    "items" in schema &&
+    typeof schema.items === "object" &&
     schema.items !== null &&
-    ('enum' in schema.items || 'anyOf' in schema.items)
+    ("enum" in schema.items || "anyOf" in schema.items)
   )
 }
 
@@ -65,10 +58,10 @@ export function isMultiSelectEnumSchema(
  * Get values from a multi-select enum schema
  */
 export function getMultiSelectValues(schema: MultiSelectEnumSchema): string[] {
-  if ('anyOf' in schema.items) {
-    return schema.items.anyOf.map(item => item.const)
+  if ("anyOf" in schema.items) {
+    return schema.items.anyOf.map((item) => item.const)
   }
-  if ('enum' in schema.items) {
+  if ("enum" in schema.items) {
     return schema.items.enum
   }
   return []
@@ -78,10 +71,10 @@ export function getMultiSelectValues(schema: MultiSelectEnumSchema): string[] {
  * Get display labels from a multi-select enum schema
  */
 export function getMultiSelectLabels(schema: MultiSelectEnumSchema): string[] {
-  if ('anyOf' in schema.items) {
-    return schema.items.anyOf.map(item => item.title)
+  if ("anyOf" in schema.items) {
+    return schema.items.anyOf.map((item) => item.title)
   }
-  if ('enum' in schema.items) {
+  if ("enum" in schema.items) {
     return schema.items.enum
   }
   return []
@@ -90,10 +83,7 @@ export function getMultiSelectLabels(schema: MultiSelectEnumSchema): string[] {
 /**
  * Get label for a specific value in a multi-select enum
  */
-export function getMultiSelectLabel(
-  schema: MultiSelectEnumSchema,
-  value: string,
-): string {
+export function getMultiSelectLabel(schema: MultiSelectEnumSchema, value: string): string {
   const index = getMultiSelectValues(schema).indexOf(value)
   return index >= 0 ? (getMultiSelectLabels(schema)[index] ?? value) : value
 }
@@ -102,10 +92,10 @@ export function getMultiSelectLabel(
  * Get enum values from EnumSchema (handles both legacy `enum` and new `oneOf` formats)
  */
 export function getEnumValues(schema: EnumSchema): string[] {
-  if ('oneOf' in schema) {
-    return schema.oneOf.map(item => item.const)
+  if ("oneOf" in schema) {
+    return schema.oneOf.map((item) => item.const)
   }
-  if ('enum' in schema) {
+  if ("enum" in schema) {
     return schema.enum
   }
   return []
@@ -115,11 +105,11 @@ export function getEnumValues(schema: EnumSchema): string[] {
  * Get enum display labels from EnumSchema
  */
 export function getEnumLabels(schema: EnumSchema): string[] {
-  if ('oneOf' in schema) {
-    return schema.oneOf.map(item => item.title)
+  if ("oneOf" in schema) {
+    return schema.oneOf.map((item) => item.title)
   }
-  if ('enum' in schema) {
-    return ('enumNames' in schema ? schema.enumNames : undefined) ?? schema.enum
+  if ("enum" in schema) {
+    return ("enumNames" in schema ? schema.enumNames : undefined) ?? schema.enum
   }
   return []
 }
@@ -140,39 +130,36 @@ function getZodSchema(schema: PrimitiveSchemaDefinition): z.ZodTypeAny {
     }
     return z.enum([first, ...rest])
   }
-  if (schema.type === 'string') {
+  if (schema.type === "string") {
     let stringSchema = z.string()
     if (schema.minLength !== undefined) {
       stringSchema = stringSchema.min(schema.minLength, {
-        message: `Must be at least ${schema.minLength} ${plural(schema.minLength, 'character')}`,
+        message: `Must be at least ${schema.minLength} ${plural(schema.minLength, "character")}`,
       })
     }
     if (schema.maxLength !== undefined) {
       stringSchema = stringSchema.max(schema.maxLength, {
-        message: `Must be at most ${schema.maxLength} ${plural(schema.maxLength, 'character')}`,
+        message: `Must be at most ${schema.maxLength} ${plural(schema.maxLength, "character")}`,
       })
     }
     switch (schema.format) {
-      case 'email':
+      case "email":
         stringSchema = stringSchema.email({
-          message: 'Must be a valid email address, e.g. user@example.com',
+          message: "Must be a valid email address, e.g. user@example.com",
         })
         break
-      case 'uri':
+      case "uri":
         stringSchema = stringSchema.url({
-          message: 'Must be a valid URI, e.g. https://example.com',
+          message: "Must be a valid URI, e.g. https://example.com",
         })
         break
-      case 'date':
-        stringSchema = stringSchema.date(
-          'Must be a valid date, e.g. 2024-03-15, today, next Monday',
-        )
+      case "date":
+        stringSchema = stringSchema.date("Must be a valid date, e.g. 2024-03-15, today, next Monday")
         break
-      case 'date-time':
+      case "date-time":
         stringSchema = stringSchema.datetime({
           offset: true,
-          message:
-            'Must be a valid date-time, e.g. 2024-03-15T14:30:00Z, tomorrow at 3pm',
+          message: "Must be a valid date-time, e.g. 2024-03-15T14:30:00Z, tomorrow at 3pm",
         })
         break
       default:
@@ -181,11 +168,10 @@ function getZodSchema(schema: PrimitiveSchemaDefinition): z.ZodTypeAny {
     }
     return stringSchema
   }
-  if (schema.type === 'number' || schema.type === 'integer') {
-    const typeLabel = schema.type === 'integer' ? 'an integer' : 'a number'
-    const isInteger = schema.type === 'integer'
-    const formatNum = (n: number) =>
-      Number.isInteger(n) && !isInteger ? `${n}.0` : String(n)
+  if (schema.type === "number" || schema.type === "integer") {
+    const typeLabel = schema.type === "integer" ? "an integer" : "a number"
+    const isInteger = schema.type === "integer"
+    const formatNum = (n: number) => (Number.isInteger(n) && !isInteger ? `${n}.0` : String(n))
 
     // Build a single descriptive error message for range violations
     const rangeMsg =
@@ -200,7 +186,7 @@ function getZodSchema(schema: PrimitiveSchemaDefinition): z.ZodTypeAny {
     let numberSchema = z.coerce.number({
       error: rangeMsg,
     })
-    if (schema.type === 'integer') {
+    if (schema.type === "integer") {
       numberSchema = numberSchema.int({ message: rangeMsg })
     }
     if (schema.minimum !== undefined) {
@@ -215,17 +201,14 @@ function getZodSchema(schema: PrimitiveSchemaDefinition): z.ZodTypeAny {
     }
     return numberSchema
   }
-  if (schema.type === 'boolean') {
+  if (schema.type === "boolean") {
     return z.coerce.boolean()
   }
 
   throw new Error(`Unsupported schema: ${jsonStringify(schema)}`)
 }
 
-export function validateElicitationInput(
-  stringValue: string,
-  schema: PrimitiveSchemaDefinition,
-): ValidationResult {
+export function validateElicitationInput(stringValue: string, schema: PrimitiveSchemaDefinition): ValidationResult {
   const zodSchema = getZodSchema(schema)
   const parseResult = zodSchema.safeParse(stringValue)
 
@@ -238,27 +221,19 @@ export function validateElicitationInput(
   }
   return {
     isValid: false,
-    error: parseResult.error.issues.map(e => e.message).join('; '),
+    error: parseResult.error.issues.map((e) => e.message).join("; "),
   }
 }
 
-const hasStringFormat = (
-  schema: PrimitiveSchemaDefinition,
-): schema is StringSchema & { format: string } => {
-  return (
-    schema.type === 'string' &&
-    'format' in schema &&
-    typeof schema.format === 'string'
-  )
+const hasStringFormat = (schema: PrimitiveSchemaDefinition): schema is StringSchema & { format: string } => {
+  return schema.type === "string" && "format" in schema && typeof schema.format === "string"
 }
 
 /**
  * Returns a helpful placeholder/hint for a given format
  */
-export function getFormatHint(
-  schema: PrimitiveSchemaDefinition,
-): string | undefined {
-  if (schema.type === 'string') {
+export function getFormatHint(schema: PrimitiveSchemaDefinition): string | undefined {
+  if (schema.type === "string") {
     if (!hasStringFormat(schema)) {
       return undefined
     }
@@ -267,10 +242,9 @@ export function getFormatHint(
     return `${description}, e.g. ${example}`
   }
 
-  if (schema.type === 'number' || schema.type === 'integer') {
-    const isInteger = schema.type === 'integer'
-    const formatNum = (n: number) =>
-      Number.isInteger(n) && !isInteger ? `${n}.0` : String(n)
+  if (schema.type === "number" || schema.type === "integer") {
+    const isInteger = schema.type === "integer"
+    const formatNum = (n: number) => (Number.isInteger(n) && !isInteger ? `${n}.0` : String(n))
 
     if (schema.minimum !== undefined && schema.maximum !== undefined) {
       return `(${schema.type} between ${formatNum(schema.minimum!)} and ${formatNum(schema.maximum!)})`
@@ -279,7 +253,7 @@ export function getFormatHint(
     } else if (schema.maximum !== undefined) {
       return `(${schema.type} <= ${formatNum(schema.maximum!)})`
     } else {
-      const example = schema.type === 'integer' ? '42' : '3.14'
+      const example = schema.type === "integer" ? "42" : "3.14"
       return `(${schema.type}, e.g. ${example})`
     }
   }
@@ -292,12 +266,8 @@ export function getFormatHint(
  */
 export function isDateTimeSchema(
   schema: PrimitiveSchemaDefinition,
-): schema is StringSchema & { format: 'date' | 'date-time' } {
-  return (
-    schema.type === 'string' &&
-    'format' in schema &&
-    (schema.format === 'date' || schema.format === 'date-time')
-  )
+): schema is StringSchema & { format: "date" | "date-time" } {
+  return schema.type === "string" && "format" in schema && (schema.format === "date" || schema.format === "date-time")
 }
 
 /**
@@ -315,17 +285,10 @@ export async function validateElicitationInputAsync(
   }
 
   if (isDateTimeSchema(schema) && !looksLikeISO8601(stringValue)) {
-    const parseResult = await parseNaturalLanguageDateTime(
-      stringValue,
-      schema.format,
-      signal,
-    )
+    const parseResult = await parseNaturalLanguageDateTime(stringValue, schema.format, signal)
 
     if (parseResult.success) {
-      const validatedParsed = validateElicitationInput(
-        parseResult.value,
-        schema,
-      )
+      const validatedParsed = validateElicitationInput(parseResult.value, schema)
       if (validatedParsed.isValid) {
         return validatedParsed
       }

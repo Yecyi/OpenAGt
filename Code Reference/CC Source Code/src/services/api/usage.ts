@@ -1,13 +1,9 @@
-import axios from 'axios'
-import { getOauthConfig } from '../../constants/oauth.js'
-import {
-  getClaudeAIOAuthTokens,
-  hasProfileScope,
-  isClaudeAISubscriber,
-} from '../../utils/auth.js'
-import { getAuthHeaders } from '../../utils/http.js'
-import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
-import { isOAuthTokenExpired } from '../oauth/client.js'
+import axios from "axios"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { getClaudeAIOAuthTokens, hasProfileScope, isClaudeAISubscriber } from "../../utils/auth.js"
+import { getAuthHeaders } from "../../utils/http.js"
+import { getClaudeCodeUserAgent } from "../../utils/userAgent.js"
+import { isOAuthTokenExpired } from "../oauth/client.js"
 
 export type RateLimit = {
   utilization: number | null // a percentage from 0 to 100
@@ -47,8 +43,8 @@ export async function fetchUtilization(): Promise<Utilization | null> {
   }
 
   const headers = {
-    'Content-Type': 'application/json',
-    'User-Agent': getClaudeCodeUserAgent(),
+    "Content-Type": "application/json",
+    "User-Agent": getClaudeCodeUserAgent(),
     ...authResult.headers,
   }
 

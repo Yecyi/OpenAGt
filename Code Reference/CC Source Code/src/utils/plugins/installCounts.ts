@@ -8,22 +8,22 @@
  * Cache location: ~/.claude/plugins/install-counts-cache.json
  */
 
-import axios from 'axios'
-import { randomBytes } from 'crypto'
-import { readFile, rename, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { logForDebugging } from '../debug.js'
-import { errorMessage, getErrnoCode } from '../errors.js'
-import { getFsImplementation } from '../fsOperations.js'
-import { logError } from '../log.js'
-import { jsonParse, jsonStringify } from '../slowOperations.js'
-import { classifyFetchError, logPluginFetch } from './fetchTelemetry.js'
-import { getPluginsDirectory } from './pluginDirectories.js'
+import axios from "axios"
+import { randomBytes } from "crypto"
+import { readFile, rename, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { logForDebugging } from "../debug.js"
+import { errorMessage, getErrnoCode } from "../errors.js"
+import { getFsImplementation } from "../fsOperations.js"
+import { logError } from "../log.js"
+import { jsonParse, jsonStringify } from "../slowOperations.js"
+import { classifyFetchError, logPluginFetch } from "./fetchTelemetry.js"
+import { getPluginsDirectory } from "./pluginDirectories.js"
 
 const INSTALL_COUNTS_CACHE_VERSION = 1
-const INSTALL_COUNTS_CACHE_FILENAME = 'install-counts-cache.json'
+const INSTALL_COUNTS_CACHE_FILENAME = "install-counts-cache.json"
 const INSTALL_COUNTS_URL =
-  'https://raw.githubusercontent.com/anthropics/claude-plugins-official/refs/heads/stats/stats/plugin-installs.json'
+  "https://raw.githubusercontent.com/anthropics/claude-plugins-official/refs/heads/stats/stats/plugin-installs.json"
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 /**
@@ -63,18 +63,18 @@ async function loadInstallCountsCache(): Promise<InstallCountsCache | null> {
   const cachePath = getInstallCountsCachePath()
 
   try {
-    const content = await readFile(cachePath, { encoding: 'utf-8' })
+    const content = await readFile(cachePath, { encoding: "utf-8" })
     const parsed = jsonParse(content) as unknown
 
     // Validate basic structure
     if (
-      typeof parsed !== 'object' ||
+      typeof parsed !== "object" ||
       parsed === null ||
-      !('version' in parsed) ||
-      !('fetchedAt' in parsed) ||
-      !('counts' in parsed)
+      !("version" in parsed) ||
+      !("fetchedAt" in parsed) ||
+      !("counts" in parsed)
     ) {
-      logForDebugging('Install counts cache has invalid structure')
+      logForDebugging("Install counts cache has invalid structure")
       return null
     }
 
@@ -93,35 +93,35 @@ async function loadInstallCountsCache(): Promise<InstallCountsCache | null> {
     }
 
     // Validate fetchedAt and counts
-    if (typeof cache.fetchedAt !== 'string' || !Array.isArray(cache.counts)) {
-      logForDebugging('Install counts cache has invalid structure')
+    if (typeof cache.fetchedAt !== "string" || !Array.isArray(cache.counts)) {
+      logForDebugging("Install counts cache has invalid structure")
       return null
     }
 
     // Validate fetchedAt is a valid date
     const fetchedAt = new Date(cache.fetchedAt).getTime()
     if (Number.isNaN(fetchedAt)) {
-      logForDebugging('Install counts cache has invalid fetchedAt timestamp')
+      logForDebugging("Install counts cache has invalid fetchedAt timestamp")
       return null
     }
 
     // Validate count entries have required fields
     const validCounts = cache.counts.every(
       (entry): entry is { plugin: string; unique_installs: number } =>
-        typeof entry === 'object' &&
+        typeof entry === "object" &&
         entry !== null &&
-        typeof entry.plugin === 'string' &&
-        typeof entry.unique_installs === 'number',
+        typeof entry.plugin === "string" &&
+        typeof entry.unique_installs === "number",
     )
     if (!validCounts) {
-      logForDebugging('Install counts cache has malformed entries')
+      logForDebugging("Install counts cache has malformed entries")
       return null
     }
 
     // Check if cache is stale (>24 hours old)
     const now = Date.now()
     if (now - fetchedAt > CACHE_TTL_MS) {
-      logForDebugging('Install counts cache is stale (>24h old)')
+      logForDebugging("Install counts cache is stale (>24h old)")
       return null
     }
 
@@ -133,10 +133,8 @@ async function loadInstallCountsCache(): Promise<InstallCountsCache | null> {
     }
   } catch (error) {
     const code = getErrnoCode(error)
-    if (code !== 'ENOENT') {
-      logForDebugging(
-        `Failed to load install counts cache: ${errorMessage(error)}`,
-      )
+    if (code !== "ENOENT") {
+      logForDebugging(`Failed to load install counts cache: ${errorMessage(error)}`)
     }
     return null
   }
@@ -146,11 +144,9 @@ async function loadInstallCountsCache(): Promise<InstallCountsCache | null> {
  * Save the install counts cache to disk atomically.
  * Uses a temp file + rename pattern to prevent corruption.
  */
-async function saveInstallCountsCache(
-  cache: InstallCountsCache,
-): Promise<void> {
+async function saveInstallCountsCache(cache: InstallCountsCache): Promise<void> {
   const cachePath = getInstallCountsCachePath()
-  const tempPath = `${cachePath}.${randomBytes(8).toString('hex')}.tmp`
+  const tempPath = `${cachePath}.${randomBytes(8).toString("hex")}.tmp`
 
   try {
     // Ensure the plugins directory exists
@@ -160,13 +156,13 @@ async function saveInstallCountsCache(
     // Write to temp file
     const content = jsonStringify(cache, null, 2)
     await writeFile(tempPath, content, {
-      encoding: 'utf-8',
+      encoding: "utf-8",
       mode: 0o600,
     })
 
     // Atomic rename
     await rename(tempPath, cachePath)
-    logForDebugging('Install counts cache saved successfully')
+    logForDebugging("Install counts cache saved successfully")
   } catch (error) {
     logError(error)
     // Clean up temp file if it exists
@@ -181,9 +177,7 @@ async function saveInstallCountsCache(
 /**
  * Fetch install counts from GitHub stats repository
  */
-async function fetchInstallCountsFromGitHub(): Promise<
-  Array<{ plugin: string; unique_installs: number }>
-> {
+async function fetchInstallCountsFromGitHub(): Promise<Array<{ plugin: string; unique_installs: number }>> {
   logForDebugging(`Fetching install counts from ${INSTALL_COUNTS_URL}`)
 
   const started = performance.now()
@@ -193,21 +187,16 @@ async function fetchInstallCountsFromGitHub(): Promise<
     })
 
     if (!response.data?.plugins || !Array.isArray(response.data.plugins)) {
-      throw new Error('Invalid response format from install counts API')
+      throw new Error("Invalid response format from install counts API")
     }
 
-    logPluginFetch(
-      'install_counts',
-      INSTALL_COUNTS_URL,
-      'success',
-      performance.now() - started,
-    )
+    logPluginFetch("install_counts", INSTALL_COUNTS_URL, "success", performance.now() - started)
     return response.data.plugins
   } catch (error) {
     logPluginFetch(
-      'install_counts',
+      "install_counts",
       INSTALL_COUNTS_URL,
-      'failure',
+      "failure",
       performance.now() - started,
       classifyFetchError(error),
     )
@@ -226,8 +215,8 @@ export async function getInstallCounts(): Promise<Map<string, number> | null> {
   // Try to load from cache first
   const cache = await loadInstallCountsCache()
   if (cache) {
-    logForDebugging('Using cached install counts')
-    logPluginFetch('install_counts', INSTALL_COUNTS_URL, 'cache_hit', 0)
+    logForDebugging("Using cached install counts")
+    logPluginFetch("install_counts", INSTALL_COUNTS_URL, "cache_hit", 0)
     const map = new Map<string, number>()
     for (const entry of cache.counts) {
       map.set(entry.plugin, entry.unique_installs)
@@ -279,14 +268,10 @@ export function formatInstallCount(count: number): string {
     const k = count / 1000
     // Use toFixed(1) but remove trailing .0
     const formatted = k.toFixed(1)
-    return formatted.endsWith('.0')
-      ? `${formatted.slice(0, -2)}K`
-      : `${formatted}K`
+    return formatted.endsWith(".0") ? `${formatted.slice(0, -2)}K` : `${formatted}K`
   }
 
   const m = count / 1000000
   const formatted = m.toFixed(1)
-  return formatted.endsWith('.0')
-    ? `${formatted.slice(0, -2)}M`
-    : `${formatted}M`
+  return formatted.endsWith(".0") ? `${formatted.slice(0, -2)}M` : `${formatted}M`
 }

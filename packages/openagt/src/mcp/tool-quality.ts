@@ -57,7 +57,11 @@ function mergeWeights(overrides?: ToolQualityWeights): Record<keyof ToolQualityC
   }
 }
 
-export function checkToolQuality(tool: MCPToolDef, clientName: string, weights?: ToolQualityWeights): ToolQualityReport {
+export function checkToolQuality(
+  tool: MCPToolDef,
+  clientName: string,
+  weights?: ToolQualityWeights,
+): ToolQualityReport {
   const issues: string[] = []
   const suggestions: string[] = []
 
@@ -69,7 +73,7 @@ export function checkToolQuality(tool: MCPToolDef, clientName: string, weights?:
     hasExamples: false,
     hasVersion: false,
     isNamingConsistent: isNamingConsistent(tool.name),
-    hasDeprecationWarning: !!(tool.description?.toLowerCase().includes("deprecated")),
+    hasDeprecationWarning: !!tool.description?.toLowerCase().includes("deprecated"),
   }
 
   if (!checks.hasValidSchema) {
@@ -150,7 +154,8 @@ export function checkToolsQuality(
   commonIssues: Record<string, number>
 } {
   const reports = tools.map(({ tool, clientName }) => checkToolQuality(tool, clientName, weights))
-  const averageScore = reports.length > 0 ? Math.round(reports.reduce((sum, r) => sum + r.overallScore, 0) / reports.length) : 0
+  const averageScore =
+    reports.length > 0 ? Math.round(reports.reduce((sum, r) => sum + r.overallScore, 0) / reports.length) : 0
 
   const highQualityTools = reports.filter((r) => r.overallScore >= 80).map((r) => `${r.clientName}:${r.toolName}`)
   const lowQualityTools = reports.filter((r) => r.overallScore < 50).map((r) => `${r.clientName}:${r.toolName}`)

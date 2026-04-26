@@ -1,6 +1,6 @@
-import { createContext } from 'react'
-import { EventEmitter } from '../events/emitter.js'
-import type { TerminalQuerier } from '../terminal-querier.js'
+import { createContext } from "react"
+import { EventEmitter } from "../events/emitter.js"
+import type { TerminalQuerier } from "../terminal-querier.js"
 
 export type Props = {
   /**
@@ -44,6 +44,6 @@ const StdinContext = createContext<Props>({
 })
 
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
-StdinContext.displayName = 'InternalStdinContext'
+StdinContext.displayName = "InternalStdinContext"
 
 export default StdinContext

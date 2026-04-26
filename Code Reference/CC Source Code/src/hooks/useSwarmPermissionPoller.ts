@@ -9,21 +9,18 @@
  * in useCanUseTool.ts, which creates pending requests that this hook monitors.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
-import { useInterval } from 'usehooks-ts'
-import { logForDebugging } from '../utils/debug.js'
-import { errorMessage } from '../utils/errors.js'
-import {
-  type PermissionUpdate,
-  permissionUpdateSchema,
-} from '../utils/permissions/PermissionUpdateSchema.js'
+import { useCallback, useEffect, useRef } from "react"
+import { useInterval } from "usehooks-ts"
+import { logForDebugging } from "../utils/debug.js"
+import { errorMessage } from "../utils/errors.js"
+import { type PermissionUpdate, permissionUpdateSchema } from "../utils/permissions/PermissionUpdateSchema.js"
 import {
   isSwarmWorker,
   type PermissionResponse,
   pollForResponse,
   removeWorkerResponse,
-} from '../utils/swarm/permissionSync.js'
-import { getAgentName, getTeamName } from '../utils/teammate.js'
+} from "../utils/swarm/permissionSync.js"
+import { getAgentName, getTeamName } from "../utils/teammate.js"
 
 const POLL_INTERVAL_MS = 500
 
@@ -43,10 +40,9 @@ function parsePermissionUpdates(raw: unknown): PermissionUpdate[] {
     if (result.success) {
       valid.push(result.data)
     } else {
-      logForDebugging(
-        `[SwarmPermissionPoller] Dropping malformed permissionUpdate entry: ${result.error.message}`,
-        { level: 'warn' },
-      )
+      logForDebugging(`[SwarmPermissionPoller] Dropping malformed permissionUpdate entry: ${result.error.message}`, {
+        level: "warn",
+      })
     }
   }
   return valid
@@ -79,13 +75,9 @@ const pendingCallbacks: PendingCallbackRegistry = new Map()
  * Register a callback for a pending permission request
  * Called by useCanUseTool when a worker submits a permission request
  */
-export function registerPermissionCallback(
-  callback: PermissionResponseCallback,
-): void {
+export function registerPermissionCallback(callback: PermissionResponseCallback): void {
   pendingCallbacks.set(callback.requestId, callback)
-  logForDebugging(
-    `[SwarmPermissionPoller] Registered callback for request ${callback.requestId}`,
-  )
+  logForDebugging(`[SwarmPermissionPoller] Registered callback for request ${callback.requestId}`)
 }
 
 /**
@@ -93,9 +85,7 @@ export function registerPermissionCallback(
  */
 export function unregisterPermissionCallback(requestId: string): void {
   pendingCallbacks.delete(requestId)
-  logForDebugging(
-    `[SwarmPermissionPoller] Unregistered callback for request ${requestId}`,
-  )
+  logForDebugging(`[SwarmPermissionPoller] Unregistered callback for request ${requestId}`)
 }
 
 /**
@@ -123,7 +113,7 @@ export function clearAllPendingCallbacks(): void {
  */
 export function processMailboxPermissionResponse(params: {
   requestId: string
-  decision: 'approved' | 'rejected'
+  decision: "approved" | "rejected"
   feedback?: string
   updatedInput?: Record<string, unknown>
   permissionUpdates?: unknown
@@ -131,9 +121,7 @@ export function processMailboxPermissionResponse(params: {
   const callback = pendingCallbacks.get(params.requestId)
 
   if (!callback) {
-    logForDebugging(
-      `[SwarmPermissionPoller] No callback registered for mailbox response ${params.requestId}`,
-    )
+    logForDebugging(`[SwarmPermissionPoller] No callback registered for mailbox response ${params.requestId}`)
     return false
   }
 
@@ -144,7 +132,7 @@ export function processMailboxPermissionResponse(params: {
   // Remove from registry before invoking callback
   pendingCallbacks.delete(params.requestId)
 
-  if (params.decision === 'approved') {
+  if (params.decision === "approved") {
     const permissionUpdates = parsePermissionUpdates(params.permissionUpdates)
     const updatedInput = params.updatedInput
     callback.onAllow(updatedInput, permissionUpdates)
@@ -169,20 +157,15 @@ export type SandboxPermissionResponseCallback = {
 }
 
 // Module-level registry for sandbox permission callbacks
-const pendingSandboxCallbacks: Map<string, SandboxPermissionResponseCallback> =
-  new Map()
+const pendingSandboxCallbacks: Map<string, SandboxPermissionResponseCallback> = new Map()
 
 /**
  * Register a callback for a pending sandbox permission request
  * Called when a worker sends a sandbox permission request to the leader
  */
-export function registerSandboxPermissionCallback(
-  callback: SandboxPermissionResponseCallback,
-): void {
+export function registerSandboxPermissionCallback(callback: SandboxPermissionResponseCallback): void {
   pendingSandboxCallbacks.set(callback.requestId, callback)
-  logForDebugging(
-    `[SwarmPermissionPoller] Registered sandbox callback for request ${callback.requestId}`,
-  )
+  logForDebugging(`[SwarmPermissionPoller] Registered sandbox callback for request ${callback.requestId}`)
 }
 
 /**
@@ -198,17 +181,11 @@ export function hasSandboxPermissionCallback(requestId: string): boolean {
  *
  * @returns true if the response was processed, false if no callback was registered
  */
-export function processSandboxPermissionResponse(params: {
-  requestId: string
-  host: string
-  allow: boolean
-}): boolean {
+export function processSandboxPermissionResponse(params: { requestId: string; host: string; allow: boolean }): boolean {
   const callback = pendingSandboxCallbacks.get(params.requestId)
 
   if (!callback) {
-    logForDebugging(
-      `[SwarmPermissionPoller] No sandbox callback registered for request ${params.requestId}`,
-    )
+    logForDebugging(`[SwarmPermissionPoller] No sandbox callback registered for request ${params.requestId}`)
     return false
   }
 
@@ -232,20 +209,16 @@ function processResponse(response: PermissionResponse): boolean {
   const callback = pendingCallbacks.get(response.requestId)
 
   if (!callback) {
-    logForDebugging(
-      `[SwarmPermissionPoller] No callback registered for request ${response.requestId}`,
-    )
+    logForDebugging(`[SwarmPermissionPoller] No callback registered for request ${response.requestId}`)
     return false
   }
 
-  logForDebugging(
-    `[SwarmPermissionPoller] Processing response for request ${response.requestId}: ${response.decision}`,
-  )
+  logForDebugging(`[SwarmPermissionPoller] Processing response for request ${response.requestId}: ${response.decision}`)
 
   // Remove from registry before invoking callback
   pendingCallbacks.delete(response.requestId)
 
-  if (response.decision === 'approved') {
+  if (response.decision === "approved") {
     const permissionUpdates = parsePermissionUpdates(response.permissionUpdates)
     const updatedInput = response.updatedInput
     callback.onAllow(updatedInput, permissionUpdates)
@@ -309,9 +282,7 @@ export function useSwarmPermissionPoller(): void {
         }
       }
     } catch (error) {
-      logForDebugging(
-        `[SwarmPermissionPoller] Error during poll: ${errorMessage(error)}`,
-      )
+      logForDebugging(`[SwarmPermissionPoller] Error during poll: ${errorMessage(error)}`)
     } finally {
       isProcessingRef.current = false
     }

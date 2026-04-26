@@ -3,7 +3,7 @@
  * This isolates mock logic from production code
  */
 
-import { APIError } from '@anthropic-ai/sdk'
+import { APIError } from "@anthropic-ai/sdk"
 import {
   applyMockHeaders,
   checkMockFastModeRateLimit,
@@ -11,14 +11,12 @@ import {
   getMockHeaders,
   isMockFastModeRateLimitScenario,
   shouldProcessMockLimits,
-} from './mockRateLimits.js'
+} from "./mockRateLimits.js"
 
 /**
  * Process headers, applying mocks if /mock-limits command is active
  */
-export function processRateLimitHeaders(
-  headers: globalThis.Headers,
-): globalThis.Headers {
+export function processRateLimitHeaders(headers: globalThis.Headers): globalThis.Headers {
   // Only apply mocks for Ant employees using /mock-limits command
   if (shouldProcessMockLimits()) {
     return applyMockHeaders(headers)
@@ -39,10 +37,7 @@ export function shouldProcessRateLimits(isSubscriber: boolean): boolean {
  * @param currentModel The model being used for the current request
  * @param isFastModeActive Whether fast mode is currently active (for fast-mode-only mocks)
  */
-export function checkMockRateLimitError(
-  currentModel: string,
-  isFastModeActive?: boolean,
-): APIError | null {
+export function checkMockRateLimitError(currentModel: string, isFastModeActive?: boolean): APIError | null {
   if (!shouldProcessMockLimits()) {
     return null
   }
@@ -51,7 +46,7 @@ export function checkMockRateLimitError(
   if (headerlessMessage) {
     return new APIError(
       429,
-      { error: { type: 'rate_limit_error', message: headerlessMessage } },
+      { error: { type: "rate_limit_error", message: headerlessMessage } },
       headerlessMessage,
       // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
       new globalThis.Headers(),
@@ -68,17 +63,15 @@ export function checkMockRateLimitError(
   // 1. Status is rejected AND
   // 2. Either no overage headers OR overage is also rejected
   // 3. For Opus-specific limits, only throw if actually using an Opus model
-  const status = mockHeaders['anthropic-ratelimit-unified-status']
-  const overageStatus =
-    mockHeaders['anthropic-ratelimit-unified-overage-status']
-  const rateLimitType =
-    mockHeaders['anthropic-ratelimit-unified-representative-claim']
+  const status = mockHeaders["anthropic-ratelimit-unified-status"]
+  const overageStatus = mockHeaders["anthropic-ratelimit-unified-overage-status"]
+  const rateLimitType = mockHeaders["anthropic-ratelimit-unified-representative-claim"]
 
   // Check if this is an Opus-specific rate limit
-  const isOpusLimit = rateLimitType === 'seven_day_opus'
+  const isOpusLimit = rateLimitType === "seven_day_opus"
 
   // Check if current model is an Opus model (handles all variants including aliases)
-  const isUsingOpus = currentModel.includes('opus')
+  const isUsingOpus = currentModel.includes("opus")
 
   // For Opus limits, only throw 429 if actually using Opus
   // This simulates the real API behavior where fallback to Sonnet succeeds
@@ -95,35 +88,24 @@ export function checkMockRateLimitError(
     // Create a mock 429 error with the fast mode headers
     const error = new APIError(
       429,
-      { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
-      'Rate limit exceeded',
+      { error: { type: "rate_limit_error", message: "Rate limit exceeded" } },
+      "Rate limit exceeded",
       // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-      new globalThis.Headers(
-        Object.entries(fastModeHeaders).filter(([_, v]) => v !== undefined) as [
-          string,
-          string,
-        ][],
-      ),
+      new globalThis.Headers(Object.entries(fastModeHeaders).filter(([_, v]) => v !== undefined) as [string, string][]),
     )
     return error
   }
 
-  const shouldThrow429 =
-    status === 'rejected' && (!overageStatus || overageStatus === 'rejected')
+  const shouldThrow429 = status === "rejected" && (!overageStatus || overageStatus === "rejected")
 
   if (shouldThrow429) {
     // Create a mock 429 error with the appropriate headers
     const error = new APIError(
       429,
-      { error: { type: 'rate_limit_error', message: 'Rate limit exceeded' } },
-      'Rate limit exceeded',
+      { error: { type: "rate_limit_error", message: "Rate limit exceeded" } },
+      "Rate limit exceeded",
       // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-      new globalThis.Headers(
-        Object.entries(mockHeaders).filter(([_, v]) => v !== undefined) as [
-          string,
-          string,
-        ][],
-      ),
+      new globalThis.Headers(Object.entries(mockHeaders).filter(([_, v]) => v !== undefined) as [string, string][]),
     )
     return error
   }

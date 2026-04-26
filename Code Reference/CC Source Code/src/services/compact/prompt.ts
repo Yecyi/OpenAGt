@@ -1,11 +1,11 @@
-import { feature } from 'bun:bundle'
-import type { PartialCompactDirection } from '../../types/message.js'
+import { feature } from "bun:bundle"
+import type { PartialCompactDirection } from "../../types/message.js"
 
 // Dead code elimination: conditional import for proactive mode
 /* eslint-disable @typescript-eslint/no-require-imports */
 const proactiveModule =
-  feature('PROACTIVE') || feature('KAIROS')
-    ? (require('../../proactive/index.js') as typeof import('../../proactive/index.js'))
+  feature("PROACTIVE") || feature("KAIROS")
+    ? (require("../../proactive/index.js") as typeof import("../../proactive/index.js"))
     : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -267,21 +267,18 @@ Please provide your summary following this structure, ensuring precision and tho
 `
 
 const NO_TOOLS_TRAILER =
-  '\n\nREMINDER: Do NOT call any tools. Respond with plain text only — ' +
-  'an <analysis> block followed by a <summary> block. ' +
-  'Tool calls will be rejected and you will fail the task.'
+  "\n\nREMINDER: Do NOT call any tools. Respond with plain text only — " +
+  "an <analysis> block followed by a <summary> block. " +
+  "Tool calls will be rejected and you will fail the task."
 
 export function getPartialCompactPrompt(
   customInstructions?: string,
-  direction: PartialCompactDirection = 'from',
+  direction: PartialCompactDirection = "from",
 ): string {
-  const template =
-    direction === 'up_to'
-      ? PARTIAL_COMPACT_UP_TO_PROMPT
-      : PARTIAL_COMPACT_PROMPT
+  const template = direction === "up_to" ? PARTIAL_COMPACT_UP_TO_PROMPT : PARTIAL_COMPACT_PROMPT
   let prompt = NO_TOOLS_PREAMBLE + template
 
-  if (customInstructions && customInstructions.trim() !== '') {
+  if (customInstructions && customInstructions.trim() !== "") {
     prompt += `\n\nAdditional Instructions:\n${customInstructions}`
   }
 
@@ -293,7 +290,7 @@ export function getPartialCompactPrompt(
 export function getCompactPrompt(customInstructions?: string): string {
   let prompt = NO_TOOLS_PREAMBLE + BASE_COMPACT_PROMPT
 
-  if (customInstructions && customInstructions.trim() !== '') {
+  if (customInstructions && customInstructions.trim() !== "") {
     prompt += `\n\nAdditional Instructions:\n${customInstructions}`
   }
 
@@ -313,23 +310,17 @@ export function formatCompactSummary(summary: string): string {
 
   // Strip analysis section — it's a drafting scratchpad that improves summary
   // quality but has no informational value once the summary is written.
-  formattedSummary = formattedSummary.replace(
-    /<analysis>[\s\S]*?<\/analysis>/,
-    '',
-  )
+  formattedSummary = formattedSummary.replace(/<analysis>[\s\S]*?<\/analysis>/, "")
 
   // Extract and format summary section
   const summaryMatch = formattedSummary.match(/<summary>([\s\S]*?)<\/summary>/)
   if (summaryMatch) {
-    const content = summaryMatch[1] || ''
-    formattedSummary = formattedSummary.replace(
-      /<summary>[\s\S]*?<\/summary>/,
-      `Summary:\n${content.trim()}`,
-    )
+    const content = summaryMatch[1] || ""
+    formattedSummary = formattedSummary.replace(/<summary>[\s\S]*?<\/summary>/, `Summary:\n${content.trim()}`)
   }
 
   // Clean up extra whitespace between sections
-  formattedSummary = formattedSummary.replace(/\n\n+/g, '\n\n')
+  formattedSummary = formattedSummary.replace(/\n\n+/g, "\n\n")
 
   return formattedSummary.trim()
 }
@@ -358,10 +349,7 @@ ${formattedSummary}`
     let continuation = `${baseSummary}
 Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.`
 
-    if (
-      (feature('PROACTIVE') || feature('KAIROS')) &&
-      proactiveModule?.isProactiveActive()
-    ) {
+    if ((feature("PROACTIVE") || feature("KAIROS")) && proactiveModule?.isProactiveActive()) {
       continuation += `
 
 You are running in autonomous/proactive mode. This is NOT a first wake-up — you were already working autonomously before compaction. Continue your work loop: pick up where you left off based on the summary above. Do not greet the user or ask what to work on.`

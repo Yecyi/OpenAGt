@@ -1,9 +1,9 @@
-import type { UUID } from 'crypto'
-import type { FileHistorySnapshot } from 'src/utils/fileHistory.js'
-import type { ContentReplacementRecord } from 'src/utils/toolResultStorage.js'
-import type { AgentId } from './ids.js'
-import type { Message } from './message.js'
-import type { QueueOperationMessage } from './messageQueueTypes.js'
+import type { UUID } from "crypto"
+import type { FileHistorySnapshot } from "src/utils/fileHistory.js"
+import type { ContentReplacementRecord } from "src/utils/toolResultStorage.js"
+import type { AgentId } from "./ids.js"
+import type { Message } from "./message.js"
+import type { QueueOperationMessage } from "./messageQueueTypes.js"
 
 export type SerializedMessage = Message & {
   cwd: string
@@ -47,19 +47,19 @@ export type LogOption = {
   prNumber?: number // GitHub PR number linked to this session
   prUrl?: string // Full URL to the linked PR
   prRepository?: string // Repository in "owner/repo" format
-  mode?: 'coordinator' | 'normal' // Session mode for coordinator/normal detection
+  mode?: "coordinator" | "normal" // Session mode for coordinator/normal detection
   worktreeSession?: PersistedWorktreeSession | null // Worktree state at session end (null = exited, undefined = never entered)
   contentReplacements?: ContentReplacementRecord[] // Replacement decisions for resume reconstruction
 }
 
 export type SummaryMessage = {
-  type: 'summary'
+  type: "summary"
   leafUuid: UUID
   summary: string
 }
 
 export type CustomTitleMessage = {
-  type: 'custom-title'
+  type: "custom-title"
   sessionId: UUID
   customTitle: string
 }
@@ -73,13 +73,13 @@ export type CustomTitleMessage = {
  *   allowing AI to overwrite its own previous AI title but not user titles
  */
 export type AiTitleMessage = {
-  type: 'ai-title'
+  type: "ai-title"
   sessionId: UUID
   aiTitle: string
 }
 
 export type LastPromptMessage = {
-  type: 'last-prompt'
+  type: "last-prompt"
   sessionId: UUID
   lastPrompt: string
 }
@@ -91,32 +91,32 @@ export type LastPromptMessage = {
  * (which is often "ok go" or "fix it").
  */
 export type TaskSummaryMessage = {
-  type: 'task-summary'
+  type: "task-summary"
   sessionId: UUID
   summary: string
   timestamp: string
 }
 
 export type TagMessage = {
-  type: 'tag'
+  type: "tag"
   sessionId: UUID
   tag: string
 }
 
 export type AgentNameMessage = {
-  type: 'agent-name'
+  type: "agent-name"
   sessionId: UUID
   agentName: string
 }
 
 export type AgentColorMessage = {
-  type: 'agent-color'
+  type: "agent-color"
   sessionId: UUID
   agentColor: string
 }
 
 export type AgentSettingMessage = {
-  type: 'agent-setting'
+  type: "agent-setting"
   sessionId: UUID
   agentSetting: string
 }
@@ -126,7 +126,7 @@ export type AgentSettingMessage = {
  * Links a session to a GitHub pull request for tracking and navigation.
  */
 export type PRLinkMessage = {
-  type: 'pr-link'
+  type: "pr-link"
   sessionId: UUID
   prNumber: number
   prUrl: string
@@ -135,9 +135,9 @@ export type PRLinkMessage = {
 }
 
 export type ModeEntry = {
-  type: 'mode'
+  type: "mode"
   sessionId: UUID
-  mode: 'coordinator' | 'normal'
+  mode: "coordinator" | "normal"
 }
 
 /**
@@ -165,7 +165,7 @@ export type PersistedWorktreeSession = {
  * still exists on disk (the /exit dialog may have removed it).
  */
 export type WorktreeStateEntry = {
-  type: 'worktree-state'
+  type: "worktree-state"
   sessionId: UUID
   worktreeSession: PersistedWorktreeSession | null
 }
@@ -179,14 +179,14 @@ export type WorktreeStateEntry = {
  * (/resume reads these).
  */
 export type ContentReplacementEntry = {
-  type: 'content-replacement'
+  type: "content-replacement"
   sessionId: UUID
   agentId?: AgentId
   replacements: ContentReplacementRecord[]
 }
 
 export type FileHistorySnapshotMessage = {
-  type: 'file-history-snapshot'
+  type: "file-history-snapshot"
   messageId: UUID
   snapshot: FileHistorySnapshot
   isSnapshotUpdate: boolean
@@ -206,7 +206,7 @@ export type FileAttributionState = {
  * Tracks character-level contributions by Claude for commit attribution.
  */
 export type AttributionSnapshotMessage = {
-  type: 'attribution-snapshot'
+  type: "attribution-snapshot"
   messageId: UUID
   surface: string // Client surface (cli, ide, web, api)
   fileStates: Record<string, FileAttributionState>
@@ -231,7 +231,7 @@ export type TranscriptMessage = SerializedMessage & {
 }
 
 export type SpeculationAcceptMessage = {
-  type: 'speculation-accept'
+  type: "speculation-accept"
   timestamp: string
   timeSavedMs: number
 }
@@ -253,7 +253,7 @@ export type SpeculationAcceptMessage = {
  * nothing in an external build ever writes or reads this entry.
  */
 export type ContextCollapseCommitEntry = {
-  type: 'marble-origami-commit'
+  type: "marble-origami-commit"
   sessionId: UUID
   /** 16-digit collapse ID. Max across entries reseeds the ID counter. */
   collapseId: string
@@ -280,7 +280,7 @@ export type ContextCollapseCommitEntry = {
  * span itself resolves correctly.
  */
 export type ContextCollapseSnapshotEntry = {
-  type: 'marble-origami-snapshot'
+  type: "marble-origami-snapshot"
   sessionId: UUID
   staged: Array<{
     startUuid: string

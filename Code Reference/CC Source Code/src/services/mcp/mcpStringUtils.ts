@@ -4,7 +4,7 @@
  * consumers that only need string parsing (e.g., permissionValidation).
  */
 
-import { normalizeNameForMCP } from './normalization.js'
+import { normalizeNameForMCP } from "./normalization.js"
 
 /*
  * Extracts MCP server information from a tool name string
@@ -20,14 +20,13 @@ export function mcpInfoFromString(toolString: string): {
   serverName: string
   toolName: string | undefined
 } | null {
-  const parts = toolString.split('__')
+  const parts = toolString.split("__")
   const [mcpPart, serverName, ...toolNameParts] = parts
-  if (mcpPart !== 'mcp' || !serverName) {
+  if (mcpPart !== "mcp" || !serverName) {
     return null
   }
   // Join all parts after server name to preserve double underscores in tool names
-  const toolName =
-    toolNameParts.length > 0 ? toolNameParts.join('__') : undefined
+  const toolName = toolNameParts.length > 0 ? toolNameParts.join("__") : undefined
   return { serverName, toolName }
 }
 
@@ -61,9 +60,7 @@ export function getToolNameForPermissionCheck(tool: {
   name: string
   mcpInfo?: { serverName: string; toolName: string }
 }): string {
-  return tool.mcpInfo
-    ? buildMcpToolName(tool.mcpInfo.serverName, tool.mcpInfo.toolName)
-    : tool.name
+  return tool.mcpInfo ? buildMcpToolName(tool.mcpInfo.serverName, tool.mcpInfo.toolName) : tool.name
 }
 
 /*
@@ -72,12 +69,9 @@ export function getToolNameForPermissionCheck(tool: {
  * @param serverName The server name to remove from the prefix
  * @returns The display name without the MCP prefix
  */
-export function getMcpDisplayName(
-  fullName: string,
-  serverName: string,
-): string {
+export function getMcpDisplayName(fullName: string, serverName: string): string {
   const prefix = `mcp__${normalizeNameForMCP(serverName)}__`
-  return fullName.replace(prefix, '')
+  return fullName.replace(prefix, "")
 }
 
 /**
@@ -89,13 +83,13 @@ export function extractMcpToolDisplayName(userFacingName: string): string {
   // This is really ugly but our current Tool type doesn't make it easy to have different display names for different purposes.
 
   // First, remove the (MCP) suffix if present
-  let withoutSuffix = userFacingName.replace(/\s*\(MCP\)\s*$/, '')
+  let withoutSuffix = userFacingName.replace(/\s*\(MCP\)\s*$/, "")
 
   // Trim the result
   withoutSuffix = withoutSuffix.trim()
 
   // Then, remove the server prefix (everything before " - ")
-  const dashIndex = withoutSuffix.indexOf(' - ')
+  const dashIndex = withoutSuffix.indexOf(" - ")
   if (dashIndex !== -1) {
     const displayName = withoutSuffix.substring(dashIndex + 3).trim()
     return displayName

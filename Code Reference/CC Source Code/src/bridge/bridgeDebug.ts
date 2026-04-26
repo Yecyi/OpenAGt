@@ -1,6 +1,6 @@
-import { logForDebugging } from '../utils/debug.js'
-import { BridgeFatalError } from './bridgeApi.js'
-import type { BridgeApiClient } from './types.js'
+import { logForDebugging } from "../utils/debug.js"
+import { BridgeFatalError } from "./bridgeApi.js"
+import type { BridgeApiClient } from "./types.js"
 
 /**
  * Ant-only fault injection for manually testing bridge recovery paths.
@@ -20,15 +20,11 @@ import type { BridgeApiClient } from './types.js'
 
 /** One-shot fault to inject on the next matching api call. */
 type BridgeFault = {
-  method:
-    | 'pollForWork'
-    | 'registerBridgeEnvironment'
-    | 'reconnectSession'
-    | 'heartbeatWork'
+  method: "pollForWork" | "registerBridgeEnvironment" | "reconnectSession" | "heartbeatWork"
   /** Fatal errors go through handleErrorStatus → BridgeFatalError. Transient
    *  errors surface as plain axios rejections (5xx / network). Recovery code
    *  distinguishes the two: fatal → teardown, transient → retry/backoff. */
-  kind: 'fatal' | 'transient'
+  kind: "fatal" | "transient"
   status: number
   errorType?: string
   /** Remaining injections. Decremented on consume; removed at 0. */
@@ -70,7 +66,7 @@ export function getBridgeDebugHandle(): BridgeDebugHandle | null {
 export function injectBridgeFault(fault: BridgeFault): void {
   faultQueue.push(fault)
   logForDebugging(
-    `[bridge:debug] Queued fault: ${fault.method} ${fault.kind}/${fault.status}${fault.errorType ? `/${fault.errorType}` : ''} ×${fault.count}`,
+    `[bridge:debug] Queued fault: ${fault.method} ${fault.kind}/${fault.status}${fault.errorType ? `/${fault.errorType}` : ""} ×${fault.count}`,
   )
 }
 
@@ -81,11 +77,9 @@ export function injectBridgeFault(fault: BridgeFault): void {
  *
  * Only called when USER_TYPE === 'ant' — zero overhead in external builds.
  */
-export function wrapApiForFaultInjection(
-  api: BridgeApiClient,
-): BridgeApiClient {
-  function consume(method: BridgeFault['method']): BridgeFault | null {
-    const idx = faultQueue.findIndex(f => f.method === method)
+export function wrapApiForFaultInjection(api: BridgeApiClient): BridgeApiClient {
+  function consume(method: BridgeFault["method"]): BridgeFault | null {
+    const idx = faultQueue.findIndex((f) => f.method === method)
     if (idx === -1) return null
     const fault = faultQueue[idx]!
     fault.count--
@@ -95,14 +89,10 @@ export function wrapApiForFaultInjection(
 
   function throwFault(fault: BridgeFault, context: string): never {
     logForDebugging(
-      `[bridge:debug] Injecting ${fault.kind} fault into ${context}: status=${fault.status} errorType=${fault.errorType ?? 'none'}`,
+      `[bridge:debug] Injecting ${fault.kind} fault into ${context}: status=${fault.status} errorType=${fault.errorType ?? "none"}`,
     )
-    if (fault.kind === 'fatal') {
-      throw new BridgeFatalError(
-        `[injected] ${context} ${fault.status}`,
-        fault.status,
-        fault.errorType,
-      )
+    if (fault.kind === "fatal") {
+      throw new BridgeFatalError(`[injected] ${context} ${fault.status}`, fault.status, fault.errorType)
     }
     // Transient: mimic an axios rejection (5xx / network). No .status on
     // the error itself — that's how the catch blocks distinguish.
@@ -112,23 +102,23 @@ export function wrapApiForFaultInjection(
   return {
     ...api,
     async pollForWork(envId, secret, signal, reclaimMs) {
-      const f = consume('pollForWork')
-      if (f) throwFault(f, 'Poll')
+      const f = consume("pollForWork")
+      if (f) throwFault(f, "Poll")
       return api.pollForWork(envId, secret, signal, reclaimMs)
     },
     async registerBridgeEnvironment(config) {
-      const f = consume('registerBridgeEnvironment')
-      if (f) throwFault(f, 'Registration')
+      const f = consume("registerBridgeEnvironment")
+      if (f) throwFault(f, "Registration")
       return api.registerBridgeEnvironment(config)
     },
     async reconnectSession(envId, sessionId) {
-      const f = consume('reconnectSession')
-      if (f) throwFault(f, 'ReconnectSession')
+      const f = consume("reconnectSession")
+      if (f) throwFault(f, "ReconnectSession")
       return api.reconnectSession(envId, sessionId)
     },
     async heartbeatWork(envId, workId, token) {
-      const f = consume('heartbeatWork')
-      if (f) throwFault(f, 'Heartbeat')
+      const f = consume("heartbeatWork")
+      if (f) throwFault(f, "Heartbeat")
       return api.heartbeatWork(envId, workId, token)
     },
   }

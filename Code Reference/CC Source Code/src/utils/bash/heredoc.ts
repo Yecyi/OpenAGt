@@ -24,10 +24,10 @@
  * @module
  */
 
-import { randomBytes } from 'crypto'
+import { randomBytes } from "crypto"
 
-const HEREDOC_PLACEHOLDER_PREFIX = '__HEREDOC_'
-const HEREDOC_PLACEHOLDER_SUFFIX = '__'
+const HEREDOC_PLACEHOLDER_PREFIX = "__HEREDOC_"
+const HEREDOC_PLACEHOLDER_SUFFIX = "__"
 
 /**
  * Generates a random hex string for placeholder uniqueness.
@@ -35,7 +35,7 @@ const HEREDOC_PLACEHOLDER_SUFFIX = '__'
  */
 function generatePlaceholderSalt(): string {
   // Generate 8 random bytes as hex (16 characters)
-  return randomBytes(8).toString('hex')
+  return randomBytes(8).toString("hex")
 }
 
 /**
@@ -110,14 +110,11 @@ export type HeredocExtractionResult = {
  * // result.heredocs has the mapping to restore later
  * ```
  */
-export function extractHeredocs(
-  command: string,
-  options?: { quotedOnly?: boolean },
-): HeredocExtractionResult {
+export function extractHeredocs(command: string, options?: { quotedOnly?: boolean }): HeredocExtractionResult {
   const heredocs = new Map<string, HeredocInfo>()
 
   // Quick check: if no << present, skip processing
-  if (!command.includes('<<')) {
+  if (!command.includes("<<")) {
     return { processedCommand: command, heredocs }
   }
 
@@ -144,8 +141,8 @@ export function extractHeredocs(
   // shell_eof_token for PST_EOFTOKEN (make_cmd.c:606), enabling early
   // heredoc closure that our parser can't replicate. We only check
   // before << because backticks in heredoc body content are harmless.
-  const firstHeredocPos = command.indexOf('<<')
-  if (firstHeredocPos > 0 && command.slice(0, firstHeredocPos).includes('`')) {
+  const firstHeredocPos = command.indexOf("<<")
+  if (firstHeredocPos > 0 && command.slice(0, firstHeredocPos).includes("`")) {
     return { processedCommand: command, heredocs }
   }
 
@@ -168,7 +165,7 @@ export function extractHeredocs(
   }
 
   // Create a global version of the pattern for iteration
-  const heredocStartPattern = new RegExp(HEREDOC_START_PATTERN.source, 'g')
+  const heredocStartPattern = new RegExp(HEREDOC_START_PATTERN.source, "g")
 
   const heredocMatches: HeredocInfo[] = []
   // Security: When quotedOnly skips an unquoted heredoc, we still need to
@@ -236,7 +233,7 @@ export function extractHeredocs(
       // used `lineStart = lastIndexOf('\n', pos-1)+1` (quote-blind), so a
       // `\n` inside quotes still advanced lineStart. Match that here by
       // clearing BEFORE the quote branches.
-      if (ch === '\n') scanInComment = false
+      if (ch === "\n") scanInComment = false
 
       if (scanInSingleQuote) {
         if (ch === "'") scanInSingleQuote = false
@@ -248,7 +245,7 @@ export function extractHeredocs(
           scanDqEscapeNext = false
           continue
         }
-        if (ch === '\\') {
+        if (ch === "\\") {
           scanDqEscapeNext = true
           continue
         }
@@ -259,7 +256,7 @@ export function extractHeredocs(
       // Unquoted context. Quote tracking is COMMENT-BLIND (same as the old
       // isInsideQuotedString): we do NOT skip chars for being inside a
       // comment. Only the `#` detection itself is gated on not-in-comment.
-      if (ch === '\\') {
+      if (ch === "\\") {
         scanPendingBackslashes++
         continue
       }
@@ -269,7 +266,7 @@ export function extractHeredocs(
 
       if (ch === "'") scanInSingleQuote = true
       else if (ch === '"') scanInDoubleQuote = true
-      else if (!scanInComment && ch === '#') scanInComment = true
+      else if (!scanInComment && ch === "#") scanInComment = true
     }
     scanPos = target
   }
@@ -310,10 +307,7 @@ export function extractHeredocs(
     // operator. Extracting it would hide content that bash actually expands.
     let insideSkipped = false
     for (const skipped of skippedHeredocRanges) {
-      if (
-        startIndex > skipped.contentStartIndex &&
-        startIndex < skipped.contentEndIndex
-      ) {
+      if (startIndex > skipped.contentStartIndex && startIndex < skipped.contentEndIndex) {
         insideSkipped = true
         break
       }
@@ -323,7 +317,7 @@ export function extractHeredocs(
     }
 
     const fullMatch = match[0]
-    const isDash = match[1] === '-'
+    const isDash = match[1] === "-"
     // Group 3 = quoted delimiter (may include backslash), group 4 = unquoted
     const delimiter = (match[3] || match[4])!
     const operatorEndIndex = startIndex + fullMatch.length
@@ -351,7 +345,7 @@ export function extractHeredocs(
     // and ${} in the body ARE executed. When quotedOnly is set, skip
     // unquoted heredocs so their bodies remain visible to security
     // validators (they may contain executable command substitutions).
-    const isEscapedDelimiter = fullMatch.includes('\\')
+    const isEscapedDelimiter = fullMatch.includes("\\")
     const isQuotedOrEscaped = !!quoteChar || isEscapedDelimiter
     // Note: We do NOT skip unquoted heredocs here anymore when quotedOnly is
     // set. Instead, we compute their content range and add them to
@@ -409,7 +403,7 @@ export function extractHeredocs(
           continue
         }
         if (inDoubleQuote) {
-          if (ch === '\\') {
+          if (ch === "\\") {
             k++ // skip escaped char inside double quotes
             continue
           }
@@ -417,13 +411,13 @@ export function extractHeredocs(
           continue
         }
         // Unquoted context
-        if (ch === '\n') {
+        if (ch === "\n") {
           firstNewlineOffset = k - operatorEndIndex
           break
         }
         // Count backslashes for escape detection in unquoted context
         let backslashCount = 0
-        for (let j = k - 1; j >= operatorEndIndex && command[j] === '\\'; j--) {
+        for (let j = k - 1; j >= operatorEndIndex && command[j] === "\\"; j--) {
           backslashCount++
         }
         if (backslashCount % 2 === 1) continue // escaped char
@@ -451,13 +445,10 @@ export function extractHeredocs(
     // joining (commands.ts:82), so it would put `rm -rf /` in the heredoc body,
     // hiding it from all validators. Bail if same-line content ends with an
     // odd number of backslashes.
-    const sameLineContent = command.slice(
-      operatorEndIndex,
-      operatorEndIndex + firstNewlineOffset,
-    )
+    const sameLineContent = command.slice(operatorEndIndex, operatorEndIndex + firstNewlineOffset)
     let trailingBackslashes = 0
     for (let j = sameLineContent.length - 1; j >= 0; j--) {
-      if (sameLineContent[j] === '\\') {
+      if (sameLineContent[j] === "\\") {
         trailingBackslashes++
       } else {
         break
@@ -472,7 +463,7 @@ export function extractHeredocs(
 
     const contentStartIndex = operatorEndIndex + firstNewlineOffset
     const afterNewline = command.slice(contentStartIndex + 1) // +1 to skip the newline itself
-    const contentLines = afterNewline.split('\n')
+    const contentLines = afterNewline.split("\n")
 
     // Find the closing delimiter - must be on its own line
     // Security: Must match bash's exact behavior to prevent parsing discrepancies
@@ -484,7 +475,7 @@ export function extractHeredocs(
       if (isDash) {
         // <<- strips leading TABS only (not spaces), per POSIX/bash spec.
         // The line after stripping leading tabs must be exactly the delimiter.
-        const stripped = line.replace(/^\t*/, '')
+        const stripped = line.replace(/^\t*/, "")
         if (stripped === delimiter) {
           closingLineIndex = i
           break
@@ -509,11 +500,8 @@ export function extractHeredocs(
       // parsing discrepancy we haven't identified.
       //
       // For <<- heredocs, bash strips leading tabs before this check.
-      const eofCheckLine = isDash ? line.replace(/^\t*/, '') : line
-      if (
-        eofCheckLine.length > delimiter.length &&
-        eofCheckLine.startsWith(delimiter)
-      ) {
+      const eofCheckLine = isDash ? line.replace(/^\t*/, "") : line
+      if (eofCheckLine.length > delimiter.length && eofCheckLine.startsWith(delimiter)) {
         const charAfterDelimiter = eofCheckLine[delimiter.length]!
         if (/^[)}`|&;(<>]$/.test(charAfterDelimiter)) {
           // Shell metacharacter or substitution closer after delimiter —
@@ -542,7 +530,7 @@ export function extractHeredocs(
         skipContentEndIndex = command.length
       } else {
         const skipLinesUpToClosing = contentLines.slice(0, closingLineIndex + 1)
-        const skipContentLength = skipLinesUpToClosing.join('\n').length
+        const skipContentLength = skipLinesUpToClosing.join("\n").length
         skipContentEndIndex = contentStartIndex + 1 + skipContentLength
       }
       skippedHeredocRanges.push({
@@ -559,7 +547,7 @@ export function extractHeredocs(
 
     // Calculate end position: contentStartIndex + 1 (newline) + length of lines up to and including closing delimiter
     const linesUpToClosing = contentLines.slice(0, closingLineIndex + 1)
-    const contentLength = linesUpToClosing.join('\n').length
+    const contentLength = linesUpToClosing.join("\n").length
     const contentEndIndex = contentStartIndex + 1 + contentLength
 
     // Security: Bail if this heredoc's content range OVERLAPS with any
@@ -585,10 +573,7 @@ export function extractHeredocs(
     let overlapsSkipped = false
     for (const skipped of skippedHeredocRanges) {
       // Ranges [a,b) and [c,d) overlap iff a < d && c < b
-      if (
-        contentStartIndex < skipped.contentEndIndex &&
-        skipped.contentStartIndex < contentEndIndex
-      ) {
+      if (contentStartIndex < skipped.contentEndIndex && skipped.contentStartIndex < contentEndIndex) {
         overlapsSkipped = true
         break
       }
@@ -647,9 +632,7 @@ export function extractHeredocs(
   // because indices are calculated on the original string but applied to
   // a progressively modified string. Return without extraction - the fallback
   // is safe (requires manual approval or fails parsing).
-  const contentStartPositions = new Set(
-    topLevelHeredocs.map(h => h.contentStartIndex),
-  )
+  const contentStartPositions = new Set(topLevelHeredocs.map((h) => h.contentStartIndex))
   if (contentStartPositions.size < topLevelHeredocs.length) {
     return { processedCommand: command, heredocs }
   }
@@ -690,10 +673,7 @@ export function extractHeredocs(
  * Restores heredoc placeholders back to their original content in a single string.
  * Internal helper used by restoreHeredocs.
  */
-function restoreHeredocsInString(
-  text: string,
-  heredocs: Map<string, HeredocInfo>,
-): string {
+function restoreHeredocsInString(text: string, heredocs: Map<string, HeredocInfo>): string {
   let result = text
   for (const [placeholder, info] of heredocs) {
     result = result.replaceAll(placeholder, info.fullText)
@@ -708,15 +688,12 @@ function restoreHeredocsInString(
  * @param heredocs - The map of placeholders from `extractHeredocs`
  * @returns New array with placeholders replaced by original heredoc content
  */
-export function restoreHeredocs(
-  parts: string[],
-  heredocs: Map<string, HeredocInfo>,
-): string[] {
+export function restoreHeredocs(parts: string[], heredocs: Map<string, HeredocInfo>): string[] {
   if (heredocs.size === 0) {
     return parts
   }
 
-  return parts.map(part => restoreHeredocsInString(part, heredocs))
+  return parts.map((part) => restoreHeredocsInString(part, heredocs))
 }
 
 /**

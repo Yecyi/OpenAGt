@@ -1,16 +1,16 @@
-import { feature } from 'bun:bundle'
-import { open } from 'fs/promises'
-import { basename, dirname, join, sep } from 'path'
-import type { ModelUsage } from 'src/entrypoints/agentSdkTypes.js'
-import type { Entry, TranscriptMessage } from '../types/logs.js'
-import { logForDebugging } from './debug.js'
-import { errorMessage, isENOENT } from './errors.js'
-import { getFsImplementation } from './fsOperations.js'
-import { readJSONLFile } from './json.js'
-import { SYNTHETIC_MODEL } from './messages.js'
-import { getProjectsDir, isTranscriptMessage } from './sessionStorage.js'
-import { SHELL_TOOL_NAMES } from './shell/shellToolUtils.js'
-import { jsonParse } from './slowOperations.js'
+import { feature } from "bun:bundle"
+import { open } from "fs/promises"
+import { basename, dirname, join, sep } from "path"
+import type { ModelUsage } from "src/entrypoints/agentSdkTypes.js"
+import type { Entry, TranscriptMessage } from "../types/logs.js"
+import { logForDebugging } from "./debug.js"
+import { errorMessage, isENOENT } from "./errors.js"
+import { getFsImplementation } from "./fsOperations.js"
+import { readJSONLFile } from "./json.js"
+import { SYNTHETIC_MODEL } from "./messages.js"
+import { getProjectsDir, isTranscriptMessage } from "./sessionStorage.js"
+import { SHELL_TOOL_NAMES } from "./shell/shellToolUtils.js"
+import { jsonParse } from "./slowOperations.js"
 import {
   getTodayDateString,
   getYesterdayDateString,
@@ -21,7 +21,7 @@ import {
   saveStatsCache,
   toDateString,
   withStatsCacheLock,
-} from './statsCache.js'
+} from "./statsCache.js"
 
 export type DailyActivity = {
   date: string // YYYY-MM-DD format
@@ -114,10 +114,7 @@ type ProcessOptions = {
  * Process session files and extract stats.
  * Can filter by date range.
  */
-async function processSessionFiles(
-  sessionFiles: string[],
-  options: ProcessOptions = {},
-): Promise<ProcessedStats> {
+async function processSessionFiles(sessionFiles: string[], options: ProcessOptions = {}): Promise<ProcessedStats> {
   const { fromDate, toDate } = options
   const fs = getFsImplementation()
 
@@ -128,9 +125,7 @@ async function processSessionFiles(
   let totalMessages = 0
   let totalSpeculationTimeSavedMs = 0
   const modelUsageAgg: { [modelName: string]: ModelUsage } = {}
-  const shotDistributionMap = feature('SHOT_STATS')
-    ? new Map<number, number>()
-    : undefined
+  const shotDistributionMap = feature("SHOT_STATS") ? new Map<number, number>() : undefined
   // Track parent sessions that already recorded a shot count (dedup across subagents)
   const sessionsWithShotCount = new Set<string>()
 
@@ -139,7 +134,7 @@ async function processSessionFiles(
   for (let i = 0; i < sessionFiles.length; i += BATCH_SIZE) {
     const batch = sessionFiles.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(
-      batch.map(async sessionFile => {
+      batch.map(async (sessionFile) => {
         try {
           // If we have a fromDate filter, skip files that haven't been modified since then
           if (fromDate) {
@@ -185,19 +180,17 @@ async function processSessionFiles(
     for (const { sessionFile, entries, error, skipped } of results) {
       if (skipped) continue
       if (error || !entries) {
-        logForDebugging(
-          `Failed to read session file ${sessionFile}: ${errorMessage(error)}`,
-        )
+        logForDebugging(`Failed to read session file ${sessionFile}: ${errorMessage(error)}`)
         continue
       }
 
-      const sessionId = basename(sessionFile, '.jsonl')
+      const sessionId = basename(sessionFile, ".jsonl")
       const messages: TranscriptMessage[] = []
 
       for (const entry of entries) {
         if (isTranscriptMessage(entry)) {
           messages.push(entry)
-        } else if (entry.type === 'speculation-accept') {
+        } else if (entry.type === "speculation-accept") {
           totalSpeculationTimeSavedMs += entry.timeSavedMs
         }
       }
@@ -211,28 +204,21 @@ async function processSessionFiles(
       // Extract shot count from PR attribution in gh pr create calls (ant-only)
       // This must run before the sidechain filter since subagent transcripts
       // mark all messages as sidechain
-      if (feature('SHOT_STATS') && shotDistributionMap) {
-        const parentSessionId = isSubagentFile
-          ? basename(dirname(dirname(sessionFile)))
-          : sessionId
+      if (feature("SHOT_STATS") && shotDistributionMap) {
+        const parentSessionId = isSubagentFile ? basename(dirname(dirname(sessionFile))) : sessionId
 
         if (!sessionsWithShotCount.has(parentSessionId)) {
           const shotCount = extractShotCountFromMessages(messages)
           if (shotCount !== null) {
             sessionsWithShotCount.add(parentSessionId)
-            shotDistributionMap.set(
-              shotCount,
-              (shotDistributionMap.get(shotCount) || 0) + 1,
-            )
+            shotDistributionMap.set(shotCount, (shotDistributionMap.get(shotCount) || 0) + 1)
           }
         }
       }
 
       // Filter out sidechain messages for session metadata (duration, counts).
       // For subagent files, use all messages since they're all sidechain.
-      const mainMessages = isSubagentFile
-        ? messages
-        : messages.filter(m => !m.isSidechain)
+      const mainMessages = isSubagentFile ? messages : messages.filter((m) => !m.isSidechain)
       if (mainMessages.length === 0) continue
 
       const firstMessage = mainMessages[0]!
@@ -246,9 +232,7 @@ async function processSessionFiles(
       // new Date(undefined) produces an Invalid Date, and toDateString() would
       // throw RangeError: Invalid Date on .toISOString().
       if (isNaN(firstTimestamp.getTime()) || isNaN(lastTimestamp.getTime())) {
-        logForDebugging(
-          `Skipping session with invalid timestamp: ${sessionFile}`,
-        )
+        logForDebugging(`Skipping session with invalid timestamp: ${sessionFile}`)
         continue
       }
 
@@ -292,11 +276,11 @@ async function processSessionFiles(
 
       // Process messages for tool usage and model stats
       for (const message of mainMessages) {
-        if (message.type === 'assistant') {
+        if (message.type === "assistant") {
           const content = message.message?.content
           if (Array.isArray(content)) {
             for (const block of content) {
-              if (block.type === 'tool_use') {
+              if (block.type === "tool_use") {
                 const activity = dailyActivityMap.get(dateKey)
                 if (activity) {
                   activity.toolCallCount++
@@ -308,7 +292,7 @@ async function processSessionFiles(
           // Track model usage if available (skip synthetic messages)
           if (message.message?.usage) {
             const usage = message.message.usage
-            const model = message.message.model || 'unknown'
+            const model = message.message.model || "unknown"
 
             // Skip synthetic messages - they are internal and shouldn't appear in stats
             if (model === SYNTHETIC_MODEL) {
@@ -330,14 +314,11 @@ async function processSessionFiles(
 
             modelUsageAgg[model]!.inputTokens += usage.input_tokens || 0
             modelUsageAgg[model]!.outputTokens += usage.output_tokens || 0
-            modelUsageAgg[model]!.cacheReadInputTokens +=
-              usage.cache_read_input_tokens || 0
-            modelUsageAgg[model]!.cacheCreationInputTokens +=
-              usage.cache_creation_input_tokens || 0
+            modelUsageAgg[model]!.cacheReadInputTokens += usage.cache_read_input_tokens || 0
+            modelUsageAgg[model]!.cacheCreationInputTokens += usage.cache_creation_input_tokens || 0
 
             // Track daily tokens per model
-            const totalTokens =
-              (usage.input_tokens || 0) + (usage.output_tokens || 0)
+            const totalTokens = (usage.input_tokens || 0) + (usage.output_tokens || 0)
             if (totalTokens > 0) {
               const dayTokens = dailyModelTokensMap.get(dateKey) || {}
               dayTokens[model] = (dayTokens[model] || 0) + totalTokens
@@ -350,9 +331,7 @@ async function processSessionFiles(
   }
 
   return {
-    dailyActivity: Array.from(dailyActivityMap.values()).sort((a, b) =>
-      a.date.localeCompare(b.date),
-    ),
+    dailyActivity: Array.from(dailyActivityMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
     dailyModelTokens: Array.from(dailyModelTokensMap.entries())
       .map(([date, tokensByModel]) => ({ date, tokensByModel }))
       .sort((a, b) => a.date.localeCompare(b.date)),
@@ -361,7 +340,7 @@ async function processSessionFiles(
     hourCounts: Object.fromEntries(hourCounts),
     totalMessages,
     totalSpeculationTimeSavedMs,
-    ...(feature('SHOT_STATS') && shotDistributionMap
+    ...(feature("SHOT_STATS") && shotDistributionMap
       ? { shotDistribution: Object.fromEntries(shotDistributionMap) }
       : {}),
   }
@@ -384,36 +363,33 @@ async function getAllSessionFiles(): Promise<string[]> {
     throw e
   }
   const projectDirs = allEntries
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => join(projectsDir, dirent.name))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => join(projectsDir, dirent.name))
 
   // Collect all session files from all projects in parallel
   const projectResults = await Promise.all(
-    projectDirs.map(async projectDir => {
+    projectDirs.map(async (projectDir) => {
       try {
         const entries = await fs.readdir(projectDir)
 
         // Collect main session files (*.jsonl directly in project dir)
         const mainFiles = entries
-          .filter(dirent => dirent.isFile() && dirent.name.endsWith('.jsonl'))
-          .map(dirent => join(projectDir, dirent.name))
+          .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".jsonl"))
+          .map((dirent) => join(projectDir, dirent.name))
 
         // Collect subagent files from session subdirectories in parallel
         // Structure: {projectDir}/{sessionId}/subagents/agent-{agentId}.jsonl
-        const sessionDirs = entries.filter(dirent => dirent.isDirectory())
+        const sessionDirs = entries.filter((dirent) => dirent.isDirectory())
         const subagentResults = await Promise.all(
-          sessionDirs.map(async sessionDir => {
-            const subagentsDir = join(projectDir, sessionDir.name, 'subagents')
+          sessionDirs.map(async (sessionDir) => {
+            const subagentsDir = join(projectDir, sessionDir.name, "subagents")
             try {
               const subagentEntries = await fs.readdir(subagentsDir)
               return subagentEntries
                 .filter(
-                  dirent =>
-                    dirent.isFile() &&
-                    dirent.name.endsWith('.jsonl') &&
-                    dirent.name.startsWith('agent-'),
+                  (dirent) => dirent.isFile() && dirent.name.endsWith(".jsonl") && dirent.name.startsWith("agent-"),
                 )
-                .map(dirent => join(subagentsDir, dirent.name))
+                .map((dirent) => join(subagentsDir, dirent.name))
             } catch {
               // subagents directory doesn't exist for this session, skip
               return []
@@ -423,9 +399,7 @@ async function getAllSessionFiles(): Promise<string[]> {
 
         return [...mainFiles, ...subagentResults.flat()]
       } catch (error) {
-        logForDebugging(
-          `Failed to read project directory ${projectDir}: ${errorMessage(error)}`,
-        )
+        logForDebugging(`Failed to read project directory ${projectDir}: ${errorMessage(error)}`)
         return []
       }
     }),
@@ -437,10 +411,7 @@ async function getAllSessionFiles(): Promise<string[]> {
 /**
  * Convert a PersistedStatsCache to ClaudeCodeStats by computing derived fields.
  */
-function cacheToStats(
-  cache: PersistedStatsCache,
-  todayStats: ProcessedStats | null,
-): ClaudeCodeStats {
+function cacheToStats(cache: PersistedStatsCache, todayStats: ProcessedStats | null): ClaudeCodeStats {
   // Merge cache with today's stats
   const dailyActivityMap = new Map<string, DailyActivity>()
   for (const day of cache.dailyActivity) {
@@ -484,23 +455,12 @@ function cacheToStats(
         modelUsage[model] = {
           inputTokens: modelUsage[model]!.inputTokens + usage.inputTokens,
           outputTokens: modelUsage[model]!.outputTokens + usage.outputTokens,
-          cacheReadInputTokens:
-            modelUsage[model]!.cacheReadInputTokens +
-            usage.cacheReadInputTokens,
-          cacheCreationInputTokens:
-            modelUsage[model]!.cacheCreationInputTokens +
-            usage.cacheCreationInputTokens,
-          webSearchRequests:
-            modelUsage[model]!.webSearchRequests + usage.webSearchRequests,
+          cacheReadInputTokens: modelUsage[model]!.cacheReadInputTokens + usage.cacheReadInputTokens,
+          cacheCreationInputTokens: modelUsage[model]!.cacheCreationInputTokens + usage.cacheCreationInputTokens,
+          webSearchRequests: modelUsage[model]!.webSearchRequests + usage.webSearchRequests,
           costUSD: modelUsage[model]!.costUSD + usage.costUSD,
-          contextWindow: Math.max(
-            modelUsage[model]!.contextWindow,
-            usage.contextWindow,
-          ),
-          maxOutputTokens: Math.max(
-            modelUsage[model]!.maxOutputTokens,
-            usage.maxOutputTokens,
-          ),
+          contextWindow: Math.max(modelUsage[model]!.contextWindow, usage.contextWindow),
+          maxOutputTokens: Math.max(modelUsage[model]!.maxOutputTokens, usage.maxOutputTokens),
         }
       } else {
         modelUsage[model] = { ...usage }
@@ -521,9 +481,7 @@ function cacheToStats(
   }
 
   // Calculate derived stats
-  const dailyActivityArray = Array.from(dailyActivityMap.values()).sort(
-    (a, b) => a.date.localeCompare(b.date),
-  )
+  const dailyActivityArray = Array.from(dailyActivityMap.values()).sort((a, b) => a.date.localeCompare(b.date))
   const streaks = calculateStreaks(dailyActivityArray)
 
   const dailyModelTokens = Array.from(dailyModelTokensMap.entries())
@@ -531,8 +489,7 @@ function cacheToStats(
     .sort((a, b) => a.date.localeCompare(b.date))
 
   // Compute session aggregates: combine cache aggregates with today's stats
-  const totalSessions =
-    cache.totalSessions + (todayStats?.sessionStats.length || 0)
+  const totalSessions = cache.totalSessions + (todayStats?.sessionStats.length || 0)
   const totalMessages = cache.totalMessages + (todayStats?.totalMessages || 0)
 
   // Find longest session (compare cache's longest with today's sessions)
@@ -565,30 +522,22 @@ function cacheToStats(
 
   const peakActivityDay =
     dailyActivityArray.length > 0
-      ? dailyActivityArray.reduce((max, d) =>
-          d.messageCount > max.messageCount ? d : max,
-        ).date
+      ? dailyActivityArray.reduce((max, d) => (d.messageCount > max.messageCount ? d : max)).date
       : null
 
   const peakActivityHour =
     hourCountsMap.size > 0
-      ? Array.from(hourCountsMap.entries()).reduce((max, [hour, count]) =>
-          count > max[1] ? [hour, count] : max,
-        )[0]
+      ? Array.from(hourCountsMap.entries()).reduce((max, [hour, count]) => (count > max[1] ? [hour, count] : max))[0]
       : null
 
   const totalDays =
     firstSessionDate && lastSessionDate
       ? Math.ceil(
-          (new Date(lastSessionDate).getTime() -
-            new Date(firstSessionDate).getTime()) /
-            (1000 * 60 * 60 * 24),
+          (new Date(lastSessionDate).getTime() - new Date(firstSessionDate).getTime()) / (1000 * 60 * 60 * 24),
         ) + 1
       : 0
 
-  const totalSpeculationTimeSavedMs =
-    cache.totalSpeculationTimeSavedMs +
-    (todayStats?.totalSpeculationTimeSavedMs || 0)
+  const totalSpeculationTimeSavedMs = cache.totalSpeculationTimeSavedMs + (todayStats?.totalSpeculationTimeSavedMs || 0)
 
   const result: ClaudeCodeStats = {
     totalSessions,
@@ -607,27 +556,19 @@ function cacheToStats(
     totalSpeculationTimeSavedMs,
   }
 
-  if (feature('SHOT_STATS')) {
+  if (feature("SHOT_STATS")) {
     const shotDistribution: { [shotCount: number]: number } = {
       ...(cache.shotDistribution || {}),
     }
     if (todayStats?.shotDistribution) {
-      for (const [count, sessions] of Object.entries(
-        todayStats.shotDistribution,
-      )) {
+      for (const [count, sessions] of Object.entries(todayStats.shotDistribution)) {
         const key = parseInt(count, 10)
         shotDistribution[key] = (shotDistribution[key] || 0) + sessions
       }
     }
     result.shotDistribution = shotDistribution
-    const totalWithShots = Object.values(shotDistribution).reduce(
-      (sum, n) => sum + n,
-      0,
-    )
-    result.oneShotRate =
-      totalWithShots > 0
-        ? Math.round(((shotDistribution[1] || 0) / totalWithShots) * 100)
-        : 0
+    const totalWithShots = Object.values(shotDistribution).reduce((sum, n) => sum + n, 0)
+    result.oneShotRate = totalWithShots > 0 ? Math.round(((shotDistribution[1] || 0) / totalWithShots) * 100) : 0
   }
 
   return result
@@ -657,15 +598,12 @@ export async function aggregateClaudeCodeStats(): Promise<ClaudeCodeStats> {
 
     if (!cache.lastComputedDate) {
       // No cache - process all historical data (everything before today)
-      logForDebugging('Stats cache empty, processing all historical data')
+      logForDebugging("Stats cache empty, processing all historical data")
       const historicalStats = await processSessionFiles(allSessionFiles, {
         toDate: yesterday,
       })
 
-      if (
-        historicalStats.sessionStats.length > 0 ||
-        historicalStats.dailyActivity.length > 0
-      ) {
+      if (historicalStats.sessionStats.length > 0 || historicalStats.dailyActivity.length > 0) {
         result = mergeCacheWithNewStats(cache, historicalStats, yesterday)
         await saveStatsCache(result)
       }
@@ -673,18 +611,13 @@ export async function aggregateClaudeCodeStats(): Promise<ClaudeCodeStats> {
       // Cache is stale - process new days
       // Process from day after lastComputedDate to yesterday
       const nextDay = getNextDay(cache.lastComputedDate)
-      logForDebugging(
-        `Stats cache stale (${cache.lastComputedDate}), processing ${nextDay} to ${yesterday}`,
-      )
+      logForDebugging(`Stats cache stale (${cache.lastComputedDate}), processing ${nextDay} to ${yesterday}`)
       const newStats = await processSessionFiles(allSessionFiles, {
         fromDate: nextDay,
         toDate: yesterday,
       })
 
-      if (
-        newStats.sessionStats.length > 0 ||
-        newStats.dailyActivity.length > 0
-      ) {
+      if (newStats.sessionStats.length > 0 || newStats.dailyActivity.length > 0) {
         result = mergeCacheWithNewStats(cache, newStats, yesterday)
         await saveStatsCache(result)
       } else {
@@ -709,16 +642,14 @@ export async function aggregateClaudeCodeStats(): Promise<ClaudeCodeStats> {
   return cacheToStats(updatedCache, todayStats)
 }
 
-export type StatsDateRange = '7d' | '30d' | 'all'
+export type StatsDateRange = "7d" | "30d" | "all"
 
 /**
  * Aggregates stats for a specific date range.
  * For 'all', uses the cached aggregation. For other ranges, processes files directly.
  */
-export async function aggregateClaudeCodeStatsForRange(
-  range: StatsDateRange,
-): Promise<ClaudeCodeStats> {
-  if (range === 'all') {
+export async function aggregateClaudeCodeStatsForRange(range: StatsDateRange): Promise<ClaudeCodeStats> {
+  if (range === "all") {
     return aggregateClaudeCodeStats()
   }
 
@@ -729,7 +660,7 @@ export async function aggregateClaudeCodeStatsForRange(
 
   // Calculate fromDate based on range
   const today = new Date()
-  const daysBack = range === '7d' ? 7 : 30
+  const daysBack = range === "7d" ? 7 : 30
   const fromDate = new Date(today)
   fromDate.setDate(today.getDate() - daysBack + 1) // +1 to include today
   const fromDateStr = toDateString(fromDate)
@@ -746,15 +677,9 @@ export async function aggregateClaudeCodeStatsForRange(
  * Convert ProcessedStats to ClaudeCodeStats.
  * Used for filtered date ranges that bypass the cache.
  */
-function processedStatsToClaudeCodeStats(
-  stats: ProcessedStats,
-): ClaudeCodeStats {
-  const dailyActivitySorted = stats.dailyActivity
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date))
-  const dailyModelTokensSorted = stats.dailyModelTokens
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date))
+function processedStatsToClaudeCodeStats(stats: ProcessedStats): ClaudeCodeStats {
+  const dailyActivitySorted = stats.dailyActivity.slice().sort((a, b) => a.date.localeCompare(b.date))
+  const dailyModelTokensSorted = stats.dailyModelTokens.slice().sort((a, b) => a.date.localeCompare(b.date))
 
   // Calculate streaks from daily activity
   const streaks = calculateStreaks(dailyActivitySorted)
@@ -782,9 +707,7 @@ function processedStatsToClaudeCodeStats(
   // Peak activity day
   const peakActivityDay =
     dailyActivitySorted.length > 0
-      ? dailyActivitySorted.reduce((max, d) =>
-          d.messageCount > max.messageCount ? d : max,
-        ).date
+      ? dailyActivitySorted.reduce((max, d) => (d.messageCount > max.messageCount ? d : max)).date
       : null
 
   // Peak activity hour
@@ -792,9 +715,7 @@ function processedStatsToClaudeCodeStats(
   const peakActivityHour =
     hourEntries.length > 0
       ? parseInt(
-          hourEntries.reduce((max, [hour, count]) =>
-            count > parseInt(max[1].toString()) ? [hour, count] : max,
-          )[0],
+          hourEntries.reduce((max, [hour, count]) => (count > parseInt(max[1].toString()) ? [hour, count] : max))[0],
           10,
         )
       : null
@@ -803,9 +724,7 @@ function processedStatsToClaudeCodeStats(
   const totalDays =
     firstSessionDate && lastSessionDate
       ? Math.ceil(
-          (new Date(lastSessionDate).getTime() -
-            new Date(firstSessionDate).getTime()) /
-            (1000 * 60 * 60 * 24),
+          (new Date(lastSessionDate).getTime() - new Date(firstSessionDate).getTime()) / (1000 * 60 * 60 * 24),
         ) + 1
       : 0
 
@@ -826,16 +745,10 @@ function processedStatsToClaudeCodeStats(
     totalSpeculationTimeSavedMs: stats.totalSpeculationTimeSavedMs,
   }
 
-  if (feature('SHOT_STATS') && stats.shotDistribution) {
+  if (feature("SHOT_STATS") && stats.shotDistribution) {
     result.shotDistribution = stats.shotDistribution
-    const totalWithShots = Object.values(stats.shotDistribution).reduce(
-      (sum, n) => sum + n,
-      0,
-    )
-    result.oneShotRate =
-      totalWithShots > 0
-        ? Math.round(((stats.shotDistribution[1] || 0) / totalWithShots) * 100)
-        : 0
+    const totalWithShots = Object.values(stats.shotDistribution).reduce((sum, n) => sum + n, 0)
+    result.oneShotRate = totalWithShots > 0 ? Math.round(((stats.shotDistribution[1] || 0) / totalWithShots) * 100) : 0
   }
 
   return result
@@ -870,7 +783,7 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
   const checkDate = new Date(today)
 
   // Build a set of active dates for quick lookup
-  const activeDates = new Set(dailyActivity.map(d => d.date))
+  const activeDates = new Set(dailyActivity.map((d) => d.date))
 
   while (true) {
     const dateStr = toDateString(checkDate)
@@ -896,9 +809,7 @@ function calculateStreaks(dailyActivity: DailyActivity[]): StreakInfo {
       const prevDate = new Date(sortedDates[i - 1]!)
       const currDate = new Date(sortedDates[i]!)
 
-      const dayDiff = Math.round(
-        (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24),
-      )
+      const dayDiff = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
 
       if (dayDiff === 1) {
         tempStreak++
@@ -937,21 +848,19 @@ const SHOT_COUNT_REGEX = /(\d+)-shotted by/
  * The attribution format is: "N-shotted by model-name"
  * Returns the shot count, or null if not found.
  */
-function extractShotCountFromMessages(
-  messages: TranscriptMessage[],
-): number | null {
+function extractShotCountFromMessages(messages: TranscriptMessage[]): number | null {
   for (const m of messages) {
-    if (m.type !== 'assistant') continue
+    if (m.type !== "assistant") continue
     const content = m.message?.content
     if (!Array.isArray(content)) continue
     for (const block of content) {
       if (
-        block.type !== 'tool_use' ||
+        block.type !== "tool_use" ||
         !SHELL_TOOL_NAMES.includes(block.name) ||
-        typeof block.input !== 'object' ||
+        typeof block.input !== "object" ||
         block.input === null ||
-        !('command' in block.input) ||
-        typeof block.input.command !== 'string'
+        !("command" in block.input) ||
+        typeof block.input.command !== "string"
       ) {
         continue
       }
@@ -968,13 +877,7 @@ function extractShotCountFromMessages(
 // The canonical dateKey (see processSessionFiles) reads mainMessages[0].timestamp,
 // where mainMessages = entries.filter(isTranscriptMessage).filter(!isSidechain).
 // This peek must extract the same value to be a safe skip optimization.
-const TRANSCRIPT_MESSAGE_TYPES = new Set([
-  'user',
-  'assistant',
-  'attachment',
-  'system',
-  'progress',
-])
+const TRANSCRIPT_MESSAGE_TYPES = new Set(["user", "assistant", "attachment", "system", "progress"])
 
 /**
  * Peeks at the head of a session file to get the session start date.
@@ -991,22 +894,20 @@ const TRANSCRIPT_MESSAGE_TYPES = new Set([
  * Returns a YYYY-MM-DD string, or null if no transcript message fits in the
  * head (caller falls through to the full read — safe default).
  */
-export async function readSessionStartDate(
-  filePath: string,
-): Promise<string | null> {
+export async function readSessionStartDate(filePath: string): Promise<string | null> {
   try {
-    const fd = await open(filePath, 'r')
+    const fd = await open(filePath, "r")
     try {
       const buf = Buffer.allocUnsafe(4096)
       const { bytesRead } = await fd.read(buf, 0, buf.length, 0)
       if (bytesRead === 0) return null
-      const head = buf.toString('utf8', 0, bytesRead)
+      const head = buf.toString("utf8", 0, bytesRead)
 
       // Only trust complete lines — the 4KB boundary may bisect a JSON entry.
-      const lastNewline = head.lastIndexOf('\n')
+      const lastNewline = head.lastIndexOf("\n")
       if (lastNewline < 0) return null
 
-      for (const line of head.slice(0, lastNewline).split('\n')) {
+      for (const line of head.slice(0, lastNewline).split("\n")) {
         if (!line) continue
         let entry: {
           type?: unknown
@@ -1018,10 +919,10 @@ export async function readSessionStartDate(
         } catch {
           continue
         }
-        if (typeof entry.type !== 'string') continue
+        if (typeof entry.type !== "string") continue
         if (!TRANSCRIPT_MESSAGE_TYPES.has(entry.type)) continue
         if (entry.isSidechain === true) continue
-        if (typeof entry.timestamp !== 'string') return null
+        if (typeof entry.timestamp !== "string") return null
         const date = new Date(entry.timestamp)
         if (Number.isNaN(date.getTime())) return null
         return toDateString(date)

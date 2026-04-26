@@ -12,9 +12,9 @@
  *
  * Only runs on macOS - no-op on other platforms.
  */
-import { type ChildProcess, spawn } from 'child_process'
-import { registerCleanup } from '../utils/cleanupRegistry.js'
-import { logForDebugging } from '../utils/debug.js'
+import { type ChildProcess, spawn } from "child_process"
+import { registerCleanup } from "../utils/cleanupRegistry.js"
+import { logForDebugging } from "../utils/debug.js"
 
 // Caffeinate timeout in seconds. Process auto-exits after this duration.
 // We restart it before expiry to maintain continuous sleep prevention.
@@ -69,7 +69,7 @@ export function forceStopPreventSleep(): void {
 
 function startRestartInterval(): void {
   // Only run on macOS
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     return
   }
 
@@ -81,7 +81,7 @@ function startRestartInterval(): void {
   restartInterval = setInterval(() => {
     // Only restart if we still need sleep prevention
     if (refCount > 0) {
-      logForDebugging('Restarting caffeinate to maintain sleep prevention')
+      logForDebugging("Restarting caffeinate to maintain sleep prevention")
       killCaffeinate()
       spawnCaffeinate()
     }
@@ -100,7 +100,7 @@ function stopRestartInterval(): void {
 
 function spawnCaffeinate(): void {
   // Only run on macOS
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     return
   }
 
@@ -122,28 +122,24 @@ function spawnCaffeinate(): void {
     //     This is the least aggressive option - display can still sleep
     // -t: Timeout in seconds - caffeinate exits automatically after this
     //     This provides self-healing if Node is killed with SIGKILL
-    caffeinateProcess = spawn(
-      'caffeinate',
-      ['-i', '-t', String(CAFFEINATE_TIMEOUT_SECONDS)],
-      {
-        stdio: 'ignore',
-      },
-    )
+    caffeinateProcess = spawn("caffeinate", ["-i", "-t", String(CAFFEINATE_TIMEOUT_SECONDS)], {
+      stdio: "ignore",
+    })
 
     // Don't let caffeinate keep the Node process alive
     caffeinateProcess.unref()
 
     const thisProc = caffeinateProcess
-    caffeinateProcess.on('error', err => {
+    caffeinateProcess.on("error", (err) => {
       logForDebugging(`caffeinate spawn error: ${err.message}`)
       if (caffeinateProcess === thisProc) caffeinateProcess = null
     })
 
-    caffeinateProcess.on('exit', () => {
+    caffeinateProcess.on("exit", () => {
       if (caffeinateProcess === thisProc) caffeinateProcess = null
     })
 
-    logForDebugging('Started caffeinate to prevent sleep')
+    logForDebugging("Started caffeinate to prevent sleep")
   } catch {
     // Silently fail - caffeinate not available or spawn failed
     caffeinateProcess = null
@@ -156,8 +152,8 @@ function killCaffeinate(): void {
     caffeinateProcess = null
     try {
       // SIGKILL for immediate termination - SIGTERM could be delayed
-      proc.kill('SIGKILL')
-      logForDebugging('Stopped caffeinate, allowing sleep')
+      proc.kill("SIGKILL")
+      logForDebugging("Stopped caffeinate, allowing sleep")
     } catch {
       // Process may have already exited
     }

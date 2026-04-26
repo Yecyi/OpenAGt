@@ -23,13 +23,11 @@ const files = (
 ).flat()
 
 const lines = await Promise.all(
-  files
-    .sort()
-    .map(async (file) => {
-      const bytes = await Bun.file(path.join(dir, file)).bytes()
-      const hash = createHash("sha256").update(bytes).digest("hex")
-      return `${hash}  ${file}`
-    }),
+  files.sort().map(async (file) => {
+    const bytes = await Bun.file(path.join(dir, file)).bytes()
+    const hash = createHash("sha256").update(bytes).digest("hex")
+    return `${hash}  ${file}`
+  }),
 )
 
 await Bun.write(output, `${lines.join("\n")}\n`)

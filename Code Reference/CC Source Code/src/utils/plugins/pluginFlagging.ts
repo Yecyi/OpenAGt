@@ -12,16 +12,16 @@
  * with writes.
  */
 
-import { randomBytes } from 'crypto'
-import { readFile, rename, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { logForDebugging } from '../debug.js'
-import { getFsImplementation } from '../fsOperations.js'
-import { logError } from '../log.js'
-import { jsonParse, jsonStringify } from '../slowOperations.js'
-import { getPluginsDirectory } from './pluginDirectories.js'
+import { randomBytes } from "crypto"
+import { readFile, rename, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { logForDebugging } from "../debug.js"
+import { getFsImplementation } from "../fsOperations.js"
+import { logError } from "../log.js"
+import { jsonParse, jsonStringify } from "../slowOperations.js"
+import { getPluginsDirectory } from "./pluginDirectories.js"
 
-const FLAGGED_PLUGINS_FILENAME = 'flagged-plugins.json'
+const FLAGGED_PLUGINS_FILENAME = "flagged-plugins.json"
 
 export type FlaggedPlugin = {
   flaggedAt: string
@@ -40,10 +40,10 @@ function getFlaggedPluginsPath(): string {
 function parsePluginsData(content: string): Record<string, FlaggedPlugin> {
   const parsed = jsonParse(content) as unknown
   if (
-    typeof parsed !== 'object' ||
+    typeof parsed !== "object" ||
     parsed === null ||
-    !('plugins' in parsed) ||
-    typeof (parsed as { plugins: unknown }).plugins !== 'object' ||
+    !("plugins" in parsed) ||
+    typeof (parsed as { plugins: unknown }).plugins !== "object" ||
     (parsed as { plugins: unknown }).plugins === null
   ) {
     return {}
@@ -53,17 +53,14 @@ function parsePluginsData(content: string): Record<string, FlaggedPlugin> {
   for (const [id, entry] of Object.entries(plugins)) {
     if (
       entry &&
-      typeof entry === 'object' &&
-      'flaggedAt' in entry &&
-      typeof (entry as { flaggedAt: unknown }).flaggedAt === 'string'
+      typeof entry === "object" &&
+      "flaggedAt" in entry &&
+      typeof (entry as { flaggedAt: unknown }).flaggedAt === "string"
     ) {
       const parsed: FlaggedPlugin = {
         flaggedAt: (entry as { flaggedAt: string }).flaggedAt,
       }
-      if (
-        'seenAt' in entry &&
-        typeof (entry as { seenAt: unknown }).seenAt === 'string'
-      ) {
+      if ("seenAt" in entry && typeof (entry as { seenAt: unknown }).seenAt === "string") {
         parsed.seenAt = (entry as { seenAt: string }).seenAt
       }
       result[id] = parsed
@@ -75,7 +72,7 @@ function parsePluginsData(content: string): Record<string, FlaggedPlugin> {
 async function readFromDisk(): Promise<Record<string, FlaggedPlugin>> {
   try {
     const content = await readFile(getFlaggedPluginsPath(), {
-      encoding: 'utf-8',
+      encoding: "utf-8",
     })
     return parsePluginsData(content)
   } catch {
@@ -83,18 +80,16 @@ async function readFromDisk(): Promise<Record<string, FlaggedPlugin>> {
   }
 }
 
-async function writeToDisk(
-  plugins: Record<string, FlaggedPlugin>,
-): Promise<void> {
+async function writeToDisk(plugins: Record<string, FlaggedPlugin>): Promise<void> {
   const filePath = getFlaggedPluginsPath()
-  const tempPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`
+  const tempPath = `${filePath}.${randomBytes(8).toString("hex")}.tmp`
 
   try {
     await getFsImplementation().mkdir(getPluginsDirectory())
 
     const content = jsonStringify({ plugins }, null, 2)
     await writeFile(tempPath, content, {
-      encoding: 'utf-8',
+      encoding: "utf-8",
       mode: 0o600,
     })
     await rename(tempPath, filePath)
@@ -120,10 +115,7 @@ export async function loadFlaggedPlugins(): Promise<void> {
   let changed = false
 
   for (const [id, entry] of Object.entries(all)) {
-    if (
-      entry.seenAt &&
-      now - new Date(entry.seenAt).getTime() >= SEEN_EXPIRY_MS
-    ) {
+    if (entry.seenAt && now - new Date(entry.seenAt).getTime() >= SEEN_EXPIRY_MS) {
       delete all[id]
       changed = true
     }
@@ -169,9 +161,7 @@ export async function addFlaggedPlugin(pluginId: string): Promise<void> {
  * flagged plugins. Sets seenAt on entries that don't already have it.
  * After 48 hours from seenAt, entries are auto-cleared on next load.
  */
-export async function markFlaggedPluginsSeen(
-  pluginIds: string[],
-): Promise<void> {
+export async function markFlaggedPluginsSeen(pluginIds: string[]): Promise<void> {
   if (cache === null) {
     cache = await readFromDisk()
   }

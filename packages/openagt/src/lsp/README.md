@@ -84,16 +84,13 @@ const server = await detectAndLaunch(
 
 ```typescript
 // 自动选择合适的 LSP 服务器
-const server = await launchForFile(
-  "/path/to/project/src/main.ts",
-  {
-    typescript: "typescript-language-server",
-    javascript: "typescript-language-server",
-    python: "python-lsp-server",
-    rust: "rust-analyzer",
-    go: "gopls",
-  }
-)
+const server = await launchForFile("/path/to/project/src/main.ts", {
+  typescript: "typescript-language-server",
+  javascript: "typescript-language-server",
+  python: "python-lsp-server",
+  rust: "rust-analyzer",
+  go: "gopls",
+})
 ```
 
 ### Language Definitions (`language.ts`)
@@ -126,17 +123,17 @@ client.on("textDocument/publishDiagnostics", (params) => {
 
 ## 支持的 LSP 功能
 
-| 功能 | 说明 |
-|------|------|
-| 诊断 (Diagnostics) | 编译错误、警告、lint 问题 |
-| 自动补全 (Completion) | 智能补全建议 |
-| 跳转到定义 (Goto Definition) | 跳转到符号定义位置 |
-| 查找引用 (Find References) | 查找符号的所有引用 |
-| 重命名 (Rename) | 符号重命名 |
-| 悬停信息 (Hover) | 符号类型和文档 |
-| 签名帮助 (Signature Help) | 函数参数签名 |
-| 格式化 (Formatting) | 代码格式化 |
-| 折叠 (Folding) | 折叠区域 |
+| 功能                         | 说明                      |
+| ---------------------------- | ------------------------- |
+| 诊断 (Diagnostics)           | 编译错误、警告、lint 问题 |
+| 自动补全 (Completion)        | 智能补全建议              |
+| 跳转到定义 (Goto Definition) | 跳转到符号定义位置        |
+| 查找引用 (Find References)   | 查找符号的所有引用        |
+| 重命名 (Rename)              | 符号重命名                |
+| 悬停信息 (Hover)             | 符号类型和文档            |
+| 签名帮助 (Signature Help)    | 函数参数签名              |
+| 格式化 (Formatting)          | 代码格式化                |
+| 折叠 (Folding)               | 折叠区域                  |
 
 ---
 
@@ -215,7 +212,7 @@ if (result) {
 const completions = await client.textDocument.completion({
   textDocument: { uri: fileUri },
   position: { line: 10, character: 15 },
-  context: { triggerKind: 1, triggerCharacter: "." }
+  context: { triggerKind: 1, triggerCharacter: "." },
 })
 ```
 
@@ -233,8 +230,8 @@ interface Diagnostic {
   }
   severity: "error" | "warning" | "information" | "hint"
   message: string
-  source: string          // 来源，如 "typescript", "eslint"
-  code?: string | number  // 错误代码
+  source: string // 来源，如 "typescript", "eslint"
+  code?: string | number // 错误代码
   tags?: ("unnecessary" | "deprecated")[]
 }
 ```

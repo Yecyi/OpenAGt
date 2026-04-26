@@ -1,26 +1,30 @@
 // @refresh skip
-import App from "solid-start:app";
-import { ErrorBoundary } from "../shared/ErrorBoundary.jsx";
+import App from "solid-start:app"
+import { ErrorBoundary } from "../shared/ErrorBoundary.jsx"
 function Dummy(props) {
-    return props.children;
+  return props.children
 }
 /**
  *
  * Read more: https://docs.solidjs.com/solid-start/reference/client/start-client
  */
 export function StartClient() {
-    return (<Dummy>
+  return (
+    <Dummy>
       <Dummy>
         <ErrorBoundary>
           <App />
         </ErrorBoundary>
       </Dummy>
-    </Dummy>);
+    </Dummy>
+  )
 }
 export function StartClientTanstack() {
-    return (<Dummy>
+  return (
+    <Dummy>
       <ErrorBoundary>
         <App />
       </ErrorBoundary>
-    </Dummy>);
+    </Dummy>
+  )
 }

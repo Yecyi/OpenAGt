@@ -1,28 +1,18 @@
-import {
-  type ReadResourceResult,
-  ReadResourceResultSchema,
-} from '@modelcontextprotocol/sdk/types.js'
-import { z } from 'zod/v4'
-import { ensureConnectedClient } from '../../services/mcp/client.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import {
-  getBinaryBlobSavedMessage,
-  persistBinaryContent,
-} from '../../utils/mcpOutputStorage.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { isOutputLineTruncated } from '../../utils/terminal.js'
-import { DESCRIPTION, PROMPT } from './prompt.js'
-import {
-  renderToolResultMessage,
-  renderToolUseMessage,
-  userFacingName,
-} from './UI.js'
+import { type ReadResourceResult, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js"
+import { z } from "zod/v4"
+import { ensureConnectedClient } from "../../services/mcp/client.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getBinaryBlobSavedMessage, persistBinaryContent } from "../../utils/mcpOutputStorage.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { isOutputLineTruncated } from "../../utils/terminal.js"
+import { DESCRIPTION, PROMPT } from "./prompt.js"
+import { renderToolResultMessage, renderToolUseMessage, userFacingName } from "./UI.js"
 
 export const inputSchema = lazySchema(() =>
   z.object({
-    server: z.string().describe('The MCP server name'),
-    uri: z.string().describe('The resource URI to read'),
+    server: z.string().describe("The MCP server name"),
+    uri: z.string().describe("The resource URI to read"),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -31,13 +21,10 @@ export const outputSchema = lazySchema(() =>
   z.object({
     contents: z.array(
       z.object({
-        uri: z.string().describe('Resource URI'),
-        mimeType: z.string().optional().describe('MIME type of the content'),
-        text: z.string().optional().describe('Text content of the resource'),
-        blobSavedTo: z
-          .string()
-          .optional()
-          .describe('Path where binary blob content was saved'),
+        uri: z.string().describe("Resource URI"),
+        mimeType: z.string().optional().describe("MIME type of the content"),
+        text: z.string().optional().describe("Text content of the resource"),
+        blobSavedTo: z.string().optional().describe("Path where binary blob content was saved"),
       }),
     ),
   }),
@@ -57,8 +44,8 @@ export const ReadMcpResourceTool = buildTool({
     return `${input.server} ${input.uri}`
   },
   shouldDefer: true,
-  name: 'ReadMcpResourceTool',
-  searchHint: 'read a specific MCP resource by URI',
+  name: "ReadMcpResourceTool",
+  searchHint: "read a specific MCP resource by URI",
   maxResultSizeChars: 100_000,
   async description() {
     return DESCRIPTION
@@ -75,15 +62,15 @@ export const ReadMcpResourceTool = buildTool({
   async call(input, { options: { mcpClients } }) {
     const { server: serverName, uri } = input
 
-    const client = mcpClients.find(client => client.name === serverName)
+    const client = mcpClients.find((client) => client.name === serverName)
 
     if (!client) {
       throw new Error(
-        `Server "${serverName}" not found. Available servers: ${mcpClients.map(c => c.name).join(', ')}`,
+        `Server "${serverName}" not found. Available servers: ${mcpClients.map((c) => c.name).join(", ")}`,
       )
     }
 
-    if (client.type !== 'connected') {
+    if (client.type !== "connected") {
       throw new Error(`Server "${serverName}" is not connected`)
     }
 
@@ -94,7 +81,7 @@ export const ReadMcpResourceTool = buildTool({
     const connectedClient = await ensureConnectedClient(client)
     const result = (await connectedClient.client.request(
       {
-        method: 'resources/read',
+        method: "resources/read",
         params: { uri },
       },
       ReadResourceResultSchema,
@@ -105,19 +92,15 @@ export const ReadMcpResourceTool = buildTool({
     // would be stringified straight into the context.
     const contents = await Promise.all(
       result.contents.map(async (c, i) => {
-        if ('text' in c) {
+        if ("text" in c) {
           return { uri: c.uri, mimeType: c.mimeType, text: c.text }
         }
-        if (!('blob' in c) || typeof c.blob !== 'string') {
+        if (!("blob" in c) || typeof c.blob !== "string") {
           return { uri: c.uri, mimeType: c.mimeType }
         }
         const persistId = `mcp-resource-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`
-        const persisted = await persistBinaryContent(
-          Buffer.from(c.blob, 'base64'),
-          c.mimeType,
-          persistId,
-        )
-        if ('error' in persisted) {
+        const persisted = await persistBinaryContent(Buffer.from(c.blob, "base64"), c.mimeType, persistId)
+        if ("error" in persisted) {
           return {
             uri: c.uri,
             mimeType: c.mimeType,
@@ -151,7 +134,7 @@ export const ReadMcpResourceTool = buildTool({
   mapToolResultToToolResultBlockParam(content, toolUseID) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content: jsonStringify(content),
     }
   },

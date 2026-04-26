@@ -23,17 +23,17 @@
  * user's TMUX in all child processes spawned by Shell.ts.
  */
 
-import { posix } from 'path'
-import { registerCleanup } from './cleanupRegistry.js'
-import { logForDebugging } from './debug.js'
-import { toError } from './errors.js'
-import { execFileNoThrow } from './execFileNoThrow.js'
-import { logError } from './log.js'
-import { getPlatform } from './platform.js'
+import { posix } from "path"
+import { registerCleanup } from "./cleanupRegistry.js"
+import { logForDebugging } from "./debug.js"
+import { toError } from "./errors.js"
+import { execFileNoThrow } from "./execFileNoThrow.js"
+import { logError } from "./log.js"
+import { getPlatform } from "./platform.js"
 
 // Constants for tmux socket management
-const TMUX_COMMAND = 'tmux'
-const CLAUDE_SOCKET_PREFIX = 'claude'
+const TMUX_COMMAND = "tmux"
+const CLAUDE_SOCKET_PREFIX = "claude"
 
 /**
  * Executes a tmux command, routing through WSL on Windows.
@@ -45,26 +45,26 @@ async function execTmux(
   args: string[],
   opts?: { useCwd?: boolean },
 ): Promise<{ stdout: string; stderr: string; code: number }> {
-  if (getPlatform() === 'windows') {
+  if (getPlatform() === "windows") {
     // -e execs tmux directly without the login shell. Without it, wsl hands the
     // command line to bash which eats `#` as a comment: `display-message -p
     // #{socket_path},#{pid}` below becomes `display-message -p ` → exit 1 →
     // we silently fall back to the guessed path and never learn the real
     // server PID. Same root cause as TungstenTool/utils.ts:execTmuxCommand.
-    const result = await execFileNoThrow('wsl', ['-e', TMUX_COMMAND, ...args], {
-      env: { ...process.env, WSL_UTF8: '1' },
+    const result = await execFileNoThrow("wsl", ["-e", TMUX_COMMAND, ...args], {
+      env: { ...process.env, WSL_UTF8: "1" },
       ...opts,
     })
     return {
-      stdout: result.stdout || '',
-      stderr: result.stderr || '',
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
       code: result.code || 0,
     }
   }
   const result = await execFileNoThrow(TMUX_COMMAND, args, opts)
   return {
-    stdout: result.stdout || '',
-    stderr: result.stderr || '',
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
     code: result.code || 0,
   }
 }
@@ -151,19 +151,17 @@ export function getClaudeTmuxEnv(): string | null {
 export async function checkTmuxAvailable(): Promise<boolean> {
   if (!tmuxAvailabilityChecked) {
     const result =
-      getPlatform() === 'windows'
-        ? await execFileNoThrow('wsl', ['-e', TMUX_COMMAND, '-V'], {
-            env: { ...process.env, WSL_UTF8: '1' },
+      getPlatform() === "windows"
+        ? await execFileNoThrow("wsl", ["-e", TMUX_COMMAND, "-V"], {
+            env: { ...process.env, WSL_UTF8: "1" },
             useCwd: false,
           })
-        : await execFileNoThrow('which', [TMUX_COMMAND], {
+        : await execFileNoThrow("which", [TMUX_COMMAND], {
             useCwd: false,
           })
     tmuxAvailable = result.code === 0
     if (!tmuxAvailable) {
-      logForDebugging(
-        `[Socket] tmux is not installed. The Tmux tool and Teammate tool will not be available.`,
-      )
+      logForDebugging(`[Socket] tmux is not installed. The Tmux tool and Teammate tool will not be available.`)
     }
     tmuxAvailabilityChecked = true
   }
@@ -237,9 +235,7 @@ export async function ensureSocketInitialized(): Promise<void> {
     // Log error but don't throw - graceful degradation
     const err = toError(error)
     logError(err)
-    logForDebugging(
-      `[Socket] Failed to initialize tmux socket: ${err.message}. Tmux isolation will be disabled.`,
-    )
+    logForDebugging(`[Socket] Failed to initialize tmux socket: ${err.message}. Tmux isolation will be disabled.`)
   } finally {
     isInitializing = false
   }
@@ -253,15 +249,13 @@ async function killTmuxServer(): Promise<void> {
   const socket = getClaudeSocketName()
   logForDebugging(`[Socket] Killing tmux server for socket: ${socket}`)
 
-  const result = await execTmux(['-L', socket, 'kill-server'])
+  const result = await execTmux(["-L", socket, "kill-server"])
 
   if (result.code === 0) {
     logForDebugging(`[Socket] Successfully killed tmux server`)
   } else {
     // Server may already be dead, which is fine
-    logForDebugging(
-      `[Socket] Failed to kill tmux server (exit ${result.code}): ${result.stderr}`,
-    )
+    logForDebugging(`[Socket] Failed to kill tmux server (exit ${result.code}): ${result.stderr}`)
   }
 }
 
@@ -280,33 +274,23 @@ async function doInitialize(): Promise<void> {
   // interop. /run/WSL/1_interop is a stable symlink WSL maintains to the real
   // handler; pin the server to it so interop survives the spawning wsl.exe.
   const result = await execTmux([
-    '-L',
+    "-L",
     socket,
-    'new-session',
-    '-d',
-    '-s',
-    'base',
-    '-e',
-    'CLAUDE_CODE_SKIP_PROMPT_HISTORY=true',
-    ...(getPlatform() === 'windows'
-      ? ['-e', 'WSL_INTEROP=/run/WSL/1_interop']
-      : []),
+    "new-session",
+    "-d",
+    "-s",
+    "base",
+    "-e",
+    "CLAUDE_CODE_SKIP_PROMPT_HISTORY=true",
+    ...(getPlatform() === "windows" ? ["-e", "WSL_INTEROP=/run/WSL/1_interop"] : []),
   ])
 
   if (result.code !== 0) {
     // Session might already exist from a previous run with same PID (unlikely but possible)
     // Check if the session exists
-    const checkResult = await execTmux([
-      '-L',
-      socket,
-      'has-session',
-      '-t',
-      'base',
-    ])
+    const checkResult = await execTmux(["-L", socket, "has-session", "-t", "base"])
     if (checkResult.code !== 0) {
-      throw new Error(
-        `Failed to create tmux session on socket ${socket}: ${result.stderr}`,
-      )
+      throw new Error(`Failed to create tmux session on socket ${socket}: ${result.stderr}`)
     }
   }
 
@@ -319,42 +303,22 @@ async function doInitialize(): Promise<void> {
   // Any Claude Code instance spawned on this socket will inherit this env var,
   // preventing test/verification sessions from polluting the user's real
   // command history and --resume session list.
-  await execTmux([
-    '-L',
-    socket,
-    'set-environment',
-    '-g',
-    'CLAUDE_CODE_SKIP_PROMPT_HISTORY',
-    'true',
-  ])
+  await execTmux(["-L", socket, "set-environment", "-g", "CLAUDE_CODE_SKIP_PROMPT_HISTORY", "true"])
 
   // Same WSL_INTEROP pin as the new-session -e above, but in the GLOBAL env
   // so sessions created by TungstenTool inherit it too. The -e on new-session
   // only covers the base session's initial shell; a later `new-session -s cc`
   // inherits the SERVER's env, which still holds the stale socket from the
   // wsl.exe that spawned it.
-  if (getPlatform() === 'windows') {
-    await execTmux([
-      '-L',
-      socket,
-      'set-environment',
-      '-g',
-      'WSL_INTEROP',
-      '/run/WSL/1_interop',
-    ])
+  if (getPlatform() === "windows") {
+    await execTmux(["-L", socket, "set-environment", "-g", "WSL_INTEROP", "/run/WSL/1_interop"])
   }
 
   // Get the socket path and server PID
-  const infoResult = await execTmux([
-    '-L',
-    socket,
-    'display-message',
-    '-p',
-    '#{socket_path},#{pid}',
-  ])
+  const infoResult = await execTmux(["-L", socket, "display-message", "-p", "#{socket_path},#{pid}"])
 
   if (infoResult.code === 0) {
-    const [path, pidStr] = infoResult.stdout.trim().split(',')
+    const [path, pidStr] = infoResult.stdout.trim().split(",")
     if (path && pidStr) {
       const pid = parseInt(pidStr, 10)
       if (!isNaN(pid)) {
@@ -378,35 +342,23 @@ async function doInitialize(): Promise<void> {
   // On Windows this path is inside WSL, so always use POSIX separators.
   // process.getuid() is undefined on Windows; WSL default user is root (uid 0) in CI.
   const uid = process.getuid?.() ?? 0
-  const baseTmpDir = process.env.TMPDIR || '/tmp'
+  const baseTmpDir = process.env.TMPDIR || "/tmp"
   const fallbackPath = posix.join(baseTmpDir, `tmux-${uid}`, socket)
 
   // Get server PID separately
-  const pidResult = await execTmux([
-    '-L',
-    socket,
-    'display-message',
-    '-p',
-    '#{pid}',
-  ])
+  const pidResult = await execTmux(["-L", socket, "display-message", "-p", "#{pid}"])
 
   if (pidResult.code === 0) {
     const pid = parseInt(pidResult.stdout.trim(), 10)
     if (!isNaN(pid)) {
-      logForDebugging(
-        `[Socket] Using fallback socket path: ${fallbackPath} (server PID: ${pid})`,
-      )
+      logForDebugging(`[Socket] Using fallback socket path: ${fallbackPath} (server PID: ${pid})`)
       setClaudeSocketInfo(fallbackPath, pid)
       return
     }
     // PID parsing failed
-    logForDebugging(
-      `[Socket] Failed to parse server PID from tmux output: "${pidResult.stdout.trim()}"`,
-    )
+    logForDebugging(`[Socket] Failed to parse server PID from tmux output: "${pidResult.stdout.trim()}"`)
   } else {
-    logForDebugging(
-      `[Socket] Failed to get server PID (exit ${pidResult.code}): ${pidResult.stderr}`,
-    )
+    logForDebugging(`[Socket] Failed to get server PID (exit ${pidResult.code}): ${pidResult.stderr}`)
   }
 
   throw new Error(

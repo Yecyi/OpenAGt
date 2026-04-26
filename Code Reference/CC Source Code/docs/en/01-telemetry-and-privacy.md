@@ -97,6 +97,7 @@ export function is1PEventLoggingEnabled(): boolean {
 ```
 
 `isAnalyticsDisabled()` returns true only for:
+
 - Test environments
 - Third-party cloud providers (Bedrock, Vertex)
 - Global telemetry opt-out (not exposed in settings UI)

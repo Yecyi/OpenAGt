@@ -10,10 +10,7 @@ const PATH_CMD_PATTERN = /^(cd|cp|mv|rm|rmdir|mkdir|chmod|chown|touch|cat|head|t
  */
 function extractQuotedPaths(text: string): string[] {
   const paths: string[] = []
-  const patterns = [
-    /"([^"\\]|\\.)*"/g,
-    /'([^'\\]|\\.)*'/g,
-  ]
+  const patterns = [/"([^"\\]|\\.)*"/g, /'([^'\\]|\\.)*'/g]
 
   for (const pattern of patterns) {
     let match

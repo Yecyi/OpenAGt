@@ -8,11 +8,7 @@ const pkg = await Bun.file(path.join(root, "packages", "openagt", "package.json"
 
 const arch = process.arch === "arm64" ? "arm64" : "x64"
 const platformNames =
-  process.platform === "win32"
-    ? ["windows"]
-    : process.platform === "darwin"
-      ? ["macos", "darwin"]
-      : ["linux"]
+  process.platform === "win32" ? ["windows"] : process.platform === "darwin" ? ["macos", "darwin"] : ["linux"]
 const candidates = platformNames.map((platform) =>
   path.join(
     root,
@@ -25,9 +21,9 @@ const candidates = platformNames.map((platform) =>
     process.platform === "win32" ? "openagt.exe" : "openagt",
   ),
 )
-const bin = (await Promise.all(candidates.map(async (candidate) => ((await Bun.file(candidate).exists()) ? candidate : undefined)))).find(
-  (item) => item !== undefined,
-)
+const bin = (
+  await Promise.all(candidates.map(async (candidate) => ((await Bun.file(candidate).exists()) ? candidate : undefined)))
+).find((item) => item !== undefined)
 
 if (!bin) {
   throw new Error(`Packaged binary not found. Tried:\n${candidates.join("\n")}`)

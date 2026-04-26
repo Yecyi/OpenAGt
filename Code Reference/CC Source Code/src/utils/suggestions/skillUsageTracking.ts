@@ -1,4 +1,4 @@
-import { getGlobalConfig, saveGlobalConfig } from '../config.js'
+import { getGlobalConfig, saveGlobalConfig } from "../config.js"
 
 const SKILL_USAGE_DEBOUNCE_MS = 60_000
 
@@ -19,7 +19,7 @@ export function recordSkillUsage(skillName: string): void {
     return
   }
   lastWriteBySkill.set(skillName, now)
-  saveGlobalConfig(current => {
+  saveGlobalConfig((current) => {
     const existing = current.skillUsage?.[skillName]
     return {
       ...current,

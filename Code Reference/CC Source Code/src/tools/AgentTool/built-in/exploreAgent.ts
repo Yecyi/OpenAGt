@@ -1,14 +1,14 @@
-import { BASH_TOOL_NAME } from 'src/tools/BashTool/toolName.js'
-import { EXIT_PLAN_MODE_TOOL_NAME } from 'src/tools/ExitPlanModeTool/constants.js'
-import { FILE_EDIT_TOOL_NAME } from 'src/tools/FileEditTool/constants.js'
-import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
-import { FILE_WRITE_TOOL_NAME } from 'src/tools/FileWriteTool/prompt.js'
-import { GLOB_TOOL_NAME } from 'src/tools/GlobTool/prompt.js'
-import { GREP_TOOL_NAME } from 'src/tools/GrepTool/prompt.js'
-import { NOTEBOOK_EDIT_TOOL_NAME } from 'src/tools/NotebookEditTool/constants.js'
-import { hasEmbeddedSearchTools } from 'src/utils/embeddedTools.js'
-import { AGENT_TOOL_NAME } from '../constants.js'
-import type { BuiltInAgentDefinition } from '../loadAgentsDir.js'
+import { BASH_TOOL_NAME } from "src/tools/BashTool/toolName.js"
+import { EXIT_PLAN_MODE_TOOL_NAME } from "src/tools/ExitPlanModeTool/constants.js"
+import { FILE_EDIT_TOOL_NAME } from "src/tools/FileEditTool/constants.js"
+import { FILE_READ_TOOL_NAME } from "src/tools/FileReadTool/prompt.js"
+import { FILE_WRITE_TOOL_NAME } from "src/tools/FileWriteTool/prompt.js"
+import { GLOB_TOOL_NAME } from "src/tools/GlobTool/prompt.js"
+import { GREP_TOOL_NAME } from "src/tools/GrepTool/prompt.js"
+import { NOTEBOOK_EDIT_TOOL_NAME } from "src/tools/NotebookEditTool/constants.js"
+import { hasEmbeddedSearchTools } from "src/utils/embeddedTools.js"
+import { AGENT_TOOL_NAME } from "../constants.js"
+import type { BuiltInAgentDefinition } from "../loadAgentsDir.js"
 
 function getExploreSystemPrompt(): string {
   // Ant-native builds alias find/grep to embedded bfs/ugrep and remove the
@@ -44,7 +44,7 @@ Guidelines:
 ${globGuidance}
 ${grepGuidance}
 - Use ${FILE_READ_TOOL_NAME} when you know the specific file path you need to read
-- Use ${BASH_TOOL_NAME} ONLY for read-only operations (ls, git status, git log, git diff, find${embedded ? ', grep' : ''}, cat, head, tail)
+- Use ${BASH_TOOL_NAME} ONLY for read-only operations (ls, git status, git log, git diff, find${embedded ? ", grep" : ""}, cat, head, tail)
 - NEVER use ${BASH_TOOL_NAME} for: mkdir, touch, rm, cp, mv, git add, git commit, npm install, pip install, or any file creation/modification
 - Adapt your search approach based on the thoroughness level specified by the caller
 - Communicate your final report directly as a regular message - do NOT attempt to create files
@@ -62,7 +62,7 @@ const EXPLORE_WHEN_TO_USE =
   'Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.'
 
 export const EXPLORE_AGENT: BuiltInAgentDefinition = {
-  agentType: 'Explore',
+  agentType: "Explore",
   whenToUse: EXPLORE_WHEN_TO_USE,
   disallowedTools: [
     AGENT_TOOL_NAME,
@@ -71,11 +71,11 @@ export const EXPLORE_AGENT: BuiltInAgentDefinition = {
     FILE_WRITE_TOOL_NAME,
     NOTEBOOK_EDIT_TOOL_NAME,
   ],
-  source: 'built-in',
-  baseDir: 'built-in',
+  source: "built-in",
+  baseDir: "built-in",
   // Ants get inherit to use the main agent's model; external users get haiku for speed
   // Note: For ants, getAgentModel() checks tengu_explore_agent GrowthBook flag at runtime
-  model: process.env.USER_TYPE === 'ant' ? 'inherit' : 'haiku',
+  model: process.env.USER_TYPE === "ant" ? "inherit" : "haiku",
   // Explore is a fast read-only search agent — it doesn't need commit/PR/lint
   // rules from CLAUDE.md. The main agent has full context and interprets results.
   omitClaudeMd: true,

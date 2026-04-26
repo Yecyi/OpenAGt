@@ -1,13 +1,7 @@
-import type { Cursor } from './cursor.js'
-import type { Size } from './layout/geometry.js'
-import type { ScrollHint } from './render-node-to-output.js'
-import {
-  type CharPool,
-  createScreen,
-  type HyperlinkPool,
-  type Screen,
-  type StylePool,
-} from './screen.js'
+import type { Cursor } from "./cursor.js"
+import type { Size } from "./layout/geometry.js"
+import type { ScrollHint } from "./render-node-to-output.js"
+import { type CharPool, createScreen, type HyperlinkPool, type Screen, type StylePool } from "./screen.js"
 
 export type Frame = {
   readonly screen: Screen
@@ -33,7 +27,7 @@ export function emptyFrame(
   }
 }
 
-export type FlickerReason = 'resize' | 'offscreen' | 'clear'
+export type FlickerReason = "resize" | "offscreen" | "clear"
 
 export type FrameEvent = {
   durationMs: number
@@ -71,25 +65,25 @@ export type FrameEvent = {
 }
 
 export type Patch =
-  | { type: 'stdout'; content: string }
-  | { type: 'clear'; count: number }
+  | { type: "stdout"; content: string }
+  | { type: "clear"; count: number }
   | {
-      type: 'clearTerminal'
+      type: "clearTerminal"
       reason: FlickerReason
       // Populated by log-update when a scrollback diff triggers the reset.
       // ink.tsx uses triggerY with findOwnerChainAtRow to attribute the
       // flicker to its source React component.
       debug?: { triggerY: number; prevLine: string; nextLine: string }
     }
-  | { type: 'cursorHide' }
-  | { type: 'cursorShow' }
-  | { type: 'cursorMove'; x: number; y: number }
-  | { type: 'cursorTo'; col: number }
-  | { type: 'carriageReturn' }
-  | { type: 'hyperlink'; uri: string }
+  | { type: "cursorHide" }
+  | { type: "cursorShow" }
+  | { type: "cursorMove"; x: number; y: number }
+  | { type: "cursorTo"; col: number }
+  | { type: "carriageReturn" }
+  | { type: "hyperlink"; uri: string }
   // Pre-serialized style transition string from StylePool.transition() —
   // cached by (fromId, toId), zero allocations after warmup.
-  | { type: 'styleStr'; str: string }
+  | { type: "styleStr"; str: string }
 
 export type Diff = Patch[]
 
@@ -102,22 +96,17 @@ export type Diff = Patch[]
  * 2. Current frame screen height exceeds available terminal rows → 'offscreen'
  * 3. Previous frame screen height exceeded available terminal rows → 'offscreen'
  */
-export function shouldClearScreen(
-  prevFrame: Frame,
-  frame: Frame,
-): FlickerReason | undefined {
+export function shouldClearScreen(prevFrame: Frame, frame: Frame): FlickerReason | undefined {
   const didResize =
-    frame.viewport.height !== prevFrame.viewport.height ||
-    frame.viewport.width !== prevFrame.viewport.width
+    frame.viewport.height !== prevFrame.viewport.height || frame.viewport.width !== prevFrame.viewport.width
   if (didResize) {
-    return 'resize'
+    return "resize"
   }
 
   const currentFrameOverflows = frame.screen.height >= frame.viewport.height
-  const previousFrameOverflowed =
-    prevFrame.screen.height >= prevFrame.viewport.height
+  const previousFrameOverflowed = prevFrame.screen.height >= prevFrame.viewport.height
   if (currentFrameOverflows || previousFrameOverflowed) {
-    return 'offscreen'
+    return "offscreen"
   }
 
   return undefined

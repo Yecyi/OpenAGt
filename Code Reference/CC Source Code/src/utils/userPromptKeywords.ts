@@ -17,7 +17,7 @@ export function matchesKeepGoingKeyword(input: string): boolean {
   const lowerInput = input.toLowerCase().trim()
 
   // Match "continue" only if it's the entire prompt
-  if (lowerInput === 'continue') {
+  if (lowerInput === "continue") {
     return true
   }
 

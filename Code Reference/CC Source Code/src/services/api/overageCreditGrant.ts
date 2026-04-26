@@ -1,10 +1,10 @@
-import axios from 'axios'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { getOauthAccountInfo } from '../../utils/auth.js'
-import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
-import { logError } from '../../utils/log.js'
-import { isEssentialTrafficOnly } from '../../utils/privacyLevel.js'
-import { getOAuthHeaders, prepareApiRequest } from '../../utils/teleport/api.js'
+import axios from "axios"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { getOauthAccountInfo } from "../../utils/auth.js"
+import { getGlobalConfig, saveGlobalConfig } from "../../utils/config.js"
+import { logError } from "../../utils/log.js"
+import { isEssentialTrafficOnly } from "../../utils/privacyLevel.js"
+import { getOAuthHeaders, prepareApiRequest } from "../../utils/teleport/api.js"
 
 export type OverageCreditGrantInfo = {
   available: boolean
@@ -63,7 +63,7 @@ export function invalidateOverageCreditGrantCache(): void {
   if (!orgId) return
   const cache = getGlobalConfig().overageCreditGrantCache
   if (!cache || !(orgId in cache)) return
-  saveGlobalConfig(prev => {
+  saveGlobalConfig((prev) => {
     const next = { ...prev.overageCreditGrantCache }
     delete next[orgId]
     return { ...prev, overageCreditGrantCache: next }
@@ -84,7 +84,7 @@ export async function refreshOverageCreditGrantCache(): Promise<void> {
   // amplification (inc-4552 pattern). Still refresh the timestamp so the
   // TTL-based staleness check in getCachedOverageCreditGrant doesn't keep
   // re-triggering API calls on every component mount.
-  saveGlobalConfig(prev => {
+  saveGlobalConfig((prev) => {
     // Derive from prev (lock-fresh) rather than a pre-lock getGlobalConfig()
     // read — saveConfigWithLock re-reads config from disk under the file lock,
     // so another CLI instance may have written between any outer read and lock
@@ -99,11 +99,7 @@ export async function refreshOverageCreditGrantCache(): Promise<void> {
       existing.amount_minor_units === info.amount_minor_units &&
       existing.currency === info.currency
     // When data is unchanged and timestamp is still fresh, skip the write entirely
-    if (
-      dataUnchanged &&
-      prevCached &&
-      Date.now() - prevCached.timestamp <= CACHE_TTL_MS
-    ) {
+    if (dataUnchanged && prevCached && Date.now() - prevCached.timestamp <= CACHE_TTL_MS) {
       return prev
     }
     const entry: CachedGrantEntry = {
@@ -127,7 +123,7 @@ export async function refreshOverageCreditGrantCache(): Promise<void> {
 export function formatGrantAmount(info: OverageCreditGrantInfo): string | null {
   if (info.amount_minor_units == null || !info.currency) return null
   // For now only USD; backend may expand later
-  if (info.currency.toUpperCase() === 'USD') {
+  if (info.currency.toUpperCase() === "USD") {
     const dollars = info.amount_minor_units / 100
     return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`
   }

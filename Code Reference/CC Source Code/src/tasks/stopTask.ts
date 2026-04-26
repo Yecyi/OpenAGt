@@ -1,19 +1,19 @@
 // Shared logic for stopping a running task.
 // Used by TaskStopTool (LLM-invoked) and SDK stop_task control request.
 
-import type { AppState } from '../state/AppState.js'
-import type { TaskStateBase } from '../Task.js'
-import { getTaskByType } from '../tasks.js'
-import { emitTaskTerminatedSdk } from '../utils/sdkEventQueue.js'
-import { isLocalShellTask } from './LocalShellTask/guards.js'
+import type { AppState } from "../state/AppState.js"
+import type { TaskStateBase } from "../Task.js"
+import { getTaskByType } from "../tasks.js"
+import { emitTaskTerminatedSdk } from "../utils/sdkEventQueue.js"
+import { isLocalShellTask } from "./LocalShellTask/guards.js"
 
 export class StopTaskError extends Error {
   constructor(
     message: string,
-    public readonly code: 'not_found' | 'not_running' | 'unsupported_type',
+    public readonly code: "not_found" | "not_running" | "unsupported_type",
   ) {
     super(message)
-    this.name = 'StopTaskError'
+    this.name = "StopTaskError"
   }
 }
 
@@ -35,31 +35,22 @@ type StopTaskResult = {
  * not running, or unsupported type). Callers can inspect `error.code` to
  * distinguish the failure reason.
  */
-export async function stopTask(
-  taskId: string,
-  context: StopTaskContext,
-): Promise<StopTaskResult> {
+export async function stopTask(taskId: string, context: StopTaskContext): Promise<StopTaskResult> {
   const { getAppState, setAppState } = context
   const appState = getAppState()
   const task = appState.tasks?.[taskId] as TaskStateBase | undefined
 
   if (!task) {
-    throw new StopTaskError(`No task found with ID: ${taskId}`, 'not_found')
+    throw new StopTaskError(`No task found with ID: ${taskId}`, "not_found")
   }
 
-  if (task.status !== 'running') {
-    throw new StopTaskError(
-      `Task ${taskId} is not running (status: ${task.status})`,
-      'not_running',
-    )
+  if (task.status !== "running") {
+    throw new StopTaskError(`Task ${taskId} is not running (status: ${task.status})`, "not_running")
   }
 
   const taskImpl = getTaskByType(task.type)
   if (!taskImpl) {
-    throw new StopTaskError(
-      `Unsupported task type: ${task.type}`,
-      'unsupported_type',
-    )
+    throw new StopTaskError(`Unsupported task type: ${task.type}`, "unsupported_type")
   }
 
   await taskImpl.kill(taskId, setAppState)
@@ -69,7 +60,7 @@ export async function stopTask(
   // extractPartialResult(agentMessages), which is the payload not noise.
   if (isLocalShellTask(task)) {
     let suppressed = false
-    setAppState(prev => {
+    setAppState((prev) => {
       const prevTask = prev.tasks[taskId]
       if (!prevTask || prevTask.notified) {
         return prev
@@ -87,7 +78,7 @@ export async function stopTask(
     // task_notification SDK event — emit it directly so SDK consumers see
     // the task close.
     if (suppressed) {
-      emitTaskTerminatedSdk(taskId, 'stopped', {
+      emitTaskTerminatedSdk(taskId, "stopped", {
         toolUseId: task.toolUseId,
         summary: task.description,
       })

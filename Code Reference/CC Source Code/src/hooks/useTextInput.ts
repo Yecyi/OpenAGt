@@ -1,13 +1,10 @@
-import { isInputModeCharacter } from 'src/components/PromptInput/inputModes.js'
-import { useNotifications } from 'src/context/notifications.js'
-import stripAnsi from 'strip-ansi'
-import { markBackslashReturnUsed } from '../commands/terminalSetup/terminalSetup.js'
-import { addToHistory } from '../history.js'
-import type { Key } from '../ink.js'
-import type {
-  InlineGhostText,
-  TextInputState,
-} from '../types/textInputTypes.js'
+import { isInputModeCharacter } from "src/components/PromptInput/inputModes.js"
+import { useNotifications } from "src/context/notifications.js"
+import stripAnsi from "strip-ansi"
+import { markBackslashReturnUsed } from "../commands/terminalSetup/terminalSetup.js"
+import { addToHistory } from "../history.js"
+import type { Key } from "../ink.js"
+import type { InlineGhostText, TextInputState } from "../types/textInputTypes.js"
 import {
   Cursor,
   getLastKill,
@@ -17,12 +14,12 @@ import {
   resetYankState,
   updateYankLength,
   yankPop,
-} from '../utils/Cursor.js'
-import { env } from '../utils/env.js'
-import { isFullscreenEnvEnabled } from '../utils/fullscreen.js'
-import type { ImageDimensions } from '../utils/imageResizer.js'
-import { isModifierPressed, prewarmModifiers } from '../utils/modifiers.js'
-import { useDoublePress } from './useDoublePress.js'
+} from "../utils/Cursor.js"
+import { env } from "../utils/env.js"
+import { isFullscreenEnvEnabled } from "../utils/fullscreen.js"
+import type { ImageDimensions } from "../utils/imageResizer.js"
+import { isModifierPressed, prewarmModifiers } from "../utils/modifiers.js"
+import { useDoublePress } from "./useDoublePress.js"
 
 type MaybeCursor = void | Cursor
 type InputHandler = (input: string) => MaybeCursor
@@ -80,7 +77,7 @@ export function useTextInput({
   onHistoryDown,
   onHistoryReset,
   onClearInput,
-  mask = '',
+  mask = "",
   multiline = false,
   cursorChar,
   invert,
@@ -96,7 +93,7 @@ export function useTextInput({
   dim,
 }: UseTextInputProps): TextInputState {
   // Pre-warm the modifiers module for Apple Terminal (has internal guard, safe to call multiple times)
-  if (env.terminal === 'Apple_Terminal') {
+  if (env.terminal === "Apple_Terminal") {
     prewarmModifiers()
   }
 
@@ -106,13 +103,13 @@ export function useTextInput({
   const { addNotification, removeNotification } = useNotifications()
 
   const handleCtrlC = useDoublePress(
-    show => {
-      onExitMessage?.(show, 'Ctrl-C')
+    (show) => {
+      onExitMessage?.(show, "Ctrl-C")
     },
     () => onExit?.(),
     () => {
       if (originalValue) {
-        onChange('')
+        onChange("")
         setOffset(0)
         onHistoryReset?.()
       }
@@ -129,23 +126,23 @@ export function useTextInput({
         return
       }
       addNotification({
-        key: 'escape-again-to-clear',
-        text: 'Esc again to clear',
-        priority: 'immediate',
+        key: "escape-again-to-clear",
+        text: "Esc again to clear",
+        priority: "immediate",
         timeoutMs: 1000,
       })
     },
     () => {
       // Remove the "Esc again to clear" notification immediately
-      removeNotification('escape-again-to-clear')
+      removeNotification("escape-again-to-clear")
       onClearInput?.()
       if (originalValue) {
         // Track double-escape usage for feature discovery
         // Save to history before clearing
-        if (originalValue.trim() !== '') {
+        if (originalValue.trim() !== "") {
           addToHistory(originalValue)
         }
-        onChange('')
+        onChange("")
         setOffset(0)
         onHistoryReset?.()
       }
@@ -153,14 +150,14 @@ export function useTextInput({
   )
 
   const handleEmptyCtrlD = useDoublePress(
-    show => {
-      if (originalValue !== '') {
+    (show) => {
+      if (originalValue !== "") {
         return
       }
-      onExitMessage?.(show, 'Ctrl-D')
+      onExitMessage?.(show, "Ctrl-D")
     },
     () => {
-      if (originalValue !== '') {
+      if (originalValue !== "") {
         return
       }
       onExit?.()
@@ -168,7 +165,7 @@ export function useTextInput({
   )
 
   function handleCtrlD(): MaybeCursor {
-    if (cursor.text === '') {
+    if (cursor.text === "") {
       // When input is empty, handle double-press
       handleEmptyCtrlD()
       return cursor
@@ -179,19 +176,19 @@ export function useTextInput({
 
   function killToLineEnd(): Cursor {
     const { cursor: newCursor, killed } = cursor.deleteToLineEnd()
-    pushToKillRing(killed, 'append')
+    pushToKillRing(killed, "append")
     return newCursor
   }
 
   function killToLineStart(): Cursor {
     const { cursor: newCursor, killed } = cursor.deleteToLineStart()
-    pushToKillRing(killed, 'prepend')
+    pushToKillRing(killed, "prepend")
     return newCursor
   }
 
   function killWordBefore(): Cursor {
     const { cursor: newCursor, killed } = cursor.deleteWordBefore()
-    pushToKillRing(killed, 'prepend')
+    pushToKillRing(killed, "prepend")
     return newCursor
   }
 
@@ -222,46 +219,42 @@ export function useTextInput({
   }
 
   const handleCtrl = mapInput([
-    ['a', () => cursor.startOfLine()],
-    ['b', () => cursor.left()],
-    ['c', handleCtrlC],
-    ['d', handleCtrlD],
-    ['e', () => cursor.endOfLine()],
-    ['f', () => cursor.right()],
-    ['h', () => cursor.deleteTokenBefore() ?? cursor.backspace()],
-    ['k', killToLineEnd],
-    ['n', () => downOrHistoryDown()],
-    ['p', () => upOrHistoryUp()],
-    ['u', killToLineStart],
-    ['w', killWordBefore],
-    ['y', yank],
+    ["a", () => cursor.startOfLine()],
+    ["b", () => cursor.left()],
+    ["c", handleCtrlC],
+    ["d", handleCtrlD],
+    ["e", () => cursor.endOfLine()],
+    ["f", () => cursor.right()],
+    ["h", () => cursor.deleteTokenBefore() ?? cursor.backspace()],
+    ["k", killToLineEnd],
+    ["n", () => downOrHistoryDown()],
+    ["p", () => upOrHistoryUp()],
+    ["u", killToLineStart],
+    ["w", killWordBefore],
+    ["y", yank],
   ])
 
   const handleMeta = mapInput([
-    ['b', () => cursor.prevWord()],
-    ['f', () => cursor.nextWord()],
-    ['d', () => cursor.deleteWordAfter()],
-    ['y', handleYankPop],
+    ["b", () => cursor.prevWord()],
+    ["f", () => cursor.nextWord()],
+    ["d", () => cursor.deleteWordAfter()],
+    ["y", handleYankPop],
   ])
 
   function handleEnter(key: Key) {
-    if (
-      multiline &&
-      cursor.offset > 0 &&
-      cursor.text[cursor.offset - 1] === '\\'
-    ) {
+    if (multiline && cursor.offset > 0 && cursor.text[cursor.offset - 1] === "\\") {
       // Track that the user has used backslash+return
       markBackslashReturnUsed()
-      return cursor.backspace().insert('\n')
+      return cursor.backspace().insert("\n")
     }
     // Meta+Enter or Shift+Enter inserts a newline
     if (key.meta || key.shift) {
-      return cursor.insert('\n')
+      return cursor.insert("\n")
     }
     // Apple Terminal doesn't support custom Shift+Enter keybindings,
     // so we use native macOS modifier detection to check if Shift is held
-    if (env.terminal === 'Apple_Terminal' && isModifierPressed('shift')) {
-      return cursor.insert('\n')
+    if (env.terminal === "Apple_Terminal" && isModifierPressed("shift")) {
+      return cursor.insert("\n")
     }
     onSubmit?.(originalValue)
   }
@@ -334,9 +327,7 @@ export function useTextInput({
       case key.rightArrow && (key.ctrl || key.meta || key.fn):
         return () => cursor.nextWord()
       case key.backspace:
-        return key.meta || key.ctrl
-          ? killWordBefore
-          : () => cursor.deleteTokenBefore() ?? cursor.backspace()
+        return key.meta || key.ctrl ? killWordBefore : () => cursor.deleteTokenBefore() ?? cursor.backspace()
       case key.delete:
         return key.meta ? killToLineEnd : () => cursor.del()
       case key.ctrl:
@@ -382,10 +373,10 @@ export function useTextInput({
         return function (input: string) {
           switch (true) {
             // Home key
-            case input === '\x1b[H' || input === '\x1b[1~':
+            case input === "\x1b[H" || input === "\x1b[1~":
               return cursor.startOfLine()
             // End key
-            case input === '\x1b[F' || input === '\x1b[4~':
+            case input === "\x1b[F" || input === "\x1b[4~":
               return cursor.endOfLine()
             default: {
               // Trailing \r after text is SSH-coalesced Enter ("o\r") —
@@ -399,8 +390,8 @@ export function useTextInput({
               // it becomes \n below (anthropics/claude-code#31316).
               const text = stripAnsi(input)
                 // eslint-disable-next-line custom-rules/no-lookbehind-regex -- .replace(re, str) on 1-2 char keystrokes: no-match returns same string (Object.is), regex never runs
-                .replace(/(?<=[^\\\r\n])\r$/, '')
-                .replace(/\r/g, '\n')
+                .replace(/(?<=[^\\\r\n])\r$/, "")
+                .replace(/\r/g, "\n")
               if (cursor.isAtStart() && isInputModeCharacter(input)) {
                 return cursor.insert(text).left()
               }
@@ -414,7 +405,7 @@ export function useTextInput({
 
   // Check if this is a kill command (Ctrl+K, Ctrl+U, Ctrl+W, or Meta+Backspace/Delete)
   function isKillKey(key: Key, input: string): boolean {
-    if (key.ctrl && (input === 'k' || input === 'u' || input === 'w')) {
+    if (key.ctrl && (input === "k" || input === "u" || input === "w")) {
       return true
     }
     if (key.meta && (key.backspace || key.delete)) {
@@ -425,7 +416,7 @@ export function useTextInput({
 
   // Check if this is a yank command (Ctrl+Y or Alt+Y)
   function isYankKey(key: Key, input: string): boolean {
-    return (key.ctrl || key.meta) && input === 'y'
+    return (key.ctrl || key.meta) && input === "y"
   }
 
   function onInput(input: string, key: Key): void {
@@ -435,21 +426,20 @@ export function useTextInput({
     const filteredInput = inputFilter ? inputFilter(input, key) : input
 
     // If the input was filtered out, do nothing
-    if (filteredInput === '' && input !== '') {
+    if (filteredInput === "" && input !== "") {
       return
     }
 
     // Fix Issue #1853: Filter DEL characters that interfere with backspace in SSH/tmux
     // In SSH/tmux environments, backspace generates both key events and raw DEL chars
-    if (!key.backspace && !key.delete && input.includes('\x7f')) {
+    if (!key.backspace && !key.delete && input.includes("\x7f")) {
       const delCount = (input.match(/\x7f/g) || []).length
 
       // Apply all DEL characters as backspace operations synchronously
       // Try to delete tokens first, fall back to character backspace
       let currentCursor = cursor
       for (let i = 0; i < delCount; i++) {
-        currentCursor =
-          currentCursor.deleteTokenBefore() ?? currentCursor.backspace()
+        currentCursor = currentCursor.deleteTokenBefore() ?? currentCursor.backspace()
       }
 
       // Update state once with the final result
@@ -489,11 +479,11 @@ export function useTextInput({
       // (newline); embedded \r is multi-line paste.
       if (
         filteredInput.length > 1 &&
-        filteredInput.endsWith('\r') &&
-        !filteredInput.slice(0, -1).includes('\r') &&
+        filteredInput.endsWith("\r") &&
+        !filteredInput.slice(0, -1).includes("\r") &&
         // Backslash+CR is a stale VS Code Shift+Enter binding, not
         // coalesced Enter. See default handler above.
-        filteredInput[filteredInput.length - 2] !== '\\'
+        filteredInput[filteredInput.length - 2] !== "\\"
       ) {
         onSubmit?.(nextCursor.text)
       }
@@ -512,13 +502,7 @@ export function useTextInput({
 
   return {
     onInput,
-    renderedValue: cursor.render(
-      cursorChar,
-      mask,
-      invert,
-      ghostTextForRender,
-      maxVisibleLines,
-    ),
+    renderedValue: cursor.render(cursorChar, mask, invert, ghostTextForRender, maxVisibleLines),
     offset,
     setOffset,
     cursorLine: cursorPos.line - cursor.getViewportStartLine(maxVisibleLines),

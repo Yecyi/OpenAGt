@@ -68,9 +68,9 @@ export namespace Slug {
   ] as const
 
   export function create() {
-  return [
-    ADJECTIVES[Math.floor(randomBytes(4).readUInt8(0) / ADJECTIVES.length * ADJECTIVES.length)],
-    NOUNS[Math.floor(randomBytes(4).readUInt8(0) / NOUNS.length * NOUNS.length)],
-  ].join("-")
+    return [
+      ADJECTIVES[Math.floor((randomBytes(4).readUInt8(0) / ADJECTIVES.length) * ADJECTIVES.length)],
+      NOUNS[Math.floor((randomBytes(4).readUInt8(0) / NOUNS.length) * NOUNS.length)],
+    ].join("-")
   }
 }

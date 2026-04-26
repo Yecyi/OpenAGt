@@ -25,15 +25,15 @@
  * - Detailed new_context attributes for LLM requests
  */
 
-import type { Span } from '@opentelemetry/api'
-import { createHash } from 'crypto'
-import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
-import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.js'
-import type { AssistantMessage, UserMessage } from '../../types/message.js'
-import { isEnvTruthy } from '../envUtils.js'
-import { jsonParse, jsonStringify } from '../slowOperations.js'
-import { logOTelEvent } from './events.js'
+import type { Span } from "@opentelemetry/api"
+import { createHash } from "crypto"
+import { getIsNonInteractiveSession } from "../../bootstrap/state.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../../services/analytics/growthbook.js"
+import { sanitizeToolNameForAnalytics } from "../../services/analytics/metadata.js"
+import type { AssistantMessage, UserMessage } from "../../types/message.js"
+import { isEnvTruthy } from "../envUtils.js"
+import { jsonParse, jsonStringify } from "../slowOperations.js"
+import { logOTelEvent } from "./events.js"
 
 // Message type for API calls (UserMessage or AssistantMessage)
 type APIMessage = UserMessage | AssistantMessage
@@ -77,8 +77,7 @@ const MAX_CONTENT_SIZE = 60 * 1024 // 60KB (Honeycomb limit is 64KB, staying saf
  */
 export function isBetaTracingEnabled(): boolean {
   const baseEnabled =
-    isEnvTruthy(process.env.ENABLE_BETA_TRACING_DETAILED) &&
-    Boolean(process.env.BETA_TRACING_ENDPOINT)
+    isEnvTruthy(process.env.ENABLE_BETA_TRACING_DETAILED) && Boolean(process.env.BETA_TRACING_ENDPOINT)
 
   if (!baseEnabled) {
     return false
@@ -87,11 +86,8 @@ export function isBetaTracingEnabled(): boolean {
   // For external users, enable in SDK/headless mode OR when org is allowlisted.
   // Gate reads from disk cache, so first run after allowlisting returns false;
   // works from second run onward (same behavior as enhanced_telemetry_beta).
-  if (process.env.USER_TYPE !== 'ant') {
-    return (
-      getIsNonInteractiveSession() ||
-      getFeatureValue_CACHED_MAY_BE_STALE('tengu_trace_lantern', false)
-    )
+  if (process.env.USER_TYPE !== "ant") {
+    return getIsNonInteractiveSession() || getFeatureValue_CACHED_MAY_BE_STALE("tengu_trace_lantern", false)
   }
 
   return true
@@ -109,9 +105,7 @@ export function truncateContent(
   }
 
   return {
-    content:
-      content.slice(0, maxSize) +
-      '\n\n[TRUNCATED - Content exceeds 60KB limit]',
+    content: content.slice(0, maxSize) + "\n\n[TRUNCATED - Content exceeds 60KB limit]",
     truncated: true,
   }
 }
@@ -120,7 +114,7 @@ export function truncateContent(
  * Generate a short hash (first 12 hex chars of SHA-256).
  */
 function shortHash(content: string): string {
-  return createHash('sha256').update(content).digest('hex').slice(0, 12)
+  return createHash("sha256").update(content).digest("hex").slice(0, 12)
 }
 
 /**
@@ -139,8 +133,7 @@ function hashMessage(message: APIMessage): string {
 }
 
 // Regex to detect content wrapped in <system-reminder> tags
-const SYSTEM_REMINDER_REGEX =
-  /^<system-reminder>\n?([\s\S]*?)\n?<\/system-reminder>$/
+const SYSTEM_REMINDER_REGEX = /^<system-reminder>\n?([\s\S]*?)\n?<\/system-reminder>$/
 
 /**
  * Check if text is entirely a system reminder (wrapped in <system-reminder> tags).
@@ -169,7 +162,7 @@ function formatMessagesForContext(messages: UserMessage[]): FormattedMessages {
 
   for (const message of messages) {
     const content = message.message.content
-    if (typeof content === 'string') {
+    if (typeof content === "string") {
       const reminderContent = extractSystemReminderContent(content)
       if (reminderContent) {
         systemReminders.push(reminderContent)
@@ -178,26 +171,21 @@ function formatMessagesForContext(messages: UserMessage[]): FormattedMessages {
       }
     } else if (Array.isArray(content)) {
       for (const block of content) {
-        if (block.type === 'text') {
+        if (block.type === "text") {
           const reminderContent = extractSystemReminderContent(block.text)
           if (reminderContent) {
             systemReminders.push(reminderContent)
           } else {
             contextParts.push(`[USER]\n${block.text}`)
           }
-        } else if (block.type === 'tool_result') {
-          const resultContent =
-            typeof block.content === 'string'
-              ? block.content
-              : jsonStringify(block.content)
+        } else if (block.type === "tool_result") {
+          const resultContent = typeof block.content === "string" ? block.content : jsonStringify(block.content)
           // Tool results can also contain system reminders (e.g., malware warning)
           const reminderContent = extractSystemReminderContent(resultContent)
           if (reminderContent) {
             systemReminders.push(reminderContent)
           } else {
-            contextParts.push(
-              `[TOOL RESULT: ${block.tool_use_id}]\n${resultContent}`,
-            )
+            contextParts.push(`[TOOL RESULT: ${block.tool_use_id}]\n${resultContent}`)
           }
         }
       }
@@ -220,17 +208,12 @@ export interface LLMRequestNewContext {
  * Add beta attributes to an interaction span.
  * Adds new_context with the user prompt.
  */
-export function addBetaInteractionAttributes(
-  span: Span,
-  userPrompt: string,
-): void {
+export function addBetaInteractionAttributes(span: Span, userPrompt: string): void {
   if (!isBetaTracingEnabled()) {
     return
   }
 
-  const { content: truncatedPrompt, truncated } = truncateContent(
-    `[USER PROMPT]\n${userPrompt}`,
-  )
+  const { content: truncatedPrompt, truncated } = truncateContent(`[USER PROMPT]\n${userPrompt}`)
   span.setAttributes({
     new_context: truncatedPrompt,
     ...(truncated && {
@@ -259,24 +242,22 @@ export function addBetaLLMRequestAttributes(
     const preview = newContext.systemPrompt.slice(0, 500)
 
     // Always add hash, preview, and length to the span
-    span.setAttribute('system_prompt_hash', promptHash)
-    span.setAttribute('system_prompt_preview', preview)
-    span.setAttribute('system_prompt_length', newContext.systemPrompt.length)
+    span.setAttribute("system_prompt_hash", promptHash)
+    span.setAttribute("system_prompt_preview", preview)
+    span.setAttribute("system_prompt_length", newContext.systemPrompt.length)
 
     // Log the full system prompt only once per unique hash this session
     if (!seenHashes.has(promptHash)) {
       seenHashes.add(promptHash)
 
       // Truncate for the log if needed
-      const { content: truncatedPrompt, truncated } = truncateContent(
-        newContext.systemPrompt,
-      )
+      const { content: truncatedPrompt, truncated } = truncateContent(newContext.systemPrompt)
 
-      void logOTelEvent('system_prompt', {
+      void logOTelEvent("system_prompt", {
         system_prompt_hash: promptHash,
         system_prompt: truncatedPrompt,
         system_prompt_length: String(newContext.systemPrompt.length),
-        ...(truncated && { system_prompt_truncated: 'true' }),
+        ...(truncated && { system_prompt_truncated: "true" }),
       })
     }
   }
@@ -284,30 +265,22 @@ export function addBetaLLMRequestAttributes(
   // Add tools info to the span
   if (newContext?.tools) {
     try {
-      const toolsArray = jsonParse(newContext.tools) as Record<
-        string,
-        unknown
-      >[]
+      const toolsArray = jsonParse(newContext.tools) as Record<string, unknown>[]
 
       // Build array of {name, hash} for each tool
-      const toolsWithHashes = toolsArray.map(tool => {
+      const toolsWithHashes = toolsArray.map((tool) => {
         const toolJson = jsonStringify(tool)
         const toolHash = shortHash(toolJson)
         return {
-          name: typeof tool.name === 'string' ? tool.name : 'unknown',
+          name: typeof tool.name === "string" ? tool.name : "unknown",
           hash: toolHash,
           json: toolJson,
         }
       })
 
       // Set span attribute with array of name/hash pairs
-      span.setAttribute(
-        'tools',
-        jsonStringify(
-          toolsWithHashes.map(({ name, hash }) => ({ name, hash })),
-        ),
-      )
-      span.setAttribute('tools_count', toolsWithHashes.length)
+      span.setAttribute("tools", jsonStringify(toolsWithHashes.map(({ name, hash }) => ({ name, hash }))))
+      span.setAttribute("tools_count", toolsWithHashes.length)
 
       // Log each tool's full description once per unique hash
       for (const { name, hash, json } of toolsWithHashes) {
@@ -316,17 +289,17 @@ export function addBetaLLMRequestAttributes(
 
           const { content: truncatedTool, truncated } = truncateContent(json)
 
-          void logOTelEvent('tool', {
+          void logOTelEvent("tool", {
             tool_name: sanitizeToolNameForAnalytics(name),
             tool_hash: hash,
             tool: truncatedTool,
-            ...(truncated && { tool_truncated: 'true' }),
+            ...(truncated && { tool_truncated: "true" }),
           })
         }
       }
     } catch {
       // If parsing fails, log the raw tools string
-      span.setAttribute('tools_parse_error', true)
+      span.setAttribute("tools_parse_error", true)
     }
   }
 
@@ -349,20 +322,16 @@ export function addBetaLLMRequestAttributes(
     }
 
     // Get new messages (filter out assistant messages - we only want user input/tool results)
-    const newMessages = messagesForAPI
-      .slice(startIndex)
-      .filter((m): m is UserMessage => m.type === 'user')
+    const newMessages = messagesForAPI.slice(startIndex).filter((m): m is UserMessage => m.type === "user")
 
     if (newMessages.length > 0) {
       // Format new messages, separating system reminders from regular content
-      const { contextParts, systemReminders } =
-        formatMessagesForContext(newMessages)
+      const { contextParts, systemReminders } = formatMessagesForContext(newMessages)
 
       // Set new_context (regular user content and tool results)
       if (contextParts.length > 0) {
-        const fullContext = contextParts.join('\n\n---\n\n')
-        const { content: truncatedContext, truncated } =
-          truncateContent(fullContext)
+        const fullContext = contextParts.join("\n\n---\n\n")
+        const { content: truncatedContext, truncated } = truncateContent(fullContext)
 
         span.setAttributes({
           new_context: truncatedContext,
@@ -376,9 +345,8 @@ export function addBetaLLMRequestAttributes(
 
       // Set system_reminders as a separate attribute
       if (systemReminders.length > 0) {
-        const fullReminders = systemReminders.join('\n\n---\n\n')
-        const { content: truncatedReminders, truncated: remindersTruncated } =
-          truncateContent(fullReminders)
+        const fullReminders = systemReminders.join("\n\n---\n\n")
+        const { content: truncatedReminders, truncated: remindersTruncated } = truncateContent(fullReminders)
 
         span.setAttributes({
           system_reminders: truncatedReminders,
@@ -416,28 +384,21 @@ export function addBetaLLMResponseAttributes(
 
   // Add model_output (text content) - visible to all users
   if (metadata.modelOutput !== undefined) {
-    const { content: modelOutput, truncated: outputTruncated } =
-      truncateContent(metadata.modelOutput)
-    endAttributes['response.model_output'] = modelOutput
+    const { content: modelOutput, truncated: outputTruncated } = truncateContent(metadata.modelOutput)
+    endAttributes["response.model_output"] = modelOutput
     if (outputTruncated) {
-      endAttributes['response.model_output_truncated'] = true
-      endAttributes['response.model_output_original_length'] =
-        metadata.modelOutput.length
+      endAttributes["response.model_output_truncated"] = true
+      endAttributes["response.model_output_original_length"] = metadata.modelOutput.length
     }
   }
 
   // Add thinking_output - ant-only
-  if (
-    process.env.USER_TYPE === 'ant' &&
-    metadata.thinkingOutput !== undefined
-  ) {
-    const { content: thinkingOutput, truncated: thinkingTruncated } =
-      truncateContent(metadata.thinkingOutput)
-    endAttributes['response.thinking_output'] = thinkingOutput
+  if (process.env.USER_TYPE === "ant" && metadata.thinkingOutput !== undefined) {
+    const { content: thinkingOutput, truncated: thinkingTruncated } = truncateContent(metadata.thinkingOutput)
+    endAttributes["response.thinking_output"] = thinkingOutput
     if (thinkingTruncated) {
-      endAttributes['response.thinking_output_truncated'] = true
-      endAttributes['response.thinking_output_original_length'] =
-        metadata.thinkingOutput.length
+      endAttributes["response.thinking_output_truncated"] = true
+      endAttributes["response.thinking_output_original_length"] = metadata.thinkingOutput.length
     }
   }
 }
@@ -446,18 +407,12 @@ export function addBetaLLMResponseAttributes(
  * Add beta attributes to startToolSpan.
  * Adds tool_input with the serialized tool input.
  */
-export function addBetaToolInputAttributes(
-  span: Span,
-  toolName: string,
-  toolInput: string,
-): void {
+export function addBetaToolInputAttributes(span: Span, toolName: string, toolInput: string): void {
   if (!isBetaTracingEnabled()) {
     return
   }
 
-  const { content: truncatedInput, truncated } = truncateContent(
-    `[TOOL INPUT: ${toolName}]\n${toolInput}`,
-  )
+  const { content: truncatedInput, truncated } = truncateContent(`[TOOL INPUT: ${toolName}]\n${toolInput}`)
   span.setAttributes({
     tool_input: truncatedInput,
     ...(truncated && {
@@ -480,12 +435,10 @@ export function addBetaToolResultAttributes(
     return
   }
 
-  const { content: truncatedResult, truncated } = truncateContent(
-    `[TOOL RESULT: ${toolName}]\n${toolResult}`,
-  )
-  endAttributes['new_context'] = truncatedResult
+  const { content: truncatedResult, truncated } = truncateContent(`[TOOL RESULT: ${toolName}]\n${toolResult}`)
+  endAttributes["new_context"] = truncatedResult
   if (truncated) {
-    endAttributes['new_context_truncated'] = true
-    endAttributes['new_context_original_length'] = toolResult.length
+    endAttributes["new_context_truncated"] = true
+    endAttributes["new_context_original_length"] = toolResult.length
   }
 }

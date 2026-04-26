@@ -84,14 +84,14 @@ question.asked       # Question asked
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Framework | Flutter 3.x |
-| State Management | Riverpod 2.x |
-| HTTP Client | Dio |
-| WebSocket | web_socket_channel |
-| Local Storage | Hive |
-| Markdown | flutter_markdown |
+| Component        | Technology         |
+| ---------------- | ------------------ |
+| Framework        | Flutter 3.x        |
+| State Management | Riverpod 2.x       |
+| HTTP Client      | Dio                |
+| WebSocket        | web_socket_channel |
+| Local Storage    | Hive               |
+| Markdown         | flutter_markdown   |
 
 ## Getting Started
 

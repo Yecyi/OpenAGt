@@ -11,8 +11,12 @@ export const PersonalMemoryNoteTable = sqliteTable(
   {
     id: text().$type<MemoryNoteID>().primaryKey(),
     scope: text().notNull(),
-    project_id: text().$type<ProjectID>().references(() => ProjectTable.id, { onDelete: "cascade" }),
-    session_id: text().$type<SessionID>().references(() => SessionTable.id, { onDelete: "cascade" }),
+    project_id: text()
+      .$type<ProjectID>()
+      .references(() => ProjectTable.id, { onDelete: "cascade" }),
+    session_id: text()
+      .$type<SessionID>()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
     title: text().notNull(),
     content: text().notNull(),
     tags: text({ mode: "json" }).$type<string[]>().notNull(),
@@ -37,7 +41,9 @@ export const InboxItemTable = sqliteTable(
       .$type<ProjectID>()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
-    session_id: text().$type<SessionID>().references(() => SessionTable.id, { onDelete: "cascade" }),
+    session_id: text()
+      .$type<SessionID>()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
     source: text().notNull(),
     scope: text().notNull(),
     goal: text().notNull(),
@@ -64,8 +70,12 @@ export const ScheduledWakeupTable = sqliteTable(
       .$type<ProjectID>()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
-    session_id: text().$type<SessionID>().references(() => SessionTable.id, { onDelete: "cascade" }),
-    inbox_item_id: text().$type<InboxItemID>().references(() => InboxItemTable.id, { onDelete: "set null" }),
+    session_id: text()
+      .$type<SessionID>()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    inbox_item_id: text()
+      .$type<InboxItemID>()
+      .references(() => InboxItemTable.id, { onDelete: "set null" }),
     goal: text().notNull(),
     context_refs: text({ mode: "json" }).$type<string[]>().notNull(),
     priority: text().notNull(),

@@ -1,18 +1,11 @@
-import { constants as fsConstants } from 'fs'
-import {
-  type FileHandle,
-  mkdir,
-  open,
-  stat,
-  symlink,
-  unlink,
-} from 'fs/promises'
-import { join } from 'path'
-import { getSessionId } from '../../bootstrap/state.js'
-import { getErrnoCode } from '../errors.js'
-import { readFileRange, tailFile } from '../fsOperations.js'
-import { logError } from '../log.js'
-import { getProjectTempDir } from '../permissions/filesystem.js'
+import { constants as fsConstants } from "fs"
+import { type FileHandle, mkdir, open, stat, symlink, unlink } from "fs/promises"
+import { join } from "path"
+import { getSessionId } from "../../bootstrap/state.js"
+import { getErrnoCode } from "../errors.js"
+import { readFileRange, tailFile } from "../fsOperations.js"
+import { logError } from "../log.js"
+import { getProjectTempDir } from "../permissions/filesystem.js"
 
 // SECURITY: O_NOFOLLOW prevents following symlinks when opening task output files.
 // Without this, an attacker in the sandbox could create symlinks in the tasks directory
@@ -28,7 +21,7 @@ const DEFAULT_MAX_READ_BYTES = 8 * 1024 * 1024 // 8MB
  * drops chunks past this limit. Shared so both caps stay in sync.
  */
 export const MAX_TASK_OUTPUT_BYTES = 5 * 1024 * 1024 * 1024
-export const MAX_TASK_OUTPUT_BYTES_DISPLAY = '5GB'
+export const MAX_TASK_OUTPUT_BYTES_DISPLAY = "5GB"
 
 /**
  * Get the task output directory for this session.
@@ -49,7 +42,7 @@ export const MAX_TASK_OUTPUT_BYTES_DISPLAY = '5GB'
 let _taskOutputDir: string | undefined
 export function getTaskOutputDir(): string {
   if (_taskOutputDir === undefined) {
-    _taskOutputDir = join(getProjectTempDir(), getSessionId(), 'tasks')
+    _taskOutputDir = join(getProjectTempDir(), getSessionId(), "tasks")
   }
   return _taskOutputDir
 }
@@ -116,14 +109,12 @@ export class DiskTaskOutput {
     this.#bytesWritten += content.length
     if (this.#bytesWritten > MAX_TASK_OUTPUT_BYTES) {
       this.#capped = true
-      this.#queue.push(
-        `\n[output truncated: exceeded ${MAX_TASK_OUTPUT_BYTES_DISPLAY} disk cap]\n`,
-      )
+      this.#queue.push(`\n[output truncated: exceeded ${MAX_TASK_OUTPUT_BYTES_DISPLAY} disk cap]\n`)
     } else {
       this.#queue.push(content)
     }
     if (!this.#flushPromise) {
-      this.#flushPromise = new Promise<void>(resolve => {
+      this.#flushPromise = new Promise<void>((resolve) => {
         this.#flushResolve = resolve
       })
       void track(this.#drain())
@@ -145,12 +136,9 @@ export class DiskTaskOutput {
           await ensureOutputDir()
           this.#fileHandle = await open(
             this.#path,
-            process.platform === 'win32'
-              ? 'a'
-              : fsConstants.O_WRONLY |
-                  fsConstants.O_APPEND |
-                  fsConstants.O_CREAT |
-                  O_NOFOLLOW,
+            process.platform === "win32"
+              ? "a"
+              : fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | O_NOFOLLOW,
           )
         }
         while (true) {
@@ -192,13 +180,13 @@ export class DiskTaskOutput {
 
     let totalLength = 0
     for (const str of queue) {
-      totalLength += Buffer.byteLength(str, 'utf8')
+      totalLength += Buffer.byteLength(str, "utf8")
     }
 
     const buffer = Buffer.allocUnsafe(totalLength)
     let offset = 0
     for (const str of queue) {
-      offset += buffer.write(str, offset, 'utf8')
+      offset += buffer.write(str, offset, "utf8")
     }
 
     return buffer
@@ -307,13 +295,9 @@ export async function getTaskOutputDelta(
   maxBytes: number = DEFAULT_MAX_READ_BYTES,
 ): Promise<{ content: string; newOffset: number }> {
   try {
-    const result = await readFileRange(
-      getTaskOutputPath(taskId),
-      fromOffset,
-      maxBytes,
-    )
+    const result = await readFileRange(getTaskOutputPath(taskId), fromOffset, maxBytes)
     if (!result) {
-      return { content: '', newOffset: fromOffset }
+      return { content: "", newOffset: fromOffset }
     }
     return {
       content: result.content,
@@ -321,11 +305,11 @@ export async function getTaskOutputDelta(
     }
   } catch (e) {
     const code = getErrnoCode(e)
-    if (code === 'ENOENT') {
-      return { content: '', newOffset: fromOffset }
+    if (code === "ENOENT") {
+      return { content: "", newOffset: fromOffset }
     }
     logError(e)
-    return { content: '', newOffset: fromOffset }
+    return { content: "", newOffset: fromOffset }
   }
 }
 
@@ -333,26 +317,20 @@ export async function getTaskOutputDelta(
  * Get output for a task, reading the tail of the file.
  * Caps at maxBytes to avoid loading multi-GB files into memory.
  */
-export async function getTaskOutput(
-  taskId: string,
-  maxBytes: number = DEFAULT_MAX_READ_BYTES,
-): Promise<string> {
+export async function getTaskOutput(taskId: string, maxBytes: number = DEFAULT_MAX_READ_BYTES): Promise<string> {
   try {
-    const { content, bytesTotal, bytesRead } = await tailFile(
-      getTaskOutputPath(taskId),
-      maxBytes,
-    )
+    const { content, bytesTotal, bytesRead } = await tailFile(getTaskOutputPath(taskId), maxBytes)
     if (bytesTotal > bytesRead) {
       return `[${Math.round((bytesTotal - bytesRead) / 1024)}KB of earlier output omitted]\n${content}`
     }
     return content
   } catch (e) {
     const code = getErrnoCode(e)
-    if (code === 'ENOENT') {
-      return ''
+    if (code === "ENOENT") {
+      return ""
     }
     logError(e)
-    return ''
+    return ""
   }
 }
 
@@ -364,7 +342,7 @@ export async function getTaskOutputSize(taskId: string): Promise<number> {
     return (await stat(getTaskOutputPath(taskId))).size
   } catch (e) {
     const code = getErrnoCode(e)
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       return 0
     }
     logError(e)
@@ -386,7 +364,7 @@ export async function cleanupTaskOutput(taskId: string): Promise<void> {
     await unlink(getTaskOutputPath(taskId))
   } catch (e) {
     const code = getErrnoCode(e)
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       return
     }
     logError(e)
@@ -407,12 +385,9 @@ export function initTaskOutput(taskId: string): Promise<string> {
       // On Windows, use string flags — numeric O_EXCL can produce EINVAL through libuv.
       const fh = await open(
         outputPath,
-        process.platform === 'win32'
-          ? 'wx'
-          : fsConstants.O_WRONLY |
-              fsConstants.O_CREAT |
-              fsConstants.O_EXCL |
-              O_NOFOLLOW,
+        process.platform === "win32"
+          ? "wx"
+          : fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | O_NOFOLLOW,
       )
       await fh.close()
       return outputPath
@@ -424,10 +399,7 @@ export function initTaskOutput(taskId: string): Promise<string> {
  * Initialize output file as a symlink to another file (e.g., agent transcript).
  * Tries to create the symlink first; if a file already exists, removes it and retries.
  */
-export function initTaskOutputAsSymlink(
-  taskId: string,
-  targetPath: string,
-): Promise<string> {
+export function initTaskOutputAsSymlink(taskId: string, targetPath: string): Promise<string> {
   return track(
     (async () => {
       try {

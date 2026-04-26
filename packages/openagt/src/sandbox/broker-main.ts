@@ -1,5 +1,5 @@
 import { createFrameParser, encodeFrame } from "./protocol"
-import { detectBackends } from "./backends"
+import { autoBackendName, detectBackends } from "./backends"
 import { SANDBOX_PROTOCOL_VERSION, type SandboxBrokerRequestFrame } from "./types"
 
 const backends = new Map(detectBackends().map((item) => [item.status.name, item]))
@@ -11,10 +11,7 @@ async function send(frame: unknown) {
 
 function backendFor(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"]) {
   if (frame.backend_preference !== "auto") return backends.get(frame.backend_preference)
-  if (process.platform === "darwin") return backends.get("seatbelt")
-  if (process.platform === "win32") return backends.get("process")
-  if (process.platform === "linux") return backends.get("landlock")
-  return backends.get("process")
+  return backends.get(autoBackendName())
 }
 
 await send({

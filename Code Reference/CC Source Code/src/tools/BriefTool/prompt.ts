@@ -1,7 +1,7 @@
-export const BRIEF_TOOL_NAME = 'SendUserMessage'
-export const LEGACY_BRIEF_TOOL_NAME = 'Brief'
+export const BRIEF_TOOL_NAME = "SendUserMessage"
+export const LEGACY_BRIEF_TOOL_NAME = "Brief"
 
-export const DESCRIPTION = 'Send a message to the user'
+export const DESCRIPTION = "Send a message to the user"
 
 export const BRIEF_TOOL_PROMPT = `Send a message the user will read. Text outside this tool is visible in the detail view, but most won't open it — the answer lives here.
 

@@ -1,1 +1,1 @@
-export declare function createServerReference(fn: Function, id: string): Function;
+export declare function createServerReference(fn: Function, id: string): Function

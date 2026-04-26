@@ -21,7 +21,10 @@ export const TaskStopTool = Tool.define<typeof parameters, TaskStopMetadata, Tas
     return {
       description: "Cancel a task and record a stop reason.",
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskStopMetadata>, never, never> =>
+      execute: (
+        params: z.infer<typeof parameters>,
+        ctx,
+      ): Effect.Effect<Tool.ExecuteResult<TaskStopMetadata>, never, never> =>
         Effect.gen(function* () {
           const record = yield* tasks.cancel({
             taskID: SessionID.make(params.task_id),

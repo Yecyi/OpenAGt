@@ -1,10 +1,10 @@
-import axios from 'axios'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getOAuthHeaders, prepareApiRequest } from '../../utils/teleport/api.js'
-import { fetchEnvironments } from '../../utils/teleport/environments.js'
+import axios from "axios"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { getOAuthHeaders, prepareApiRequest } from "../../utils/teleport/api.js"
+import { fetchEnvironments } from "../../utils/teleport/environments.js"
 
-const CCR_BYOC_BETA_HEADER = 'ccr-byoc-2025-07-29'
+const CCR_BYOC_BETA_HEADER = "ccr-byoc-2025-07-29"
 
 /**
  * Wraps a raw GitHub token so that its string representation is redacted.
@@ -22,13 +22,13 @@ export class RedactedGithubToken {
     return this.#value
   }
   toString(): string {
-    return '[REDACTED:gh-token]'
+    return "[REDACTED:gh-token]"
   }
   toJSON(): string {
-    return '[REDACTED:gh-token]'
+    return "[REDACTED:gh-token]"
   }
-  [Symbol.for('nodejs.util.inspect.custom')](): string {
-    return '[REDACTED:gh-token]'
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return "[REDACTED:gh-token]"
   }
 }
 
@@ -37,10 +37,10 @@ export type ImportTokenResult = {
 }
 
 export type ImportTokenError =
-  | { kind: 'not_signed_in' }
-  | { kind: 'invalid_token' }
-  | { kind: 'server'; status: number }
-  | { kind: 'network' }
+  | { kind: "not_signed_in" }
+  | { kind: "invalid_token" }
+  | { kind: "server"; status: number }
+  | { kind: "network" }
 
 /**
  * POSTs a GitHub token to the CCR backend, which validates it against
@@ -50,22 +50,19 @@ export type ImportTokenError =
  */
 export async function importGithubToken(
   token: RedactedGithubToken,
-): Promise<
-  | { ok: true; result: ImportTokenResult }
-  | { ok: false; error: ImportTokenError }
-> {
+): Promise<{ ok: true; result: ImportTokenResult } | { ok: false; error: ImportTokenError }> {
   let accessToken: string, orgUUID: string
   try {
     ;({ accessToken, orgUUID } = await prepareApiRequest())
   } catch {
-    return { ok: false, error: { kind: 'not_signed_in' } }
+    return { ok: false, error: { kind: "not_signed_in" } }
   }
 
   const url = `${getOauthConfig().BASE_API_URL}/v1/code/github/import-token`
   const headers = {
     ...getOAuthHeaders(accessToken),
-    'anthropic-beta': CCR_BYOC_BETA_HEADER,
-    'x-organization-uuid': orgUUID,
+    "anthropic-beta": CCR_BYOC_BETA_HEADER,
+    "x-organization-uuid": orgUUID,
   }
 
   try {
@@ -78,24 +75,24 @@ export async function importGithubToken(
       return { ok: true, result: response.data }
     }
     if (response.status === 400) {
-      return { ok: false, error: { kind: 'invalid_token' } }
+      return { ok: false, error: { kind: "invalid_token" } }
     }
     if (response.status === 401) {
-      return { ok: false, error: { kind: 'not_signed_in' } }
+      return { ok: false, error: { kind: "not_signed_in" } }
     }
     logForDebugging(`import-token returned ${response.status}`, {
-      level: 'error',
+      level: "error",
     })
-    return { ok: false, error: { kind: 'server', status: response.status } }
+    return { ok: false, error: { kind: "server", status: response.status } }
   } catch (err) {
     if (axios.isAxiosError(err)) {
       // err.config.data would contain the POST body with the raw token.
       // Do not include it in any log. The error code alone is enough.
-      logForDebugging(`import-token network error: ${err.code ?? 'unknown'}`, {
-        level: 'error',
+      logForDebugging(`import-token network error: ${err.code ?? "unknown"}`, {
+        level: "error",
       })
     }
-    return { ok: false, error: { kind: 'network' } }
+    return { ok: false, error: { kind: "network" } }
   }
 }
 
@@ -134,24 +131,24 @@ export async function createDefaultEnvironment(): Promise<boolean> {
   const url = `${getOauthConfig().BASE_API_URL}/v1/environment_providers/cloud/create`
   const headers = {
     ...getOAuthHeaders(accessToken),
-    'x-organization-uuid': orgUUID,
+    "x-organization-uuid": orgUUID,
   }
 
   try {
     const response = await axios.post(
       url,
       {
-        name: 'Default',
-        kind: 'anthropic_cloud',
-        description: 'Default - trusted network access',
+        name: "Default",
+        kind: "anthropic_cloud",
+        description: "Default - trusted network access",
         config: {
-          environment_type: 'anthropic',
-          cwd: '/home/user',
+          environment_type: "anthropic",
+          cwd: "/home/user",
           init_script: null,
           environment: {},
           languages: [
-            { name: 'python', version: '3.11' },
-            { name: 'node', version: '20' },
+            { name: "python", version: "3.11" },
+            { name: "node", version: "20" },
           ],
           network_config: {
             allowed_hosts: [],

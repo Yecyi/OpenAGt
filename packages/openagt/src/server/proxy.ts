@@ -113,7 +113,7 @@ export async function http(url: string | URL, extra: HeadersInit | undefined, re
     })
   }
 
-    return fetch(
+  return fetch(
     new Request(url, {
       method: req.method,
       headers: headers(req, extra),

@@ -7,7 +7,7 @@ import type {
   PermissionDenyDecision,
   PermissionMetadata,
   PermissionResult,
-} from '../../types/permissions.js'
+} from "../../types/permissions.js"
 
 // Re-export for backwards compatibility
 export type {
@@ -21,15 +21,13 @@ export type {
 }
 
 // Helper function to get the appropriate prose description for rule behavior
-export function getRuleBehaviorDescription(
-  permissionResult: PermissionResult['behavior'],
-): string {
+export function getRuleBehaviorDescription(permissionResult: PermissionResult["behavior"]): string {
   switch (permissionResult) {
-    case 'allow':
-      return 'allowed'
-    case 'deny':
-      return 'denied'
+    case "allow":
+      return "allowed"
+    case "deny":
+      return "denied"
     default:
-      return 'asked for confirmation for'
+      return "asked for confirmation for"
   }
 }

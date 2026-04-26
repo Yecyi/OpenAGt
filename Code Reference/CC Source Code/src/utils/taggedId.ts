@@ -7,9 +7,8 @@
  * This must stay in sync with api/api/common/utils/tagged_id.py.
  */
 
-const BASE_58_CHARS =
-  '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-const VERSION = '01'
+const BASE_58_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+const VERSION = "01"
 // ceil(128 / log2(58)) = 22
 const ENCODED_LENGTH = 22
 
@@ -27,18 +26,18 @@ function base58Encode(n: bigint): string {
     value = value / base
     i--
   }
-  return result.join('')
+  return result.join("")
 }
 
 /**
  * Parse a UUID string (with or without hyphens) into a 128-bit bigint.
  */
 function uuidToBigInt(uuid: string): bigint {
-  const hex = uuid.replace(/-/g, '')
+  const hex = uuid.replace(/-/g, "")
   if (hex.length !== 32) {
     throw new Error(`Invalid UUID hex length: ${hex.length}`)
   }
-  return BigInt('0x' + hex)
+  return BigInt("0x" + hex)
 }
 
 /**

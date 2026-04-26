@@ -1,21 +1,18 @@
-import type { ContentBlock } from '@anthropic-ai/sdk/resources/index.mjs'
-import { getUserContext } from 'src/context.js'
-import { queryModelWithoutStreaming } from 'src/services/api/claude.js'
-import { getEmptyToolPermissionContext } from 'src/Tool.js'
-import { AGENT_TOOL_NAME } from 'src/tools/AgentTool/constants.js'
-import { prependUserContext } from 'src/utils/api.js'
-import {
-  createUserMessage,
-  normalizeMessagesForAPI,
-} from 'src/utils/messages.js'
-import type { ModelName } from 'src/utils/model/model.js'
-import { isAutoMemoryEnabled } from '../../memdir/paths.js'
+import type { ContentBlock } from "@anthropic-ai/sdk/resources/index.mjs"
+import { getUserContext } from "src/context.js"
+import { queryModelWithoutStreaming } from "src/services/api/claude.js"
+import { getEmptyToolPermissionContext } from "src/Tool.js"
+import { AGENT_TOOL_NAME } from "src/tools/AgentTool/constants.js"
+import { prependUserContext } from "src/utils/api.js"
+import { createUserMessage, normalizeMessagesForAPI } from "src/utils/messages.js"
+import type { ModelName } from "src/utils/model/model.js"
+import { isAutoMemoryEnabled } from "../../memdir/paths.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../../services/analytics/index.js'
-import { jsonParse } from '../../utils/slowOperations.js'
-import { asSystemPrompt } from '../../utils/systemPromptType.js'
+} from "../../services/analytics/index.js"
+import { jsonParse } from "../../utils/slowOperations.js"
+import { asSystemPrompt } from "../../utils/systemPromptType.js"
 
 type GeneratedAgent = {
   identifier: string
@@ -127,8 +124,8 @@ export async function generateAgent(
 ): Promise<GeneratedAgent> {
   const existingList =
     existingIdentifiers.length > 0
-      ? `\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existingIdentifiers.join(', ')}`
-      : ''
+      ? `\n\nIMPORTANT: The following identifiers already exist and must NOT be used: ${existingIdentifiers.join(", ")}`
+      : ""
 
   const prompt = `Create an agent configuration based on this request: "${userPrompt}".${existingList}
   Return ONLY the JSON object, no other text.`
@@ -149,7 +146,7 @@ export async function generateAgent(
   const response = await queryModelWithoutStreaming({
     messages: normalizeMessagesForAPI(messagesWithContext),
     systemPrompt: asSystemPrompt([systemPrompt]),
-    thinkingConfig: { type: 'disabled' as const },
+    thinkingConfig: { type: "disabled" as const },
     tools: [],
     signal: abortSignal,
     options: {
@@ -159,15 +156,15 @@ export async function generateAgent(
       agents: [],
       isNonInteractiveSession: false,
       hasAppendSystemPrompt: false,
-      querySource: 'agent_creation',
+      querySource: "agent_creation",
       mcpTools: [],
     },
   })
 
   const textBlocks = response.message.content.filter(
-    (block): block is ContentBlock & { type: 'text' } => block.type === 'text',
+    (block): block is ContentBlock & { type: "text" } => block.type === "text",
   )
-  const responseText = textBlocks.map(block => block.text).join('\n')
+  const responseText = textBlocks.map((block) => block.text).join("\n")
 
   let parsed: GeneratedAgent
   try {
@@ -175,18 +172,17 @@ export async function generateAgent(
   } catch {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      throw new Error('No JSON object found in response')
+      throw new Error("No JSON object found in response")
     }
     parsed = jsonParse(jsonMatch[0])
   }
 
   if (!parsed.identifier || !parsed.whenToUse || !parsed.systemPrompt) {
-    throw new Error('Invalid agent configuration generated')
+    throw new Error("Invalid agent configuration generated")
   }
 
-  logEvent('tengu_agent_definition_generated', {
-    agent_identifier:
-      parsed.identifier as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  logEvent("tengu_agent_definition_generated", {
+    agent_identifier: parsed.identifier as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   })
 
   return {

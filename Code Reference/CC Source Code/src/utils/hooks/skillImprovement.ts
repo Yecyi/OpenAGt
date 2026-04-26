@@ -1,32 +1,25 @@
-import { feature } from 'bun:bundle'
-import { getInvokedSkillsForAgent } from '../../bootstrap/state.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
+import { feature } from "bun:bundle"
+import { getInvokedSkillsForAgent } from "../../bootstrap/state.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../../services/analytics/growthbook.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_PII_TAGGED,
   logEvent,
-} from '../../services/analytics/index.js'
-import { queryModelWithoutStreaming } from '../../services/api/claude.js'
-import { getEmptyToolPermissionContext } from '../../Tool.js'
-import type { Message } from '../../types/message.js'
-import { createAbortController } from '../abortController.js'
-import { count } from '../array.js'
-import { getCwd } from '../cwd.js'
-import { toError } from '../errors.js'
-import { logError } from '../log.js'
-import {
-  createUserMessage,
-  extractTag,
-  extractTextContent,
-} from '../messages.js'
-import { getSmallFastModel } from '../model/model.js'
-import { jsonParse } from '../slowOperations.js'
-import { asSystemPrompt } from '../systemPromptType.js'
-import {
-  type ApiQueryHookConfig,
-  createApiQueryHook,
-} from './apiQueryHookHelper.js'
-import { registerPostSamplingHook } from './postSamplingHooks.js'
+} from "../../services/analytics/index.js"
+import { queryModelWithoutStreaming } from "../../services/api/claude.js"
+import { getEmptyToolPermissionContext } from "../../Tool.js"
+import type { Message } from "../../types/message.js"
+import { createAbortController } from "../abortController.js"
+import { count } from "../array.js"
+import { getCwd } from "../cwd.js"
+import { toError } from "../errors.js"
+import { logError } from "../log.js"
+import { createUserMessage, extractTag, extractTextContent } from "../messages.js"
+import { getSmallFastModel } from "../model/model.js"
+import { jsonParse } from "../slowOperations.js"
+import { asSystemPrompt } from "../systemPromptType.js"
+import { type ApiQueryHookConfig, createApiQueryHook } from "./apiQueryHookHelper.js"
+import { registerPostSamplingHook } from "./postSamplingHooks.js"
 
 const TURN_BATCH_SIZE = 5
 
@@ -38,27 +31,24 @@ export type SkillUpdate = {
 
 function formatRecentMessages(messages: Message[]): string {
   return messages
-    .filter(m => m.type === 'user' || m.type === 'assistant')
-    .map(m => {
-      const role = m.type === 'user' ? 'User' : 'Assistant'
+    .filter((m) => m.type === "user" || m.type === "assistant")
+    .map((m) => {
+      const role = m.type === "user" ? "User" : "Assistant"
       const content = m.message.content
-      if (typeof content === 'string')
-        return `${role}: ${content.slice(0, 500)}`
+      if (typeof content === "string") return `${role}: ${content.slice(0, 500)}`
       const text = content
-        .filter(
-          (b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text',
-        )
-        .map(b => b.text)
-        .join('\n')
+        .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
       return `${role}: ${text.slice(0, 500)}`
     })
-    .join('\n\n')
+    .join("\n\n")
 }
 
 function findProjectSkill() {
   const skills = getInvokedSkillsForAgent(null)
   for (const [, info] of skills) {
-    if (info.skillPath.startsWith('projectSettings:')) {
+    if (info.skillPath.startsWith("projectSettings:")) {
       return info
     }
   }
@@ -70,10 +60,10 @@ function createSkillImprovementHook() {
   let lastAnalyzedIndex = 0
 
   const config: ApiQueryHookConfig<SkillUpdate[]> = {
-    name: 'skill_improvement',
+    name: "skill_improvement",
 
     async shouldRun(context) {
-      if (context.querySource !== 'repl_main_thread') {
+      if (context.querySource !== "repl_main_thread") {
         return false
       }
 
@@ -82,7 +72,7 @@ function createSkillImprovementHook() {
       }
 
       // Only run every TURN_BATCH_SIZE user messages
-      const userCount = count(context.messages, m => m.type === 'user')
+      const userCount = count(context.messages, (m) => m.type === "user")
       if (userCount - lastAnalyzedCount < TURN_BATCH_SIZE) {
         return false
       }
@@ -127,12 +117,12 @@ Output <updates>[]</updates> if no updates are needed.`,
     },
 
     systemPrompt:
-      'You detect user preferences and process improvements during skill execution. Flag anything the user asks for that should be remembered for next time.',
+      "You detect user preferences and process improvements during skill execution. Flag anything the user asks for that should be remembered for next time.",
 
     useTools: false,
 
     parseResponse(content) {
-      const updatesStr = extractTag(content, 'updates')
+      const updatesStr = extractTag(content, "updates")
       if (!updatesStr) {
         return []
       }
@@ -144,20 +134,18 @@ Output <updates>[]</updates> if no updates are needed.`,
     },
 
     logResult(result, context) {
-      if (result.type === 'success' && result.result.length > 0) {
+      if (result.type === "success" && result.result.length > 0) {
         const projectSkill = findProjectSkill()
-        const skillName = projectSkill?.skillName ?? 'unknown'
+        const skillName = projectSkill?.skillName ?? "unknown"
 
-        logEvent('tengu_skill_improvement_detected', {
-          updateCount: result.result
-            .length as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        logEvent("tengu_skill_improvement_detected", {
+          updateCount: result.result.length as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           uuid: result.uuid as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           // _PROTO_skill_name routes to the privileged skill_name BQ column.
-          _PROTO_skill_name:
-            skillName as AnalyticsMetadata_I_VERIFIED_THIS_IS_PII_TAGGED,
+          _PROTO_skill_name: skillName as AnalyticsMetadata_I_VERIFIED_THIS_IS_PII_TAGGED,
         })
 
-        context.toolUseContext.setAppState(prev => ({
+        context.toolUseContext.setAppState((prev) => ({
           ...prev,
           skillImprovement: {
             suggestion: { skillName, updates: result.result },
@@ -173,10 +161,7 @@ Output <updates>[]</updates> if no updates are needed.`,
 }
 
 export function initSkillImprovement(): void {
-  if (
-    feature('SKILL_IMPROVEMENT') &&
-    getFeatureValue_CACHED_MAY_BE_STALE('tengu_copper_panda', false)
-  ) {
+  if (feature("SKILL_IMPROVEMENT") && getFeatureValue_CACHED_MAY_BE_STALE("tengu_copper_panda", false)) {
     registerPostSamplingHook(createSkillImprovementHook())
   }
 }
@@ -185,29 +170,24 @@ export function initSkillImprovement(): void {
  * Apply skill improvements by calling a side-channel LLM to rewrite the skill file.
  * Fire-and-forget — does not block the main conversation.
  */
-export async function applySkillImprovement(
-  skillName: string,
-  updates: SkillUpdate[],
-): Promise<void> {
+export async function applySkillImprovement(skillName: string, updates: SkillUpdate[]): Promise<void> {
   if (!skillName) return
 
-  const { join } = await import('path')
-  const fs = await import('fs/promises')
+  const { join } = await import("path")
+  const fs = await import("fs/promises")
 
   // Skills live at .claude/skills/<name>/SKILL.md relative to CWD
-  const filePath = join(getCwd(), '.claude', 'skills', skillName, 'SKILL.md')
+  const filePath = join(getCwd(), ".claude", "skills", skillName, "SKILL.md")
 
   let currentContent: string
   try {
-    currentContent = await fs.readFile(filePath, 'utf-8')
+    currentContent = await fs.readFile(filePath, "utf-8")
   } catch {
-    logError(
-      new Error(`Failed to read skill file for improvement: ${filePath}`),
-    )
+    logError(new Error(`Failed to read skill file for improvement: ${filePath}`))
     return
   }
 
-  const updateList = updates.map(u => `- ${u.section}: ${u.change}`).join('\n')
+  const updateList = updates.map((u) => `- ${u.section}: ${u.change}`).join("\n")
 
   const response = await queryModelWithoutStreaming({
     messages: [
@@ -231,9 +211,9 @@ Rules:
       }),
     ],
     systemPrompt: asSystemPrompt([
-      'You edit skill definition files to incorporate user preferences. Output only the updated file content.',
+      "You edit skill definition files to incorporate user preferences. Output only the updated file content.",
     ]),
-    thinkingConfig: { type: 'disabled' as const },
+    thinkingConfig: { type: "disabled" as const },
     tools: [],
     signal: createAbortController().signal,
     options: {
@@ -244,23 +224,21 @@ Rules:
       hasAppendSystemPrompt: false,
       temperatureOverride: 0,
       agents: [],
-      querySource: 'skill_improvement_apply',
+      querySource: "skill_improvement_apply",
       mcpTools: [],
     },
   })
 
   const responseText = extractTextContent(response.message.content).trim()
 
-  const updatedContent = extractTag(responseText, 'updated_file')
+  const updatedContent = extractTag(responseText, "updated_file")
   if (!updatedContent) {
-    logError(
-      new Error('Skill improvement apply: no updated_file tag in response'),
-    )
+    logError(new Error("Skill improvement apply: no updated_file tag in response"))
     return
   }
 
   try {
-    await fs.writeFile(filePath, updatedContent, 'utf-8')
+    await fs.writeFile(filePath, updatedContent, "utf-8")
   } catch (e) {
     logError(toError(e))
   }

@@ -20,14 +20,9 @@ export const InstanceBootstrap = Effect.gen(function* () {
   // Plugin can mutate config so it has to be initialized before anything else.
   yield* Plugin.Service.use((svc) => svc.init())
   yield* Effect.all(
-    [
-      LSP.Service,
-      Format.Service,
-      File.Service,
-      FileWatcher.Service,
-      Vcs.Service,
-      Snapshot.Service,
-    ].map((s) => Effect.forkDetach(s.use((i) => i.init()))),
+    [LSP.Service, Format.Service, File.Service, FileWatcher.Service, Vcs.Service, Snapshot.Service].map((s) =>
+      Effect.forkDetach(s.use((i) => i.init())),
+    ),
   ).pipe(Effect.withSpan("InstanceBootstrap.init"))
 
   yield* Bus.Service.use((svc) =>

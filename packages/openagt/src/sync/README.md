@@ -65,6 +65,7 @@ OpenAGt 的会话同步和事件溯源实现，支持多设备同步和会话回
 ```
 
 **为什么单一写者？**
+
 - 不需要复杂的分布式时钟
 - 序列号 (seq) 提供自然的全序
 - 简化冲突解决
@@ -91,7 +92,7 @@ Bus.subscribe(Created, (event) => {
 const Created = SyncEvent.define({
   type: "session.created",
   version: 1,
-  aggregate: "sessionID",  // 聚合根字段
+  aggregate: "sessionID", // 聚合根字段
   schema: z.object({
     sessionID: SessionID.zod,
     info: Info,
@@ -105,17 +106,17 @@ const Created = SyncEvent.define({
 // 事件演进
 const Updated = SyncEvent.define({
   type: "session.updated",
-  version: 2,  // 版本号
+  version: 2, // 版本号
   aggregate: "sessionID",
   schema: z.object({
     sessionID: SessionID.zod,
-    info: partialSchema(Info),  // 新版本只包含变更
+    info: partialSchema(Info), // 新版本只包含变更
   }),
   // 向后兼容：提供旧版本 schema 用于 Bus
   busSchema: z.object({
     sessionID: SessionID.zod,
-    info: Info,  // 旧版本完整对象
-  })
+    info: Info, // 旧版本完整对象
+  }),
 })
 ```
 
@@ -159,7 +160,7 @@ export const SessionUpdated = SyncEvent.define({
   }),
   busSchema: z.object({
     sessionID: SessionID.zod,
-    info: Info,  // 转换为 Bus 格式
+    info: Info, // 转换为 Bus 格式
   }),
 })
 ```
@@ -194,18 +195,23 @@ SyncEvent.replayAll(events)
 ```typescript
 // 定义投影器
 const projectors: Array<[Definition, ProjectorFunc]> = [
-  [SessionCreated, (db, data) => {
-    db.insert(SessionTable).values({
-      id: data.sessionID,
-      ...toRow(data.info)
-    }).run()
-  }],
-  [SessionUpdated, (db, data) => {
-    db.update(SessionTable)
-      .set(toRow(data.info))
-      .where(eq(SessionTable.id, data.sessionID))
-      .run()
-  }]
+  [
+    SessionCreated,
+    (db, data) => {
+      db.insert(SessionTable)
+        .values({
+          id: data.sessionID,
+          ...toRow(data.info),
+        })
+        .run()
+    },
+  ],
+  [
+    SessionUpdated,
+    (db, data) => {
+      db.update(SessionTable).set(toRow(data.info)).where(eq(SessionTable.id, data.sessionID)).run()
+    },
+  ],
 ]
 
 // 初始化同步系统
@@ -248,14 +254,14 @@ Database.transaction (IMMEDIATE)
 
 ### 事件形状对比
 
-| 属性 | SyncEvent | BusEvent |
-|------|-----------|----------|
-| `type` | ✓ | ✓ |
-| `id` | ✓ | - |
-| `seq` | ✓ | - |
-| `aggregateID` | ✓ | - |
-| `data` | ✓ | - |
-| `properties` | - | ✓ |
+| 属性          | SyncEvent | BusEvent |
+| ------------- | --------- | -------- |
+| `type`        | ✓         | ✓        |
+| `id`          | ✓         | -        |
+| `seq`         | ✓         | -        |
+| `aggregateID` | ✓         | -        |
+| `data`        | ✓         | -        |
+| `properties`  | -         | ✓        |
 
 ### 转换机制
 
@@ -273,7 +279,7 @@ SyncEvent.init({
       return { sessionID: data.sessionID, info: fullInfo }
     }
     return data
-  }
+  },
 })
 ```
 
@@ -317,7 +323,7 @@ SyncEvent.subscribeAll((event) => {
   console.log("Event:", {
     type: event.type,
     seq: event.seq,
-    aggregateID: event.aggregateID
+    aggregateID: event.aggregateID,
   })
 })
 ```
@@ -328,7 +334,7 @@ SyncEvent.subscribeAll((event) => {
 // 验证序列号连续性
 const events = await fetchEvents(sessionID)
 for (let i = 1; i < events.length; i++) {
-  if (events[i].seq !== events[i-1].seq + 1) {
+  if (events[i].seq !== events[i - 1].seq + 1) {
     console.error("Gap detected at", i)
   }
 }

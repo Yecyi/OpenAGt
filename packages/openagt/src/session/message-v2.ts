@@ -84,6 +84,21 @@ export const Format = z.discriminatedUnion("type", [OutputFormatText, OutputForm
 })
 export type OutputFormat = z.infer<typeof Format>
 
+export const Runtime = z
+  .object({
+    stepBudget: z.number().int().positive().max(240).optional(),
+    timeoutMs: z.number().int().positive().optional(),
+    maxParallelSubagents: z.number().int().positive().optional(),
+    effort: z.enum(["low", "medium", "high", "deep"]).optional(),
+    workflow: z.string().optional(),
+    taskKind: z.string().optional(),
+    reason: z.string().optional(),
+  })
+  .meta({
+    ref: "MessageRuntime",
+  })
+export type Runtime = z.infer<typeof Runtime>
+
 const PartBase = z.object({
   id: PartID.zod,
   sessionID: SessionID.zod,
@@ -375,6 +390,7 @@ export const User = Base.extend({
   }),
   system: z.string().optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
+  runtime: Runtime.optional(),
 }).meta({
   ref: "UserMessage",
 })

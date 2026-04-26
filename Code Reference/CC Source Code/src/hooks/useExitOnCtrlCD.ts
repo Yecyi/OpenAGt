@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
-import useApp from '../ink/hooks/use-app.js'
-import type { KeybindingContextName } from '../keybindings/types.js'
-import { useDoublePress } from './useDoublePress.js'
+import { useCallback, useMemo, useState } from "react"
+import useApp from "../ink/hooks/use-app.js"
+import type { KeybindingContextName } from "../keybindings/types.js"
+import { useDoublePress } from "./useDoublePress.js"
 
 export type ExitState = {
   pending: boolean
-  keyName: 'Ctrl-C' | 'Ctrl-D' | null
+  keyName: "Ctrl-C" | "Ctrl-D" | null
 }
 
 type KeybindingOptions = {
@@ -13,10 +13,7 @@ type KeybindingOptions = {
   isActive?: boolean
 }
 
-type UseKeybindingsHook = (
-  handlers: Record<string, () => void>,
-  options?: KeybindingOptions,
-) => void
+type UseKeybindingsHook = (handlers: Record<string, () => void>, options?: KeybindingOptions) => void
 
 /**
  * Handle ctrl+c and ctrl+d for exiting the application.
@@ -57,16 +54,10 @@ export function useExitOnCtrlCD(
   const exitFn = useMemo(() => onExit ?? exit, [onExit, exit])
 
   // Double-press handler for ctrl+c
-  const handleCtrlCDoublePress = useDoublePress(
-    pending => setExitState({ pending, keyName: 'Ctrl-C' }),
-    exitFn,
-  )
+  const handleCtrlCDoublePress = useDoublePress((pending) => setExitState({ pending, keyName: "Ctrl-C" }), exitFn)
 
   // Double-press handler for ctrl+d
-  const handleCtrlDDoublePress = useDoublePress(
-    pending => setExitState({ pending, keyName: 'Ctrl-D' }),
-    exitFn,
-  )
+  const handleCtrlDDoublePress = useDoublePress((pending) => setExitState({ pending, keyName: "Ctrl-D" }), exitFn)
 
   // Handler for app:interrupt (ctrl+c by default)
   // Let features handle interrupt first via callback
@@ -83,13 +74,13 @@ export function useExitOnCtrlCD(
 
   const handlers = useMemo(
     () => ({
-      'app:interrupt': handleInterrupt,
-      'app:exit': handleExit,
+      "app:interrupt": handleInterrupt,
+      "app:exit": handleExit,
     }),
     [handleInterrupt, handleExit],
   )
 
-  useKeybindingsHook(handlers, { context: 'Global', isActive })
+  useKeybindingsHook(handlers, { context: "Global", isActive })
 
   return exitState
 }

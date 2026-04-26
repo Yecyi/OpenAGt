@@ -1,12 +1,8 @@
-import { feature } from 'bun:bundle'
-import type { ToolPermissionContext } from '../../Tool.js'
-import { logForDebugging } from '../debug.js'
-import type { PermissionMode } from './PermissionMode.js'
-import {
-  getAutoModeUnavailableReason,
-  isAutoModeGateEnabled,
-  transitionPermissionMode,
-} from './permissionSetup.js'
+import { feature } from "bun:bundle"
+import type { ToolPermissionContext } from "../../Tool.js"
+import { logForDebugging } from "../debug.js"
+import type { PermissionMode } from "./PermissionMode.js"
+import { getAutoModeUnavailableReason, isAutoModeGateEnabled, transitionPermissionMode } from "./permissionSetup.js"
 
 // Checks both the cached isAutoModeAvailable (set at startup by
 // verifyAutoModeGateAccess) and the live isAutoModeGateEnabled() — these can
@@ -15,7 +11,7 @@ import {
 // (permissionSetup.ts:~559), which would silently crash the shift+tab handler
 // and leave the user stuck at the current mode.
 function canCycleToAuto(ctx: ToolPermissionContext): boolean {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+  if (feature("TRANSCRIPT_CLASSIFIER")) {
     const gateEnabled = isAutoModeGateEnabled()
     const can = !!ctx.isAutoModeAvailable && gateEnabled
     if (!can) {
@@ -36,45 +32,44 @@ export function getNextPermissionMode(
   _teamContext?: { leadAgentId: string },
 ): PermissionMode {
   switch (toolPermissionContext.mode) {
-    case 'default':
+    case "default":
       // Ants skip acceptEdits and plan — auto mode replaces them
-      if (process.env.USER_TYPE === 'ant') {
+      if (process.env.USER_TYPE === "ant") {
         if (toolPermissionContext.isBypassPermissionsModeAvailable) {
-          return 'bypassPermissions'
+          return "bypassPermissions"
         }
         if (canCycleToAuto(toolPermissionContext)) {
-          return 'auto'
+          return "auto"
         }
-        return 'default'
+        return "default"
       }
-      return 'acceptEdits'
+      return "acceptEdits"
 
-    case 'acceptEdits':
-      return 'plan'
+    case "acceptEdits":
+      return "plan"
 
-    case 'plan':
+    case "plan":
       if (toolPermissionContext.isBypassPermissionsModeAvailable) {
-        return 'bypassPermissions'
+        return "bypassPermissions"
       }
       if (canCycleToAuto(toolPermissionContext)) {
-        return 'auto'
+        return "auto"
       }
-      return 'default'
+      return "default"
 
-    case 'bypassPermissions':
+    case "bypassPermissions":
       if (canCycleToAuto(toolPermissionContext)) {
-        return 'auto'
+        return "auto"
       }
-      return 'default'
+      return "default"
 
-    case 'dontAsk':
+    case "dontAsk":
       // Not exposed in UI cycle yet, but return default if somehow reached
-      return 'default'
-
+      return "default"
 
     default:
       // Covers auto (when TRANSCRIPT_CLASSIFIER is enabled) and any future modes — always fall back to default
-      return 'default'
+      return "default"
   }
 }
 
@@ -92,10 +87,6 @@ export function cyclePermissionMode(
   const nextMode = getNextPermissionMode(toolPermissionContext, teamContext)
   return {
     nextMode,
-    context: transitionPermissionMode(
-      toolPermissionContext.mode,
-      nextMode,
-      toolPermissionContext,
-    ),
+    context: transitionPermissionMode(toolPermissionContext.mode, nextMode, toolPermissionContext),
   }
 }

@@ -85,19 +85,15 @@ type QuoteSpans = {
  * raw_string / ansi_c_string / quoted-heredoc bodies are literal text
  * in bash (no expansion), so no nested quote nodes exist — return early.
  */
-function collectQuoteSpans(
-  node: TreeSitterNode,
-  out: QuoteSpans,
-  inDouble: boolean,
-): void {
+function collectQuoteSpans(node: TreeSitterNode, out: QuoteSpans, inDouble: boolean): void {
   switch (node.type) {
-    case 'raw_string':
+    case "raw_string":
       out.raw.push([node.startIndex, node.endIndex])
       return // literal body, no nested quotes possible
-    case 'ansi_c_string':
+    case "ansi_c_string":
       out.ansiC.push([node.startIndex, node.endIndex])
       return // literal body
-    case 'string':
+    case "string":
       // Only collect the outermost string (matches old per-type walk
       // which stops at first match). Recurse regardless — a nested
       // $(cmd 'x') inside "..." has a real inner raw_string.
@@ -106,7 +102,7 @@ function collectQuoteSpans(
         if (child) collectQuoteSpans(child, out, true)
       }
       return
-    case 'heredoc_redirect': {
+    case "heredoc_redirect": {
       // Quoted heredocs (<<'EOF', <<"EOF", <<\EOF): literal body.
       // Unquoted (<<EOF) expands $()/${} — the body can contain
       // $(cmd 'x') whose inner '...' IS a real raw_string node.
@@ -114,9 +110,9 @@ function collectQuoteSpans(
       // Matches sync path's extractHeredocs({ quotedOnly: true }).
       let isQuoted = false
       for (const child of node.children) {
-        if (child && child.type === 'heredoc_start') {
+        if (child && child.type === "heredoc_start") {
           const first = child.text[0]
-          isQuoted = first === "'" || first === '"' || first === '\\'
+          isQuoted = first === "'" || first === '"' || first === "\\"
           break
         }
       }
@@ -156,17 +152,11 @@ function buildPositionSet(spans: Array<[number, number]>): Set<number> {
  * Processing overlapping spans corrupts indices since removing/replacing the
  * outer span shifts the inner span's start/end into stale positions.
  */
-function dropContainedSpans<T extends readonly [number, number, ...unknown[]]>(
-  spans: T[],
-): T[] {
+function dropContainedSpans<T extends readonly [number, number, ...unknown[]]>(spans: T[]): T[] {
   return spans.filter(
     (s, i) =>
       !spans.some(
-        (other, j) =>
-          j !== i &&
-          other[0] <= s[0] &&
-          other[1] >= s[1] &&
-          (other[0] < s[0] || other[1] > s[1]),
+        (other, j) => j !== i && other[0] <= s[0] && other[1] >= s[1] && (other[0] < s[0] || other[1] > s[1]),
       ),
   )
 }
@@ -191,10 +181,7 @@ function removeSpans(command: string, spans: Array<[number, number]>): string {
 /**
  * Replaces spans with just the quote delimiters (preserving ' and " characters).
  */
-function replaceSpansKeepQuotes(
-  command: string,
-  spans: Array<[number, number, string, string]>,
-): string {
+function replaceSpansKeepQuotes(command: string, spans: Array<[number, number, string, string]>): string {
   if (spans.length === 0) return command
 
   const sorted = dropContainedSpans(spans).sort((a, b) => b[0] - a[0])
@@ -221,10 +208,7 @@ function replaceSpansKeepQuotes(
  *   inside them, and validators need to see those patterns. Matches the
  *   sync path's extractHeredocs({ quotedOnly: true }).
  */
-export function extractQuoteContext(
-  rootNode: unknown,
-  command: string,
-): QuoteContext {
+export function extractQuoteContext(rootNode: unknown, command: string): QuoteContext {
   // Single walk collects all quote span types at once.
   const spans: QuoteSpans = { raw: [], ansiC: [], double: [], heredoc: [] }
   collectQuoteSpans(rootNode as TreeSitterNode, spans, false)
@@ -232,29 +216,20 @@ export function extractQuoteContext(
   const ansiCSpans = spans.ansiC
   const doubleQuoteSpans = spans.double
   const quotedHeredocSpans = spans.heredoc
-  const allQuoteSpans = [
-    ...singleQuoteSpans,
-    ...ansiCSpans,
-    ...doubleQuoteSpans,
-    ...quotedHeredocSpans,
-  ]
+  const allQuoteSpans = [...singleQuoteSpans, ...ansiCSpans, ...doubleQuoteSpans, ...quotedHeredocSpans]
 
   // Build a set of positions that should be excluded for each output variant.
   // For withDoubleQuotes: remove single-quoted spans entirely, plus the
   // opening/closing `"` delimiters of double-quoted spans (but keep the
   // content between them). This matches the regex extractQuotedContent()
   // semantics where `"` toggles quote state but content is still emitted.
-  const singleQuoteSet = buildPositionSet([
-    ...singleQuoteSpans,
-    ...ansiCSpans,
-    ...quotedHeredocSpans,
-  ])
+  const singleQuoteSet = buildPositionSet([...singleQuoteSpans, ...ansiCSpans, ...quotedHeredocSpans])
   const doubleQuoteDelimSet = new Set<number>()
   for (const [start, end] of doubleQuoteSpans) {
     doubleQuoteDelimSet.add(start) // opening "
     doubleQuoteDelimSet.add(end - 1) // closing "
   }
-  let withDoubleQuotes = ''
+  let withDoubleQuotes = ""
   for (let i = 0; i < command.length; i++) {
     if (singleQuoteSet.has(i)) continue
     if (doubleQuoteDelimSet.has(i)) continue
@@ -279,12 +254,9 @@ export function extractQuoteContext(
   }
   for (const [start, end] of quotedHeredocSpans) {
     // Heredoc redirect spans have no inline quote delimiters — strip entirely.
-    spansWithQuoteChars.push([start, end, '', ''])
+    spansWithQuoteChars.push([start, end, "", ""])
   }
-  const unquotedKeepQuoteChars = replaceSpansKeepQuotes(
-    command,
-    spansWithQuoteChars,
-  )
+  const unquotedKeepQuoteChars = replaceSpansKeepQuotes(command, spansWithQuoteChars)
 
   return { withDoubleQuotes, fullyUnquoted, unquotedKeepQuoteChars }
 }
@@ -293,10 +265,7 @@ export function extractQuoteContext(
  * Extract compound command structure from the AST.
  * Replaces isUnsafeCompoundCommand() and splitCommand() for tree-sitter path.
  */
-export function extractCompoundStructure(
-  rootNode: unknown,
-  command: string,
-): CompoundStructure {
+export function extractCompoundStructure(rootNode: unknown, command: string): CompoundStructure {
   const n = rootNode as TreeSitterNode
   const operators: string[] = []
   const segments: string[] = []
@@ -309,53 +278,50 @@ export function extractCompoundStructure(
     for (const child of node.children) {
       if (!child) continue
 
-      if (child.type === 'list') {
+      if (child.type === "list") {
         // list nodes contain && and || operators
         for (const listChild of child.children) {
           if (!listChild) continue
-          if (listChild.type === '&&' || listChild.type === '||') {
+          if (listChild.type === "&&" || listChild.type === "||") {
             operators.push(listChild.type)
-          } else if (
-            listChild.type === 'list' ||
-            listChild.type === 'redirected_statement'
-          ) {
+          } else if (listChild.type === "list" || listChild.type === "redirected_statement") {
             // Nested list, or redirected_statement wrapping a list/pipeline —
             // recurse so inner operators/pipelines are detected. For
             // `cmd1 && cmd2 2>/dev/null && cmd3`, the redirected_statement
             // wraps `list(cmd1 && cmd2)` — the inner `&&` would be missed
             // without recursion.
             walkTopLevel({ ...node, children: [listChild] } as TreeSitterNode)
-          } else if (listChild.type === 'pipeline') {
+          } else if (listChild.type === "pipeline") {
             hasPipeline = true
             segments.push(listChild.text)
-          } else if (listChild.type === 'subshell') {
+          } else if (listChild.type === "subshell") {
             hasSubshell = true
             segments.push(listChild.text)
-          } else if (listChild.type === 'compound_statement') {
+          } else if (listChild.type === "compound_statement") {
             hasCommandGroup = true
             segments.push(listChild.text)
           } else {
             segments.push(listChild.text)
           }
         }
-      } else if (child.type === ';') {
-        operators.push(';')
-      } else if (child.type === 'pipeline') {
+      } else if (child.type === ";") {
+        operators.push(";")
+      } else if (child.type === "pipeline") {
         hasPipeline = true
         segments.push(child.text)
-      } else if (child.type === 'subshell') {
+      } else if (child.type === "subshell") {
         hasSubshell = true
         segments.push(child.text)
-      } else if (child.type === 'compound_statement') {
+      } else if (child.type === "compound_statement") {
         hasCommandGroup = true
         segments.push(child.text)
       } else if (
-        child.type === 'command' ||
-        child.type === 'declaration_command' ||
-        child.type === 'variable_assignment'
+        child.type === "command" ||
+        child.type === "declaration_command" ||
+        child.type === "variable_assignment"
       ) {
         segments.push(child.text)
-      } else if (child.type === 'redirected_statement') {
+      } else if (child.type === "redirected_statement") {
         // `cd ~/src && find path 2>/dev/null` — tree-sitter wraps the ENTIRE
         // compound in a redirected_statement: program → redirected_statement →
         // (list → cmd1, &&, cmd2) + file_redirect. Same for `cmd1 | cmd2 > out`
@@ -364,7 +330,7 @@ export function extractCompoundStructure(
         // don't affect compound/pipeline classification).
         let foundInner = false
         for (const inner of child.children) {
-          if (!inner || inner.type === 'file_redirect') continue
+          if (!inner || inner.type === "file_redirect") continue
           foundInner = true
           walkTopLevel({ ...child, children: [inner] } as TreeSitterNode)
         }
@@ -372,18 +338,18 @@ export function extractCompoundStructure(
           // Standalone redirect with no body (shouldn't happen, but fail-safe)
           segments.push(child.text)
         }
-      } else if (child.type === 'negated_command') {
+      } else if (child.type === "negated_command") {
         // `! cmd` — recurse into the inner command so its structure is
         // classified (pipeline/subshell/etc.), but also record the full
         // negated text as a segment so segments.length stays meaningful.
         segments.push(child.text)
         walkTopLevel(child)
       } else if (
-        child.type === 'if_statement' ||
-        child.type === 'while_statement' ||
-        child.type === 'for_statement' ||
-        child.type === 'case_statement' ||
-        child.type === 'function_definition'
+        child.type === "if_statement" ||
+        child.type === "while_statement" ||
+        child.type === "for_statement" ||
+        child.type === "case_statement" ||
+        child.type === "function_definition"
       ) {
         // Control-flow constructs: the construct itself is one segment,
         // but recurse so inner pipelines/subshells/operators are detected.
@@ -423,12 +389,12 @@ export function hasActualOperatorNodes(rootNode: unknown): boolean {
 
   function walk(node: TreeSitterNode): boolean {
     // Check for operator types that indicate compound commands
-    if (node.type === ';' || node.type === '&&' || node.type === '||') {
+    if (node.type === ";" || node.type === "&&" || node.type === "||") {
       // Verify this is a child of a list or program, not inside a command
       return true
     }
 
-    if (node.type === 'list') {
+    if (node.type === "list") {
       // A list node means there are compound operators
       return true
     }
@@ -455,19 +421,19 @@ export function extractDangerousPatterns(rootNode: unknown): DangerousPatterns {
 
   function walk(node: TreeSitterNode): void {
     switch (node.type) {
-      case 'command_substitution':
+      case "command_substitution":
         hasCommandSubstitution = true
         break
-      case 'process_substitution':
+      case "process_substitution":
         hasProcessSubstitution = true
         break
-      case 'expansion':
+      case "expansion":
         hasParameterExpansion = true
         break
-      case 'heredoc_redirect':
+      case "heredoc_redirect":
         hasHeredoc = true
         break
-      case 'comment':
+      case "comment":
         hasComment = true
         break
     }
@@ -493,10 +459,7 @@ export function extractDangerousPatterns(rootNode: unknown): DangerousPatterns {
  * Extracts all security-relevant data from the AST in one pass.
  * This data must be extracted before tree.delete() is called.
  */
-export function analyzeCommand(
-  rootNode: unknown,
-  command: string,
-): TreeSitterAnalysis {
+export function analyzeCommand(rootNode: unknown, command: string): TreeSitterAnalysis {
   return {
     quoteContext: extractQuoteContext(rootNode, command),
     compoundStructure: extractCompoundStructure(rootNode, command),

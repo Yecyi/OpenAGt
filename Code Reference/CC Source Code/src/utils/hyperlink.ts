@@ -1,11 +1,11 @@
-import chalk from 'chalk'
-import { supportsHyperlinks } from '../ink/supports-hyperlinks.js'
+import chalk from "chalk"
+import { supportsHyperlinks } from "../ink/supports-hyperlinks.js"
 
 // OSC 8 hyperlink escape sequences
 // Format: \e]8;;URL\e\\TEXT\e]8;;\e\\
 // Using \x07 (BEL) as terminator which is more widely supported
-export const OSC8_START = '\x1b]8;;'
-export const OSC8_END = '\x07'
+export const OSC8_START = "\x1b]8;;"
+export const OSC8_END = "\x07"
 
 type HyperlinkOptions = {
   supportsHyperlinks?: boolean
@@ -21,11 +21,7 @@ type HyperlinkOptions = {
  *                  If hyperlinks are not supported, content is ignored and only the URL is shown.
  * @param options - Optional overrides for testing (supportsHyperlinks)
  */
-export function createHyperlink(
-  url: string,
-  content?: string,
-  options?: HyperlinkOptions,
-): string {
+export function createHyperlink(url: string, content?: string, options?: HyperlinkOptions): string {
   const hasSupport = options?.supportsHyperlinks ?? supportsHyperlinks()
   if (!hasSupport) {
     return url

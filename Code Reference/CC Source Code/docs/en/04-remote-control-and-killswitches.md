@@ -11,6 +11,7 @@ Claude Code implements multiple remote control mechanisms that allow Anthropic (
 ### Architecture
 
 Every eligible session fetches settings from:
+
 ```
 GET /api/claude_code/settings
 ```
@@ -40,8 +41,8 @@ When remote settings contain "dangerous" changes, a blocking dialog is shown:
 ```typescript
 // src/services/remoteManagedSettings/securityCheck.tsx:67-73
 export function handleSecurityCheckResult(result: SecurityCheckResult): boolean {
-  if (result === 'rejected') {
-    gracefulShutdownSync(1)  // Exit with code 1
+  if (result === "rejected") {
+    gracefulShutdownSync(1) // Exit with code 1
     return false
   }
   return true
@@ -57,7 +58,7 @@ If the remote server is unreachable, cached settings from disk are used:
 ```typescript
 // src/services/remoteManagedSettings/index.ts:433-436
 if (cachedSettings) {
-  logForDebugging('Remote settings: Using stale cache after fetch failure')
+  logForDebugging("Remote settings: Using stale cache after fetch failure")
   setSessionCache(cachedSettings)
   return cachedSettings
 }
@@ -99,7 +100,7 @@ Auto mode can be remotely disabled.
 
 ```typescript
 // src/services/analytics/sinkKillswitch.ts:4
-const SINK_KILLSWITCH_CONFIG_NAME = 'tengu_frond_boric'
+const SINK_KILLSWITCH_CONFIG_NAME = "tengu_frond_boric"
 ```
 
 Can remotely stop all analytics output.
@@ -129,6 +130,7 @@ Anthropic can remotely override which model internal employees use:
 ```
 
 The `tengu_ant_model_override` GrowthBook flag can:
+
 - Set a default model
 - Set default effort level
 - Append to the system prompt
@@ -145,17 +147,18 @@ Fast mode status is fetched from a dedicated endpoint:
 ```
 
 Multiple feature flags control fast mode availability:
+
 - `tengu_penguins_off`
 - `tengu_marble_sandcastle`
 
 ## Summary
 
-| Mechanism | Scope | User Consent |
-|-----------|-------|-------------|
-| Remote managed settings | Enterprise/Team | Accept or exit |
-| GrowthBook feature flags | All users | None |
-| Killswitches | All users | None |
-| Model override | Internal (ant) | None |
-| Fast mode control | All users | None |
+| Mechanism                | Scope           | User Consent   |
+| ------------------------ | --------------- | -------------- |
+| Remote managed settings  | Enterprise/Team | Accept or exit |
+| GrowthBook feature flags | All users       | None           |
+| Killswitches             | All users       | None           |
+| Model override           | Internal (ant)  | None           |
+| Fast mode control        | All users       | None           |
 
 The remote control infrastructure is extensive and operates largely without user visibility or consent. Enterprise administrators can enforce policies that users cannot override, and Anthropic can remotely change behavior for any user through feature flags.

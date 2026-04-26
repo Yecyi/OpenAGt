@@ -18,33 +18,22 @@
  *   settings.ts  — parsing, caching, first-source-wins logic (this file)
  */
 
-import { join } from 'path'
-import { logForDebugging } from '../../debug.js'
-import { logForDiagnosticsNoPII } from '../../diagLogs.js'
-import { readFileSync } from '../../fileRead.js'
-import { getFsImplementation } from '../../fsOperations.js'
-import { safeParseJSON } from '../../json.js'
-import { profileCheckpoint } from '../../startupProfiler.js'
-import {
-  getManagedFilePath,
-  getManagedSettingsDropInDir,
-} from '../managedPath.js'
-import { type SettingsJson, SettingsSchema } from '../types.js'
-import {
-  filterInvalidPermissionRules,
-  formatZodError,
-  type ValidationError,
-} from '../validation.js'
+import { join } from "path"
+import { logForDebugging } from "../../debug.js"
+import { logForDiagnosticsNoPII } from "../../diagLogs.js"
+import { readFileSync } from "../../fileRead.js"
+import { getFsImplementation } from "../../fsOperations.js"
+import { safeParseJSON } from "../../json.js"
+import { profileCheckpoint } from "../../startupProfiler.js"
+import { getManagedFilePath, getManagedSettingsDropInDir } from "../managedPath.js"
+import { type SettingsJson, SettingsSchema } from "../types.js"
+import { filterInvalidPermissionRules, formatZodError, type ValidationError } from "../validation.js"
 import {
   WINDOWS_REGISTRY_KEY_PATH_HKCU,
   WINDOWS_REGISTRY_KEY_PATH_HKLM,
   WINDOWS_REGISTRY_VALUE_NAME,
-} from './constants.js'
-import {
-  fireRawRead,
-  getMdmRawReadPromise,
-  type RawReadResult,
-} from './rawRead.js'
+} from "./constants.js"
+import { fireRawRead, getMdmRawReadPromise, type RawReadResult } from "./rawRead.js"
 
 // ---------------------------------------------------------------------------
 // Types and cache
@@ -67,7 +56,7 @@ let mdmLoadPromise: Promise<void> | null = null
 export function startMdmSettingsLoad(): void {
   if (mdmLoadPromise) return
   mdmLoadPromise = (async () => {
-    profileCheckpoint('mdm_load_start')
+    profileCheckpoint("mdm_load_start")
     const startTime = Date.now()
 
     // Use the startup raw read if cli.tsx fired it, otherwise fire a fresh one.
@@ -76,16 +65,14 @@ export function startMdmSettingsLoad(): void {
     const { mdm, hkcu } = consumeRawReadResult(await rawPromise)
     mdmCache = mdm
     hkcuCache = hkcu
-    profileCheckpoint('mdm_load_end')
+    profileCheckpoint("mdm_load_end")
 
     const duration = Date.now() - startTime
     logForDebugging(`MDM settings load completed in ${duration}ms`)
     if (Object.keys(mdm.settings).length > 0) {
-      logForDebugging(
-        `MDM settings found: ${Object.keys(mdm.settings).join(', ')}`,
-      )
+      logForDebugging(`MDM settings found: ${Object.keys(mdm.settings).join(", ")}`)
       try {
-        logForDiagnosticsNoPII('info', 'mdm_settings_loaded', {
+        logForDiagnosticsNoPII("info", "mdm_settings_loaded", {
           duration_ms: duration,
           key_count: Object.keys(mdm.settings).length,
           error_count: mdm.errors.length,
@@ -185,7 +172,7 @@ export function parseCommandOutputAsSettings(
   sourcePath: string,
 ): { settings: SettingsJson; errors: ValidationError[] } {
   const data = safeParseJSON(stdout, false)
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== "object") {
     return { settings: {}, errors: [] }
   }
 
@@ -205,13 +192,10 @@ export function parseCommandOutputAsSettings(
  * Expected format:
  *     Settings    REG_SZ    {"json":"value"}
  */
-export function parseRegQueryStdout(
-  stdout: string,
-  valueName = 'Settings',
-): string | null {
+export function parseRegQueryStdout(stdout: string, valueName = "Settings"): string | null {
   const lines = stdout.split(/\r?\n/)
-  const escaped = valueName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const re = new RegExp(`^\\s+${escaped}\\s+REG_(?:EXPAND_)?SZ\\s+(.*)$`, 'i')
+  const escaped = valueName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const re = new RegExp(`^\\s+${escaped}\\s+REG_(?:EXPAND_)?SZ\\s+(.*)$`, "i")
   for (const line of lines) {
     const match = line.match(re)
     if (match && match[1]) {
@@ -279,10 +263,10 @@ function consumeRawReadResult(raw: RawReadResult): {
  */
 function hasManagedSettingsFile(): boolean {
   try {
-    const filePath = join(getManagedFilePath(), 'managed-settings.json')
+    const filePath = join(getManagedFilePath(), "managed-settings.json")
     const content = readFileSync(filePath)
     const data = safeParseJSON(content, false)
-    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+    if (data && typeof data === "object" && Object.keys(data).length > 0) {
       return true
     }
   } catch {
@@ -292,17 +276,13 @@ function hasManagedSettingsFile(): boolean {
     const dropInDir = getManagedSettingsDropInDir()
     const entries = getFsImplementation().readdirSync(dropInDir)
     for (const d of entries) {
-      if (
-        !(d.isFile() || d.isSymbolicLink()) ||
-        !d.name.endsWith('.json') ||
-        d.name.startsWith('.')
-      ) {
+      if (!(d.isFile() || d.isSymbolicLink()) || !d.name.endsWith(".json") || d.name.startsWith(".")) {
         continue
       }
       try {
         const content = readFileSync(join(dropInDir, d.name))
         const data = safeParseJSON(content, false)
-        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+        if (data && typeof data === "object" && Object.keys(data).length > 0) {
           return true
         }
       } catch {

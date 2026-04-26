@@ -51,10 +51,7 @@ const log = Log.create({ service: "config" })
 // Custom merge function that concatenates array fields instead of replacing them
 function mergeConfigConcatArrays(target: Info, source: Info): Info {
   const merged = mergeDeep(target, source)
-  merged.instructions = Array.from(new Set([
-    ...(target.instructions ?? []),
-    ...(source.instructions ?? []),
-  ]))
+  merged.instructions = Array.from(new Set([...(target.instructions ?? []), ...(source.instructions ?? [])]))
   return merged
 }
 
@@ -229,7 +226,13 @@ const InfoSchema = Schema.Struct({
         Schema.Struct({
           enabled: Schema.optional(Schema.Boolean),
           backend: Schema.optional(
-            Schema.Literals(["auto", "seatbelt", "windows_native", "landlock", "process"] satisfies SandboxBackendPreference[]),
+            Schema.Literals([
+              "auto",
+              "seatbelt",
+              "windows_native",
+              "landlock",
+              "process",
+            ] satisfies SandboxBackendPreference[]),
           ),
           failure_policy: Schema.optional(
             Schema.Literals(["closed", "confirm_downgrade", "fallback"] satisfies SandboxFailurePolicy[]),
@@ -261,14 +264,28 @@ const InfoSchema = Schema.Struct({
         Schema.Struct({
           weights: Schema.optional(
             Schema.Struct({
-              hasValidSchema: Schema.optional(NonNegativeInt).annotate({ description: "Score for valid schema (default: 20)" }),
-              hasDescription: Schema.optional(NonNegativeInt).annotate({ description: "Score for description (default: 15)" }),
-              hasParameterDescriptions: Schema.optional(NonNegativeInt).annotate({ description: "Score for parameter descriptions (default: 20)" }),
-              hasReturnTypeDescription: Schema.optional(NonNegativeInt).annotate({ description: "Score for return type description (default: 10)" }),
-              hasExamples: Schema.optional(NonNegativeInt).annotate({ description: "Score for examples (default: 10)" }),
+              hasValidSchema: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for valid schema (default: 20)",
+              }),
+              hasDescription: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for description (default: 15)",
+              }),
+              hasParameterDescriptions: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for parameter descriptions (default: 20)",
+              }),
+              hasReturnTypeDescription: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for return type description (default: 10)",
+              }),
+              hasExamples: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for examples (default: 10)",
+              }),
               hasVersion: Schema.optional(NonNegativeInt).annotate({ description: "Score for version (default: 5)" }),
-              isNamingConsistent: Schema.optional(NonNegativeInt).annotate({ description: "Score for consistent naming (default: 10)" }),
-              hasDeprecationWarning: Schema.optional(NonNegativeInt).annotate({ description: "Score for deprecation warning (default: 10)" }),
+              isNamingConsistent: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for consistent naming (default: 10)",
+              }),
+              hasDeprecationWarning: Schema.optional(NonNegativeInt).annotate({
+                description: "Score for deprecation warning (default: 10)",
+              }),
             }),
           ).annotate({ description: "Quality score weights for each checklist item" }),
         }),

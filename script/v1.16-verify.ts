@@ -54,7 +54,9 @@ async function run(step: Step): Promise<StepResult> {
 }
 
 async function securityTests() {
-  const files = await Array.fromAsync(new Glob("test/security/*.test.ts").scan({ cwd: path.join(root, "packages", "openagt") }))
+  const files = await Array.fromAsync(
+    new Glob("test/security/*.test.ts").scan({ cwd: path.join(root, "packages", "openagt") }),
+  )
   return files.sort()
 }
 

@@ -8,8 +8,9 @@ import { Agent } from "../agent/agent"
 import { Provider } from "../provider"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
-import { Cause, Effect, Exit } from "effect"
-import { TaskRuntime } from "../session/task-runtime"
+import { Cause, Effect, Exit, Option } from "effect"
+import { TaskKind, TaskRuntime } from "../session/task-runtime"
+import { effortFromMetadata, isBroadAgentTask, numericMetadata } from "../agent/task-classifier"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): void
@@ -49,10 +50,103 @@ type TaskMetadata = {
     providerID: string
   }
   taskId?: SessionID
-  status?: "pending" | "completed" | "failed"
+  status?: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
   groupId?: string
   error?: string
   retryable?: boolean
+  partial?: boolean
+  limitReason?: string
+  partialSummary?: string
+}
+
+function taskPartialSummary(messages: MessageV2.WithParts[]) {
+  const summary = messages
+    .filter((message) => message.info.role === "assistant")
+    .flatMap((message) =>
+      message.parts.flatMap((part) => {
+        if (part.type === "text") return part.text.trim() ? [part.text.trim()] : []
+        if (part.type !== "tool") return []
+        if (part.state.status === "completed") {
+          return [`tool ${part.tool} completed: ${part.state.output.slice(0, 300)}`]
+        }
+        if (part.state.status === "error") return [`tool ${part.tool} error: ${part.state.error}`]
+        if (part.state.status === "running") return [`tool ${part.tool} running${part.state.title ? `: ${part.state.title}` : ""}`]
+        return [`tool ${part.tool} pending`]
+      }),
+    )
+    .join("\n")
+    .trim()
+  if (!summary) return undefined
+  return summary.length > 4_000 ? summary.slice(-4_000) : summary
+}
+
+function taskStepBudget(params: z.infer<typeof parameters>, agentName: string, taskKind: z.infer<typeof TaskKind>) {
+  const explicit = numericMetadata(params.metadata, "max_steps") ?? numericMetadata(params.metadata, "step_budget")
+  if (explicit) return Math.min(explicit, 240)
+  const effort = effortFromMetadata(params.metadata)
+  const broad = isBroadAgentTask(params.prompt)
+  const base =
+    effort === "deep"
+      ? 96
+      : effort === "high"
+        ? 64
+        : effort === "medium"
+          ? 36
+          : effort === "low"
+            ? 16
+            : agentName === "explore" && broad
+              ? 48
+              : taskKind === "research" && broad
+                ? 36
+                : undefined
+  if (!base) return undefined
+  if (agentName === "explore" && broad) return Math.max(base, 48)
+  return base
+}
+
+function taskTimeoutMs(
+  params: z.infer<typeof parameters>,
+  agentName: string,
+  taskKind: z.infer<typeof TaskKind>,
+  stepBudget: number | undefined,
+) {
+  const requested = numericMetadata(params.metadata, "timeout_ms")
+  if (requested) return Math.min(requested, 1_800_000)
+  const effort = effortFromMetadata(params.metadata)
+  const broad = isBroadAgentTask(params.prompt)
+  const base = agentName === "explore" ? 180_000 : 300_000
+  const effortFloor =
+    effort === "deep"
+      ? 900_000
+      : effort === "high"
+        ? 600_000
+        : effort === "medium"
+          ? 300_000
+          : effort === "low"
+            ? 120_000
+            : base
+  const broadFloor =
+    broad || taskKind === "research"
+      ? Math.max(effortFloor, agentName === "explore" ? 360_000 : 480_000)
+      : effortFloor
+  const stepFloor = stepBudget ? stepBudget * 12_000 : base
+  return Math.min(Math.max(base, broadFloor, stepFloor), 1_800_000)
+}
+
+function assistantText(message: MessageV2.WithParts) {
+  return message.parts
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n")
+    .trim()
+}
+
+function limitReason(message: MessageV2.WithParts) {
+  if (message.info.role === "assistant" && message.info.finish === "step-budget") return "step_budget"
+  const text = assistantText(message).toLowerCase()
+  if (text.includes("step budget") && text.includes("reached")) return "step_budget"
+  if (text.includes("maximum steps") && text.includes("reached")) return "step_budget"
+  if (text.includes("max steps") && text.includes("reached")) return "step_budget"
+  return undefined
 }
 
 export const TaskTool = Tool.define(
@@ -86,7 +180,6 @@ export const TaskTool = Tool.define(
 
       const canTask = next.permission.some((rule) => rule.permission === id)
       const canTodo = next.permission.some((rule) => rule.permission === "todowrite")
-      const readOnlyExplore = next.name === "explore"
 
       const taskID = params.task_id
       const session = taskID
@@ -149,31 +242,60 @@ export const TaskTool = Tool.define(
 
       const messageID = MessageID.ascending()
       const taskKind = params.task_kind ?? "generic"
+      const readOnlyTask = next.name === "explore" || (taskKind === "research" && (params.write_scope ?? []).length === 0)
+      const stepBudget = taskStepBudget(params, next.name, taskKind)
       const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
-      const requestedTimeout = params.metadata?.timeout_ms
-      const timeoutMs =
-        typeof requestedTimeout === "number" && Number.isFinite(requestedTimeout) && requestedTimeout > 0
-          ? Math.min(requestedTimeout, 900_000)
-          : next.name === "explore"
-            ? 90_000
-            : 300_000
+      const timeoutMs = taskTimeoutMs(params, next.name, taskKind, stepBudget)
+      const existingRecord = yield* tasks.get({ taskID: nextSession.id, parentSessionID: ctx.sessionID })
 
-      const record = yield* tasks.create({
-        parentSessionID: ctx.sessionID,
-        childSessionID: nextSession.id,
-        groupID: params.group_id,
-        taskKind,
-        subagentType: next.name,
-        description: params.description,
-        prompt: params.prompt,
-        dependsOn,
-        writeScope: params.write_scope,
-        readScope: params.read_scope,
-        acceptanceChecks: params.acceptance_checks,
-        priority: params.priority,
-        origin: params.origin,
-        metadata: params.metadata,
-      })
+      const record =
+        Option.isSome(existingRecord)
+          ? existingRecord.value.status === "failed" ||
+            existingRecord.value.status === "cancelled" ||
+            existingRecord.value.status === "partial"
+            ? yield* tasks.retry({ taskID: nextSession.id, parentSessionID: ctx.sessionID })
+            : existingRecord.value
+          : yield* tasks.create({
+              parentSessionID: ctx.sessionID,
+              childSessionID: nextSession.id,
+              groupID: params.group_id,
+              taskKind,
+              subagentType: next.name,
+              description: params.description,
+              prompt: params.prompt,
+              dependsOn,
+              writeScope: params.write_scope,
+              readScope: params.read_scope,
+              acceptanceChecks: params.acceptance_checks,
+              priority: params.priority,
+              origin: params.origin,
+              metadata: params.metadata,
+            })
+
+      if (record.status !== "pending") {
+        return {
+          title: params.description,
+          metadata: {
+            sessionId: nextSession.id,
+            model,
+            taskId: nextSession.id,
+            status: record.status,
+            groupId: record.group_id,
+            partial: record.status === "partial" ? true : undefined,
+            retryable: record.metadata?.retryable === true ? true : undefined,
+            limitReason: typeof record.metadata?.limit_reason === "string" ? record.metadata.limit_reason : undefined,
+            partialSummary:
+              typeof record.metadata?.partial_summary === "string" ? record.metadata.partial_summary : undefined,
+          },
+          output: [
+            `task_id: ${nextSession.id} (${record.status})`,
+            "",
+            "<task_result>",
+            record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`,
+            "</task_result>",
+          ].join("\n"),
+        }
+      }
 
       const canRun = yield* tasks.canRun({ parentSessionID: ctx.sessionID, task: record })
       if (!canRun) {
@@ -200,6 +322,13 @@ export const TaskTool = Tool.define(
         ops.cancel(nextSession.id)
       }
 
+      const partialSummary = Effect.fn("TaskTool.partialSummary")(function* () {
+        const messages = yield* sessions
+          .messages({ sessionID: nextSession.id, limit: 12 })
+          .pipe(Effect.catch(() => Effect.succeed([])))
+        return taskPartialSummary(messages)
+      })
+
       return yield* Effect.acquireUseRelease(
         Effect.gen(function* () {
           ctx.abort.addEventListener("abort", cancel)
@@ -223,8 +352,18 @@ export const TaskTool = Tool.define(
                   providerID: model.providerID,
                 },
                 agent: next.name,
+                runtime: {
+                  stepBudget,
+                  timeoutMs,
+                  maxParallelSubagents:
+                    numericMetadata(params.metadata, "max_parallel_subagents") ??
+                    numericMetadata(params.metadata, "maxParallelSubagents"),
+                  effort: effortFromMetadata(params.metadata),
+                  taskKind,
+                  reason: isBroadAgentTask(params.prompt) ? "broad task or high-effort subagent" : undefined,
+                },
                 tools: {
-                  ...(readOnlyExplore
+                  ...(readOnlyTask
                     ? { bash: false, edit: false, write: false, multiedit: false, apply_patch: false }
                     : {}),
                   ...(canTodo ? {} : { todowrite: false }),
@@ -233,17 +372,15 @@ export const TaskTool = Tool.define(
                 },
                 parts,
               })
-              .pipe(
-                Effect.timeout(`${timeoutMs} millis`),
-                Effect.exit,
-              )
+              .pipe(Effect.timeout(`${timeoutMs} millis`), Effect.exit)
             const result = Exit.isSuccess(promptExit)
               ? { status: "completed" as const, message: promptExit.value }
-              : yield* Effect.sync(() => {
+              : yield* Effect.gen(function* () {
                   const error = Cause.squash(promptExit.cause)
                   const timeout =
                     typeof error === "object" && error !== null && "_tag" in error && error._tag === "TimeoutError"
                   if (timeout) cancel()
+                  const partial = timeout ? yield* partialSummary() : undefined
                   return {
                     status: "failed" as const,
                     error: timeout
@@ -252,6 +389,7 @@ export const TaskTool = Tool.define(
                         ? error.message
                         : String(error),
                     retryable: timeout,
+                    partial,
                   }
                 })
 
@@ -272,13 +410,54 @@ export const TaskTool = Tool.define(
                   groupId: params.group_id,
                   error: result.error,
                   retryable: result.retryable,
+                  partialSummary: result.partial,
                 },
                 output: [
                   `task_id: ${nextSession.id} (failed${result.retryable ? ", retryable" : ""})`,
                   "",
-                  "<task_result status=\"failed\">",
+                  '<task_result status="failed">',
                   result.error,
                   "</task_result>",
+                  ...(result.partial
+                    ? ["", '<partial_task_result status="partial">', result.partial, "</partial_task_result>"]
+                    : []),
+                ].join("\n"),
+              }
+            }
+
+            const maxStepReason = limitReason(result.message)
+            if (maxStepReason) {
+              yield* tasks.partial({
+                taskID: nextSession.id,
+                parentSessionID: ctx.sessionID,
+                result: result.message,
+                reason: maxStepReason,
+                retryable: true,
+              })
+
+              const summary = assistantText(result.message) || "Subagent reached its step budget before returning a detailed summary."
+
+              return {
+                title: params.description,
+                metadata: {
+                  sessionId: nextSession.id,
+                  model,
+                  taskId: nextSession.id,
+                  status: "partial" as const,
+                  groupId: params.group_id,
+                  partial: true,
+                  retryable: true,
+                  limitReason: maxStepReason,
+                  partialSummary: summary,
+                },
+                output: [
+                  `task_id: ${nextSession.id} (partial, retryable)`,
+                  "",
+                  `<partial_task_result status="partial" reason="${maxStepReason}">`,
+                  summary,
+                  "",
+                  "Remaining work: retry this subagent with narrower scope or a larger step budget if the parent still needs more evidence.",
+                  "</partial_task_result>",
                 ].join("\n"),
               }
             }
@@ -289,7 +468,7 @@ export const TaskTool = Tool.define(
               result: result.message,
             })
 
-            const summary = result.message.parts.findLast((item) => item.type === "text")?.text ?? ""
+            const summary = assistantText(result.message)
 
             return {
               title: params.description,
@@ -323,7 +502,8 @@ export const TaskTool = Tool.define(
     return {
       description: DESCRIPTION,
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context<TaskMetadata>) => run(params, ctx).pipe(Effect.orDie),
+      execute: (params: z.infer<typeof parameters>, ctx: Tool.Context<TaskMetadata>) =>
+        run(params, ctx).pipe(Effect.orDie),
     }
   }),
 )

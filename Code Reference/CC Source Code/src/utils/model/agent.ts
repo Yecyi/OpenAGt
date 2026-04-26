@@ -1,15 +1,11 @@
-import type { PermissionMode } from '../permissions/PermissionMode.js'
-import { capitalize } from '../stringUtils.js'
-import { MODEL_ALIASES, type ModelAlias } from './aliases.js'
-import { applyBedrockRegionPrefix, getBedrockRegionPrefix } from './bedrock.js'
-import {
-  getCanonicalName,
-  getRuntimeMainLoopModel,
-  parseUserSpecifiedModel,
-} from './model.js'
-import { getAPIProvider } from './providers.js'
+import type { PermissionMode } from "../permissions/PermissionMode.js"
+import { capitalize } from "../stringUtils.js"
+import { MODEL_ALIASES, type ModelAlias } from "./aliases.js"
+import { applyBedrockRegionPrefix, getBedrockRegionPrefix } from "./bedrock.js"
+import { getCanonicalName, getRuntimeMainLoopModel, parseUserSpecifiedModel } from "./model.js"
+import { getAPIProvider } from "./providers.js"
 
-export const AGENT_MODEL_OPTIONS = [...MODEL_ALIASES, 'inherit'] as const
+export const AGENT_MODEL_OPTIONS = [...MODEL_ALIASES, "inherit"] as const
 export type AgentModelAlias = (typeof AGENT_MODEL_OPTIONS)[number]
 
 export type AgentModelOption = {
@@ -23,7 +19,7 @@ export type AgentModelOption = {
  * the model from the parent thread.
  */
 export function getDefaultSubagentModel(): string {
-  return 'inherit'
+  return "inherit"
 }
 
 /**
@@ -55,11 +51,8 @@ export function getAgentModel(
   // region prefix (e.g., "eu.anthropic.…"), we preserve it instead of overwriting
   // with the parent's prefix. This prevents silent data-residency violations when
   // an agent config intentionally pins to a different region than the parent.
-  const applyParentRegionPrefix = (
-    resolvedModel: string,
-    originalSpec: string,
-  ): string => {
-    if (parentRegionPrefix && getAPIProvider() === 'bedrock') {
+  const applyParentRegionPrefix = (resolvedModel: string, originalSpec: string): string => {
+    if (parentRegionPrefix && getAPIProvider() === "bedrock") {
       if (getBedrockRegionPrefix(originalSpec)) return resolvedModel
       return applyBedrockRegionPrefix(resolvedModel, parentRegionPrefix)
     }
@@ -77,11 +70,11 @@ export function getAgentModel(
 
   const agentModelWithExp = agentModel ?? getDefaultSubagentModel()
 
-  if (agentModelWithExp === 'inherit') {
+  if (agentModelWithExp === "inherit") {
     // Apply runtime model resolution for inherit to get the effective model
     // This ensures agents using 'inherit' get opusplan→Opus resolution in plan mode
     return getRuntimeMainLoopModel({
-      permissionMode: permissionMode ?? 'default',
+      permissionMode: permissionMode ?? "default",
       mainLoopModel: parentModel,
       exceeds200kTokens: false,
     })
@@ -110,12 +103,12 @@ export function getAgentModel(
 function aliasMatchesParentTier(alias: string, parentModel: string): boolean {
   const canonical = getCanonicalName(parentModel)
   switch (alias.toLowerCase()) {
-    case 'opus':
-      return canonical.includes('opus')
-    case 'sonnet':
-      return canonical.includes('sonnet')
-    case 'haiku':
-      return canonical.includes('haiku')
+    case "opus":
+      return canonical.includes("opus")
+    case "sonnet":
+      return canonical.includes("sonnet")
+    case "haiku":
+      return canonical.includes("haiku")
     default:
       return false
   }
@@ -123,8 +116,8 @@ function aliasMatchesParentTier(alias: string, parentModel: string): boolean {
 
 export function getAgentModelDisplay(model: string | undefined): string {
   // When model is omitted, getDefaultSubagentModel() returns 'inherit' at runtime
-  if (!model) return 'Inherit from parent (default)'
-  if (model === 'inherit') return 'Inherit from parent'
+  if (!model) return "Inherit from parent (default)"
+  if (model === "inherit") return "Inherit from parent"
   return capitalize(model)
 }
 
@@ -134,24 +127,24 @@ export function getAgentModelDisplay(model: string | undefined): string {
 export function getAgentModelOptions(): AgentModelOption[] {
   return [
     {
-      value: 'sonnet',
-      label: 'Sonnet',
-      description: 'Balanced performance - best for most agents',
+      value: "sonnet",
+      label: "Sonnet",
+      description: "Balanced performance - best for most agents",
     },
     {
-      value: 'opus',
-      label: 'Opus',
-      description: 'Most capable for complex reasoning tasks',
+      value: "opus",
+      label: "Opus",
+      description: "Most capable for complex reasoning tasks",
     },
     {
-      value: 'haiku',
-      label: 'Haiku',
-      description: 'Fast and efficient for simple tasks',
+      value: "haiku",
+      label: "Haiku",
+      description: "Fast and efficient for simple tasks",
     },
     {
-      value: 'inherit',
-      label: 'Inherit from parent',
-      description: 'Use the same model as the main conversation',
+      value: "inherit",
+      label: "Inherit from parent",
+      description: "Use the same model as the main conversation",
     },
   ]
 }

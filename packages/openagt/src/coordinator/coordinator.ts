@@ -12,10 +12,11 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
-import { existsSync, readdirSync, statSync } from "fs"
+import { existsSync, readdirSync } from "fs"
 import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
+import { isBroadAgentTask } from "@/agent/task-classifier"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -69,31 +70,80 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+type WorkspaceSignals = {
+  file_count: number
+  package_count: number
+  language_count: number
+  reasons: string[]
+}
+
+function safeReaddir(dir: string) {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).slice(0, 256)
+  } catch {
+    return []
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function workspaceSignalsForGoal(goal: string): WorkspaceSignals {
+  if (!isProjectDeepDiveGoal(goal)) {
+    return { file_count: 0, package_count: 0, language_count: 0, reasons: [] }
+  }
+  const root = process.cwd()
+  const ignored = new Set([".git", "node_modules", "dist", "build", ".next", ".turbo", "coverage", ".artifacts"])
+  const extensions = new Set<string>()
+  const seenPackages = { value: 0 }
+  const scan = (dir: string, remaining: number): number => {
+    if (remaining <= 0) return 0
+    if (!existsSync(dir)) return 0
+    return safeReaddir(dir).reduce((count, entry) => {
+      if (count >= remaining) return count
+      if (ignored.has(entry.name)) return count
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) return count + scan(full, remaining - count)
+      if (!entry.isFile()) return count
+      if (entry.name === "package.json") seenPackages.value += 1
+      const ext = path.extname(entry.name).toLowerCase()
+      if (ext) extensions.add(ext)
+      return count + 1
+    }, 0)
+  }
+  const file_count = scan(root, 2_000)
+  const package_count =
+    seenPackages.value +
+    (existsSync(path.join(root, "bun.lock")) || existsSync(path.join(root, "pnpm-lock.yaml")) ? 1 : 0)
+  const language_count = extensions.size
+  return {
+    file_count,
+    package_count,
+    language_count,
+    reasons: [
+      file_count >= 100 ? `workspace has at least ${file_count} scanned files` : undefined,
+      package_count >= 2 ? `workspace has ${package_count} package or lockfile markers` : undefined,
+      language_count >= 4 ? `workspace has ${language_count} file extension families` : undefined,
+    ].filter((item): item is string => Boolean(item)),
+  }
 }
 
 function isProjectDeepDiveGoal(goal: string) {
   const normalized = goal.toLowerCase()
   return (
-    hasAny(normalized, [
-      "deep dive",
-      "dive deeper",
-      "codebase overview",
-      "project overview",
-      "project architecture",
-      "technical detail",
-      "technological detail",
-      "key technology",
-      "key technological",
+    isBroadAgentTask(goal) &&
+    (hasAny(normalized, [
+      "project",
+      "codebase",
+      "repo",
+      "repository",
+      "architecture",
+      "runtime",
       "algorithm",
-      "algorith",
       "algor",
-      "internals",
-      "how this project works",
-      "how the project works",
-    ]) &&
-    hasAny(normalized, ["project", "codebase", "repo", "repository", "architecture", "runtime", "algorithm", "algor"])
+    ]) ||
+      hasAny(goal, ["项目", "代码库", "仓库", "架构", "运行时", "算法"]))
   )
 }
 
@@ -183,6 +233,23 @@ function capResourceLimit(limit: ResourceLimitType, cap: ResourceLimitType) {
   })
 }
 
+function addResourceLimit(limit: ResourceLimitType, delta?: Partial<ResourceLimitType>) {
+  return ResourceLimit.parse({
+    max_rounds: Math.min(10_000, limit.max_rounds + Math.max(0, delta?.max_rounds ?? 0)),
+    max_model_calls: Math.min(20_000, limit.max_model_calls + Math.max(0, delta?.max_model_calls ?? 0)),
+    max_tool_calls: Math.min(100_000, limit.max_tool_calls + Math.max(0, delta?.max_tool_calls ?? 0)),
+    max_subagents: Math.min(10_000, limit.max_subagents + Math.max(0, delta?.max_subagents ?? 0)),
+    max_wallclock_ms: Math.min(
+      14 * 24 * 60 * 60 * 1000,
+      limit.max_wallclock_ms + Math.max(0, delta?.max_wallclock_ms ?? 0),
+    ),
+    max_estimated_tokens: Math.min(
+      100_000_000,
+      limit.max_estimated_tokens + Math.max(0, delta?.max_estimated_tokens ?? 0),
+    ),
+  })
+}
+
 function taskSizeMultiplier(size: LongTaskProfileType["task_size"]) {
   if (size === "huge") return 8
   if (size === "large") return 4
@@ -249,30 +316,32 @@ function longTaskProfileFor(input: {
   intent: IntentProfileType
   effort: EffortLevelType
   nodeCount: number
+  workspaceSignals?: WorkspaceSignals
 }) {
-  const normalized = input.goal.toLowerCase()
   const tokenEstimate = Math.ceil(input.goal.length / 4)
   const outputDimensions = input.intent.success_criteria.length + (input.goal.match(/\n|\d\.|;|,/g)?.length ?? 0)
-  const explicitLong =
-    isProjectDeepDiveGoal(input.goal) ||
-    hasAny(normalized, [
-      "comprehensive",
-      "thorough",
-      "entire project",
-      "full project",
-      "all files",
-      "architecture",
-      "算法",
-      "完整",
-      "全面",
-      "深入",
-    ])
+  const workspaceScore =
+    (input.workspaceSignals?.file_count ?? 0) >= 1_000
+      ? 3
+      : (input.workspaceSignals?.file_count ?? 0) >= 300
+        ? 2
+        : (input.workspaceSignals?.file_count ?? 0) >= 100
+          ? 1
+          : 0
+  const explicitLong = isBroadAgentTask(input.goal)
   const score =
     (explicitLong ? 3 : 0) +
     (input.effort === "deep" ? 3 : input.effort === "high" ? 2 : 0) +
     (input.nodeCount >= 12 ? 3 : input.nodeCount >= 8 ? 2 : input.nodeCount >= 5 ? 1 : 0) +
     (tokenEstimate >= 300 ? 2 : tokenEstimate >= 120 ? 1 : 0) +
-    (outputDimensions >= 8 ? 2 : outputDimensions >= 5 ? 1 : 0)
+    (outputDimensions >= 8 ? 2 : outputDimensions >= 5 ? 1 : 0) +
+    workspaceScore +
+    ((input.workspaceSignals?.package_count ?? 0) >= 6
+      ? 2
+      : (input.workspaceSignals?.package_count ?? 0) >= 2
+        ? 1
+        : 0) +
+    ((input.workspaceSignals?.language_count ?? 0) >= 4 ? 1 : 0)
   const task_size = score >= 10 ? "huge" : score >= 7 ? "large" : score >= 4 ? "medium" : "small"
   const is_long_task = score >= 4 || ((input.effort === "high" || input.effort === "deep") && explicitLong)
   return LongTaskProfile.parse({
@@ -285,6 +354,7 @@ function longTaskProfileFor(input: {
       input.nodeCount >= 5 ? `coordinator plan has ${input.nodeCount} nodes` : undefined,
       tokenEstimate >= 120 ? `prompt estimate is ${tokenEstimate} tokens` : undefined,
       outputDimensions >= 5 ? `goal has ${outputDimensions} output dimensions` : undefined,
+      ...(input.workspaceSignals?.reasons ?? []),
     ].filter((item): item is string => Boolean(item)),
   })
 }
@@ -889,9 +959,9 @@ function lowEffortNodes(nodes: CoordinatorNodeType[]) {
 function todoStage(node: CoordinatorNodeType): "plan" | "research" | "expert" | "reduce" | "verify" | "final" {
   if (node.role === "planner") return "plan"
   if (node.role === "reducer") return "reduce"
+  if (node.id.includes("checkpoint") || node.output_schema === "summary") return "final"
   if (node.role === "reviewer" || node.role === "reviser" || node.task_kind === "verify") return "verify"
   if (node.task_kind === "research") return "research"
-  if (node.id.includes("checkpoint") || node.output_schema === "summary") return "final"
   return "expert"
 }
 
@@ -1033,6 +1103,7 @@ function effortPlanMetadata(input: {
   reviseNodes: CoordinatorNodeType[]
   budgetLimited: boolean
   budgetOptions?: BudgetOptions
+  workspaceSignals?: WorkspaceSignals
 }) {
   const expert_lanes = ExpertLane.array().parse(
     Object.values(
@@ -1070,6 +1141,7 @@ function effortPlanMetadata(input: {
     intent: input.intent,
     effort: input.effort,
     nodeCount: input.nodes.length,
+    workspaceSignals: input.workspaceSignals,
   })
   const todo_timeline = todoTimelineFor({
     required: long_task.timeline_required,
@@ -1158,12 +1230,14 @@ function finalizeEffortPlan(input: {
   reviseNodes: CoordinatorNodeType[]
   budgetLimited: boolean
   budgetOptions?: BudgetOptions
+  workspaceSignals?: WorkspaceSignals
 }) {
   const longTask = longTaskProfileFor({
     goal: input.plan.goal,
     intent: input.intent,
     effort: input.effort,
     nodeCount: input.nodes.length,
+    workspaceSignals: input.workspaceSignals,
   })
   const nodes = longTask.timeline_required
     ? [
@@ -1196,6 +1270,7 @@ function finalizeEffortPlan(input: {
       reviseNodes: input.reviseNodes,
       budgetLimited: input.budgetLimited,
       budgetOptions: input.budgetOptions,
+      workspaceSignals: input.workspaceSignals,
     }),
   })
 }
@@ -1208,6 +1283,7 @@ function applyEffortGovernance(
 ) {
   const profile = effortProfileFor(effort)
   const workflow = intent.workflow
+  const workspaceSignals = workspaceSignalsForGoal(plan.goal)
   const baseNodes = (effort === "low" ? lowEffortNodes(plan.nodes) : plan.nodes).map((item) =>
     withExpertHarness(item, { workflow, effort, profile }),
   )
@@ -1289,6 +1365,7 @@ function applyEffortGovernance(
       reviseNodes,
       budgetLimited: budgetLimited.value,
       budgetOptions,
+      workspaceSignals,
     })
   }
 
@@ -1392,6 +1469,7 @@ function applyEffortGovernance(
       reviseNodes: rewrittenRevise,
       budgetLimited: budgetLimited.value,
       budgetOptions,
+      workspaceSignals,
     })
   }
 
@@ -1421,6 +1499,7 @@ function applyEffortGovernance(
     reviseNodes,
     budgetLimited: budgetLimited.value,
     budgetOptions,
+    workspaceSignals,
   })
 }
 
@@ -2041,6 +2120,7 @@ function todoStatusFromTasks(items: TaskRuntime.TaskRecord[]) {
   if (items.length === 0) return "pending" as const
   if (items.some((item) => item.status === "failed")) return "blocked" as const
   if (items.some((item) => item.status === "cancelled")) return "skipped" as const
+  if (items.some((item) => item.status === "partial")) return "partial" as const
   if (items.every((item) => item.status === "completed")) return "done" as const
   if (items.some((item) => item.status === "running")) return "active" as const
   if (items.some((item) => item.status === "completed")) return "partial" as const
@@ -2095,20 +2175,105 @@ function progressSnapshotFor(input: {
   })
 }
 
+function resourceUsageFor(run: CoordinatorRunType, taskList: TaskRuntime.TaskRecord[], extraStarts = 0) {
+  const started = taskList.filter((item) => item.status !== "pending")
+  return ResourceLimit.parse({
+    max_rounds: started.length + extraStarts,
+    max_model_calls: started.length + extraStarts,
+    max_tool_calls:
+      taskList.reduce((acc, item) => acc + (item.usage?.toolUses ?? (item.status === "completed" ? 1 : 0)), 0) +
+      extraStarts,
+    max_subagents: started.length + extraStarts,
+    max_wallclock_ms: Math.max(0, now() - run.time.created),
+    max_estimated_tokens: taskList.reduce((acc, item) => acc + (item.usage?.totalTokens ?? 0), 0),
+  })
+}
+
+function limitUsed(usage: ResourceLimitType, limit: ResourceLimitType) {
+  return Math.min(
+    1,
+    Math.max(
+      limit.max_rounds <= 0 ? (usage.max_rounds > 0 ? 1 : 0) : usage.max_rounds / limit.max_rounds,
+      limit.max_model_calls <= 0 ? (usage.max_model_calls > 0 ? 1 : 0) : usage.max_model_calls / limit.max_model_calls,
+      limit.max_tool_calls <= 0 ? (usage.max_tool_calls > 0 ? 1 : 0) : usage.max_tool_calls / limit.max_tool_calls,
+      limit.max_subagents <= 0 ? (usage.max_subagents > 0 ? 1 : 0) : usage.max_subagents / limit.max_subagents,
+      limit.max_wallclock_ms <= 0
+        ? usage.max_wallclock_ms > 0
+          ? 1
+          : 0
+        : usage.max_wallclock_ms / limit.max_wallclock_ms,
+      limit.max_estimated_tokens <= 0
+        ? usage.max_estimated_tokens > 0
+          ? 1
+          : 0
+        : usage.max_estimated_tokens / limit.max_estimated_tokens,
+    ),
+  )
+}
+
+function subtractResourceLimit(left: ResourceLimitType, right: ResourceLimitType) {
+  return ResourceLimit.parse({
+    max_rounds: left.max_rounds > right.max_rounds ? left.max_rounds - right.max_rounds : left.max_rounds,
+    max_model_calls:
+      left.max_model_calls > right.max_model_calls ? left.max_model_calls - right.max_model_calls : left.max_model_calls,
+    max_tool_calls:
+      left.max_tool_calls > right.max_tool_calls ? left.max_tool_calls - right.max_tool_calls : left.max_tool_calls,
+    max_subagents: left.max_subagents > right.max_subagents ? left.max_subagents - right.max_subagents : left.max_subagents,
+    max_wallclock_ms:
+      left.max_wallclock_ms > right.max_wallclock_ms
+        ? left.max_wallclock_ms - right.max_wallclock_ms
+        : left.max_wallclock_ms,
+    max_estimated_tokens:
+      left.max_estimated_tokens > right.max_estimated_tokens
+        ? left.max_estimated_tokens - right.max_estimated_tokens
+        : left.max_estimated_tokens,
+  })
+}
+
+function resourceLimitSlots(usage: ResourceLimitType, limit: ResourceLimitType) {
+  if (usage.max_wallclock_ms >= limit.max_wallclock_ms) return 0
+  if (usage.max_estimated_tokens >= limit.max_estimated_tokens) return 0
+  return Math.max(
+    0,
+    Math.min(
+      limit.max_rounds - usage.max_rounds,
+      limit.max_model_calls - usage.max_model_calls,
+      limit.max_tool_calls - usage.max_tool_calls,
+      limit.max_subagents - usage.max_subagents,
+    ),
+  )
+}
+
+function nodeIDForTask(task: TaskRuntime.TaskRecord) {
+  return typeof task.metadata?.coordinator_node_id === "string" ? task.metadata.coordinator_node_id : undefined
+}
+
+function todoForNode(plan: CoordinatorPlanType, nodeID: string | undefined) {
+  if (!nodeID) return
+  return plan.todo_timeline.todos.find((item) => item.node_ids.includes(nodeID))
+}
+
+function todoUsageFor(run: CoordinatorRunType, taskList: TaskRuntime.TaskRecord[], todoID: string | undefined) {
+  if (!todoID) return resourceUsageFor(run, taskList)
+  const nodeIDs = run.plan.todo_timeline.todos.find((item) => item.id === todoID)?.node_ids ?? []
+  return resourceUsageFor(
+    run,
+    taskList.filter((item) => {
+      const nodeID = nodeIDForTask(item)
+      return nodeID ? nodeIDs.includes(nodeID) : false
+    }),
+  )
+}
+
 function budgetStateFor(input: {
+  run: CoordinatorRunType
   plan: CoordinatorPlanType
   taskList: TaskRuntime.TaskRecord[]
   progressSnapshot: ProgressSnapshotType
 }) {
-  const modelCallProxy = Math.max(1, input.taskList.length)
-  const softBudgetUsed = Math.min(
-    1,
-    modelCallProxy / Math.max(1, input.plan.budget_profile.mission_ceiling.max_model_calls),
-  )
-  const absoluteUsed = Math.min(
-    1,
-    modelCallProxy / Math.max(1, input.plan.budget_profile.absolute_ceiling.max_model_calls),
-  )
+  const usage = resourceUsageFor(input.run, input.taskList)
+  const softBudgetUsed = limitUsed(usage, input.plan.budget_profile.mission_ceiling)
+  const absoluteUsed = limitUsed(usage, input.plan.budget_profile.absolute_ceiling)
   return BudgetState.parse({
     soft_budget_used: softBudgetUsed,
     absolute_ceiling_used: absoluteUsed,
@@ -2175,6 +2340,158 @@ function continuationRequestFor(input: {
   })
 }
 
+function messageText(message: MessageV2.WithParts) {
+  return message.parts
+    .filter((item) => item.type === "text")
+    .map((item) => item.text)
+    .join("\n")
+}
+
+function reviewVerdictFromText(text: string | undefined): CriticalReviewVerdictType | undefined {
+  if (!text) return
+  const objectMatch = text.match(/\{[\s\S]*\}/)
+  if (objectMatch) {
+    try {
+      const parsed = CriticalReviewVerdict.safeParse(JSON.parse(objectMatch[0]))
+      if (parsed.success) return parsed.data
+    } catch {
+      // Fall through to the line-oriented parser below.
+    }
+  }
+  const normalized = text.toLowerCase()
+  if (hasAny(normalized, ['"verdict":"pass"', "verdict: pass", "verdict pass", '"pass":true', "pass: true"])) {
+    return CriticalReviewVerdict.parse({
+      verdict: "pass",
+      confidence: hasAny(normalized, ["confidence: high", '"confidence":"high"']) ? "high" : "medium",
+    })
+  }
+  if (hasAny(normalized, ["ask_user", "ask user", "needs user", "user approval"])) {
+    return CriticalReviewVerdict.parse({ verdict: "ask_user", required_changes: ["User input required"] })
+  }
+  if (hasAny(normalized, ["stop", "do not proceed", "unsafe to proceed"])) {
+    return CriticalReviewVerdict.parse({ verdict: "stop", required_changes: ["Reviewer requested stop"] })
+  }
+  if (hasAny(normalized, ["retry", "rerun", "try again"])) {
+    return CriticalReviewVerdict.parse({ verdict: "retry", required_changes: ["Reviewer requested retry"] })
+  }
+  if (
+    hasAny(normalized, [
+      '"pass":false',
+      "pass: false",
+      "verdict: revise",
+      '"verdict":"revise"',
+      "unsupported claim",
+      "missing evidence",
+      "contradiction",
+      "required changes",
+    ])
+  ) {
+    return CriticalReviewVerdict.parse({ verdict: "revise", required_changes: ["Reviewer found unresolved issues"] })
+  }
+  return
+}
+
+function reviewFailureMessage(verdict: CriticalReviewVerdictType | undefined) {
+  if (!verdict || verdict.verdict === "pass") return
+  return [
+    `Critical review verdict: ${verdict.verdict}`,
+    verdict.unsupported_claims.length ? `unsupported claims: ${verdict.unsupported_claims.join("; ")}` : undefined,
+    verdict.missing_evidence.length ? `missing evidence: ${verdict.missing_evidence.join("; ")}` : undefined,
+    verdict.contradictions.length ? `contradictions: ${verdict.contradictions.join("; ")}` : undefined,
+    verdict.required_changes.length ? `required changes: ${verdict.required_changes.join("; ")}` : undefined,
+    verdict.confidence === "low" ? "review confidence is low" : undefined,
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join(". ")
+}
+
+function reviewVerdictForTask(task: TaskRuntime.TaskRecord) {
+  if (task.metadata?.output_schema !== "revise" && task.metadata?.role !== "reviser") return
+  return reviewVerdictFromText(
+    (typeof task.metadata?.review_text === "string" ? task.metadata.review_text : undefined) ??
+      task.result_summary ??
+      task.error_summary,
+  )
+}
+
+function taskByNodeFor(taskList: TaskRuntime.TaskRecord[]) {
+  return new Map(
+    taskList.flatMap((item) => {
+      const nodeID =
+        typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : undefined
+      return nodeID ? [[nodeID, item] as const] : []
+    }),
+  )
+}
+
+function gateStatusFor(taskByNode: Map<string, TaskRuntime.TaskRecord>, nodeID?: string) {
+  const task = nodeID ? taskByNode.get(nodeID) : undefined
+  if (!task) return "pending" as const
+  if (task.status === "completed")
+    return reviewFailureMessage(reviewVerdictForTask(task)) ? ("failed" as const) : ("passed" as const)
+  if (task.status === "partial") return "failed" as const
+  if (task.status === "failed") return "failed" as const
+  if (task.status === "cancelled") return "skipped" as const
+  return task.status
+}
+
+function runtimeStateFor(run: CoordinatorRunType, taskList: TaskRuntime.TaskRecord[]) {
+  const taskByNode = taskByNodeFor(taskList)
+  const revise_points = run.plan.revise_points.map((item) => ({
+    ...item,
+    status: gateStatusFor(taskByNode, item.node_id),
+  }))
+  const quality_gates = run.plan.quality_gates.map((item) => ({
+    ...item,
+    status: gateStatusFor(taskByNode, item.node_id),
+  }))
+  const todo_timeline = runtimeTodoTimeline(run.plan, taskByNode)
+  const progress_snapshot = progressSnapshotFor({
+    todoTimeline: todo_timeline,
+    taskList,
+    qualityGates: quality_gates,
+  })
+  const budget_state = budgetStateFor({ run, plan: run.plan, taskList, progressSnapshot: progress_snapshot })
+  const checkpoint_memory = checkpointMemoryFor({
+    run,
+    todoTimeline: todo_timeline,
+    progressSnapshot: progress_snapshot,
+  })
+  const continuation_request = continuationRequestFor({
+    plan: run.plan,
+    todoTimeline: todo_timeline,
+    budgetState: budget_state,
+    progressSnapshot: progress_snapshot,
+  })
+  return {
+    taskByNode,
+    revise_points,
+    quality_gates,
+    todo_timeline,
+    progress_snapshot,
+    budget_state,
+    checkpoint_memory,
+    continuation_request,
+  }
+}
+
+function planWithRuntimeState(
+  plan: CoordinatorPlanType,
+  runtime: Omit<ReturnType<typeof runtimeStateFor>, "taskByNode">,
+) {
+  return CoordinatorPlan.parse({
+    ...plan,
+    revise_points: runtime.revise_points,
+    quality_gates: runtime.quality_gates,
+    todo_timeline: runtime.todo_timeline,
+    budget_state: runtime.budget_state,
+    progress_snapshot: runtime.progress_snapshot,
+    checkpoint_memory: runtime.checkpoint_memory,
+    continuation_request: runtime.continuation_request,
+    budget_limited: plan.budget_limited,
+  })
+}
+
 export const Event = {
   Created: BusEvent.define("coordinator.created", CoordinatorRun),
   Updated: BusEvent.define("coordinator.updated", CoordinatorRun),
@@ -2213,6 +2530,11 @@ export interface Interface {
     taskID?: SessionID
     nodeID?: string
   }) => Effect.Effect<CoordinatorRunType, Error>
+  readonly continueRun: (input: {
+    id: CoordinatorRunIDType
+    budgetDelta?: Partial<ResourceLimitType>
+    autoContinue?: AutoContinuePolicyType
+  }) => Effect.Effect<CoordinatorRunType, Error>
   readonly get: (id: CoordinatorRunIDType) => Effect.Effect<Option.Option<CoordinatorRunType>, Error>
   readonly list: (sessionID: SessionID) => Effect.Effect<CoordinatorRunType[], Error>
   readonly dispatch: (id: CoordinatorRunIDType) => Effect.Effect<{ run: CoordinatorRunType; dispatched: number }, Error>
@@ -2220,12 +2542,12 @@ export interface Interface {
     {
       run: CoordinatorRunType
       tasks: TaskRuntime.TaskRecord[]
-      counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
+      counts: Record<"pending" | "running" | "completed" | "partial" | "failed" | "cancelled", number>
       groups: Array<{
         id: string
         node_ids: string[]
         task_ids: string[]
-        status: "pending" | "running" | "completed" | "failed" | "cancelled"
+        status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
         merge_status: "none" | "waiting" | "merged" | "conflict"
         blocked_by: string[]
         conflicts: string[]
@@ -2389,12 +2711,72 @@ export const layer = Layer.effect(
       return all.filter((item) => taskIDs.has(item.task_id))
     })
 
+    const persistRuntimeState = Effect.fn("Coordinator.persistRuntimeState")(function* (run: CoordinatorRunType) {
+      const taskList = yield* relevantTasks(run)
+      const runtime = runtimeStateFor(run, taskList)
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              plan: planWithRuntimeState(run.plan, runtime),
+              time_updated: now(),
+            })
+            .where(eq(CoordinatorRunTable.id, run.id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, run.id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      return updated
+    })
+
+    const blockRunForBudget = Effect.fn("Coordinator.blockRunForBudget")(function* (
+      run: CoordinatorRunType,
+      reason: "soft" | "absolute",
+    ) {
+      const taskList = yield* relevantTasks(run)
+      const runtime = runtimeStateFor(run, taskList)
+      const summary =
+        reason === "absolute"
+          ? "Coordinator budget absolute ceiling reached; continuation requires user approval"
+          : "Coordinator mission budget reached; checkpoint or continuation is required"
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              state: "blocked",
+              summary,
+              plan: planWithRuntimeState(run.plan, runtime),
+              time_updated: now(),
+              time_finished: null,
+            })
+            .where(eq(CoordinatorRunTable.id, run.id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, run.id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      return updated
+    })
+
     const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn(
       "Coordinator.executeTask",
     )(function* (record) {
       const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
       const continueGroup = () =>
-        record.group_id ? dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore) : Effect.void
+        record.group_id
+          ? Effect.gen(function* () {
+              const runOpt = yield* get(record.group_id as CoordinatorRunIDType)
+              if (Option.isSome(runOpt)) yield* persistRuntimeState(runOpt.value).pipe(Effect.ignore)
+              yield* dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore)
+            })
+          : Effect.void
       const started = yield* tasks.tryStartPending(record.task_id, record.parent_session_id)
       if (!started) return
       if (Option.isNone(prompt)) {
@@ -2425,6 +2807,19 @@ export const layer = Layer.effect(
         .pipe(
           Effect.tap((message: MessageV2.WithParts) =>
             Effect.gen(function* () {
+              const reviewFailure = reviewFailureMessage(
+                record.metadata?.output_schema === "revise" || record.metadata?.role === "reviser"
+                  ? reviewVerdictFromText(messageText(message))
+                  : undefined,
+              )
+              if (reviewFailure) {
+                yield* tasks.fail({
+                  taskID: record.task_id,
+                  parentSessionID: record.parent_session_id,
+                  error: reviewFailure,
+                })
+                return
+              }
               yield* tasks.complete({
                 taskID: record.task_id,
                 parentSessionID: record.parent_session_id,
@@ -2476,12 +2871,39 @@ export const layer = Layer.effect(
           concurrency: "unbounded",
         },
       )).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
+      const runtime = runtimeStateFor(run, allTasks)
+      const checkpointReady = ready.find((item) => item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis")
+      const ceilingHit = runtime.budget_state.ceiling_hit
+      const softBudgetHit = runtime.budget_state.soft_budget_used >= 1
+      const usage = resourceUsageFor(run, allTasks)
+      const normalAbsoluteLimit = subtractResourceLimit(
+        run.plan.budget_profile.absolute_ceiling,
+        run.plan.budget_profile.checkpoint_reserve,
+      )
+      const checkpointSlots = resourceLimitSlots(usage, run.plan.budget_profile.absolute_ceiling)
+      if (ceilingHit || checkpointSlots === 0) {
+        const blocked = yield* blockRunForBudget(run, "absolute")
+        return {
+          run: blocked,
+          dispatched: 0,
+        }
+      }
+      if (softBudgetHit && !checkpointReady) {
+        const blocked = yield* blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
+        return {
+          run: blocked,
+          dispatched: 0,
+        }
+      }
+      const readyCandidates = ceilingHit || softBudgetHit ? (checkpointReady ? [checkpointReady] : []) : ready
       const planOrder = new Map(run.plan.nodes.map((item, index) => [item.id, index]))
       const groupFor = (item: TaskRuntime.TaskRecord) =>
         typeof item.metadata?.parallel_group === "string" ? item.metadata.parallel_group : undefined
       const nodeFor = (item: TaskRuntime.TaskRecord) =>
         typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : ""
-      const orderedReady = ready.toSorted((a, b) => (planOrder.get(nodeFor(a)) ?? 0) - (planOrder.get(nodeFor(b)) ?? 0))
+      const orderedReady = readyCandidates.toSorted(
+        (a, b) => (planOrder.get(nodeFor(a)) ?? 0) - (planOrder.get(nodeFor(b)) ?? 0),
+      )
       const running = allTasks.filter((item) => item.status === "running")
       const runningGroups = new Set(
         running.flatMap((item) => {
@@ -2495,12 +2917,37 @@ export const layer = Layer.effect(
       const firstReady = orderedReady[0]
       const targetGroup = activeGroup ?? (firstReady ? groupFor(firstReady) : undefined)
       const slots = Math.max(0, run.plan.parallel_policy.max_parallel_agents - running.length)
-      const selected =
+      const budgetSlots =
+        softBudgetHit && checkpointReady
+          ? Math.min(1, checkpointSlots)
+          : Math.min(
+              resourceLimitSlots(usage, normalAbsoluteLimit),
+              resourceLimitSlots(usage, run.plan.budget_profile.mission_ceiling),
+              resourceLimitSlots(usage, run.plan.budget_profile.phase_ceiling),
+            )
+      if (budgetSlots === 0 && orderedReady.length > 0) {
+        const blocked = yield* blockRunForBudget(run, "absolute")
+        return {
+          run: blocked,
+          dispatched: 0,
+        }
+      }
+      const withinTodoBudget = (item: TaskRuntime.TaskRecord) => {
+        if (item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis") return true
+        const todo = todoForNode(run.plan, nodeFor(item))
+        const budget = todo ? run.plan.budget_profile.todo_budget[todo.id] : undefined
+        if (!todo || !budget) return true
+        return resourceLimitSlots(todoUsageFor(run, allTasks, todo.id), budget) > 0
+      }
+      const selected = (
         run.plan.parallel_policy.mode === "off"
           ? orderedReady.slice(0, Math.min(slots, 1))
           : targetGroup
             ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
             : orderedReady.slice(0, Math.min(slots, 1))
+      )
+        .filter(withinTodoBudget)
+        .slice(0, budgetSlots)
       yield* Effect.forEach(
         selected,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
@@ -2694,16 +3141,12 @@ export const layer = Layer.effect(
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
       const run = runOpt.value
       const taskList = yield* relevantTasks(run)
-      const taskByNode = new Map(
-        taskList.flatMap((item) => {
-          const nodeID =
-            typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : undefined
-          return nodeID ? [[nodeID, item] as const] : []
-        }),
-      )
+      const runtime = runtimeStateFor(run, taskList)
+      const taskByNode = runtime.taskByNode
       const statusFor = (items: TaskRuntime.TaskRecord[]) => {
         if (items.some((item) => item.status === "failed")) return "failed" as const
         if (items.some((item) => item.status === "cancelled")) return "cancelled" as const
+        if (items.some((item) => item.status === "partial")) return "partial" as const
         if (items.every((item) => item.status === "completed")) return "completed" as const
         if (items.some((item) => item.status === "running")) return "running" as const
         return "pending" as const
@@ -2749,40 +3192,6 @@ export const layer = Layer.effect(
             groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
         }
       })
-      const gateStatus = (nodeID?: string) => {
-        const task = nodeID ? taskByNode.get(nodeID) : undefined
-        if (!task) return "pending" as const
-        if (task.status === "completed") return "passed" as const
-        if (task.status === "failed") return "failed" as const
-        if (task.status === "cancelled") return "skipped" as const
-        return task.status
-      }
-      const revise_points = run.plan.revise_points.map((item) => ({
-        ...item,
-        status: gateStatus(item.node_id),
-      }))
-      const quality_gates = run.plan.quality_gates.map((item) => ({
-        ...item,
-        status: gateStatus(item.node_id),
-      }))
-      const todo_timeline = runtimeTodoTimeline(run.plan, taskByNode)
-      const progress_snapshot = progressSnapshotFor({
-        todoTimeline: todo_timeline,
-        taskList,
-        qualityGates: quality_gates,
-      })
-      const budget_state = budgetStateFor({ plan: run.plan, taskList, progressSnapshot: progress_snapshot })
-      const checkpoint_memory = checkpointMemoryFor({
-        run,
-        todoTimeline: todo_timeline,
-        progressSnapshot: progress_snapshot,
-      })
-      const continuation_request = continuationRequestFor({
-        plan: run.plan,
-        todoTimeline: todo_timeline,
-        budgetState: budget_state,
-        progressSnapshot: progress_snapshot,
-      })
       return {
         run,
         tasks: taskList,
@@ -2790,23 +3199,24 @@ export const layer = Layer.effect(
           pending: taskList.filter((item) => item.status === "pending").length,
           running: taskList.filter((item) => item.status === "running").length,
           completed: taskList.filter((item) => item.status === "completed").length,
+          partial: taskList.filter((item) => item.status === "partial").length,
           failed: taskList.filter((item) => item.status === "failed").length,
           cancelled: taskList.filter((item) => item.status === "cancelled").length,
         },
         groups,
         expert_lanes: run.plan.expert_lanes,
-        quality_gates,
-        revise_points,
+        quality_gates: runtime.quality_gates,
+        revise_points: runtime.revise_points,
         memory_context: run.plan.memory_context,
         effort_profile: run.plan.effort_profile,
         long_task: run.plan.long_task,
-        todo_timeline,
+        todo_timeline: runtime.todo_timeline,
         budget_profile: run.plan.budget_profile,
-        budget_state,
-        progress_snapshot,
-        checkpoint_memory,
-        continuation_request,
-        budget_limited: run.plan.budget_limited,
+        budget_state: runtime.budget_state,
+        progress_snapshot: runtime.progress_snapshot,
+        checkpoint_memory: runtime.checkpoint_memory,
+        continuation_request: runtime.continuation_request,
+        budget_limited: runtime.budget_state.budget_limited,
         specialization_fallback: run.plan.specialization_fallback,
       }
     })
@@ -2821,11 +3231,13 @@ export const layer = Layer.effect(
       const all = yield* tasks.list(SessionID.make(info.sessionID))
       const relevant = all.filter((item: (typeof all)[number]) => taskIDs.includes(item.task_id))
       const completed = relevant.filter((item) => item.status === "completed").length
+      const partial = relevant.filter((item) => item.status === "partial").length
       const failed = relevant.filter((item) => item.status === "failed").length
       const running = relevant.filter((item) => item.status === "running").length
       const pending = relevant.filter((item) => item.status === "pending").length
       const cancelled = relevant.filter((item) => item.status === "cancelled").length
-      const summary = `${completed}/${relevant.length} completed, ${running} running, ${pending} pending, ${failed} failed, ${cancelled} cancelled`
+      const summary = `${completed}/${relevant.length} completed, ${partial} partial, ${running} running, ${pending} pending, ${failed} failed, ${cancelled} cancelled`
+      const runtime = runtimeStateFor(info, relevant)
       const state =
         failed > 0
           ? "failed"
@@ -2833,7 +3245,7 @@ export const layer = Layer.effect(
             ? "cancelled"
             : completed === relevant.length && relevant.length > 0
               ? "completed"
-              : running === 0 && pending > 0
+              : running === 0 && (pending > 0 || partial > 0)
                 ? "blocked"
                 : "active"
       const finished = state === "completed" || state === "failed" || state === "cancelled" ? now() : null
@@ -2844,6 +3256,7 @@ export const layer = Layer.effect(
             .set({
               state,
               summary,
+              plan: planWithRuntimeState(info.plan, runtime),
               time_updated: now(),
               time_finished: finished,
             })
@@ -2955,7 +3368,7 @@ export const layer = Layer.effect(
       }
       const taskList = yield* relevantTasks(runOpt.value)
       const retryable = taskList
-        .filter((item) => item.status === "failed" || item.status === "cancelled")
+        .filter((item) => item.status === "failed" || item.status === "cancelled" || item.status === "partial")
         .filter((item) => {
           if (input.taskID) return item.task_id === input.taskID
           if (input.nodeID) return item.metadata?.coordinator_node_id === input.nodeID
@@ -2998,6 +3411,70 @@ export const layer = Layer.effect(
       return refreshed.value
     })
 
+    const continueRun: Interface["continueRun"] = Effect.fn("Coordinator.continueRun")(function* (input) {
+      yield* ensureSubscribed()
+      const runOpt = yield* get(input.id)
+      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${input.id}`)
+      if (runOpt.value.state !== "blocked" && runOpt.value.state !== "active") {
+        return yield* Effect.fail(new Error(`Coordinator run cannot continue from state: ${runOpt.value.state}`))
+      }
+      const taskList = yield* relevantTasks(runOpt.value)
+      const runtime = runtimeStateFor(runOpt.value, taskList)
+      const requested = input.budgetDelta ?? runtime.continuation_request?.requested_budget_delta
+      const delta = requested ?? scaleResourceLimit(runOpt.value.plan.budget_profile.single_checkpoint_ceiling, 0.5)
+      const fullDelta = ResourceLimit.parse({
+        max_rounds: delta.max_rounds ?? 0,
+        max_model_calls: delta.max_model_calls ?? 0,
+        max_tool_calls: delta.max_tool_calls ?? 0,
+        max_subagents: delta.max_subagents ?? 0,
+        max_wallclock_ms: delta.max_wallclock_ms ?? 0,
+        max_estimated_tokens: delta.max_estimated_tokens ?? 0,
+      })
+      const budget_profile = BudgetProfile.parse({
+        ...runOpt.value.plan.budget_profile,
+        auto_continue: input.autoContinue ?? runOpt.value.plan.budget_profile.auto_continue,
+        mission_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.mission_ceiling, delta),
+        absolute_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.absolute_ceiling, delta),
+        phase_ceiling: addResourceLimit(
+          runOpt.value.plan.budget_profile.phase_ceiling,
+          scaleResourceLimit(fullDelta, 0.5),
+        ),
+        checkpoint_reserve: addResourceLimit(
+          runOpt.value.plan.budget_profile.checkpoint_reserve,
+          scaleResourceLimit(fullDelta, 0.1),
+        ),
+      })
+      const plan = CoordinatorPlan.parse({
+        ...planWithRuntimeState(runOpt.value.plan, runtime),
+        budget_profile,
+        budget_state: BudgetState.parse({}),
+        continuation_request: undefined,
+      })
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              state: "active",
+              summary: "Coordinator run continued with approved budget",
+              plan,
+              time_updated: now(),
+              time_finished: null,
+            })
+            .where(eq(CoordinatorRunTable.id, input.id))
+            .run(),
+        ),
+      )
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, input.id)).get()),
+      ).pipe(Effect.map((row) => runFromRow(row!)))
+      yield* publish(Event.Updated, updated)
+      yield* dispatchReady(input.id).pipe(Effect.ignore)
+      const refreshed = yield* get(input.id)
+      if (Option.isNone(refreshed)) throw new Error(`Coordinator run not found: ${input.id}`)
+      return refreshed.value
+    })
+
     const resume: Interface["resume"] = Effect.fn("Coordinator.resume")(function* (id) {
       yield* ensureSubscribed()
       const current = yield* get(id)
@@ -3020,6 +3497,7 @@ export const layer = Layer.effect(
       approve,
       cancel,
       retry,
+      continueRun,
       get,
       list,
       dispatch: dispatchReady,

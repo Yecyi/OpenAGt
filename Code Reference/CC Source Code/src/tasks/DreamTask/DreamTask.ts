@@ -3,10 +3,10 @@
 // Shift+Down dialog. The dream agent itself is unchanged — this is pure UI
 // surfacing via the existing task registry.
 
-import { rollbackConsolidationLock } from '../../services/autoDream/consolidationLock.js'
-import type { SetAppState, Task, TaskStateBase } from '../../Task.js'
-import { createTaskStateBase, generateTaskId } from '../../Task.js'
-import { registerTask, updateTaskState } from '../../utils/task/framework.js'
+import { rollbackConsolidationLock } from "../../services/autoDream/consolidationLock.js"
+import type { SetAppState, Task, TaskStateBase } from "../../Task.js"
+import { createTaskStateBase, generateTaskId } from "../../Task.js"
+import { registerTask, updateTaskState } from "../../utils/task/framework.js"
 
 // Keep only the N most recent turns for live display.
 const MAX_TURNS = 30
@@ -20,10 +20,10 @@ export type DreamTurn = {
 // No phase detection — the dream prompt has a 4-stage structure
 // (orient/gather/consolidate/prune) but we don't parse it. Just flip from
 // 'starting' to 'updating' when the first Edit/Write tool_use lands.
-export type DreamPhase = 'starting' | 'updating'
+export type DreamPhase = "starting" | "updating"
 
 export type DreamTaskState = TaskStateBase & {
-  type: 'dream'
+  type: "dream"
   phase: DreamPhase
   sessionsReviewing: number
   /**
@@ -41,12 +41,7 @@ export type DreamTaskState = TaskStateBase & {
 }
 
 export function isDreamTask(task: unknown): task is DreamTaskState {
-  return (
-    typeof task === 'object' &&
-    task !== null &&
-    'type' in task &&
-    task.type === 'dream'
-  )
+  return typeof task === "object" && task !== null && "type" in task && task.type === "dream"
 }
 
 export function registerDreamTask(
@@ -57,12 +52,12 @@ export function registerDreamTask(
     abortController: AbortController
   },
 ): string {
-  const id = generateTaskId('dream')
+  const id = generateTaskId("dream")
   const task: DreamTaskState = {
-    ...createTaskStateBase(id, 'dream', 'dreaming'),
-    type: 'dream',
-    status: 'running',
-    phase: 'starting',
+    ...createTaskStateBase(id, "dream", "dreaming"),
+    type: "dream",
+    status: "running",
+    phase: "starting",
     sessionsReviewing: opts.sessionsReviewing,
     filesTouched: [],
     turns: [],
@@ -73,46 +68,31 @@ export function registerDreamTask(
   return id
 }
 
-export function addDreamTurn(
-  taskId: string,
-  turn: DreamTurn,
-  touchedPaths: string[],
-  setAppState: SetAppState,
-): void {
-  updateTaskState<DreamTaskState>(taskId, setAppState, task => {
+export function addDreamTurn(taskId: string, turn: DreamTurn, touchedPaths: string[], setAppState: SetAppState): void {
+  updateTaskState<DreamTaskState>(taskId, setAppState, (task) => {
     const seen = new Set(task.filesTouched)
-    const newTouched = touchedPaths.filter(p => !seen.has(p) && seen.add(p))
+    const newTouched = touchedPaths.filter((p) => !seen.has(p) && seen.add(p))
     // Skip the update entirely if the turn is empty AND nothing new was
     // touched. Avoids re-rendering on pure no-ops.
-    if (
-      turn.text === '' &&
-      turn.toolUseCount === 0 &&
-      newTouched.length === 0
-    ) {
+    if (turn.text === "" && turn.toolUseCount === 0 && newTouched.length === 0) {
       return task
     }
     return {
       ...task,
-      phase: newTouched.length > 0 ? 'updating' : task.phase,
-      filesTouched:
-        newTouched.length > 0
-          ? [...task.filesTouched, ...newTouched]
-          : task.filesTouched,
+      phase: newTouched.length > 0 ? "updating" : task.phase,
+      filesTouched: newTouched.length > 0 ? [...task.filesTouched, ...newTouched] : task.filesTouched,
       turns: task.turns.slice(-(MAX_TURNS - 1)).concat(turn),
     }
   })
 }
 
-export function completeDreamTask(
-  taskId: string,
-  setAppState: SetAppState,
-): void {
+export function completeDreamTask(taskId: string, setAppState: SetAppState): void {
   // notified: true immediately — dream has no model-facing notification path
   // (it's UI-only), and eviction requires terminal + notified. The inline
   // appendSystemMessage completion note IS the user surface.
-  updateTaskState<DreamTaskState>(taskId, setAppState, task => ({
+  updateTaskState<DreamTaskState>(taskId, setAppState, (task) => ({
     ...task,
-    status: 'completed',
+    status: "completed",
     endTime: Date.now(),
     notified: true,
     abortController: undefined,
@@ -120,9 +100,9 @@ export function completeDreamTask(
 }
 
 export function failDreamTask(taskId: string, setAppState: SetAppState): void {
-  updateTaskState<DreamTaskState>(taskId, setAppState, task => ({
+  updateTaskState<DreamTaskState>(taskId, setAppState, (task) => ({
     ...task,
-    status: 'failed',
+    status: "failed",
     endTime: Date.now(),
     notified: true,
     abortController: undefined,
@@ -130,18 +110,18 @@ export function failDreamTask(taskId: string, setAppState: SetAppState): void {
 }
 
 export const DreamTask: Task = {
-  name: 'DreamTask',
-  type: 'dream',
+  name: "DreamTask",
+  type: "dream",
 
   async kill(taskId, setAppState) {
     let priorMtime: number | undefined
-    updateTaskState<DreamTaskState>(taskId, setAppState, task => {
-      if (task.status !== 'running') return task
+    updateTaskState<DreamTaskState>(taskId, setAppState, (task) => {
+      if (task.status !== "running") return task
       task.abortController?.abort()
       priorMtime = task.priorMtime
       return {
         ...task,
-        status: 'killed',
+        status: "killed",
         endTime: Date.now(),
         notified: true,
         abortController: undefined,

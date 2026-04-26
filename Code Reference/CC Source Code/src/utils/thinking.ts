@@ -1,26 +1,23 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import type { Theme } from './theme.js'
-import { feature } from 'bun:bundle'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
-import { getCanonicalName } from './model/model.js'
-import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider } from './model/providers.js'
-import { getSettingsWithErrors } from './settings/settings.js'
+import type { Theme } from "./theme.js"
+import { feature } from "bun:bundle"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../services/analytics/growthbook.js"
+import { getCanonicalName } from "./model/model.js"
+import { get3PModelCapabilityOverride } from "./model/modelSupportOverrides.js"
+import { getAPIProvider } from "./model/providers.js"
+import { getSettingsWithErrors } from "./settings/settings.js"
 
-export type ThinkingConfig =
-  | { type: 'adaptive' }
-  | { type: 'enabled'; budgetTokens: number }
-  | { type: 'disabled' }
+export type ThinkingConfig = { type: "adaptive" } | { type: "enabled"; budgetTokens: number } | { type: "disabled" }
 
 /**
  * Build-time gate (feature) + runtime gate (GrowthBook). The build flag
  * controls code inclusion in external builds; the GB flag controls rollout.
  */
 export function isUltrathinkEnabled(): boolean {
-  if (!feature('ULTRATHINK')) {
+  if (!feature("ULTRATHINK")) {
     return false
   }
-  return getFeatureValue_CACHED_MAY_BE_STALE('tengu_turtle_carbon', true)
+  return getFeatureValue_CACHED_MAY_BE_STALE("tengu_turtle_carbon", true)
 }
 
 /**
@@ -58,29 +55,26 @@ export function findThinkingTriggerPositions(text: string): Array<{
 }
 
 const RAINBOW_COLORS: Array<keyof Theme> = [
-  'rainbow_red',
-  'rainbow_orange',
-  'rainbow_yellow',
-  'rainbow_green',
-  'rainbow_blue',
-  'rainbow_indigo',
-  'rainbow_violet',
+  "rainbow_red",
+  "rainbow_orange",
+  "rainbow_yellow",
+  "rainbow_green",
+  "rainbow_blue",
+  "rainbow_indigo",
+  "rainbow_violet",
 ]
 
 const RAINBOW_SHIMMER_COLORS: Array<keyof Theme> = [
-  'rainbow_red_shimmer',
-  'rainbow_orange_shimmer',
-  'rainbow_yellow_shimmer',
-  'rainbow_green_shimmer',
-  'rainbow_blue_shimmer',
-  'rainbow_indigo_shimmer',
-  'rainbow_violet_shimmer',
+  "rainbow_red_shimmer",
+  "rainbow_orange_shimmer",
+  "rainbow_yellow_shimmer",
+  "rainbow_green_shimmer",
+  "rainbow_blue_shimmer",
+  "rainbow_indigo_shimmer",
+  "rainbow_violet_shimmer",
 ]
 
-export function getRainbowColor(
-  charIndex: number,
-  shimmer: boolean = false,
-): keyof Theme {
+export function getRainbowColor(charIndex: number, shimmer: boolean = false): keyof Theme {
   const colors = shimmer ? RAINBOW_SHIMMER_COLORS : RAINBOW_COLORS
   return colors[charIndex % colors.length]!
 }
@@ -88,11 +82,11 @@ export function getRainbowColor(
 // TODO(inigo): add support for probing unknown models via API error detection
 // Provider-aware thinking support detection (aligns with modelSupportsISP in betas.ts)
 export function modelSupportsThinking(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'thinking')
+  const supported3P = get3PModelCapabilityOverride(model, "thinking")
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     if (resolveAntModel(model.toLowerCase())) {
       return true
     }
@@ -102,30 +96,26 @@ export function modelSupportsThinking(model: string): boolean {
   const canonical = getCanonicalName(model)
   const provider = getAPIProvider()
   // 1P and Foundry: all Claude 4+ models (including Haiku 4.5)
-  if (provider === 'foundry' || provider === 'firstParty') {
-    return !canonical.includes('claude-3-')
+  if (provider === "foundry" || provider === "firstParty") {
+    return !canonical.includes("claude-3-")
   }
   // 3P (Bedrock/Vertex): only Opus 4+ and Sonnet 4+
-  return canonical.includes('sonnet-4') || canonical.includes('opus-4')
+  return canonical.includes("sonnet-4") || canonical.includes("opus-4")
 }
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports adaptive thinking.
 export function modelSupportsAdaptiveThinking(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'adaptive_thinking')
+  const supported3P = get3PModelCapabilityOverride(model, "adaptive_thinking")
   if (supported3P !== undefined) {
     return supported3P
   }
   const canonical = getCanonicalName(model)
   // Supported by a subset of Claude 4 models
-  if (canonical.includes('opus-4-6') || canonical.includes('sonnet-4-6')) {
+  if (canonical.includes("opus-4-6") || canonical.includes("sonnet-4-6")) {
     return true
   }
   // Exclude any other known legacy models (allowlist above catches 4-6 variants first)
-  if (
-    canonical.includes('opus') ||
-    canonical.includes('sonnet') ||
-    canonical.includes('haiku')
-  ) {
+  if (canonical.includes("opus") || canonical.includes("sonnet") || canonical.includes("haiku")) {
     return false
   }
   // IMPORTANT: Do not change adaptive thinking support without notifying the
@@ -140,7 +130,7 @@ export function modelSupportsAdaptiveThinking(model: string): boolean {
   // is a proxy). Do not default to true for other 3P as they have different formats
   // for their model strings.
   const provider = getAPIProvider()
-  return provider === 'firstParty' || provider === 'foundry'
+  return provider === "firstParty" || provider === "foundry"
 }
 
 export function shouldEnableThinkingByDefault(): boolean {

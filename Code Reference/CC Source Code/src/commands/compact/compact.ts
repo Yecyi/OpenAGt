@@ -1,10 +1,10 @@
-import { feature } from 'bun:bundle'
-import chalk from 'chalk'
-import { markPostCompaction } from 'src/bootstrap/state.js'
-import { getSystemPrompt } from '../../constants/prompts.js'
-import { getSystemContext, getUserContext } from '../../context.js'
-import { getShortcutDisplay } from '../../keybindings/shortcutFormat.js'
-import { notifyCompaction } from '../../services/api/promptCacheBreakDetection.js'
+import { feature } from "bun:bundle"
+import chalk from "chalk"
+import { markPostCompaction } from "src/bootstrap/state.js"
+import { getSystemPrompt } from "../../constants/prompts.js"
+import { getSystemContext, getUserContext } from "../../context.js"
+import { getShortcutDisplay } from "../../keybindings/shortcutFormat.js"
+import { notifyCompaction } from "../../services/api/promptCacheBreakDetection.js"
 import {
   type CompactionResult,
   compactConversation,
@@ -12,28 +12,25 @@ import {
   ERROR_MESSAGE_NOT_ENOUGH_MESSAGES,
   ERROR_MESSAGE_USER_ABORT,
   mergeHookInstructions,
-} from '../../services/compact/compact.js'
-import { suppressCompactWarning } from '../../services/compact/compactWarningState.js'
-import { microcompactMessages } from '../../services/compact/microCompact.js'
-import { runPostCompactCleanup } from '../../services/compact/postCompactCleanup.js'
-import { trySessionMemoryCompaction } from '../../services/compact/sessionMemoryCompact.js'
-import { setLastSummarizedMessageId } from '../../services/SessionMemory/sessionMemoryUtils.js'
-import type { ToolUseContext } from '../../Tool.js'
-import type { LocalCommandCall } from '../../types/command.js'
-import type { Message } from '../../types/message.js'
-import { hasExactErrorMessage } from '../../utils/errors.js'
-import { executePreCompactHooks } from '../../utils/hooks.js'
-import { logError } from '../../utils/log.js'
-import { getMessagesAfterCompactBoundary } from '../../utils/messages.js'
-import { getUpgradeMessage } from '../../utils/model/contextWindowUpgradeCheck.js'
-import {
-  buildEffectiveSystemPrompt,
-  type SystemPrompt,
-} from '../../utils/systemPrompt.js'
+} from "../../services/compact/compact.js"
+import { suppressCompactWarning } from "../../services/compact/compactWarningState.js"
+import { microcompactMessages } from "../../services/compact/microCompact.js"
+import { runPostCompactCleanup } from "../../services/compact/postCompactCleanup.js"
+import { trySessionMemoryCompaction } from "../../services/compact/sessionMemoryCompact.js"
+import { setLastSummarizedMessageId } from "../../services/SessionMemory/sessionMemoryUtils.js"
+import type { ToolUseContext } from "../../Tool.js"
+import type { LocalCommandCall } from "../../types/command.js"
+import type { Message } from "../../types/message.js"
+import { hasExactErrorMessage } from "../../utils/errors.js"
+import { executePreCompactHooks } from "../../utils/hooks.js"
+import { logError } from "../../utils/log.js"
+import { getMessagesAfterCompactBoundary } from "../../utils/messages.js"
+import { getUpgradeMessage } from "../../utils/model/contextWindowUpgradeCheck.js"
+import { buildEffectiveSystemPrompt, type SystemPrompt } from "../../utils/systemPrompt.js"
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const reactiveCompact = feature('REACTIVE_COMPACT')
-  ? (require('../../services/compact/reactiveCompact.js') as typeof import('../../services/compact/reactiveCompact.js'))
+const reactiveCompact = feature("REACTIVE_COMPACT")
+  ? (require("../../services/compact/reactiveCompact.js") as typeof import("../../services/compact/reactiveCompact.js"))
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -46,7 +43,7 @@ export const call: LocalCommandCall = async (args, context) => {
   messages = getMessagesAfterCompactBoundary(messages)
 
   if (messages.length === 0) {
-    throw new Error('No messages to compact')
+    throw new Error("No messages to compact")
   }
 
   const customInstructions = args.trim()
@@ -55,27 +52,21 @@ export const call: LocalCommandCall = async (args, context) => {
     // Try session memory compaction first if no custom instructions
     // (session memory compaction doesn't support custom instructions)
     if (!customInstructions) {
-      const sessionMemoryResult = await trySessionMemoryCompaction(
-        messages,
-        context.agentId,
-      )
+      const sessionMemoryResult = await trySessionMemoryCompaction(messages, context.agentId)
       if (sessionMemoryResult) {
         getUserContext.cache.clear?.()
         runPostCompactCleanup()
         // Reset cache read baseline so the post-compact drop isn't flagged
         // as a break. compactConversation does this internally; SM-compact doesn't.
-        if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
-          notifyCompaction(
-            context.options.querySource ?? 'compact',
-            context.agentId,
-          )
+        if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
+          notifyCompaction(context.options.querySource ?? "compact", context.agentId)
         }
         markPostCompaction()
         // Suppress warning immediately after successful compaction
         suppressCompactWarning()
 
         return {
-          type: 'compact',
+          type: "compact",
           compactionResult: sessionMemoryResult,
           displayText: buildDisplayText(context),
         }
@@ -85,12 +76,7 @@ export const call: LocalCommandCall = async (args, context) => {
     // Reactive-only mode: route /compact through the reactive path.
     // Checked after session-memory (that path is cheap and orthogonal).
     if (reactiveCompact?.isReactiveOnlyMode()) {
-      return await compactViaReactive(
-        messages,
-        context,
-        customInstructions,
-        reactiveCompact,
-      )
+      return await compactViaReactive(messages, context, customInstructions, reactiveCompact)
     }
 
     // Fall back to traditional compaction
@@ -118,13 +104,13 @@ export const call: LocalCommandCall = async (args, context) => {
     runPostCompactCleanup()
 
     return {
-      type: 'compact',
+      type: "compact",
       compactionResult: result,
       displayText: buildDisplayText(context, result.userDisplayMessage),
     }
   } catch (error) {
     if (abortController.signal.aborted) {
-      throw new Error('Compaction canceled.')
+      throw new Error("Compaction canceled.")
     } else if (hasExactErrorMessage(error, ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)) {
       throw new Error(ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)
     } else if (hasExactErrorMessage(error, ERROR_MESSAGE_INCOMPLETE_RESPONSE)) {
@@ -142,15 +128,15 @@ async function compactViaReactive(
   customInstructions: string,
   reactive: NonNullable<typeof reactiveCompact>,
 ): Promise<{
-  type: 'compact'
+  type: "compact"
   compactionResult: CompactionResult
   displayText: string
 }> {
   context.onCompactProgress?.({
-    type: 'hooks_start',
-    hookType: 'pre_compact',
+    type: "hooks_start",
+    hookType: "pre_compact",
   })
-  context.setSDKStatus?.('compacting')
+  context.setSDKStatus?.("compacting")
 
   try {
     // Hooks and cache-param build are independent — run concurrently.
@@ -158,38 +144,34 @@ async function compactViaReactive(
     // pre-compact hooks spawn subprocesses. Neither depends on the other.
     const [hookResult, cacheSafeParams] = await Promise.all([
       executePreCompactHooks(
-        { trigger: 'manual', customInstructions: customInstructions || null },
+        { trigger: "manual", customInstructions: customInstructions || null },
         context.abortController.signal,
       ),
       getCacheSharingParams(context, messages),
     ])
-    const mergedInstructions = mergeHookInstructions(
-      customInstructions,
-      hookResult.newCustomInstructions,
-    )
+    const mergedInstructions = mergeHookInstructions(customInstructions, hookResult.newCustomInstructions)
 
-    context.setStreamMode?.('requesting')
+    context.setStreamMode?.("requesting")
     context.setResponseLength?.(() => 0)
-    context.onCompactProgress?.({ type: 'compact_start' })
+    context.onCompactProgress?.({ type: "compact_start" })
 
-    const outcome = await reactive.reactiveCompactOnPromptTooLong(
-      messages,
-      cacheSafeParams,
-      { customInstructions: mergedInstructions, trigger: 'manual' },
-    )
+    const outcome = await reactive.reactiveCompactOnPromptTooLong(messages, cacheSafeParams, {
+      customInstructions: mergedInstructions,
+      trigger: "manual",
+    })
 
     if (!outcome.ok) {
       // The outer catch in `call` translates these: aborted → "Compaction
       // canceled." (via abortController.signal.aborted check), NOT_ENOUGH →
       // re-thrown as-is, everything else → "Error during compaction: …".
       switch (outcome.reason) {
-        case 'too_few_groups':
+        case "too_few_groups":
           throw new Error(ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)
-        case 'aborted':
+        case "aborted":
           throw new Error(ERROR_MESSAGE_USER_ABORT)
-        case 'exhausted':
-        case 'error':
-        case 'media_unstrippable':
+        case "exhausted":
+        case "error":
+        case "media_unstrippable":
           throw new Error(ERROR_MESSAGE_INCOMPLETE_RESPONSE)
       }
     }
@@ -207,12 +189,10 @@ async function compactViaReactive(
     // they can merge its userDisplayMessage with PostCompact's here. This
     // caller additionally runs it concurrently with getCacheSharingParams.
     const combinedMessage =
-      [hookResult.userDisplayMessage, outcome.result.userDisplayMessage]
-        .filter(Boolean)
-        .join('\n') || undefined
+      [hookResult.userDisplayMessage, outcome.result.userDisplayMessage].filter(Boolean).join("\n") || undefined
 
     return {
-      type: 'compact',
+      type: "compact",
       compactionResult: {
         ...outcome.result,
         userDisplayMessage: combinedMessage,
@@ -220,31 +200,22 @@ async function compactViaReactive(
       displayText: buildDisplayText(context, combinedMessage),
     }
   } finally {
-    context.setStreamMode?.('requesting')
+    context.setStreamMode?.("requesting")
     context.setResponseLength?.(() => 0)
-    context.onCompactProgress?.({ type: 'compact_end' })
+    context.onCompactProgress?.({ type: "compact_end" })
     context.setSDKStatus?.(null)
   }
 }
 
-function buildDisplayText(
-  context: ToolUseContext,
-  userDisplayMessage?: string,
-): string {
-  const upgradeMessage = getUpgradeMessage('tip')
-  const expandShortcut = getShortcutDisplay(
-    'app:toggleTranscript',
-    'Global',
-    'ctrl+o',
-  )
+function buildDisplayText(context: ToolUseContext, userDisplayMessage?: string): string {
+  const upgradeMessage = getUpgradeMessage("tip")
+  const expandShortcut = getShortcutDisplay("app:toggleTranscript", "Global", "ctrl+o")
   const dimmed = [
-    ...(context.options.verbose
-      ? []
-      : [`(${expandShortcut} to see full summary)`]),
+    ...(context.options.verbose ? [] : [`(${expandShortcut} to see full summary)`]),
     ...(userDisplayMessage ? [userDisplayMessage] : []),
     ...(upgradeMessage ? [upgradeMessage] : []),
   ]
-  return chalk.dim('Compacted ' + dimmed.join('\n'))
+  return chalk.dim("Compacted " + dimmed.join("\n"))
 }
 
 async function getCacheSharingParams(
@@ -261,9 +232,7 @@ async function getCacheSharingParams(
   const defaultSysPrompt = await getSystemPrompt(
     context.options.tools,
     context.options.mainLoopModel,
-    Array.from(
-      appState.toolPermissionContext.additionalWorkingDirectories.keys(),
-    ),
+    Array.from(appState.toolPermissionContext.additionalWorkingDirectories.keys()),
     context.options.mcpClients,
   )
   const systemPrompt = buildEffectiveSystemPrompt({
@@ -273,10 +242,7 @@ async function getCacheSharingParams(
     defaultSystemPrompt: defaultSysPrompt,
     appendSystemPrompt: context.options.appendSystemPrompt,
   })
-  const [userContext, systemContext] = await Promise.all([
-    getUserContext(),
-    getSystemContext(),
-  ])
+  const [userContext, systemContext] = await Promise.all([getUserContext(), getSystemContext()])
   return {
     systemPrompt,
     userContext,

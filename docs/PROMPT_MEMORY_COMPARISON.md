@@ -6,12 +6,12 @@
 
 ## 1. 总览对照
 
-| 维度 | OpenAGt（`packages/opencode`） | CC Source Code | Codex（`codex-rs/core`） |
-|------|------------------------------|----------------|-------------------------|
-| **系统 prompt 来源** | 多份按厂商区分的 `.txt`（`session/system.ts` 选择）+ 动态 `environment`/`skills` 段 + `session/prompt.ts` 内循环逻辑（plan、结构化输出、子任务等） | `constants/prompts.ts` 巨型组装；`systemPromptSections.js` 分段；**显式静态/动态边界** `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` 服务 prompt caching | `instructions/`、`client_common::Prompt`、`session`/`turn_context` 等组合；压缩用独立模板文件 |
-| **Memory 形态** | 无与 CC `SessionMemory` 同级的「会话笔记文件 + 后台 fork 子代理周期性更新」；侧重 compaction 摘要与会话内状态 | **Session memory**：磁盘 markdown + fork 子代理按 token/工具调用阈值更新；**memdir**：`MEMORY.md` 等入口、截断与注入 `loadMemoryPrompt` | **`memories` 模块**：启动两阶段（phase1 抽取 raw + rollout summary → phase2 全局 consolidation）；模板 `templates/memories/stage_one_system.md`；强调 no-op、红队式卫生规则 |
-| **Compact 策略** | **三层**：micro（时间阈值+工具白名单，无 LLM）→ auto（接近窗口的规则裁剪）→ full（LLM 摘要，`compaction/full.ts` 模板含 Goal/Instructions/…） | **微压 + 全量**：`services/compact/prompt.ts` 极长指令（`<analysis>` 草稿 + 九段式 summary）；NO_TOOLS 前置防 Sonnet 误调工具；可选 cached microcompact 等特性开关 | **`compact.rs` + `templates/compact/prompt.md`**：短指令「checkpoint handoff」；支持 **remote compaction**；`InitialContextInjection` 区分 mid-turn / pre-turn 与初始上下文再注入策略 |
-| **与 API 缓存关系** | 需在实现层自行考虑（未见与 CC 同级的 boundary 常量） | 边界常量与 `api.ts` / `claude.ts` 构建块注释联动 | 由协议层 `ContextCompactionItem`、turn 历史替换与遥测事件驱动 |
+| 维度                 | OpenAGt（`packages/opencode`）                                                                                                                     | CC Source Code                                                                                                                                                     | Codex（`codex-rs/core`）                                                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **系统 prompt 来源** | 多份按厂商区分的 `.txt`（`session/system.ts` 选择）+ 动态 `environment`/`skills` 段 + `session/prompt.ts` 内循环逻辑（plan、结构化输出、子任务等） | `constants/prompts.ts` 巨型组装；`systemPromptSections.js` 分段；**显式静态/动态边界** `SYSTEM_PROMPT_DYNAMIC_BOUNDARY` 服务 prompt caching                        | `instructions/`、`client_common::Prompt`、`session`/`turn_context` 等组合；压缩用独立模板文件                                                                                         |
+| **Memory 形态**      | 无与 CC `SessionMemory` 同级的「会话笔记文件 + 后台 fork 子代理周期性更新」；侧重 compaction 摘要与会话内状态                                      | **Session memory**：磁盘 markdown + fork 子代理按 token/工具调用阈值更新；**memdir**：`MEMORY.md` 等入口、截断与注入 `loadMemoryPrompt`                            | **`memories` 模块**：启动两阶段（phase1 抽取 raw + rollout summary → phase2 全局 consolidation）；模板 `templates/memories/stage_one_system.md`；强调 no-op、红队式卫生规则           |
+| **Compact 策略**     | **三层**：micro（时间阈值+工具白名单，无 LLM）→ auto（接近窗口的规则裁剪）→ full（LLM 摘要，`compaction/full.ts` 模板含 Goal/Instructions/…）      | **微压 + 全量**：`services/compact/prompt.ts` 极长指令（`<analysis>` 草稿 + 九段式 summary）；NO_TOOLS 前置防 Sonnet 误调工具；可选 cached microcompact 等特性开关 | **`compact.rs` + `templates/compact/prompt.md`**：短指令「checkpoint handoff」；支持 **remote compaction**；`InitialContextInjection` 区分 mid-turn / pre-turn 与初始上下文再注入策略 |
+| **与 API 缓存关系**  | 需在实现层自行考虑（未见与 CC 同级的 boundary 常量）                                                                                               | 边界常量与 `api.ts` / `claude.ts` 构建块注释联动                                                                                                                   | 由协议层 `ContextCompactionItem`、turn 历史替换与遥测事件驱动                                                                                                                         |
 
 ---
 
@@ -103,11 +103,11 @@
 
 ## 7. 建议的 OpenAGt 落地顺序（可选）
 
-1. 为 compaction **增加「无工具」强前置**与可选 `<analysis>` 剥离路径（对齐 CC 经验）。  
-2. 设计 **静态/动态 system 分段** 与 provider cache 文档化。  
-3. 原型 **会话级 markdown 笔记**（结构可简化自 CC 模板）+ 与 full compact 的合并策略。  
+1. 为 compaction **增加「无工具」强前置**与可选 `<analysis>` 剥离路径（对齐 CC 经验）。
+2. 设计 **静态/动态 system 分段** 与 provider cache 文档化。
+3. 原型 **会话级 markdown 笔记**（结构可简化自 CC 模板）+ 与 full compact 的合并策略。
 4. 中长期评估 **Codex 式跨 rollout consolidation** 是否适合开源/自托管部署形态。
 
 ---
 
-*文档生成自仓库源码路径：`packages/opencode`、`Code Reference/CC Source Code`、`Code Reference/codex/codex-rs/core`。*
+_文档生成自仓库源码路径：`packages/opencode`、`Code Reference/CC Source Code`、`Code Reference/codex/codex-rs/core`。_

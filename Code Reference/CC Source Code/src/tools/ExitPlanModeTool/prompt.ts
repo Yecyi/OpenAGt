@@ -1,7 +1,7 @@
 // External stub for ExitPlanModeTool prompt - excludes Ant-only allowedPrompts section
 
 // Hardcoded to avoid relative import issues in stub
-const ASK_USER_QUESTION_TOOL_NAME = 'AskUserQuestion'
+const ASK_USER_QUESTION_TOOL_NAME = "AskUserQuestion"
 
 export const EXIT_PLAN_MODE_V2_TOOL_PROMPT = `Use this tool when you are in plan mode and have finished writing your plan to the plan file and are ready for user approval.
 

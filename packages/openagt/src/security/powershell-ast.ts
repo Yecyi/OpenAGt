@@ -31,7 +31,12 @@ export interface AstNode {
 export interface CommandInfo {
   name: string
   position: { start: number; end: number }
-  arguments: Array<{ type: "parameter" | "value"; name?: string; value: string; position: { start: number; end: number } }>
+  arguments: Array<{
+    type: "parameter" | "value"
+    name?: string
+    value: string
+    position: { start: number; end: number }
+  }>
   isScriptBlock: boolean
   hasPipeline: boolean
   nested: CommandInfo[]
@@ -85,7 +90,14 @@ interface Token {
 }
 
 const COMMAND_BOUNDARY = new Set<TokenType>(["pipe", "semicolon"])
-const VALUE_TOKEN_TYPES = new Set<TokenType>(["word", "string_single", "string_double", "variable", "subexpression", "script_block"])
+const VALUE_TOKEN_TYPES = new Set<TokenType>([
+  "word",
+  "string_single",
+  "string_double",
+  "variable",
+  "subexpression",
+  "script_block",
+])
 
 export const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
   "invoke-expression": { severity: "high", reason: "Dynamic code execution" },
@@ -110,17 +122,48 @@ export const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "
   "add-type": { severity: "high", reason: "Dynamic type loading" },
 }
 
-const PATTERN_DANGERS: Array<{ pattern: RegExp; reason: string; severity: "high" | "medium"; nodeType: AstNodeType }> = [
-  { pattern: /-enc(?:odedCommand)?\s+\S+/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
-  { pattern: /FromBase64String/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
-  { pattern: /\[Ref\]\.Assembly\.GetType/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
-  { pattern: /AmsiUtils/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
-  { pattern: /rundll32(?:\.exe)?/i, reason: "rundll32 Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /regsvr32(?:\.exe)?/i, reason: "regsvr32 Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /mshta(?:\.exe)?/i, reason: "mshta Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /cscript(?:\.exe)?/i, reason: "cscript Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-  { pattern: /wscript(?:\.exe)?/i, reason: "wscript Living-off-the-land binary usage", severity: "high", nodeType: "expression" },
-]
+const PATTERN_DANGERS: Array<{ pattern: RegExp; reason: string; severity: "high" | "medium"; nodeType: AstNodeType }> =
+  [
+    {
+      pattern: /-enc(?:odedCommand)?\s+\S+/i,
+      reason: "Encoded command detected",
+      severity: "high",
+      nodeType: "expression",
+    },
+    { pattern: /FromBase64String/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
+    { pattern: /\[Ref\]\.Assembly\.GetType/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
+    { pattern: /AmsiUtils/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
+    {
+      pattern: /rundll32(?:\.exe)?/i,
+      reason: "rundll32 Living-off-the-land binary usage",
+      severity: "high",
+      nodeType: "expression",
+    },
+    {
+      pattern: /regsvr32(?:\.exe)?/i,
+      reason: "regsvr32 Living-off-the-land binary usage",
+      severity: "high",
+      nodeType: "expression",
+    },
+    {
+      pattern: /mshta(?:\.exe)?/i,
+      reason: "mshta Living-off-the-land binary usage",
+      severity: "high",
+      nodeType: "expression",
+    },
+    {
+      pattern: /cscript(?:\.exe)?/i,
+      reason: "cscript Living-off-the-land binary usage",
+      severity: "high",
+      nodeType: "expression",
+    },
+    {
+      pattern: /wscript(?:\.exe)?/i,
+      reason: "wscript Living-off-the-land binary usage",
+      severity: "high",
+      nodeType: "expression",
+    },
+  ]
 
 /**
  * PowerShell common aliases
@@ -395,7 +438,12 @@ function tokenize(input: string): Token[] {
 
     const start = pos
     while (pos < input.length && !/\s/.test(input[pos]) && !"|;".includes(input[pos])) {
-      if (input[pos] === "'" || input[pos] === '"' || (input[pos] === "$" && input[pos + 1] === "(") || input[pos] === "{") {
+      if (
+        input[pos] === "'" ||
+        input[pos] === '"' ||
+        (input[pos] === "$" && input[pos + 1] === "(") ||
+        input[pos] === "{"
+      ) {
         break
       }
       pos++

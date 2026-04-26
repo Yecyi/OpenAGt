@@ -1,4 +1,4 @@
-import type { AgentColorName } from '../../../tools/AgentTool/agentColorManager.js'
+import type { AgentColorName } from "../../../tools/AgentTool/agentColorManager.js"
 
 /**
  * Types of backends available for teammate execution.
@@ -6,13 +6,13 @@ import type { AgentColorName } from '../../../tools/AgentTool/agentColorManager.
  * - 'iterm2': Uses iTerm2 native split panes via the it2 CLI
  * - 'in-process': Runs teammate in the same Node.js process with isolated context
  */
-export type BackendType = 'tmux' | 'iterm2' | 'in-process'
+export type BackendType = "tmux" | "iterm2" | "in-process"
 
 /**
  * Subset of BackendType for pane-based backends only.
  * Used in messages and types that specifically deal with terminal panes.
  */
-export type PaneBackendType = 'tmux' | 'iterm2'
+export type PaneBackendType = "tmux" | "iterm2"
 
 /**
  * Opaque identifier for a pane managed by a backend.
@@ -68,10 +68,7 @@ export type PaneBackend = {
    * @param color - The color to use for the pane border/title
    * @returns The pane ID and whether this was the first teammate
    */
-  createTeammatePaneInSwarmView(
-    name: string,
-    color: AgentColorName,
-  ): Promise<CreatePaneResult>
+  createTeammatePaneInSwarmView(name: string, color: AgentColorName): Promise<CreatePaneResult>
 
   /**
    * Sends a command to execute in a specific pane.
@@ -80,11 +77,7 @@ export type PaneBackend = {
    * @param command - The command string to execute
    * @param useExternalSession - If true, uses external session socket (tmux-specific)
    */
-  sendCommandToPane(
-    paneId: PaneId,
-    command: string,
-    useExternalSession?: boolean,
-  ): Promise<void>
+  sendCommandToPane(paneId: PaneId, command: string, useExternalSession?: boolean): Promise<void>
 
   /**
    * Sets the border color for a pane.
@@ -93,11 +86,7 @@ export type PaneBackend = {
    * @param color - The color to apply to the border
    * @param useExternalSession - If true, uses external session socket (tmux-specific)
    */
-  setPaneBorderColor(
-    paneId: PaneId,
-    color: AgentColorName,
-    useExternalSession?: boolean,
-  ): Promise<void>
+  setPaneBorderColor(paneId: PaneId, color: AgentColorName, useExternalSession?: boolean): Promise<void>
 
   /**
    * Sets the title for a pane (displayed in pane border/header).
@@ -107,12 +96,7 @@ export type PaneBackend = {
    * @param color - The color for the title text
    * @param useExternalSession - If true, uses external session socket (tmux-specific)
    */
-  setPaneTitle(
-    paneId: PaneId,
-    name: string,
-    color: AgentColorName,
-    useExternalSession?: boolean,
-  ): Promise<void>
+  setPaneTitle(paneId: PaneId, name: string, color: AgentColorName, useExternalSession?: boolean): Promise<void>
 
   /**
    * Enables pane border status display (shows titles in borders).
@@ -120,10 +104,7 @@ export type PaneBackend = {
    * @param windowTarget - The window to enable status for (optional)
    * @param useExternalSession - If true, uses external session socket (tmux-specific)
    */
-  enablePaneBorderStatus(
-    windowTarget?: string,
-    useExternalSession?: boolean,
-  ): Promise<void>
+  enablePaneBorderStatus(windowTarget?: string, useExternalSession?: boolean): Promise<void>
 
   /**
    * Rebalances panes to achieve the desired layout.
@@ -160,11 +141,7 @@ export type PaneBackend = {
    * @param useExternalSession - If true, uses external session socket (tmux-specific)
    * @returns true if the pane was shown successfully, false otherwise
    */
-  showPane(
-    paneId: PaneId,
-    targetWindowOrPane: string,
-    useExternalSession?: boolean,
-  ): Promise<boolean>
+  showPane(paneId: PaneId, targetWindowOrPane: string, useExternalSession?: boolean): Promise<boolean>
 }
 
 /**
@@ -212,7 +189,7 @@ export type TeammateSpawnConfig = TeammateIdentity & {
   /** System prompt for this teammate (resolved from workflow config) */
   systemPrompt?: string
   /** How to apply the system prompt: 'replace' or 'append' to default */
-  systemPromptMode?: 'default' | 'replace' | 'append'
+  systemPromptMode?: "default" | "replace" | "append"
   /** Optional git worktree path */
   worktreePath?: string
   /** Parent session ID (for context linking) */
@@ -306,6 +283,6 @@ export type TeammateExecutor = {
 /**
  * Type guard to check if a backend type uses terminal panes.
  */
-export function isPaneBackend(type: BackendType): type is 'tmux' | 'iterm2' {
-  return type === 'tmux' || type === 'iterm2'
+export function isPaneBackend(type: BackendType): type is "tmux" | "iterm2" {
+  return type === "tmux" || type === "iterm2"
 }

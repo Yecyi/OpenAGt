@@ -1,19 +1,19 @@
-import { feature } from 'bun:bundle'
-import { randomBytes } from 'crypto'
-import { open } from 'fs/promises'
-import { join } from 'path'
-import type { ModelUsage } from '../entrypoints/agentSdkTypes.js'
-import { logForDebugging } from './debug.js'
-import { getClaudeConfigHomeDir } from './envUtils.js'
-import { errorMessage } from './errors.js'
-import { getFsImplementation } from './fsOperations.js'
-import { logError } from './log.js'
-import { jsonParse, jsonStringify } from './slowOperations.js'
-import type { DailyActivity, DailyModelTokens, SessionStats } from './stats.js'
+import { feature } from "bun:bundle"
+import { randomBytes } from "crypto"
+import { open } from "fs/promises"
+import { join } from "path"
+import type { ModelUsage } from "../entrypoints/agentSdkTypes.js"
+import { logForDebugging } from "./debug.js"
+import { getClaudeConfigHomeDir } from "./envUtils.js"
+import { errorMessage } from "./errors.js"
+import { getFsImplementation } from "./fsOperations.js"
+import { logError } from "./log.js"
+import { jsonParse, jsonStringify } from "./slowOperations.js"
+import type { DailyActivity, DailyModelTokens, SessionStats } from "./stats.js"
 
 export const STATS_CACHE_VERSION = 3
 const MIN_MIGRATABLE_VERSION = 1
-const STATS_CACHE_FILENAME = 'stats-cache.json'
+const STATS_CACHE_FILENAME = "stats-cache.json"
 
 /**
  * Simple in-memory lock to prevent concurrent cache operations.
@@ -32,7 +32,7 @@ export async function withStatsCacheLock<T>(fn: () => Promise<T>): Promise<T> {
 
   // Create our lock
   let releaseLock: (() => void) | undefined
-  statsCacheLockPromise = new Promise<void>(resolve => {
+  statsCacheLockPromise = new Promise<void>((resolve) => {
     releaseLock = resolve
   })
 
@@ -104,11 +104,9 @@ function getEmptyCache(): PersistedStatsCache {
  * Pre-migration days may undercount (e.g. v2 lacked subagent tokens);
  * we accept that rather than drop the history.
  */
-function migrateStatsCache(
-  parsed: Partial<PersistedStatsCache> & { version: number },
-): PersistedStatsCache | null {
+function migrateStatsCache(parsed: Partial<PersistedStatsCache> & { version: number }): PersistedStatsCache | null {
   if (
-    typeof parsed.version !== 'number' ||
+    typeof parsed.version !== "number" ||
     parsed.version < MIN_MIGRATABLE_VERSION ||
     parsed.version > STATS_CACHE_VERSION
   ) {
@@ -117,8 +115,8 @@ function migrateStatsCache(
   if (
     !Array.isArray(parsed.dailyActivity) ||
     !Array.isArray(parsed.dailyModelTokens) ||
-    typeof parsed.totalSessions !== 'number' ||
-    typeof parsed.totalMessages !== 'number'
+    typeof parsed.totalSessions !== "number" ||
+    typeof parsed.totalMessages !== "number"
   ) {
     return null
   }
@@ -149,7 +147,7 @@ export async function loadStatsCache(): Promise<PersistedStatsCache> {
   const cachePath = getStatsCachePath()
 
   try {
-    const content = await fs.readFile(cachePath, { encoding: 'utf-8' })
+    const content = await fs.readFile(cachePath, { encoding: "utf-8" })
     const parsed = jsonParse(content) as PersistedStatsCache
 
     // Validate version
@@ -161,18 +159,14 @@ export async function loadStatsCache(): Promise<PersistedStatsCache> {
         )
         return getEmptyCache()
       }
-      logForDebugging(
-        `Migrated stats cache from v${parsed.version} to v${STATS_CACHE_VERSION}`,
-      )
+      logForDebugging(`Migrated stats cache from v${parsed.version} to v${STATS_CACHE_VERSION}`)
       // Persist migration so we don't re-migrate on every load.
       // aggregateClaudeCodeStats() skips its save when lastComputedDate is
       // already current, so without this the on-disk file stays at the old
       // version indefinitely.
       await saveStatsCache(migrated)
-      if (feature('SHOT_STATS') && !migrated.shotDistribution) {
-        logForDebugging(
-          'Migrated stats cache missing shotDistribution, forcing recomputation',
-        )
+      if (feature("SHOT_STATS") && !migrated.shotDistribution) {
+        logForDebugging("Migrated stats cache missing shotDistribution, forcing recomputation")
         return getEmptyCache()
       }
       return migrated
@@ -182,21 +176,17 @@ export async function loadStatsCache(): Promise<PersistedStatsCache> {
     if (
       !Array.isArray(parsed.dailyActivity) ||
       !Array.isArray(parsed.dailyModelTokens) ||
-      typeof parsed.totalSessions !== 'number' ||
-      typeof parsed.totalMessages !== 'number'
+      typeof parsed.totalSessions !== "number" ||
+      typeof parsed.totalMessages !== "number"
     ) {
-      logForDebugging(
-        'Stats cache has invalid structure, returning empty cache',
-      )
+      logForDebugging("Stats cache has invalid structure, returning empty cache")
       return getEmptyCache()
     }
 
     // If SHOT_STATS is enabled but cache doesn't have shotDistribution,
     // force full recomputation to get historical shot data
-    if (feature('SHOT_STATS') && !parsed.shotDistribution) {
-      logForDebugging(
-        'Stats cache missing shotDistribution, forcing recomputation',
-      )
+    if (feature("SHOT_STATS") && !parsed.shotDistribution) {
+      logForDebugging("Stats cache missing shotDistribution, forcing recomputation")
       return getEmptyCache()
     }
 
@@ -211,12 +201,10 @@ export async function loadStatsCache(): Promise<PersistedStatsCache> {
  * Save the stats cache to disk atomically.
  * Uses a temp file + rename pattern to prevent corruption.
  */
-export async function saveStatsCache(
-  cache: PersistedStatsCache,
-): Promise<void> {
+export async function saveStatsCache(cache: PersistedStatsCache): Promise<void> {
   const fs = getFsImplementation()
   const cachePath = getStatsCachePath()
-  const tempPath = `${cachePath}.${randomBytes(8).toString('hex')}.tmp`
+  const tempPath = `${cachePath}.${randomBytes(8).toString("hex")}.tmp`
 
   try {
     // Ensure the directory exists
@@ -229,9 +217,9 @@ export async function saveStatsCache(
 
     // Write to temp file with fsync for atomic write safety
     const content = jsonStringify(cache, null, 2)
-    const handle = await open(tempPath, 'w', 0o600)
+    const handle = await open(tempPath, "w", 0o600)
     try {
-      await handle.writeFile(content, { encoding: 'utf-8' })
+      await handle.writeFile(content, { encoding: "utf-8" })
       await handle.sync()
     } finally {
       await handle.close()
@@ -239,9 +227,7 @@ export async function saveStatsCache(
 
     // Atomic rename
     await fs.rename(tempPath, cachePath)
-    logForDebugging(
-      `Stats cache saved successfully (lastComputedDate: ${cache.lastComputedDate})`,
-    )
+    logForDebugging(`Stats cache saved successfully (lastComputedDate: ${cache.lastComputedDate})`)
   } catch (error) {
     logError(error)
     // Clean up temp file
@@ -309,22 +295,12 @@ export function mergeCacheWithNewStats(
       modelUsage[model] = {
         inputTokens: modelUsage[model]!.inputTokens + usage.inputTokens,
         outputTokens: modelUsage[model]!.outputTokens + usage.outputTokens,
-        cacheReadInputTokens:
-          modelUsage[model]!.cacheReadInputTokens + usage.cacheReadInputTokens,
-        cacheCreationInputTokens:
-          modelUsage[model]!.cacheCreationInputTokens +
-          usage.cacheCreationInputTokens,
-        webSearchRequests:
-          modelUsage[model]!.webSearchRequests + usage.webSearchRequests,
+        cacheReadInputTokens: modelUsage[model]!.cacheReadInputTokens + usage.cacheReadInputTokens,
+        cacheCreationInputTokens: modelUsage[model]!.cacheCreationInputTokens + usage.cacheCreationInputTokens,
+        webSearchRequests: modelUsage[model]!.webSearchRequests + usage.webSearchRequests,
         costUSD: modelUsage[model]!.costUSD + usage.costUSD,
-        contextWindow: Math.max(
-          modelUsage[model]!.contextWindow,
-          usage.contextWindow,
-        ),
-        maxOutputTokens: Math.max(
-          modelUsage[model]!.maxOutputTokens,
-          usage.maxOutputTokens,
-        ),
+        contextWindow: Math.max(modelUsage[model]!.contextWindow, usage.contextWindow),
+        maxOutputTokens: Math.max(modelUsage[model]!.maxOutputTokens, usage.maxOutputTokens),
       }
     } else {
       modelUsage[model] = { ...usage }
@@ -339,11 +315,8 @@ export function mergeCacheWithNewStats(
   }
 
   // Update session aggregates
-  const totalSessions =
-    existingCache.totalSessions + newStats.sessionStats.length
-  const totalMessages =
-    existingCache.totalMessages +
-    newStats.sessionStats.reduce((sum, s) => sum + s.messageCount, 0)
+  const totalSessions = existingCache.totalSessions + newStats.sessionStats.length
+  const totalMessages = existingCache.totalMessages + newStats.sessionStats.reduce((sum, s) => sum + s.messageCount, 0)
 
   // Find longest session (compare existing with new)
   let longestSession = existingCache.longestSession
@@ -364,9 +337,7 @@ export function mergeCacheWithNewStats(
   const result: PersistedStatsCache = {
     version: STATS_CACHE_VERSION,
     lastComputedDate: newLastComputedDate,
-    dailyActivity: Array.from(dailyActivityMap.values()).sort((a, b) =>
-      a.date.localeCompare(b.date),
-    ),
+    dailyActivity: Array.from(dailyActivityMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
     dailyModelTokens: Array.from(dailyModelTokensMap.entries())
       .map(([date, tokensByModel]) => ({ date, tokensByModel }))
       .sort((a, b) => a.date.localeCompare(b.date)),
@@ -376,18 +347,14 @@ export function mergeCacheWithNewStats(
     longestSession,
     firstSessionDate,
     hourCounts,
-    totalSpeculationTimeSavedMs:
-      existingCache.totalSpeculationTimeSavedMs +
-      newStats.totalSpeculationTimeSavedMs,
+    totalSpeculationTimeSavedMs: existingCache.totalSpeculationTimeSavedMs + newStats.totalSpeculationTimeSavedMs,
   }
 
-  if (feature('SHOT_STATS')) {
+  if (feature("SHOT_STATS")) {
     const shotDistribution: { [shotCount: number]: number } = {
       ...(existingCache.shotDistribution || {}),
     }
-    for (const [count, sessions] of Object.entries(
-      newStats.shotDistribution || {},
-    )) {
+    for (const [count, sessions] of Object.entries(newStats.shotDistribution || {})) {
       const key = parseInt(count, 10)
       shotDistribution[key] = (shotDistribution[key] || 0) + sessions
     }
@@ -401,10 +368,10 @@ export function mergeCacheWithNewStats(
  * Extract the date portion (YYYY-MM-DD) from a Date object.
  */
 export function toDateString(date: Date): string {
-  const parts = date.toISOString().split('T')
+  const parts = date.toISOString().split("T")
   const dateStr = parts[0]
   if (!dateStr) {
-    throw new Error('Invalid ISO date string')
+    throw new Error("Invalid ISO date string")
   }
   return dateStr
 }

@@ -1,6 +1,6 @@
-import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.js'
-import type { Command } from '../commands.js'
-import type { ToolUseContext } from '../Tool.js'
+import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages.js"
+import type { Command } from "../commands.js"
+import type { ToolUseContext } from "../Tool.js"
 
 type Options = {
   name: string
@@ -13,10 +13,7 @@ type Options = {
    * External users will get this prompt. Once the marketplace is public,
    * this parameter and the fallback logic can be removed.
    */
-  getPromptWhileMarketplaceIsPrivate: (
-    args: string,
-    context: ToolUseContext,
-  ) => Promise<ContentBlockParam[]>
+  getPromptWhileMarketplaceIsPrivate: (args: string, context: ToolUseContext) => Promise<ContentBlockParam[]>
 }
 
 export function createMovedToPluginCommand({
@@ -28,7 +25,7 @@ export function createMovedToPluginCommand({
   getPromptWhileMarketplaceIsPrivate,
 }: Options): Command {
   return {
-    type: 'prompt',
+    type: "prompt",
     name,
     description,
     progressMessage,
@@ -36,15 +33,12 @@ export function createMovedToPluginCommand({
     userFacingName() {
       return name
     },
-    source: 'builtin',
-    async getPromptForCommand(
-      args: string,
-      context: ToolUseContext,
-    ): Promise<ContentBlockParam[]> {
-      if (process.env.USER_TYPE === 'ant') {
+    source: "builtin",
+    async getPromptForCommand(args: string, context: ToolUseContext): Promise<ContentBlockParam[]> {
+      if (process.env.USER_TYPE === "ant") {
         return [
           {
-            type: 'text',
+            type: "text",
             text: `This command has been moved to a plugin. Tell the user:
 
 1. To install the plugin, run:

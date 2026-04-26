@@ -7,8 +7,8 @@
  * @see https://specifications.freedesktop.org/basedir-spec/latest/
  */
 
-import { homedir as osHomedir } from 'os'
-import { join } from 'path'
+import { homedir as osHomedir } from "os"
+import { join } from "path"
 
 type EnvLike = Record<string, string | undefined>
 
@@ -31,7 +31,7 @@ function resolveOptions(options?: XDGOptions): { env: EnvLike; home: string } {
  */
 export function getXDGStateHome(options?: XDGOptions): string {
   const { env, home } = resolveOptions(options)
-  return env.XDG_STATE_HOME ?? join(home, '.local', 'state')
+  return env.XDG_STATE_HOME ?? join(home, ".local", "state")
 }
 
 /**
@@ -41,7 +41,7 @@ export function getXDGStateHome(options?: XDGOptions): string {
  */
 export function getXDGCacheHome(options?: XDGOptions): string {
   const { env, home } = resolveOptions(options)
-  return env.XDG_CACHE_HOME ?? join(home, '.cache')
+  return env.XDG_CACHE_HOME ?? join(home, ".cache")
 }
 
 /**
@@ -51,7 +51,7 @@ export function getXDGCacheHome(options?: XDGOptions): string {
  */
 export function getXDGDataHome(options?: XDGOptions): string {
   const { env, home } = resolveOptions(options)
-  return env.XDG_DATA_HOME ?? join(home, '.local', 'share')
+  return env.XDG_DATA_HOME ?? join(home, ".local", "share")
 }
 
 /**
@@ -61,5 +61,5 @@ export function getXDGDataHome(options?: XDGOptions): string {
  */
 export function getUserBinDir(options?: XDGOptions): string {
   const { home } = resolveOptions(options)
-  return join(home, '.local', 'bin')
+  return join(home, ".local", "bin")
 }

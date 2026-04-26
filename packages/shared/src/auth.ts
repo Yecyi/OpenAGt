@@ -8,5 +8,7 @@ export function isAllowedServerUsername(username: string, expected = DEFAULT_SER
 }
 
 export function serverUsernames(configured?: string) {
-  return Array.from(new Set([configured ?? DEFAULT_SERVER_USERNAME, DEFAULT_SERVER_USERNAME, ...LEGACY_SERVER_USERNAMES]))
+  return Array.from(
+    new Set([configured ?? DEFAULT_SERVER_USERNAME, DEFAULT_SERVER_USERNAME, ...LEGACY_SERVER_USERNAMES]),
+  )
 }

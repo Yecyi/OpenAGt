@@ -1,12 +1,12 @@
-import { z } from 'zod'
-import type { SuggestionItem } from '../../components/PromptInput/PromptInputFooterSuggestions.js'
-import type { MCPServerConnection } from '../../services/mcp/types.js'
-import { logForDebugging } from '../debug.js'
-import { lazySchema } from '../lazySchema.js'
-import { createSignal } from '../signal.js'
-import { jsonParse } from '../slowOperations.js'
+import { z } from "zod"
+import type { SuggestionItem } from "../../components/PromptInput/PromptInputFooterSuggestions.js"
+import type { MCPServerConnection } from "../../services/mcp/types.js"
+import { logForDebugging } from "../debug.js"
+import { lazySchema } from "../lazySchema.js"
+import { createSignal } from "../signal.js"
+import { jsonParse } from "../slowOperations.js"
 
-const SLACK_SEARCH_TOOL = 'slack_search_channels'
+const SLACK_SEARCH_TOOL = "slack_search_channels"
 
 // Plain Map (not LRUCache) — findReusableCacheEntry needs to iterate all
 // entries for prefix matching, which LRUCache doesn't expose cleanly.
@@ -20,18 +20,13 @@ export const subscribeKnownChannels = knownChannelsChanged.subscribe
 let inflightQuery: string | null = null
 let inflightPromise: Promise<string[]> | null = null
 
-function findSlackClient(
-  clients: MCPServerConnection[],
-): MCPServerConnection | undefined {
-  return clients.find(c => c.type === 'connected' && c.name.includes('slack'))
+function findSlackClient(clients: MCPServerConnection[]): MCPServerConnection | undefined {
+  return clients.find((c) => c.type === "connected" && c.name.includes("slack"))
 }
 
-async function fetchChannels(
-  clients: MCPServerConnection[],
-  query: string,
-): Promise<string[]> {
+async function fetchChannels(clients: MCPServerConnection[], query: string): Promise<string[]> {
   const slackClient = findSlackClient(clients)
-  if (!slackClient || slackClient.type !== 'connected') {
+  if (!slackClient || slackClient.type !== "connected") {
     return []
   }
 
@@ -42,7 +37,7 @@ async function fetchChannels(
         arguments: {
           query,
           limit: 20,
-          channel_types: 'public_channel,private_channel',
+          channel_types: "public_channel,private_channel",
         },
       },
       undefined,
@@ -53,9 +48,9 @@ async function fetchChannels(
     if (!Array.isArray(content)) return []
 
     const rawText = content
-      .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
-      .map(c => c.text)
-      .join('\n')
+      .filter((c): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("\n")
 
     return parseChannels(unwrapResults(rawText))
   } catch (error) {
@@ -66,13 +61,11 @@ async function fetchChannels(
 
 // The Slack MCP server wraps its markdown in a JSON envelope:
 // {"results":"# Search Results...\nName: #chan\n..."}
-const resultsEnvelopeSchema = lazySchema(() =>
-  z.object({ results: z.string() }),
-)
+const resultsEnvelopeSchema = lazySchema(() => z.object({ results: z.string() }))
 
 function unwrapResults(text: string): string {
   const trimmed = text.trim()
-  if (!trimmed.startsWith('{')) return text
+  if (!trimmed.startsWith("{")) return text
   try {
     const parsed = resultsEnvelopeSchema().safeParse(jsonParse(trimmed))
     if (parsed.success) return parsed.data.results
@@ -88,7 +81,7 @@ function parseChannels(text: string): string[] {
   const channels: string[] = []
   const seen = new Set<string>()
 
-  for (const line of text.split('\n')) {
+  for (const line of text.split("\n")) {
     const m = line.match(/^Name:\s*#?([a-z0-9][a-z0-9_-]{0,79})\s*$/)
     if (m && !seen.has(m[1]!)) {
       seen.add(m[1]!)
@@ -107,9 +100,7 @@ export function getKnownChannelsVersion(): number {
   return knownChannelsVersion
 }
 
-export function findSlackChannelPositions(
-  text: string,
-): Array<{ start: number; end: number }> {
+export function findSlackChannelPositions(text: string): Array<{ start: number; end: number }> {
   const positions: Array<{ start: number; end: number }> = []
   const re = /(^|\s)#([a-z0-9][a-z0-9_-]{0,79})(?=\s|$)/g
   let m: RegExpExecArray | null
@@ -127,28 +118,18 @@ export function findSlackChannelPositions(
 // locally. This keeps the query maximally specific (avoiding the 20-result
 // cap) while never sending a partial word that kills the search.
 function mcpQueryFor(searchToken: string): string {
-  const lastSep = Math.max(
-    searchToken.lastIndexOf('-'),
-    searchToken.lastIndexOf('_'),
-  )
+  const lastSep = Math.max(searchToken.lastIndexOf("-"), searchToken.lastIndexOf("_"))
   return lastSep > 0 ? searchToken.slice(0, lastSep) : searchToken
 }
 
 // Find a cached entry whose key is a prefix of mcpQuery and still has
 // matches for searchToken. Lets typing "c"→"cl"→"cla" reuse the "c" cache
 // instead of issuing a new MCP call per keystroke.
-function findReusableCacheEntry(
-  mcpQuery: string,
-  searchToken: string,
-): string[] | undefined {
+function findReusableCacheEntry(mcpQuery: string, searchToken: string): string[] | undefined {
   let best: string[] | undefined
   let bestLen = 0
   for (const [key, channels] of cache) {
-    if (
-      mcpQuery.startsWith(key) &&
-      key.length > bestLen &&
-      channels.some(c => c.startsWith(searchToken))
-    ) {
+    if (mcpQuery.startsWith(key) && key.length > bestLen && channels.some((c) => c.startsWith(searchToken))) {
       best = channels
       bestLen = key.length
     }
@@ -191,10 +172,10 @@ export async function getSlackChannelSuggestions(
   }
 
   return channels
-    .filter(c => c.startsWith(lower))
+    .filter((c) => c.startsWith(lower))
     .sort()
     .slice(0, 10)
-    .map(c => ({
+    .map((c) => ({
       id: `slack-channel-${c}`,
       displayText: `#${c}`,
     }))

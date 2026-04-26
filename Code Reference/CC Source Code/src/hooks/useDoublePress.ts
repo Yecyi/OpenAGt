@@ -1,7 +1,7 @@
 // Creates a function that calls one function on the first call and another
 // function on the second call within a certain timeout
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from "react"
 
 export const DOUBLE_PRESS_TIMEOUT_MS = 800
 
@@ -30,9 +30,7 @@ export function useDoublePress(
   return useCallback(() => {
     const now = Date.now()
     const timeSinceLastPress = now - lastPressRef.current
-    const isDoublePress =
-      timeSinceLastPress <= DOUBLE_PRESS_TIMEOUT_MS &&
-      timeoutRef.current !== undefined
+    const isDoublePress = timeSinceLastPress <= DOUBLE_PRESS_TIMEOUT_MS && timeoutRef.current !== undefined
 
     if (isDoublePress) {
       // Double press detected

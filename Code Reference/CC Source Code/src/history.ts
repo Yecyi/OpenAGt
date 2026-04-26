@@ -1,20 +1,16 @@
-import { appendFile, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { getProjectRoot, getSessionId } from './bootstrap/state.js'
-import { registerCleanup } from './utils/cleanupRegistry.js'
-import type { HistoryEntry, PastedContent } from './utils/config.js'
-import { logForDebugging } from './utils/debug.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './utils/envUtils.js'
-import { getErrnoCode } from './utils/errors.js'
-import { readLinesReverse } from './utils/fsOperations.js'
-import { lock } from './utils/lockfile.js'
-import {
-  hashPastedText,
-  retrievePastedText,
-  storePastedText,
-} from './utils/pasteStore.js'
-import { sleep } from './utils/sleep.js'
-import { jsonParse, jsonStringify } from './utils/slowOperations.js'
+import { appendFile, writeFile } from "fs/promises"
+import { join } from "path"
+import { getProjectRoot, getSessionId } from "./bootstrap/state.js"
+import { registerCleanup } from "./utils/cleanupRegistry.js"
+import type { HistoryEntry, PastedContent } from "./utils/config.js"
+import { logForDebugging } from "./utils/debug.js"
+import { getClaudeConfigHomeDir, isEnvTruthy } from "./utils/envUtils.js"
+import { getErrnoCode } from "./utils/errors.js"
+import { readLinesReverse } from "./utils/fsOperations.js"
+import { lock } from "./utils/lockfile.js"
+import { hashPastedText, retrievePastedText, storePastedText } from "./utils/pasteStore.js"
+import { sleep } from "./utils/sleep.js"
+import { jsonParse, jsonStringify } from "./utils/slowOperations.js"
 
 const MAX_HISTORY_ITEMS = 100
 const MAX_PASTED_CONTENT_LENGTH = 1024
@@ -24,7 +20,7 @@ const MAX_PASTED_CONTENT_LENGTH = 1024
  */
 type StoredPastedContent = {
   id: number
-  type: 'text' | 'image'
+  type: "text" | "image"
   content?: string // Inline content for small pastes
   contentHash?: string // Hash reference for large pastes stored externally
   mediaType?: string
@@ -59,29 +55,23 @@ export function formatImageRef(id: number): string {
   return `[Image #${id}]`
 }
 
-export function parseReferences(
-  input: string,
-): Array<{ id: number; match: string; index: number }> {
-  const referencePattern =
-    /\[(Pasted text|Image|\.\.\.Truncated text) #(\d+)(?: \+\d+ lines)?(\.)*\]/g
+export function parseReferences(input: string): Array<{ id: number; match: string; index: number }> {
+  const referencePattern = /\[(Pasted text|Image|\.\.\.Truncated text) #(\d+)(?: \+\d+ lines)?(\.)*\]/g
   const matches = [...input.matchAll(referencePattern)]
   return matches
-    .map(match => ({
-      id: parseInt(match[2] || '0'),
+    .map((match) => ({
+      id: parseInt(match[2] || "0"),
       match: match[0],
       index: match.index,
     }))
-    .filter(match => match.id > 0)
+    .filter((match) => match.id > 0)
 }
 
 /**
  * Replace [Pasted text #N] placeholders in input with their actual content.
  * Image refs are left alone — they become content blocks, not inlined text.
  */
-export function expandPastedTextRefs(
-  input: string,
-  pastedContents: Record<number, PastedContent>,
-): string {
+export function expandPastedTextRefs(input: string, pastedContents: Record<number, PastedContent>): string {
   const refs = parseReferences(input)
   let expanded = input
   // Splice at the original match offsets so placeholder-like strings inside
@@ -90,11 +80,8 @@ export function expandPastedTextRefs(
   for (let i = refs.length - 1; i >= 0; i--) {
     const ref = refs[i]!
     const content = pastedContents[ref.id]
-    if (content?.type !== 'text') continue
-    expanded =
-      expanded.slice(0, ref.index) +
-      content.content +
-      expanded.slice(ref.index + ref.match.length)
+    if (content?.type !== "text") continue
+    expanded = expanded.slice(0, ref.index) + content.content + expanded.slice(ref.index + ref.match.length)
   }
   return expanded
 }
@@ -112,7 +99,7 @@ async function* makeLogEntryReader(): AsyncGenerator<LogEntry> {
   }
 
   // Read from global history file (shared across all projects)
-  const historyPath = join(getClaudeConfigHomeDir(), 'history.jsonl')
+  const historyPath = join(getClaudeConfigHomeDir(), "history.jsonl")
 
   try {
     for await (const line of readLinesReverse(historyPath)) {
@@ -121,10 +108,7 @@ async function* makeLogEntryReader(): AsyncGenerator<LogEntry> {
         // removeLastFromHistory slow path: entry was flushed before removal,
         // so filter here so both getHistory (Up-arrow) and makeHistoryReader
         // (ctrl+r search) skip it consistently.
-        if (
-          entry.sessionId === currentSession &&
-          skippedTimestamps.has(entry.timestamp)
-        ) {
+        if (entry.sessionId === currentSession && skippedTimestamps.has(entry.timestamp)) {
           continue
         }
         yield entry
@@ -135,7 +119,7 @@ async function* makeLogEntryReader(): AsyncGenerator<LogEntry> {
     }
   } catch (e: unknown) {
     const code = getErrnoCode(e)
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       return
     }
     throw e
@@ -164,7 +148,7 @@ export async function* getTimestampedHistory(): AsyncGenerator<TimestampedHistor
   const seen = new Set<string>()
 
   for await (const entry of makeLogEntryReader()) {
-    if (!entry || typeof entry.project !== 'string') continue
+    if (!entry || typeof entry.project !== "string") continue
     if (entry.project !== currentProject) continue
     if (seen.has(entry.display)) continue
     seen.add(entry.display)
@@ -195,7 +179,7 @@ export async function* getHistory(): AsyncGenerator<HistoryEntry> {
 
   for await (const entry of makeLogEntryReader()) {
     // Skip malformed entries (corrupted file, old format, or invalid JSON structure)
-    if (!entry || typeof entry.project !== 'string') continue
+    if (!entry || typeof entry.project !== "string") continue
     if (entry.project !== currentProject) continue
 
     if (entry.sessionId === currentSession) {
@@ -227,9 +211,7 @@ type LogEntry = {
 /**
  * Resolve stored paste content to full PastedContent by fetching from paste store if needed.
  */
-async function resolveStoredPastedContent(
-  stored: StoredPastedContent,
-): Promise<PastedContent | null> {
+async function resolveStoredPastedContent(stored: StoredPastedContent): Promise<PastedContent | null> {
   // If we have inline content, use it directly
   if (stored.content) {
     return {
@@ -296,13 +278,13 @@ async function immediateFlushHistory(): Promise<void> {
 
   let release
   try {
-    const historyPath = join(getClaudeConfigHomeDir(), 'history.jsonl')
+    const historyPath = join(getClaudeConfigHomeDir(), "history.jsonl")
 
     // Ensure the file exists before acquiring lock (append mode creates if missing)
-    await writeFile(historyPath, '', {
-      encoding: 'utf8',
+    await writeFile(historyPath, "", {
+      encoding: "utf8",
       mode: 0o600,
-      flag: 'a',
+      flag: "a",
     })
 
     release = await lock(historyPath, {
@@ -313,10 +295,10 @@ async function immediateFlushHistory(): Promise<void> {
       },
     })
 
-    const jsonLines = pendingEntries.map(entry => jsonStringify(entry) + '\n')
+    const jsonLines = pendingEntries.map((entry) => jsonStringify(entry) + "\n")
     pendingEntries = []
 
-    await appendFile(historyPath, jsonLines.join(''), { mode: 0o600 })
+    await appendFile(historyPath, jsonLines.join(""), { mode: 0o600 })
   } catch (error) {
     logForDebugging(`Failed to write prompt history: ${error}`)
   } finally {
@@ -352,19 +334,14 @@ async function flushPromptHistory(retries: number): Promise<void> {
   }
 }
 
-async function addToPromptHistory(
-  command: HistoryEntry | string,
-): Promise<void> {
-  const entry =
-    typeof command === 'string'
-      ? { display: command, pastedContents: {} }
-      : command
+async function addToPromptHistory(command: HistoryEntry | string): Promise<void> {
+  const entry = typeof command === "string" ? { display: command, pastedContents: {} } : command
 
   const storedPastedContents: Record<number, StoredPastedContent> = {}
   if (entry.pastedContents) {
     for (const [id, content] of Object.entries(entry.pastedContents)) {
       // Filter out images (they're stored separately in image-cache)
-      if (content.type === 'image') {
+      if (content.type === "image") {
         continue
       }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react"
 
 /**
  * Throttles a value so each distinct value stays visible for at least `minMs`.

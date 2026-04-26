@@ -11,7 +11,7 @@ import Yoga, {
   PositionType,
   Wrap,
   type Node as YogaNode,
-} from 'src/native-ts/yoga-layout/index.js'
+} from "src/native-ts/yoga-layout/index.js"
 import {
   type LayoutAlign,
   LayoutDisplay,
@@ -25,7 +25,7 @@ import {
   type LayoutOverflow,
   type LayoutPositionType,
   type LayoutWrap,
-} from './node.js'
+} from "./node.js"
 
 // --
 // Edge/Gutter mapping
@@ -177,9 +177,9 @@ export class YogaLayoutNode implements LayoutNode {
   setFlexDirection(dir: LayoutFlexDirection): void {
     const map: Record<LayoutFlexDirection, FlexDirection> = {
       row: FlexDirection.Row,
-      'row-reverse': FlexDirection.RowReverse,
+      "row-reverse": FlexDirection.RowReverse,
       column: FlexDirection.Column,
-      'column-reverse': FlexDirection.ColumnReverse,
+      "column-reverse": FlexDirection.ColumnReverse,
     }
     this.yoga.setFlexDirection(map[dir]!)
   }
@@ -201,7 +201,7 @@ export class YogaLayoutNode implements LayoutNode {
     const map: Record<LayoutWrap, Wrap> = {
       nowrap: Wrap.NoWrap,
       wrap: Wrap.Wrap,
-      'wrap-reverse': Wrap.WrapReverse,
+      "wrap-reverse": Wrap.WrapReverse,
     }
     this.yoga.setFlexWrap(map[wrap]!)
   }
@@ -210,9 +210,9 @@ export class YogaLayoutNode implements LayoutNode {
     const map: Record<LayoutAlign, Align> = {
       auto: Align.Auto,
       stretch: Align.Stretch,
-      'flex-start': Align.FlexStart,
+      "flex-start": Align.FlexStart,
       center: Align.Center,
-      'flex-end': Align.FlexEnd,
+      "flex-end": Align.FlexEnd,
     }
     this.yoga.setAlignItems(map[align]!)
   }
@@ -221,39 +221,35 @@ export class YogaLayoutNode implements LayoutNode {
     const map: Record<LayoutAlign, Align> = {
       auto: Align.Auto,
       stretch: Align.Stretch,
-      'flex-start': Align.FlexStart,
+      "flex-start": Align.FlexStart,
       center: Align.Center,
-      'flex-end': Align.FlexEnd,
+      "flex-end": Align.FlexEnd,
     }
     this.yoga.setAlignSelf(map[align]!)
   }
 
   setJustifyContent(justify: LayoutJustify): void {
     const map: Record<LayoutJustify, Justify> = {
-      'flex-start': Justify.FlexStart,
+      "flex-start": Justify.FlexStart,
       center: Justify.Center,
-      'flex-end': Justify.FlexEnd,
-      'space-between': Justify.SpaceBetween,
-      'space-around': Justify.SpaceAround,
-      'space-evenly': Justify.SpaceEvenly,
+      "flex-end": Justify.FlexEnd,
+      "space-between": Justify.SpaceBetween,
+      "space-around": Justify.SpaceAround,
+      "space-evenly": Justify.SpaceEvenly,
     }
     this.yoga.setJustifyContent(map[justify]!)
   }
 
   setDisplay(display: LayoutDisplay): void {
-    this.yoga.setDisplay(display === 'flex' ? Display.Flex : Display.None)
+    this.yoga.setDisplay(display === "flex" ? Display.Flex : Display.None)
   }
 
   getDisplay(): LayoutDisplay {
-    return this.yoga.getDisplay() === Display.None
-      ? LayoutDisplay.None
-      : LayoutDisplay.Flex
+    return this.yoga.getDisplay() === Display.None ? LayoutDisplay.None : LayoutDisplay.Flex
   }
 
   setPositionType(type: LayoutPositionType): void {
-    this.yoga.setPositionType(
-      type === 'absolute' ? PositionType.Absolute : PositionType.Relative,
-    )
+    this.yoga.setPositionType(type === "absolute" ? PositionType.Absolute : PositionType.Relative)
   }
 
   setPosition(edge: LayoutEdge, value: number): void {

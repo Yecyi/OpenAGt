@@ -32,16 +32,16 @@ OpenAGt 当前围绕四个核心方向构建：
 
 下表基于 OpenCode 官方开源仓库和文档进行技术对比，而不是只看命名。
 
-| 主题 | OpenCode | OpenAGt |
-| --- | --- | --- |
-| 运行时中心 | Client/server coding agent，强调 TUI 体验 | 后端优先的 session runtime，可被 CLI、TUI、server、SDK 复用 |
-| Agent loop | 通用编码 agent，内置 agent mode 和 subagent 能力 | 持久 session 工具循环，扩展 task runtime、coordinator graph、personal-agent primitives |
-| Provider 策略 | Provider-agnostic，支持 Claude、OpenAI、Google、本地模型等 | 多 provider runtime，支持 provider fallback、server 暴露和生成式 JavaScript SDK |
-| LSP 集成 | 官方文档强调开箱即用 LSP | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop |
-| 安全模型 | Agent mode 与 permission prompt 是 CLI 体验核心 | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
-| 编排重点 | Terminal-first 编码流，保留 client/server 远程控制潜力 | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆 |
-| 前端形态 | TUI-first，官方项目也提供 desktop beta | 当前稳定版聚焦 CLI/TUI/headless server/SDK；Flutter 延后 |
-| 迁移兼容 | 原生 OpenCode 项目 | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容 |
+| 主题          | OpenCode                                                   | OpenAGt                                                                                               |
+| ------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 运行时中心    | Client/server coding agent，强调 TUI 体验                  | 后端优先的 session runtime，可被 CLI、TUI、server、SDK 复用                                           |
+| Agent loop    | 通用编码 agent，内置 agent mode 和 subagent 能力           | 持久 session 工具循环，扩展 task runtime、coordinator graph、personal-agent primitives                |
+| Provider 策略 | Provider-agnostic，支持 Claude、OpenAI、Google、本地模型等 | 多 provider runtime，支持 provider fallback、server 暴露和生成式 JavaScript SDK                       |
+| LSP 集成      | 官方文档强调开箱即用 LSP                                   | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop                          |
+| 安全模型      | Agent mode 与 permission prompt 是 CLI 体验核心            | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
+| 编排重点      | Terminal-first 编码流，保留 client/server 远程控制潜力     | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆                        |
+| 前端形态      | TUI-first，官方项目也提供 desktop beta                     | 当前稳定版聚焦 CLI/TUI/headless server/SDK；Flutter 延后                                              |
+| 迁移兼容      | 原生 OpenCode 项目                                         | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容                                                     |
 
 ## 发布
 
@@ -75,15 +75,15 @@ OpenAGt v1.16 的稳定后端能力包括：
 
 ## Verification Matrix
 
-| 能力 | 状态 |
-| --- | --- |
-| Session runtime 与工具循环 | v1.16 稳定 |
-| Approval and Safety Envelope | v1.16 稳定，带版本化 `shell_safety` |
-| Coordinator Runtime | v1.16 稳定覆盖 graph projection、dispatch、retry、cancel |
-| Personal Agent Core | 已实现，v1.16 稳定后端契约 |
-| Debug doctor / repro bundle | v1.16 稳定诊断面 |
-| Release verification automation | `bun run verify:v1.16` |
-| Flutter 前端 | 路线图；先稳定后端契约 |
+| 能力                            | 状态                                                     |
+| ------------------------------- | -------------------------------------------------------- |
+| Session runtime 与工具循环      | v1.16 稳定                                               |
+| Approval and Safety Envelope    | v1.16 稳定，带版本化 `shell_safety`                      |
+| Coordinator Runtime             | v1.16 稳定覆盖 graph projection、dispatch、retry、cancel |
+| Personal Agent Core             | 已实现，v1.16 稳定后端契约                               |
+| Debug doctor / repro bundle     | v1.16 稳定诊断面                                         |
+| Release verification automation | `bun run verify:v1.16`                                   |
+| Flutter 前端                    | 路线图；先稳定后端契约                                   |
 
 ## Flowchart
 
@@ -228,31 +228,31 @@ Shell 权限请求会携带结构化 `shell_safety` 元数据。
 
 ## 主要命令
 
-| 命令 | 作用 |
-| --- | --- |
-| `openagt` | 启动默认交互 CLI / TUI |
-| `openagt run [message..]` | 执行一次性任务 |
-| `openagt serve` | 启动 headless server |
-| `openagt web` | 启动 server 和 Web UI 流程 |
-| `openagt session list` | 列出 session |
-| `openagt providers login` | 添加或刷新 provider 凭据 |
-| `openagt mcp list` | 查看 MCP 配置 |
-| `openagt debug paths` | 打印有效运行时路径 |
-| `openagt debug doctor` | 运行环境与 runtime 诊断 |
-| `openagt debug bundle --session <id>` | 导出脱敏 repro bundle |
+| 命令                                  | 作用                       |
+| ------------------------------------- | -------------------------- |
+| `openagt`                             | 启动默认交互 CLI / TUI     |
+| `openagt run [message..]`             | 执行一次性任务             |
+| `openagt serve`                       | 启动 headless server       |
+| `openagt web`                         | 启动 server 和 Web UI 流程 |
+| `openagt session list`                | 列出 session               |
+| `openagt providers login`             | 添加或刷新 provider 凭据   |
+| `openagt mcp list`                    | 查看 MCP 配置              |
+| `openagt debug paths`                 | 打印有效运行时路径         |
+| `openagt debug doctor`                | 运行环境与 runtime 诊断    |
+| `openagt debug bundle --session <id>` | 导出脱敏 repro bundle      |
 
 ## 仓库结构
 
-| 路径 | 作用 |
-| --- | --- |
-| `packages/openagt` | 核心 runtime、CLI、server、tools、session engine |
-| `packages/app` | Solid/Vite Web 客户端 |
-| `packages/sdk/js` | 生成式 JavaScript SDK |
-| `packages/openagt_flutter` | Flutter MVP |
-| `packages/console/*` | Console 与 control-plane 包 |
-| `packages/opencode` | 兼容遗留目录，不是主 runtime |
-| `.opencode/` | 本地 agents、commands、plugins、skills、tools、themes 示例 |
-| `docs/` | 发布、安装、技术文档 |
+| 路径                       | 作用                                                       |
+| -------------------------- | ---------------------------------------------------------- |
+| `packages/openagt`         | 核心 runtime、CLI、server、tools、session engine           |
+| `packages/app`             | Solid/Vite Web 客户端                                      |
+| `packages/sdk/js`          | 生成式 JavaScript SDK                                      |
+| `packages/openagt_flutter` | Flutter MVP                                                |
+| `packages/console/*`       | Console 与 control-plane 包                                |
+| `packages/opencode`        | 兼容遗留目录，不是主 runtime                               |
+| `.opencode/`               | 本地 agents、commands、plugins、skills、tools、themes 示例 |
+| `docs/`                    | 发布、安装、技术文档                                       |
 
 ## 开发
 
@@ -283,19 +283,19 @@ bun run verify:v1.16
 
 ## 配置与环境变量
 
-| 变量 | 作用 |
-| --- | --- |
-| `OPENAGT_CONFIG` | 指定配置文件 |
-| `OPENAGT_CONFIG_DIR` | 添加显式配置目录 |
-| `OPENAGT_CONFIG_CONTENT` | 直接注入配置内容 |
-| `OPENAGT_DISABLE_PROJECT_CONFIG` | 忽略项目本地配置 |
-| `OPENAGT_SERVER_PASSWORD` | 保护 `serve` / `web` |
-| `OPENAGT_SERVER_USERNAME` | server 基本认证用户名 |
-| `OPENAGT_PERMISSION` | 通过环境变量注入权限规则 |
-| `OPENAGT_PURE` | 禁用外部插件 |
-| `OPENAGT_EXPERIMENTAL` | 启用实验特性包 |
-| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | 启用 plan-mode 特定工具 |
-| `OPENAGT_DB` | 覆盖数据库路径 |
+| 变量                             | 作用                     |
+| -------------------------------- | ------------------------ |
+| `OPENAGT_CONFIG`                 | 指定配置文件             |
+| `OPENAGT_CONFIG_DIR`             | 添加显式配置目录         |
+| `OPENAGT_CONFIG_CONTENT`         | 直接注入配置内容         |
+| `OPENAGT_DISABLE_PROJECT_CONFIG` | 忽略项目本地配置         |
+| `OPENAGT_SERVER_PASSWORD`        | 保护 `serve` / `web`     |
+| `OPENAGT_SERVER_USERNAME`        | server 基本认证用户名    |
+| `OPENAGT_PERMISSION`             | 通过环境变量注入权限规则 |
+| `OPENAGT_PURE`                   | 禁用外部插件             |
+| `OPENAGT_EXPERIMENTAL`           | 启用实验特性包           |
+| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | 启用 plan-mode 特定工具  |
+| `OPENAGT_DB`                     | 覆盖数据库路径           |
 
 ## 扩展 OpenAGt
 

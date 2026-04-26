@@ -13,16 +13,17 @@ Source: `src/utils/undercover.ts`
 ```typescript
 // src/utils/undercover.ts:28-37
 export function isUndercover(): boolean {
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     if (isEnvTruthy(process.env.CLAUDE_CODE_UNDERCOVER)) return true
     // Auto: active unless positively confirmed internal repo
-    return getRepoClassCached() !== 'internal'
+    return getRepoClassCached() !== "internal"
   }
   return false
 }
 ```
 
 Key properties:
+
 - **Internal only**: Only active for Anthropic employees (`USER_TYPE === 'ant'`)
 - **Default ON**: Active in all repos except those on the internal allowlist
 - **No force-off**: "There is NO force-OFF. This guards against model codename leaks"
@@ -78,9 +79,9 @@ The attribution system (`src/utils/attribution.ts`, `src/utils/commitAttribution
 // src/utils/model/model.ts:386-392
 function maskModelCodename(baseName: string): string {
   // e.g. capybara-v2-fast → cap*****-v2-fast
-  const [codename = '', ...rest] = baseName.split('-')
-  const masked = codename.slice(0, 3) + '*'.repeat(Math.max(0, codename.length - 3))
-  return [masked, ...rest].join('-')
+  const [codename = "", ...rest] = baseName.split("-")
+  const masked = codename.slice(0, 3) + "*".repeat(Math.max(0, codename.length - 3))
+  return [masked, ...rest].join("-")
 }
 ```
 
@@ -89,6 +90,7 @@ function maskModelCodename(baseName: string): string {
 ### For Open Source
 
 When Anthropic employees use Claude Code to contribute to open-source projects:
+
 1. Code is written by AI but commits appear human-authored
 2. No "Co-Authored-By: Claude" attribution
 3. No "Generated with Claude Code" markers
@@ -98,6 +100,7 @@ When Anthropic employees use Claude Code to contribute to open-source projects:
 ### For Anthropic's Protection
 
 The primary stated purpose is preventing accidental leaks of:
+
 - Internal model codenames (competitive intelligence)
 - Unreleased version numbers (market timing)
 - Internal infrastructure details (security)
@@ -105,6 +108,7 @@ The primary stated purpose is preventing accidental leaks of:
 ### Ethical Considerations
 
 The phrase "Do not blow your cover" frames the AI as an undercover agent. The intentional concealment of AI authorship in public code contributions raises questions about:
+
 - Transparency in open-source communities
 - Compliance with project contribution guidelines
 - The line between trade secret protection and deception

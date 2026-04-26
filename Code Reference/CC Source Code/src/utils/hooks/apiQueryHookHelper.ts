@@ -1,13 +1,13 @@
-import { randomUUID } from 'crypto'
-import type { QuerySource } from '../../constants/querySource.js'
-import { queryModelWithoutStreaming } from '../../services/api/claude.js'
-import type { Message } from '../../types/message.js'
-import { createAbortController } from '../../utils/abortController.js'
-import { logError } from '../../utils/log.js'
-import { toError } from '../errors.js'
-import { extractTextContent } from '../messages.js'
-import { asSystemPrompt } from '../systemPromptType.js'
-import type { REPLHookContext } from './postSamplingHooks.js'
+import { randomUUID } from "crypto"
+import type { QuerySource } from "../../constants/querySource.js"
+import { queryModelWithoutStreaming } from "../../services/api/claude.js"
+import type { Message } from "../../types/message.js"
+import { createAbortController } from "../../utils/abortController.js"
+import { logError } from "../../utils/log.js"
+import { toError } from "../errors.js"
+import { extractTextContent } from "../messages.js"
+import { asSystemPrompt } from "../systemPromptType.js"
+import type { REPLHookContext } from "./postSamplingHooks.js"
 
 export type ApiQueryHookContext = REPLHookContext & {
   queryMessageCount?: number
@@ -28,10 +28,7 @@ export type ApiQueryHookConfig<TResult> = {
   useTools?: boolean
 
   parseResponse: (content: string, context: ApiQueryHookContext) => TResult
-  logResult: (
-    result: ApiQueryResult<TResult>,
-    context: ApiQueryHookContext,
-  ) => void
+  logResult: (result: ApiQueryResult<TResult>, context: ApiQueryHookContext) => void
   // Must be a function to ensure lazy loading (config is accessed before allowed)
   // Receives context so callers can inherit the main loop model if desired.
   getModel: (context: ApiQueryHookContext) => string
@@ -39,7 +36,7 @@ export type ApiQueryHookConfig<TResult> = {
 
 export type ApiQueryResult<TResult> =
   | {
-      type: 'success'
+      type: "success"
       queryName: string
       result: TResult
       messageId: string
@@ -47,15 +44,13 @@ export type ApiQueryResult<TResult> =
       uuid: string
     }
   | {
-      type: 'error'
+      type: "error"
       queryName: string
       error: Error
       uuid: string
     }
 
-export function createApiQueryHook<TResult>(
-  config: ApiQueryHookConfig<TResult>,
-) {
+export function createApiQueryHook<TResult>(config: ApiQueryHookConfig<TResult>) {
   return async (context: ApiQueryHookContext): Promise<void> => {
     try {
       const shouldRun = await config.shouldRun(context)
@@ -70,9 +65,7 @@ export function createApiQueryHook<TResult>(
       context.queryMessageCount = messages.length
 
       // Use config's system prompt if provided, otherwise use context's
-      const systemPrompt = config.systemPrompt
-        ? asSystemPrompt([config.systemPrompt])
-        : context.systemPrompt
+      const systemPrompt = config.systemPrompt ? asSystemPrompt([config.systemPrompt]) : context.systemPrompt
 
       // Use config's tools preference (defaults to true = use context tools)
       const useTools = config.useTools ?? true
@@ -85,7 +78,7 @@ export function createApiQueryHook<TResult>(
       const response = await queryModelWithoutStreaming({
         messages,
         systemPrompt,
-        thinkingConfig: { type: 'disabled' as const },
+        thinkingConfig: { type: "disabled" as const },
         tools,
         signal: createAbortController().signal,
         options: {
@@ -95,10 +88,8 @@ export function createApiQueryHook<TResult>(
           },
           model,
           toolChoice: undefined,
-          isNonInteractiveSession:
-            context.toolUseContext.options.isNonInteractiveSession,
-          hasAppendSystemPrompt:
-            !!context.toolUseContext.options.appendSystemPrompt,
+          isNonInteractiveSession: context.toolUseContext.options.isNonInteractiveSession,
+          hasAppendSystemPrompt: !!context.toolUseContext.options.appendSystemPrompt,
           temperatureOverride: 0,
           agents: context.toolUseContext.options.agentDefinitions.activeAgents,
           querySource: config.name,
@@ -114,7 +105,7 @@ export function createApiQueryHook<TResult>(
         const result = config.parseResponse(content, context)
         config.logResult(
           {
-            type: 'success',
+            type: "success",
             queryName: config.name,
             result,
             messageId: response.message.id,
@@ -126,7 +117,7 @@ export function createApiQueryHook<TResult>(
       } catch (error) {
         config.logResult(
           {
-            type: 'error',
+            type: "error",
             queryName: config.name,
             error: error as Error,
             uuid,

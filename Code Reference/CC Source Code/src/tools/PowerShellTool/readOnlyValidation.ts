@@ -4,37 +4,29 @@
  * Cmdlets are case-insensitive; all matching is done in lowercase.
  */
 
-import type {
-  ParsedCommandElement,
-  ParsedPowerShellCommand,
-} from '../../utils/powershell/parser.js'
+import type { ParsedCommandElement, ParsedPowerShellCommand } from "../../utils/powershell/parser.js"
 
-type ParsedStatement = ParsedPowerShellCommand['statements'][number]
+type ParsedStatement = ParsedPowerShellCommand["statements"][number]
 
-import { getPlatform } from '../../utils/platform.js'
+import { getPlatform } from "../../utils/platform.js"
 import {
   COMMON_ALIASES,
   deriveSecurityFlags,
   getPipelineSegments,
   isNullRedirectionTarget,
   isPowerShellParameter,
-} from '../../utils/powershell/parser.js'
-import type { ExternalCommandConfig } from '../../utils/shell/readOnlyCommandValidation.js'
+} from "../../utils/powershell/parser.js"
+import type { ExternalCommandConfig } from "../../utils/shell/readOnlyCommandValidation.js"
 import {
   DOCKER_READ_ONLY_COMMANDS,
   EXTERNAL_READONLY_COMMANDS,
   GH_READ_ONLY_COMMANDS,
   GIT_READ_ONLY_COMMANDS,
   validateFlags,
-} from '../../utils/shell/readOnlyCommandValidation.js'
-import { COMMON_PARAMETERS } from './commonParameters.js'
+} from "../../utils/shell/readOnlyCommandValidation.js"
+import { COMMON_PARAMETERS } from "./commonParameters.js"
 
-const DOTNET_READ_ONLY_FLAGS = new Set([
-  '--version',
-  '--info',
-  '--list-runtimes',
-  '--list-sdks',
-])
+const DOTNET_READ_ONLY_FLAGS = new Set(["--version", "--info", "--list-runtimes", "--list-sdks"])
 
 type CommandConfig = {
   /** Safe subcommands or flags for this command */
@@ -49,10 +41,7 @@ type CommandConfig = {
   /** Regex constraint on the original command */
   regex?: RegExp
   /** Additional validation callback - returns true if command is dangerous */
-  additionalCommandIsDangerousCallback?: (
-    command: string,
-    element?: ParsedCommandElement,
-  ) => boolean
+  additionalCommandIsDangerousCallback?: (command: string, element?: ParsedCommandElement) => boolean
 }
 
 /**
@@ -73,38 +62,35 @@ type CommandConfig = {
  *    anything other than StringConstant (Variable, ParenExpression wrapping
  *    arbitrary pipelines, Hashtable, etc.) is a leak vector.
  */
-export function argLeaksValue(
-  _cmd: string,
-  element?: ParsedCommandElement,
-): boolean {
+export function argLeaksValue(_cmd: string, element?: ParsedCommandElement): boolean {
   const argTypes = (element?.elementTypes ?? []).slice(1)
   const args = element?.args ?? []
   const children = element?.children
   for (let i = 0; i < argTypes.length; i++) {
-    if (argTypes[i] !== 'StringConstant' && argTypes[i] !== 'Parameter') {
+    if (argTypes[i] !== "StringConstant" && argTypes[i] !== "Parameter") {
       // ArrayLiteralAst (`Select-Object Name, Id`) maps to 'Other' — the
       // parse script only populates children for CommandParameterAst.Argument,
       // so we can't inspect elements. Fall back to string-archaeology on the
       // extent text: Hashtable has `@{`, ParenExpr has `(`, variables have
       // `$`, type literals have `[`, scriptblocks have `{`. A comma-list of
       // bare identifiers has none. `Name, $x` still rejects on `$`.
-      if (!/[$(@{[]/.test(args[i] ?? '')) {
+      if (!/[$(@{[]/.test(args[i] ?? "")) {
         continue
       }
       return true
     }
-    if (argTypes[i] === 'Parameter') {
+    if (argTypes[i] === "Parameter") {
       const paramChildren = children?.[i]
       if (paramChildren) {
-        if (paramChildren.some(c => c.type !== 'StringConstant')) {
+        if (paramChildren.some((c) => c.type !== "StringConstant")) {
           return true
         }
       } else {
         // Fallback: string-archaeology on arg text (pre-children parsers).
         // Reject `$` (variable), `(` (ParenExpressionAst), `@` (hash/array
         // sub), `{` (scriptblock), `[` (type literal/static method).
-        const arg = args[i] ?? ''
-        const colonIdx = arg.indexOf(':')
+        const arg = args[i] ?? ""
+        const colonIdx = arg.indexOf(":")
         if (colonIdx > 0 && /[$(@{[]/.test(arg.slice(colonIdx + 1))) {
           return true
         }
@@ -132,190 +118,147 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // =========================================================================
     // PowerShell Cmdlets - Filesystem (read-only)
     // =========================================================================
-    'get-childitem': {
+    "get-childitem": {
       safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-Filter',
-        '-Include',
-        '-Exclude',
-        '-Recurse',
-        '-Depth',
-        '-Name',
-        '-Force',
-        '-Attributes',
-        '-Directory',
-        '-File',
-        '-Hidden',
-        '-ReadOnly',
-        '-System',
+        "-Path",
+        "-LiteralPath",
+        "-Filter",
+        "-Include",
+        "-Exclude",
+        "-Recurse",
+        "-Depth",
+        "-Name",
+        "-Force",
+        "-Attributes",
+        "-Directory",
+        "-File",
+        "-Hidden",
+        "-ReadOnly",
+        "-System",
       ],
     },
-    'get-content': {
+    "get-content": {
       safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-TotalCount',
-        '-Head',
-        '-Tail',
-        '-Raw',
-        '-Encoding',
-        '-Delimiter',
-        '-ReadCount',
+        "-Path",
+        "-LiteralPath",
+        "-TotalCount",
+        "-Head",
+        "-Tail",
+        "-Raw",
+        "-Encoding",
+        "-Delimiter",
+        "-ReadCount",
       ],
     },
-    'get-item': {
-      safeFlags: ['-Path', '-LiteralPath', '-Force', '-Stream'],
+    "get-item": {
+      safeFlags: ["-Path", "-LiteralPath", "-Force", "-Stream"],
     },
-    'get-itemproperty': {
-      safeFlags: ['-Path', '-LiteralPath', '-Name'],
+    "get-itemproperty": {
+      safeFlags: ["-Path", "-LiteralPath", "-Name"],
     },
-    'test-path': {
+    "test-path": {
       safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-PathType',
-        '-Filter',
-        '-Include',
-        '-Exclude',
-        '-IsValid',
-        '-NewerThan',
-        '-OlderThan',
+        "-Path",
+        "-LiteralPath",
+        "-PathType",
+        "-Filter",
+        "-Include",
+        "-Exclude",
+        "-IsValid",
+        "-NewerThan",
+        "-OlderThan",
       ],
     },
-    'resolve-path': {
-      safeFlags: ['-Path', '-LiteralPath', '-Relative'],
+    "resolve-path": {
+      safeFlags: ["-Path", "-LiteralPath", "-Relative"],
     },
-    'get-filehash': {
-      safeFlags: ['-Path', '-LiteralPath', '-Algorithm', '-InputStream'],
+    "get-filehash": {
+      safeFlags: ["-Path", "-LiteralPath", "-Algorithm", "-InputStream"],
     },
-    'get-acl': {
-      safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-Audit',
-        '-Filter',
-        '-Include',
-        '-Exclude',
-      ],
+    "get-acl": {
+      safeFlags: ["-Path", "-LiteralPath", "-Audit", "-Filter", "-Include", "-Exclude"],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Navigation (read-only, just changes working directory)
     // =========================================================================
-    'set-location': {
-      safeFlags: ['-Path', '-LiteralPath', '-PassThru', '-StackName'],
+    "set-location": {
+      safeFlags: ["-Path", "-LiteralPath", "-PassThru", "-StackName"],
     },
-    'push-location': {
-      safeFlags: ['-Path', '-LiteralPath', '-PassThru', '-StackName'],
+    "push-location": {
+      safeFlags: ["-Path", "-LiteralPath", "-PassThru", "-StackName"],
     },
-    'pop-location': {
-      safeFlags: ['-PassThru', '-StackName'],
+    "pop-location": {
+      safeFlags: ["-PassThru", "-StackName"],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Text searching/filtering (read-only)
     // =========================================================================
-    'select-string': {
+    "select-string": {
       safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-Pattern',
-        '-InputObject',
-        '-SimpleMatch',
-        '-CaseSensitive',
-        '-Quiet',
-        '-List',
-        '-NotMatch',
-        '-AllMatches',
-        '-Encoding',
-        '-Context',
-        '-Raw',
-        '-NoEmphasis',
+        "-Path",
+        "-LiteralPath",
+        "-Pattern",
+        "-InputObject",
+        "-SimpleMatch",
+        "-CaseSensitive",
+        "-Quiet",
+        "-List",
+        "-NotMatch",
+        "-AllMatches",
+        "-Encoding",
+        "-Context",
+        "-Raw",
+        "-NoEmphasis",
       ],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Data conversion (pure transforms, no side effects)
     // =========================================================================
-    'convertto-json': {
-      safeFlags: [
-        '-InputObject',
-        '-Depth',
-        '-Compress',
-        '-EnumsAsStrings',
-        '-AsArray',
-      ],
+    "convertto-json": {
+      safeFlags: ["-InputObject", "-Depth", "-Compress", "-EnumsAsStrings", "-AsArray"],
     },
-    'convertfrom-json': {
-      safeFlags: ['-InputObject', '-Depth', '-AsHashtable', '-NoEnumerate'],
+    "convertfrom-json": {
+      safeFlags: ["-InputObject", "-Depth", "-AsHashtable", "-NoEnumerate"],
     },
-    'convertto-csv': {
-      safeFlags: [
-        '-InputObject',
-        '-Delimiter',
-        '-NoTypeInformation',
-        '-NoHeader',
-        '-UseQuotes',
-      ],
+    "convertto-csv": {
+      safeFlags: ["-InputObject", "-Delimiter", "-NoTypeInformation", "-NoHeader", "-UseQuotes"],
     },
-    'convertfrom-csv': {
-      safeFlags: ['-InputObject', '-Delimiter', '-Header', '-UseCulture'],
+    "convertfrom-csv": {
+      safeFlags: ["-InputObject", "-Delimiter", "-Header", "-UseCulture"],
     },
-    'convertto-xml': {
-      safeFlags: ['-InputObject', '-Depth', '-As', '-NoTypeInformation'],
+    "convertto-xml": {
+      safeFlags: ["-InputObject", "-Depth", "-As", "-NoTypeInformation"],
     },
-    'convertto-html': {
-      safeFlags: [
-        '-InputObject',
-        '-Property',
-        '-Head',
-        '-Title',
-        '-Body',
-        '-Pre',
-        '-Post',
-        '-As',
-        '-Fragment',
-      ],
+    "convertto-html": {
+      safeFlags: ["-InputObject", "-Property", "-Head", "-Title", "-Body", "-Pre", "-Post", "-As", "-Fragment"],
     },
-    'format-hex': {
-      safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-InputObject',
-        '-Encoding',
-        '-Count',
-        '-Offset',
-      ],
+    "format-hex": {
+      safeFlags: ["-Path", "-LiteralPath", "-InputObject", "-Encoding", "-Count", "-Offset"],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Object inspection and manipulation (read-only)
     // =========================================================================
-    'get-member': {
-      safeFlags: [
-        '-InputObject',
-        '-MemberType',
-        '-Name',
-        '-Static',
-        '-View',
-        '-Force',
-      ],
+    "get-member": {
+      safeFlags: ["-InputObject", "-MemberType", "-Name", "-Static", "-View", "-Force"],
     },
-    'get-unique': {
-      safeFlags: ['-InputObject', '-AsString', '-CaseInsensitive', '-OnType'],
+    "get-unique": {
+      safeFlags: ["-InputObject", "-AsString", "-CaseInsensitive", "-OnType"],
     },
-    'compare-object': {
+    "compare-object": {
       safeFlags: [
-        '-ReferenceObject',
-        '-DifferenceObject',
-        '-Property',
-        '-SyncWindow',
-        '-CaseSensitive',
-        '-Culture',
-        '-ExcludeDifferent',
-        '-IncludeEqual',
-        '-PassThru',
+        "-ReferenceObject",
+        "-DifferenceObject",
+        "-Property",
+        "-SyncWindow",
+        "-CaseSensitive",
+        "-Culture",
+        "-ExcludeDifferent",
+        "-IncludeEqual",
+        "-PassThru",
       ],
     },
     // SECURITY: select-xml REMOVED. XML external entity (XXE) resolution can
@@ -324,16 +267,16 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // "http://evil.com/x">]><x>&e;</x>' -XPath '/'` sends a GET request.
     // PowerShell's XmlDocument.LoadXml doesn't disable entity resolution by
     // default. Removal forces prompt.
-    'join-string': {
+    "join-string": {
       safeFlags: [
-        '-InputObject',
-        '-Property',
-        '-Separator',
-        '-OutputPrefix',
-        '-OutputSuffix',
-        '-SingleQuote',
-        '-DoubleQuote',
-        '-FormatString',
+        "-InputObject",
+        "-Property",
+        "-Separator",
+        "-OutputPrefix",
+        "-OutputSuffix",
+        "-SingleQuote",
+        "-DoubleQuote",
+        "-FormatString",
       ],
     },
     // SECURITY: Test-Json REMOVED. -Schema (positional 1) accepts JSON Schema
@@ -341,15 +284,8 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // request). safeFlags only validates EXPLICIT flags, not positional binding:
     // `Test-Json '{}' '{"$ref":"http://evil.com"}'` → position 1 binds to
     // -Schema → safeFlags check sees two non-flag args, skips both → auto-allow.
-    'get-random': {
-      safeFlags: [
-        '-InputObject',
-        '-Minimum',
-        '-Maximum',
-        '-Count',
-        '-SetSeed',
-        '-Shuffle',
-      ],
+    "get-random": {
+      safeFlags: ["-InputObject", "-Minimum", "-Maximum", "-Count", "-SetSeed", "-Shuffle"],
     },
 
     // =========================================================================
@@ -358,28 +294,28 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // convert-path's entire purpose is to resolve filesystem paths. It is now
     // in CMDLET_PATH_CONFIG for proper path validation, so safeFlags here only
     // list the path parameters (which CMDLET_PATH_CONFIG will validate).
-    'convert-path': {
-      safeFlags: ['-Path', '-LiteralPath'],
+    "convert-path": {
+      safeFlags: ["-Path", "-LiteralPath"],
     },
-    'join-path': {
+    "join-path": {
       // -Resolve removed: it touches the filesystem to verify the joined path
       // exists, but the path was not validated against allowed directories.
       // Without -Resolve, Join-Path is pure string manipulation.
-      safeFlags: ['-Path', '-ChildPath', '-AdditionalChildPath'],
+      safeFlags: ["-Path", "-ChildPath", "-AdditionalChildPath"],
     },
-    'split-path': {
+    "split-path": {
       // -Resolve removed: same rationale as join-path. Without -Resolve,
       // Split-Path is pure string manipulation.
       safeFlags: [
-        '-Path',
-        '-LiteralPath',
-        '-Qualifier',
-        '-NoQualifier',
-        '-Parent',
-        '-Leaf',
-        '-LeafBase',
-        '-Extension',
-        '-IsAbsolute',
+        "-Path",
+        "-LiteralPath",
+        "-Qualifier",
+        "-NoQualifier",
+        "-Parent",
+        "-Leaf",
+        "-LeafBase",
+        "-Extension",
+        "-IsAbsolute",
       ],
     },
 
@@ -389,52 +325,39 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // NOTE: Get-Clipboard is intentionally NOT included - it can expose sensitive
     // data like passwords or API keys that the user may have copied. Bash also
     // does not auto-allow clipboard commands (pbpaste, xclip, etc.).
-    'get-hotfix': {
-      safeFlags: ['-Id', '-Description'],
+    "get-hotfix": {
+      safeFlags: ["-Id", "-Description"],
     },
-    'get-itempropertyvalue': {
-      safeFlags: ['-Path', '-LiteralPath', '-Name'],
+    "get-itempropertyvalue": {
+      safeFlags: ["-Path", "-LiteralPath", "-Name"],
     },
-    'get-psprovider': {
-      safeFlags: ['-PSProvider'],
+    "get-psprovider": {
+      safeFlags: ["-PSProvider"],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Process/System info
     // =========================================================================
-    'get-process': {
-      safeFlags: [
-        '-Name',
-        '-Id',
-        '-Module',
-        '-FileVersionInfo',
-        '-IncludeUserName',
-      ],
+    "get-process": {
+      safeFlags: ["-Name", "-Id", "-Module", "-FileVersionInfo", "-IncludeUserName"],
     },
-    'get-service': {
-      safeFlags: [
-        '-Name',
-        '-DisplayName',
-        '-DependentServices',
-        '-RequiredServices',
-        '-Include',
-        '-Exclude',
-      ],
+    "get-service": {
+      safeFlags: ["-Name", "-DisplayName", "-DependentServices", "-RequiredServices", "-Include", "-Exclude"],
     },
-    'get-computerinfo': {
+    "get-computerinfo": {
       allowAllFlags: true,
     },
-    'get-host': {
+    "get-host": {
       allowAllFlags: true,
     },
-    'get-date': {
-      safeFlags: ['-Date', '-Format', '-UFormat', '-DisplayHint', '-AsUTC'],
+    "get-date": {
+      safeFlags: ["-Date", "-Format", "-UFormat", "-DisplayHint", "-AsUTC"],
     },
-    'get-location': {
-      safeFlags: ['-PSProvider', '-PSDrive', '-Stack', '-StackName'],
+    "get-location": {
+      safeFlags: ["-PSProvider", "-PSDrive", "-Stack", "-StackName"],
     },
-    'get-psdrive': {
-      safeFlags: ['-Name', '-PSProvider', '-Scope'],
+    "get-psdrive": {
+      safeFlags: ["-Name", "-PSProvider", "-Scope"],
     },
     // SECURITY: Get-Command REMOVED from allowlist. -Name (positional 0,
     // ValueFromPipeline=true) triggers module autoload which runs .psm1 init
@@ -443,34 +366,28 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // positional StringConstant, but pipeline input (`'EvilCmdlet' | Get-Command`)
     // bypasses the callback entirely since args are empty. Removal forces
     // prompt. Users who need it can add explicit allow rule.
-    'get-module': {
-      safeFlags: [
-        '-Name',
-        '-ListAvailable',
-        '-All',
-        '-FullyQualifiedName',
-        '-PSEdition',
-      ],
+    "get-module": {
+      safeFlags: ["-Name", "-ListAvailable", "-All", "-FullyQualifiedName", "-PSEdition"],
     },
     // SECURITY: Get-Help REMOVED from allowlist. Same module autoload hazard
     // as Get-Command (-Name has ValueFromPipeline=true, pipeline input bypasses
     // arg-level callback). Removal forces prompt.
-    'get-alias': {
-      safeFlags: ['-Name', '-Definition', '-Scope', '-Exclude'],
+    "get-alias": {
+      safeFlags: ["-Name", "-Definition", "-Scope", "-Exclude"],
     },
-    'get-history': {
-      safeFlags: ['-Id', '-Count'],
+    "get-history": {
+      safeFlags: ["-Id", "-Count"],
     },
-    'get-culture': {
+    "get-culture": {
       allowAllFlags: true,
     },
-    'get-uiculture': {
+    "get-uiculture": {
       allowAllFlags: true,
     },
-    'get-timezone': {
-      safeFlags: ['-Name', '-Id', '-ListAvailable'],
+    "get-timezone": {
+      safeFlags: ["-Name", "-Id", "-ListAvailable"],
     },
-    'get-uptime': {
+    "get-uptime": {
       allowAllFlags: true,
     },
 
@@ -480,28 +397,22 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // Bash parity: `echo` is auto-allowed via custom regex (BashTool
     // readOnlyValidation.ts:~1517). That regex WHITELISTS safe chars per arg.
     // See argLeaksValue above for the three attack shapes it blocks.
-    'write-output': {
-      safeFlags: ['-InputObject', '-NoEnumerate'],
+    "write-output": {
+      safeFlags: ["-InputObject", "-NoEnumerate"],
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
     // Write-Host bypasses the pipeline (Information stream, PS5+), so it's
     // strictly less capable than Write-Output — but the same
     // `Write-Host $env:SECRET` leak-via-display applies.
-    'write-host': {
-      safeFlags: [
-        '-Object',
-        '-NoNewline',
-        '-Separator',
-        '-ForegroundColor',
-        '-BackgroundColor',
-      ],
+    "write-host": {
+      safeFlags: ["-Object", "-NoNewline", "-Separator", "-ForegroundColor", "-BackgroundColor"],
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
     // Bash parity: `sleep` is in READONLY_COMMANDS (BashTool
     // readOnlyValidation.ts:~1146). Zero side effects at runtime — but
     // `Start-Sleep $env:SECRET` leaks via type-coerce error. Same guard.
-    'start-sleep': {
-      safeFlags: ['-Seconds', '-Milliseconds', '-Duration'],
+    "start-sleep": {
+      safeFlags: ["-Seconds", "-Milliseconds", "-Duration"],
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
     // Format-* and Measure-Object moved here from SAFE_OUTPUT_CMDLETS after
@@ -518,23 +429,23 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // ScriptBlock → blocked). Format-* flags themselves (-AutoSize, -GroupBy,
     // -Wrap, etc.) are display-only. Without allowAllFlags, the empty-safeFlags
     // default rejects ALL flags — `Format-Table -AutoSize` would over-prompt.
-    'format-table': {
+    "format-table": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'format-list': {
+    "format-list": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'format-wide': {
+    "format-wide": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'format-custom': {
+    "format-custom": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'measure-object': {
+    "measure-object": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
@@ -547,19 +458,19 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // `Where-Object { ... }`). allowAllFlags: -First/-Last/-Skip/-Descending/
     // -Property/-EQ etc. are all selection/ordering flags — harmless on their own;
     // argLeaksValue catches the dangerous arg *values*.
-    'select-object': {
+    "select-object": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'sort-object': {
+    "sort-object": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'group-object': {
+    "group-object": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'where-object': {
+    "where-object": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
@@ -568,11 +479,11 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // `Get-Process | Out-String -InputObject $env:SECRET` → secret prints.
     // allowAllFlags: -Width/-Stream/-Paging/-NoNewline are display flags;
     // argLeaksValue catches the dangerous -InputObject *value*.
-    'out-string': {
+    "out-string": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
-    'out-host': {
+    "out-host": {
       allowAllFlags: true,
       additionalCommandIsDangerousCallback: argLeaksValue,
     },
@@ -580,62 +491,47 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // =========================================================================
     // PowerShell Cmdlets - Network info (read-only)
     // =========================================================================
-    'get-netadapter': {
-      safeFlags: [
-        '-Name',
-        '-InterfaceDescription',
-        '-InterfaceIndex',
-        '-Physical',
-      ],
+    "get-netadapter": {
+      safeFlags: ["-Name", "-InterfaceDescription", "-InterfaceIndex", "-Physical"],
     },
-    'get-netipaddress': {
-      safeFlags: [
-        '-InterfaceIndex',
-        '-InterfaceAlias',
-        '-AddressFamily',
-        '-Type',
-      ],
+    "get-netipaddress": {
+      safeFlags: ["-InterfaceIndex", "-InterfaceAlias", "-AddressFamily", "-Type"],
     },
-    'get-netipconfiguration': {
-      safeFlags: ['-InterfaceIndex', '-InterfaceAlias', '-Detailed', '-All'],
+    "get-netipconfiguration": {
+      safeFlags: ["-InterfaceIndex", "-InterfaceAlias", "-Detailed", "-All"],
     },
-    'get-netroute': {
-      safeFlags: [
-        '-InterfaceIndex',
-        '-InterfaceAlias',
-        '-AddressFamily',
-        '-DestinationPrefix',
-      ],
+    "get-netroute": {
+      safeFlags: ["-InterfaceIndex", "-InterfaceAlias", "-AddressFamily", "-DestinationPrefix"],
     },
-    'get-dnsclientcache': {
+    "get-dnsclientcache": {
       // SECURITY: -CimSession/-ThrottleLimit excluded. -CimSession connects to
       // a remote host (network request). Previously empty config = all flags OK.
-      safeFlags: ['-Entry', '-Name', '-Type', '-Status', '-Section', '-Data'],
+      safeFlags: ["-Entry", "-Name", "-Type", "-Status", "-Section", "-Data"],
     },
-    'get-dnsclient': {
-      safeFlags: ['-InterfaceIndex', '-InterfaceAlias'],
+    "get-dnsclient": {
+      safeFlags: ["-InterfaceIndex", "-InterfaceAlias"],
     },
 
     // =========================================================================
     // PowerShell Cmdlets - Event log (read-only)
     // =========================================================================
-    'get-eventlog': {
+    "get-eventlog": {
       safeFlags: [
-        '-LogName',
-        '-Newest',
-        '-After',
-        '-Before',
-        '-EntryType',
-        '-Index',
-        '-InstanceId',
-        '-Message',
-        '-Source',
-        '-UserName',
-        '-AsBaseObject',
-        '-List',
+        "-LogName",
+        "-Newest",
+        "-After",
+        "-Before",
+        "-EntryType",
+        "-Index",
+        "-InstanceId",
+        "-Message",
+        "-Source",
+        "-UserName",
+        "-AsBaseObject",
+        "-List",
       ],
     },
-    'get-winevent': {
+    "get-winevent": {
       // SECURITY: -FilterXml/-FilterHashtable removed. -FilterXml accepts XML
       // with DOCTYPE external entities (XXE → network request). -FilterHashtable
       // would be caught by the elementTypes 'Other' check since @{} is
@@ -643,15 +539,15 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
       // (removed above). -FilterXPath kept (string pattern only, no entity
       // resolution). -ComputerName/-Credential also implicitly excluded.
       safeFlags: [
-        '-LogName',
-        '-ListLog',
-        '-ListProvider',
-        '-ProviderName',
-        '-Path',
-        '-MaxEvents',
-        '-FilterXPath',
-        '-Force',
-        '-Oldest',
+        "-LogName",
+        "-ListLog",
+        "-ListProvider",
+        "-ProviderName",
+        "-Path",
+        "-MaxEvents",
+        "-FilterXPath",
+        "-Force",
+        "-Oldest",
       ],
     },
 
@@ -667,14 +563,8 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     //   → sends ICMP to evil.com (DNS leak + potential NTLM auth leak).
     // WMI can also auto-load provider DLLs (init code). Removal forces prompt.
     // get-cimclass stays — only lists class metadata, no instance enumeration.
-    'get-cimclass': {
-      safeFlags: [
-        '-ClassName',
-        '-Namespace',
-        '-MethodName',
-        '-PropertyName',
-        '-QualifierName',
-      ],
+    "get-cimclass": {
+      safeFlags: ["-ClassName", "-Namespace", "-MethodName", "-PropertyName", "-QualifierName"],
     },
 
     // =========================================================================
@@ -701,83 +591,49 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
       // are SKIPPED. Reject any positional argument — only bare `ipconfig` or
       // `ipconfig /all` (read-only display) allowed. Windows ipconfig only uses
       // /flags (display), macOS ipconfig uses subcommands (get/set/waitall).
-      safeFlags: ['/all', '/displaydns', '/allcompartments'],
-      additionalCommandIsDangerousCallback: (
-        _cmd: string,
-        element?: ParsedCommandElement,
-      ) => {
-        return (element?.args ?? []).some(
-          a => !a.startsWith('/') && !a.startsWith('-'),
-        )
+      safeFlags: ["/all", "/displaydns", "/allcompartments"],
+      additionalCommandIsDangerousCallback: (_cmd: string, element?: ParsedCommandElement) => {
+        return (element?.args ?? []).some((a) => !a.startsWith("/") && !a.startsWith("-"))
       },
     },
     netstat: {
-      safeFlags: [
-        '-a',
-        '-b',
-        '-e',
-        '-f',
-        '-n',
-        '-o',
-        '-p',
-        '-q',
-        '-r',
-        '-s',
-        '-t',
-        '-x',
-        '-y',
-      ],
+      safeFlags: ["-a", "-b", "-e", "-f", "-n", "-o", "-p", "-q", "-r", "-s", "-t", "-x", "-y"],
     },
     systeminfo: {
-      safeFlags: ['/FO', '/NH'],
+      safeFlags: ["/FO", "/NH"],
     },
     tasklist: {
-      safeFlags: ['/M', '/SVC', '/V', '/FI', '/FO', '/NH'],
+      safeFlags: ["/M", "/SVC", "/V", "/FI", "/FO", "/NH"],
     },
     // where.exe: Windows PATH locator, bash `which` equivalent. Reaches here via
     // SAFE_EXTERNAL_EXES bypass at the nameType gate in isAllowlistedCommand.
     // All flags are read-only (/R /F /T /Q), matching bash's treatment of `which`
     // in BashTool READONLY_COMMANDS.
-    'where.exe': {
+    "where.exe": {
       allowAllFlags: true,
     },
     hostname: {
       // SECURITY: `hostname NAME` on Linux/macOS SETS the hostname (writes to
       // system config). `hostname -F FILE` / `--file=FILE` also sets from file.
       // Only allow bare `hostname` and known read-only flags.
-      safeFlags: ['-a', '-d', '-f', '-i', '-I', '-s', '-y', '-A'],
-      additionalCommandIsDangerousCallback: (
-        _cmd: string,
-        element?: ParsedCommandElement,
-      ) => {
+      safeFlags: ["-a", "-d", "-f", "-i", "-I", "-s", "-y", "-A"],
+      additionalCommandIsDangerousCallback: (_cmd: string, element?: ParsedCommandElement) => {
         // Reject any positional (non-flag) argument — sets hostname.
-        return (element?.args ?? []).some(a => !a.startsWith('-'))
+        return (element?.args ?? []).some((a) => !a.startsWith("-"))
       },
     },
     whoami: {
-      safeFlags: [
-        '/user',
-        '/groups',
-        '/claims',
-        '/priv',
-        '/logonid',
-        '/all',
-        '/fo',
-        '/nh',
-      ],
+      safeFlags: ["/user", "/groups", "/claims", "/priv", "/logonid", "/all", "/fo", "/nh"],
     },
     ver: {
       allowAllFlags: true,
     },
     arp: {
-      safeFlags: ['-a', '-g', '-v', '-N'],
+      safeFlags: ["-a", "-g", "-v", "-N"],
     },
     route: {
-      safeFlags: ['print', 'PRINT', '-4', '-6'],
-      additionalCommandIsDangerousCallback: (
-        _cmd: string,
-        element?: ParsedCommandElement,
-      ) => {
+      safeFlags: ["print", "PRINT", "-4", "-6"],
+      additionalCommandIsDangerousCallback: (_cmd: string, element?: ParsedCommandElement) => {
         // SECURITY: route.exe syntax is `route [-f] [-p] [-4|-6] VERB [args...]`.
         // The first non-flag positional is the verb. `route add 10.0.0.0 mask
         // 255.0.0.0 192.168.1.1 print` adds a route (print is a trailing display
@@ -786,8 +642,8 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
         if (!element) {
           return true
         }
-        const verb = element.args.find(a => !a.startsWith('-'))
-        return verb?.toLowerCase() !== 'print'
+        const verb = element.args.find((a) => !a.startsWith("-"))
+        return verb?.toLowerCase() !== "print"
       },
     },
     // netsh: intentionally NOT allowlisted. Three rounds of denylist gaps in PR
@@ -799,7 +655,7 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // another gap. `route` stays — `route print` is the only read-only form,
     // simple single-verb-position grammar.
     getmac: {
-      safeFlags: ['/FO', '/NH', '/V'],
+      safeFlags: ["/FO", "/NH", "/V"],
     },
 
     // =========================================================================
@@ -810,62 +666,62 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
     // allow introspection flags; reject -C / --compile / -m / --magic-file.
     file: {
       safeFlags: [
-        '-b',
-        '--brief',
-        '-i',
-        '--mime',
-        '-L',
-        '--dereference',
-        '--mime-type',
-        '--mime-encoding',
-        '-z',
-        '--uncompress',
-        '-p',
-        '--preserve-date',
-        '-k',
-        '--keep-going',
-        '-r',
-        '--raw',
-        '-v',
-        '--version',
-        '-0',
-        '--print0',
-        '-s',
-        '--special-files',
-        '-l',
-        '-F',
-        '--separator',
-        '-e',
-        '-P',
-        '-N',
-        '--no-pad',
-        '-E',
-        '--extension',
+        "-b",
+        "--brief",
+        "-i",
+        "--mime",
+        "-L",
+        "--dereference",
+        "--mime-type",
+        "--mime-encoding",
+        "-z",
+        "--uncompress",
+        "-p",
+        "--preserve-date",
+        "-k",
+        "--keep-going",
+        "-r",
+        "--raw",
+        "-v",
+        "--version",
+        "-0",
+        "--print0",
+        "-s",
+        "--special-files",
+        "-l",
+        "-F",
+        "--separator",
+        "-e",
+        "-P",
+        "-N",
+        "--no-pad",
+        "-E",
+        "--extension",
       ],
     },
     tree: {
-      safeFlags: ['/F', '/A', '/Q', '/L'],
+      safeFlags: ["/F", "/A", "/Q", "/L"],
     },
     findstr: {
       safeFlags: [
-        '/B',
-        '/E',
-        '/L',
-        '/R',
-        '/S',
-        '/I',
-        '/X',
-        '/V',
-        '/N',
-        '/M',
-        '/O',
-        '/P',
+        "/B",
+        "/E",
+        "/L",
+        "/R",
+        "/S",
+        "/I",
+        "/X",
+        "/V",
+        "/N",
+        "/M",
+        "/O",
+        "/P",
         // Flag matching strips ':' before comparison (e.g., /C:pattern → /C),
         // so these entries must NOT include the trailing colon.
-        '/C',
-        '/G',
-        '/D',
-        '/A',
+        "/C",
+        "/G",
+        "/D",
+        "/A",
       ],
     },
 
@@ -886,7 +742,7 @@ export const CMDLET_ALLOWLIST: Record<string, CommandConfig> = Object.assign(
  * Stored as canonical cmdlet names in lowercase.
  */
 const SAFE_OUTPUT_CMDLETS = new Set([
-  'out-null',
+  "out-null",
   // NOT out-string/out-host — both accept -InputObject which leaks args the
   // same way Write-Output does. Moved to CMDLET_ALLOWLIST with argLeaksValue.
   // `Get-Process | Out-String -InputObject $env:SECRET` — Out-String was
@@ -929,17 +785,17 @@ const SAFE_OUTPUT_CMDLETS = new Set([
  * the argLeaksValue guard.
  */
 const PIPELINE_TAIL_CMDLETS = new Set([
-  'format-table',
-  'format-list',
-  'format-wide',
-  'format-custom',
-  'measure-object',
-  'select-object',
-  'sort-object',
-  'group-object',
-  'where-object',
-  'out-string',
-  'out-host',
+  "format-table",
+  "format-list",
+  "format-wide",
+  "format-custom",
+  "measure-object",
+  "select-object",
+  "sort-object",
+  "group-object",
+  "where-object",
+  "out-string",
+  "out-host",
 ])
 
 /**
@@ -961,7 +817,7 @@ const PIPELINE_TAIL_CMDLETS = new Set([
  * Each entry here MUST have a matching CMDLET_ALLOWLIST entry for flag
  * validation.
  */
-const SAFE_EXTERNAL_EXES = new Set(['where.exe'])
+const SAFE_EXTERNAL_EXES = new Set(["where.exe"])
 
 /**
  * Windows PATHEXT extensions that PowerShell resolves via PATH lookup.
@@ -985,8 +841,8 @@ export function resolveToCanonical(name: string): string {
   let lower = name.toLowerCase()
   // Only strip PATHEXT on bare names — paths run a specific file, not the
   // PATH-resolved executable the guards are protecting against.
-  if (!lower.includes('\\') && !lower.includes('/')) {
-    lower = lower.replace(WINDOWS_PATHEXT, '')
+  if (!lower.includes("\\") && !lower.includes("/")) {
+    lower = lower.replace(WINDOWS_PATHEXT, "")
   }
   const alias = COMMON_ALIASES[lower]
   if (alias) {
@@ -1017,18 +873,17 @@ export function resolveToCanonical(name: string): string {
 export function isCwdChangingCmdlet(name: string): boolean {
   const canonical = resolveToCanonical(name)
   return (
-    canonical === 'set-location' ||
-    canonical === 'push-location' ||
-    canonical === 'pop-location' ||
+    canonical === "set-location" ||
+    canonical === "push-location" ||
+    canonical === "pop-location" ||
     // New-PSDrive creates a drive mapping that redirects <name>:/... paths
     // to an arbitrary filesystem root. Aliases ndr/mount are not in
     // COMMON_ALIASES — check them explicitly (finding #21).
-    canonical === 'new-psdrive' ||
+    canonical === "new-psdrive" ||
     // ndr/mount are PS aliases for New-PSDrive on Windows only. On POSIX,
     // 'mount' is the native mount(8) command; treating it as PSDrive-creating
     // would false-positive. (bug #15 / review nit)
-    (getPlatform() === 'windows' &&
-      (canonical === 'ndr' || canonical === 'mount'))
+    (getPlatform() === "windows" && (canonical === "ndr" || canonical === "mount"))
   )
 }
 
@@ -1049,10 +904,7 @@ export function isSafeOutputCommand(name: string): boolean {
  * "skip harmless pipeline tail" behavior for Format-Table / Select-Object / etc.
  * Does NOT match the full CMDLET_ALLOWLIST — only the migrated transformers.
  */
-export function isAllowlistedPipelineTail(
-  cmd: ParsedCommandElement,
-  originalCommand: string,
-): boolean {
+export function isAllowlistedPipelineTail(cmd: ParsedCommandElement, originalCommand: string): boolean {
   const canonical = resolveToCanonical(cmd.name)
   if (!PIPELINE_TAIL_CMDLETS.has(canonical)) {
     return false
@@ -1070,13 +922,13 @@ export function isAllowlistedPipelineTail(
  * through to false by construction.
  */
 export function isProvablySafeStatement(stmt: ParsedStatement): boolean {
-  if (stmt.statementType !== 'PipelineAst') return false
+  if (stmt.statementType !== "PipelineAst") return false
   // Empty commands → vacuously passes the loop below. PowerShell's
   // parser guarantees PipelineAst.PipelineElements ≥ 1 for valid source,
   // but this gate is the linchpin — defend against parser/JSON edge cases.
   if (stmt.commands.length === 0) return false
   for (const cmd of stmt.commands) {
-    if (cmd.elementType !== 'CommandAst') return false
+    if (cmd.elementType !== "CommandAst") return false
   }
   return true
 }
@@ -1165,10 +1017,7 @@ export function hasSyncSecurityConcerns(command: string): boolean {
  * @param parsed - The AST-parsed representation of the command
  * @returns true if the command is read-only, false otherwise
  */
-export function isReadOnlyCommand(
-  command: string,
-  parsed?: ParsedPowerShellCommand,
-): boolean {
+export function isReadOnlyCommand(command: string, parsed?: ParsedPowerShellCommand): boolean {
   const trimmedCommand = command.trim()
   if (!trimmedCommand) {
     return false
@@ -1220,14 +1069,9 @@ export function isReadOnlyCommand(
   // read-only when other statements may use relative paths — those paths
   // resolve differently at runtime than at validation time. BashTool has the
   // equivalent guard via compoundCommandHasCd threading into path validation.
-  const totalCommands = segments.reduce(
-    (sum, seg) => sum + seg.commands.length,
-    0,
-  )
+  const totalCommands = segments.reduce((sum, seg) => sum + seg.commands.length, 0)
   if (totalCommands > 1) {
-    const hasCd = segments.some(seg =>
-      seg.commands.some(cmd => isCwdChangingCmdlet(cmd.name)),
-    )
+    const hasCd = segments.some((seg) => seg.commands.some((cmd) => isCwdChangingCmdlet(cmd.name)))
     if (hasCd) {
       return false
     }
@@ -1242,9 +1086,7 @@ export function isReadOnlyCommand(
     // Reject file redirections (writing to files). `> $null` discards output
     // and is not a filesystem write, so it doesn't disqualify read-only status.
     if (pipeline.redirections.length > 0) {
-      const hasFileRedirection = pipeline.redirections.some(
-        r => !r.isMerging && !isNullRedirectionTarget(r.target),
-      )
+      const hasFileRedirection = pipeline.redirections.some((r) => !r.isMerging && !isNullRedirectionTarget(r.target))
       if (hasFileRedirection) {
         return false
       }
@@ -1271,7 +1113,7 @@ export function isReadOnlyCommand(
     // scripts\\Out-Null.ps1.
     for (let i = 1; i < pipeline.commands.length; i++) {
       const cmd = pipeline.commands[i]
-      if (!cmd || cmd.nameType === 'application') {
+      if (!cmd || cmd.nameType === "application") {
         return false
       }
       // SECURITY: isSafeOutputCommand is name-only; only short-circuit for
@@ -1307,10 +1149,7 @@ export function isReadOnlyCommand(
 /**
  * Checks if a single command element is in the allowlist and passes flag validation.
  */
-export function isAllowlistedCommand(
-  cmd: ParsedCommandElement,
-  originalCommand: string,
-): boolean {
+export function isAllowlistedCommand(cmd: ParsedCommandElement, originalCommand: string): boolean {
   // SECURITY: nameType is computed from the raw (pre-stripModulePrefix) name.
   // 'application' means the raw name contains path chars (. \\ /) — e.g.
   // 'scripts\\Get-Process', './git', 'node.exe'. PowerShell resolves these as
@@ -1319,12 +1158,12 @@ export function isAllowlistedCommand(
   // Known collateral: 'Microsoft.PowerShell.Management\\Get-ChildItem' also
   // classifies as 'application' (contains . and \\) and will prompt. Acceptable
   // since module-qualified names are rare in practice and prompting is safe.
-  if (cmd.nameType === 'application') {
+  if (cmd.nameType === "application") {
     // Bypass for explicit safe .exe names (bash `which` parity — see
     // SAFE_EXTERNAL_EXES). SECURITY: match the raw first token of cmd.text,
     // not cmd.name. stripModulePrefix collapses scripts\where.exe →
     // cmd.name='where.exe', but cmd.text preserves 'scripts\where.exe ...'.
-    const rawFirstToken = cmd.text.split(/\s/, 1)[0]?.toLowerCase() ?? ''
+    const rawFirstToken = cmd.text.split(/\s/, 1)[0]?.toLowerCase() ?? ""
     if (!SAFE_EXTERNAL_EXES.has(rawFirstToken)) {
       return false
     }
@@ -1383,12 +1222,12 @@ export function isAllowlistedCommand(
   {
     for (let i = 1; i < cmd.elementTypes.length; i++) {
       const t = cmd.elementTypes[i]
-      if (t !== 'StringConstant' && t !== 'Parameter') {
+      if (t !== "StringConstant" && t !== "Parameter") {
         // ArrayLiteralAst (`Get-Process Name, Id`) maps to 'Other'. The
         // leak vectors enumerated above all have a metachar in their extent
         // text: Hashtable `@{`, Convert `[`, BinaryExpr-with-var `$`,
         // ParenExpr `(`. A bare comma-list of identifiers has none.
-        if (!/[$(@{[]/.test(cmd.args[i - 1] ?? '')) {
+        if (!/[$(@{[]/.test(cmd.args[i - 1] ?? "")) {
           continue
         }
         return false
@@ -1406,18 +1245,18 @@ export function isAllowlistedCommand(
       // `-Name:('payload' > file)` (ParenExpressionAst with redirection).
       // Fallback to the extended metachar check when children is undefined
       // (backward compat / test helpers that don't set it).
-      if (t === 'Parameter') {
+      if (t === "Parameter") {
         const paramChildren = cmd.children?.[i - 1]
         if (paramChildren) {
-          if (paramChildren.some(c => c.type !== 'StringConstant')) {
+          if (paramChildren.some((c) => c.type !== "StringConstant")) {
             return false
           }
         } else {
           // Fallback: string-archaeology on arg text (pre-children parsers).
           // Reject `$` (variable), `(` (ParenExpressionAst), `@` (hash/array
           // sub), `{` (scriptblock), `[` (type literal/static method).
-          const arg = cmd.args[i - 1] ?? ''
-          const colonIdx = arg.indexOf(':')
+          const arg = cmd.args[i - 1] ?? ""
+          const colonIdx = arg.indexOf(":")
           if (colonIdx > 0 && /[$(@{[]/.test(arg.slice(colonIdx + 1))) {
             return false
           }
@@ -1429,12 +1268,7 @@ export function isAllowlistedCommand(
   const canonical = resolveToCanonical(cmd.name)
 
   // Handle external commands via shared validation
-  if (
-    canonical === 'git' ||
-    canonical === 'gh' ||
-    canonical === 'docker' ||
-    canonical === 'dotnet'
-  ) {
+  if (canonical === "git" || canonical === "gh" || canonical === "docker" || canonical === "dotnet") {
     return isExternalCommandSafe(canonical, cmd.args)
   }
 
@@ -1442,7 +1276,7 @@ export function isAllowlistedCommand(
   // But PowerShell cmdlets always use - prefixed parameters, so /tmp is a path,
   // not a flag. We detect cmdlets by checking if the command resolves to a
   // Verb-Noun canonical name (either directly or via alias).
-  const isCmdlet = canonical.includes('-')
+  const isCmdlet = canonical.includes("-")
 
   // SECURITY: if allowAllFlags is set, skip flag validation (command's entire
   // flag surface is read-only). Otherwise, missing/empty safeFlags means
@@ -1458,10 +1292,7 @@ export function isAllowlistedCommand(
       if (isCmdlet) {
         return isPowerShellParameter(arg, cmd.elementTypes?.[i + 1])
       }
-      return (
-        arg.startsWith('-') ||
-        (process.platform === 'win32' && arg.startsWith('/'))
-      )
+      return arg.startsWith("-") || (process.platform === "win32" && arg.startsWith("/"))
     })
     return !hasFlags
   }
@@ -1480,14 +1311,13 @@ export function isAllowlistedCommand(
     // tokenizer — the parser sees `/S` as a positional, not CommandParameterAst).
     const isFlag = isCmdlet
       ? isPowerShellParameter(arg, cmd.elementTypes?.[i + 1])
-      : arg.startsWith('-') ||
-        (process.platform === 'win32' && arg.startsWith('/'))
+      : arg.startsWith("-") || (process.platform === "win32" && arg.startsWith("/"))
     if (isFlag) {
       // For cmdlets, normalize Unicode dash to ASCII hyphen for safeFlags
       // comparison (safeFlags entries are always written with ASCII `-`).
       // Native-exe safeFlags are stored with `/` (e.g. '/FO') — don't touch.
-      let paramName = isCmdlet ? '-' + arg.slice(1) : arg
-      const colonIndex = paramName.indexOf(':')
+      let paramName = isCmdlet ? "-" + arg.slice(1) : arg
+      const colonIndex = paramName.indexOf(":")
       if (colonIndex > 0) {
         paramName = paramName.substring(0, colonIndex)
       }
@@ -1503,9 +1333,7 @@ export function isAllowlistedCommand(
       if (isCmdlet && COMMON_PARAMETERS.has(paramLower)) {
         continue
       }
-      const isSafe = config.safeFlags.some(
-        flag => flag.toLowerCase() === paramLower,
-      )
+      const isSafe = config.safeFlags.some((flag) => flag.toLowerCase() === paramLower)
       if (!isSafe) {
         return false
       }
@@ -1521,13 +1349,13 @@ export function isAllowlistedCommand(
 
 function isExternalCommandSafe(command: string, args: string[]): boolean {
   switch (command) {
-    case 'git':
+    case "git":
       return isGitSafe(args)
-    case 'gh':
+    case "gh":
       return isGhSafe(args)
-    case 'docker':
+    case "docker":
       return isDockerSafe(args)
-    case 'dotnet':
+    case "dotnet":
       return isDotnetSafe(args)
     default:
       return false
@@ -1535,12 +1363,12 @@ function isExternalCommandSafe(command: string, args: string[]): boolean {
 }
 
 const DANGEROUS_GIT_GLOBAL_FLAGS = new Set([
-  '-c',
-  '-C',
-  '--exec-path',
-  '--config-env',
-  '--git-dir',
-  '--work-tree',
+  "-c",
+  "-C",
+  "--exec-path",
+  "--config-env",
+  "--git-dir",
+  "--work-tree",
   // SECURITY: --attr-source creates a parser differential. Git treats the
   // token after the tree-ish value as a pathspec (not the subcommand), but
   // our skip-by-2 loop would treat it as the subcommand:
@@ -1549,7 +1377,7 @@ const DANGEROUS_GIT_GLOBAL_FLAGS = new Set([
   //   git:       consumes `log` as pathspec, runs `status` as the real subcmd
   // Verified with `GIT_TRACE=1 git --attr-source HEAD~10 log status` →
   // `trace: built-in: git status`. Reject outright rather than skip-by-2.
-  '--attr-source',
+  "--attr-source",
 ])
 
 // Git global flags that accept a separate (space-separated) value argument.
@@ -1564,22 +1392,22 @@ const DANGEROUS_GIT_GLOBAL_FLAGS = new Set([
 // default path. --attr-source REMOVED: it also triggers pathspec parsing,
 // creating a second differential — moved to DANGEROUS_GIT_GLOBAL_FLAGS above.
 const GIT_GLOBAL_FLAGS_WITH_VALUES = new Set([
-  '-c',
-  '-C',
-  '--exec-path',
-  '--config-env',
-  '--git-dir',
-  '--work-tree',
-  '--namespace',
-  '--super-prefix',
-  '--shallow-file',
+  "-c",
+  "-C",
+  "--exec-path",
+  "--config-env",
+  "--git-dir",
+  "--work-tree",
+  "--namespace",
+  "--super-prefix",
+  "--shallow-file",
 ])
 
 // Git short global flags that accept attached-form values (no space between
 // flag letter and value). Long options (--git-dir etc.) require `=` or space,
 // so the split-on-`=` check handles them. But `-ccore.pager=sh` and `-C/path`
 // need prefix matching: git parses `-c<name>=<value>` and `-C<path>` directly.
-const DANGEROUS_GIT_SHORT_FLAGS_ATTACHED = ['-c', '-C']
+const DANGEROUS_GIT_SHORT_FLAGS_ATTACHED = ["-c", "-C"]
 
 function isGitSafe(args: string[]): boolean {
   if (args.length === 0) {
@@ -1597,7 +1425,7 @@ function isGitSafe(args: string[]): boolean {
   // Bash equivalent: BashTool blanket
   // `$` rejection at readOnlyValidation.ts:~1352. isGhSafe has the same guard.
   for (const arg of args) {
-    if (arg.includes('$')) {
+    if (arg.includes("$")) {
       return false
     }
   }
@@ -1608,7 +1436,7 @@ function isGitSafe(args: string[]): boolean {
   let idx = 0
   while (idx < args.length) {
     const arg = args[idx]
-    if (!arg || !arg.startsWith('-')) {
+    if (!arg || !arg.startsWith("-")) {
       break
     }
     // SECURITY: Attached-form short flags. `-ccore.pager=sh` splits on `=` to
@@ -1623,13 +1451,13 @@ function isGitSafe(args: string[]): boolean {
       if (
         arg.length > shortFlag.length &&
         arg.startsWith(shortFlag) &&
-        (shortFlag === '-C' || arg[shortFlag.length] !== '-')
+        (shortFlag === "-C" || arg[shortFlag.length] !== "-")
       ) {
         return false
       }
     }
-    const hasInlineValue = arg.includes('=')
-    const flagName = hasInlineValue ? arg.split('=')[0] || '' : arg
+    const hasInlineValue = arg.includes("=")
+    const flagName = hasInlineValue ? arg.split("=")[0] || "" : arg
     if (DANGEROUS_GIT_GLOBAL_FLAGS.has(flagName)) {
       return false
     }
@@ -1646,15 +1474,14 @@ function isGitSafe(args: string[]): boolean {
   }
 
   // Try multi-word subcommand first (e.g. 'stash list', 'config --get', 'remote show')
-  const first = args[idx]?.toLowerCase() || ''
-  const second = idx + 1 < args.length ? args[idx + 1]?.toLowerCase() || '' : ''
+  const first = args[idx]?.toLowerCase() || ""
+  const second = idx + 1 < args.length ? args[idx + 1]?.toLowerCase() || "" : ""
 
   // GIT_READ_ONLY_COMMANDS keys are like 'git diff', 'git stash list'
   const twoWordKey = `git ${first} ${second}`
   const oneWordKey = `git ${first}`
 
-  let config: ExternalCommandConfig | undefined =
-    GIT_READ_ONLY_COMMANDS[twoWordKey]
+  let config: ExternalCommandConfig | undefined = GIT_READ_ONLY_COMMANDS[twoWordKey]
   let subcommandTokens = 2
 
   if (!config) {
@@ -1676,33 +1503,25 @@ function isGitSafe(args: string[]): boolean {
   // literal string '$env:URL' when the arg's elementType is Variable; the
   // security-flag checks don't gate bare Variable positionals passed to
   // external commands).
-  if (first === 'ls-remote') {
+  if (first === "ls-remote") {
     for (const arg of flagArgs) {
-      if (!arg.startsWith('-')) {
-        if (
-          arg.includes('://') ||
-          arg.includes('@') ||
-          arg.includes(':') ||
-          arg.includes('$')
-        ) {
+      if (!arg.startsWith("-")) {
+        if (arg.includes("://") || arg.includes("@") || arg.includes(":") || arg.includes("$")) {
           return false
         }
       }
     }
   }
 
-  if (
-    config.additionalCommandIsDangerousCallback &&
-    config.additionalCommandIsDangerousCallback('', flagArgs)
-  ) {
+  if (config.additionalCommandIsDangerousCallback && config.additionalCommandIsDangerousCallback("", flagArgs)) {
     return false
   }
-  return validateFlags(flagArgs, 0, config, { commandName: 'git' })
+  return validateFlags(flagArgs, 0, config, { commandName: "git" })
 }
 
 function isGhSafe(args: string[]): boolean {
   // gh commands are network-dependent; only allow for ant users
-  if (process.env.USER_TYPE !== 'ant') {
+  if (process.env.USER_TYPE !== "ant") {
     return false
   }
 
@@ -1743,14 +1562,11 @@ function isGhSafe(args: string[]): boolean {
   // git ls-remote has an equivalent inline guard; this generalizes it for gh.
   // Bash equivalent: BashTool blanket `$` rejection at readOnlyValidation.ts:~1352.
   for (const arg of flagArgs) {
-    if (arg.includes('$')) {
+    if (arg.includes("$")) {
       return false
     }
   }
-  if (
-    config.additionalCommandIsDangerousCallback &&
-    config.additionalCommandIsDangerousCallback('', flagArgs)
-  ) {
+  if (config.additionalCommandIsDangerousCallback && config.additionalCommandIsDangerousCallback("", flagArgs)) {
     return false
   }
   return validateFlags(flagArgs, 0, config)
@@ -1774,7 +1590,7 @@ function isDockerSafe(args: string[]): boolean {
   // ParsedCommandElement; the isAllowlistedCommand caller applies the
   // elementTypes gate one layer up.
   for (const arg of args) {
-    if (arg.includes('$')) {
+    if (arg.includes("$")) {
       return false
     }
   }
@@ -1789,18 +1605,14 @@ function isDockerSafe(args: string[]): boolean {
 
   // DOCKER_READ_ONLY_COMMANDS entries ('docker logs', 'docker inspect') have
   // per-flag configs. Mirrors isGhSafe: look up config, then validateFlags.
-  const config: ExternalCommandConfig | undefined =
-    DOCKER_READ_ONLY_COMMANDS[oneWordKey]
+  const config: ExternalCommandConfig | undefined = DOCKER_READ_ONLY_COMMANDS[oneWordKey]
   if (!config) {
     return false
   }
 
   const flagArgs = args.slice(1)
 
-  if (
-    config.additionalCommandIsDangerousCallback &&
-    config.additionalCommandIsDangerousCallback('', flagArgs)
-  ) {
+  if (config.additionalCommandIsDangerousCallback && config.additionalCommandIsDangerousCallback("", flagArgs)) {
     return false
   }
   return validateFlags(flagArgs, 0, config)

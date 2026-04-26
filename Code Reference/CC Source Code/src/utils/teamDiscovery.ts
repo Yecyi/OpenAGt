@@ -5,8 +5,8 @@
  * Used by the Teams UI in the footer to show team status.
  */
 
-import { isPaneBackend, type PaneBackendType } from './swarm/backends/types.js'
-import { readTeamFile } from './swarm/teamHelpers.js'
+import { isPaneBackend, type PaneBackendType } from "./swarm/backends/types.js"
+import { readTeamFile } from "./swarm/teamHelpers.js"
 
 export type TeamSummary = {
   name: string
@@ -21,7 +21,7 @@ export type TeammateStatus = {
   agentType?: string
   model?: string
   prompt?: string
-  status: 'running' | 'idle' | 'unknown'
+  status: "running" | "idle" | "unknown"
   color?: string
   idleSince?: string // ISO timestamp from idle notification
   tmuxPaneId: string
@@ -47,13 +47,13 @@ export function getTeammateStatuses(teamName: string): TeammateStatus[] {
 
   for (const member of teamFile.members) {
     // Exclude team-lead from the list
-    if (member.name === 'team-lead') {
+    if (member.name === "team-lead") {
       continue
     }
 
     // Read isActive from config, defaulting to true (active) if undefined
     const isActive = member.isActive !== false
-    const status: 'running' | 'idle' = isActive ? 'running' : 'idle'
+    const status: "running" | "idle" = isActive ? "running" : "idle"
 
     statuses.push({
       name: member.name,
@@ -67,10 +67,7 @@ export function getTeammateStatuses(teamName: string): TeammateStatus[] {
       cwd: member.cwd,
       worktreePath: member.worktreePath,
       isHidden: hiddenPaneIds.has(member.tmuxPaneId),
-      backendType:
-        member.backendType && isPaneBackend(member.backendType)
-          ? member.backendType
-          : undefined,
+      backendType: member.backendType && isPaneBackend(member.backendType) ? member.backendType : undefined,
       mode: member.mode,
     })
   }

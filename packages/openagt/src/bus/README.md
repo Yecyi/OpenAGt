@@ -63,10 +63,7 @@ type Payload<D extends Definition = Definition> = {
 
 // Bus Service 接口
 interface Interface {
-  readonly publish: <D extends Definition>(
-    def: D,
-    properties: z.output<D["properties"]>,
-  ) => Effect<void>
+  readonly publish: <D extends Definition>(def: D, properties: z.output<D["properties"]>) => Effect<void>
   readonly subscribe: <D extends Definition>(def: D) => Stream<Payload<D>>
   readonly subscribeAll: () => Stream<Payload>
   readonly subscribeCallback: <D extends Definition>(
@@ -105,9 +102,10 @@ export const layer = Layer.effect(
 ```
 
 **状态结构：**
+
 ```typescript
 type State = {
-  wildcard: PubSub<Payload>           // 通配符订阅，所有事件
+  wildcard: PubSub<Payload> // 通配符订阅，所有事件
   typed: Map<string, PubSub<Payload>> // 类型化订阅，按事件类型
 }
 ```
@@ -125,7 +123,7 @@ GlobalBus.emit("event", {
   directory: dir,
   project: context.project.id,
   workspace,
-  payload,  // { type, properties }
+  payload, // { type, properties }
 })
 ```
 
@@ -156,7 +154,7 @@ export const InstanceDisposed = BusEvent.define(
 ```typescript
 import { Bus } from "@/bus"
 
-yield* Bus.publish(SessionCreated, { sessionID, info })
+yield * Bus.publish(SessionCreated, { sessionID, info })
 
 // 或使用便捷函数
 import { publish } from "@/bus"
@@ -168,10 +166,11 @@ await publish(SessionCreated, { sessionID, info })
 ```typescript
 import { Bus } from "@/bus"
 
-const stream = yield* Bus.subscribe(SessionCreated)
-yield* Stream.runForEach(stream, (event) => {
-  console.log("Session created:", event.properties.sessionID)
-})
+const stream = yield * Bus.subscribe(SessionCreated)
+yield *
+  Stream.runForEach(stream, (event) => {
+    console.log("Session created:", event.properties.sessionID)
+  })
 ```
 
 ### 订阅事件 (Callback 模式)
@@ -200,10 +199,11 @@ const unsubscribe = subscribeAll((event) => {
 ### 在 Effect 中订阅
 
 ```typescript
-yield* Bus.subscribeCallback(SessionCreated, (event) => {
-  // 这个回调在 Effect Context 外执行
-  console.log(event)
-})
+yield *
+  Bus.subscribeCallback(SessionCreated, (event) => {
+    // 这个回调在 Effect Context 外执行
+    console.log(event)
+  })
 ```
 
 ---

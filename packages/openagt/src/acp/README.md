@@ -59,6 +59,7 @@
 实现 `Agent` 接口，处理智能体核心逻辑。
 
 **职责：**
+
 - 初始化和能力协商
 - 会话生命周期 (`session/new`, `session/load`)
 - 处理提示并返回响应
@@ -71,7 +72,7 @@ class ACPAgent implements Agent {
     return {
       protocolVersion: 1,
       capabilities: this.advertiseCapabilities(),
-      serverInfo: { name: "opencode", version: "1.0" }
+      serverInfo: { name: "opencode", version: "1.0" },
     }
   }
 
@@ -93,6 +94,7 @@ class ACPAgent implements Agent {
 实现 `Client` 接口，处理客户端操作。
 
 **职责：**
+
 - 文件操作 (`readTextFile`, `writeTextFile`)
 - 权限请求 (当前自动批准)
 - 终端支持 (桩实现)
@@ -113,6 +115,7 @@ async writeTextFile(params: { path: string, content: string }): Promise<void> {
 会话状态管理。
 
 **职责：**
+
 - 创建和追踪 ACP 会话
 - 映射 ACP 会话到内部 opencode 会话
 - 维护工作目录上下文
@@ -132,6 +135,7 @@ interface ACPSession {
 ACP 服务器启动和生命周期。
 
 **职责：**
+
 - 通过官方库设置 stdio 上的 JSON-RPC
 - 管理 SIGTERM/SIGINT 时的优雅关闭
 - 为智能体提供 Instance 上下文
@@ -150,29 +154,29 @@ ACP 服务器启动和生命周期。
 
 ### ✅ 已实现
 
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| **初始化** | ✅ | 协议版本协商、能力广告 |
-| **会话管理** | ✅ | `session/new`, `session/load` |
-| **提示处理** | ✅ | `session/prompt` |
-| **文件操作** | ✅ | `readTextFile`, `writeTextFile` |
-| **权限请求** | ✅ | 自动批准 |
+| 功能         | 状态 | 说明                            |
+| ------------ | ---- | ------------------------------- |
+| **初始化**   | ✅   | 协议版本协商、能力广告          |
+| **会话管理** | ✅   | `session/new`, `session/load`   |
+| **提示处理** | ✅   | `session/prompt`                |
+| **文件操作** | ✅   | `readTextFile`, `writeTextFile` |
+| **权限请求** | ✅   | 自动批准                        |
 
 ### ⚠️ 部分实现
 
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| **流式响应** | ⚠️ | 当前返回完整响应而非流式 |
-| **工具调用报告** | ⚠️ | 不报告工具执行进度 |
+| 功能             | 状态 | 说明                     |
+| ---------------- | ---- | ------------------------ |
+| **流式响应**     | ⚠️   | 当前返回完整响应而非流式 |
+| **工具调用报告** | ⚠️   | 不报告工具执行进度       |
 
 ### ❌ 未实现
 
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| **会话持久化** | ❌ | `session/load` 不恢复完整历史 |
-| **模式切换** | ❌ | 无 ask/code 等模式切换 |
-| **认证** | ❌ | 无实际认证实现 |
-| **终端支持** | ❌ | 仅为占位符 |
+| 功能           | 状态 | 说明                          |
+| -------------- | ---- | ----------------------------- |
+| **会话持久化** | ❌   | `session/load` 不恢复完整历史 |
+| **模式切换**   | ❌   | 无 ask/code 等模式切换        |
+| **认证**       | ❌   | 无实际认证实现                |
+| **终端支持**   | ❌   | 仅为占位符                    |
 
 ## 使用方式
 
@@ -252,23 +256,23 @@ const server = await ACPServer.start()
 
 每个组件单一职责：
 
-| 组件 | 职责 |
-|------|------|
-| **Agent** | 协议接口，核心智能体逻辑 |
-| **Client** | 客户端操作 (文件、权限) |
-| **Session** | 状态管理 |
-| **Server** | 生命周期和 I/O |
+| 组件        | 职责                     |
+| ----------- | ------------------------ |
+| **Agent**   | 协议接口，核心智能体逻辑 |
+| **Client**  | 客户端操作 (文件、权限)  |
+| **Session** | 状态管理                 |
+| **Server**  | 生命周期和 I/O           |
 
 ### 到 OpenCode 的映射
 
 ACP 会话映射到 opencode 内部会话模型：
 
-| ACP 操作 | OpenCode 实现 |
-|----------|--------------|
-| `session/new` | `Session.create()` |
+| ACP 操作         | OpenCode 实现            |
+| ---------------- | ------------------------ |
+| `session/new`    | `Session.create()`       |
 | `session/prompt` | `SessionPrompt.prompt()` |
-| `cwd` 上下文 | `Instance.directory` |
-| 工具执行 | `ToolRegistry.execute()` |
+| `cwd` 上下文     | `Instance.directory`     |
+| 工具执行         | `ToolRegistry.execute()` |
 
 ## 局限性与未来
 

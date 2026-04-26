@@ -1,136 +1,135 @@
-import { init } from "es-module-lexer";
-import { parse } from "es-module-lexer";
-import esbuild from "esbuild";
-import fg from "fast-glob";
-import fs from "fs";
-import micromatch from "micromatch";
-import { posix } from "path";
-import { pathToRegexp } from "path-to-regexp";
-import { normalize } from "node:path";
-export { pathToRegexp };
-export const glob = (path) => fg.sync(path, { absolute: true });
+import { init } from "es-module-lexer"
+import { parse } from "es-module-lexer"
+import esbuild from "esbuild"
+import fg from "fast-glob"
+import fs from "fs"
+import micromatch from "micromatch"
+import { posix } from "path"
+import { pathToRegexp } from "path-to-regexp"
+import { normalize } from "node:path"
+export { pathToRegexp }
+export const glob = (path) => fg.sync(path, { absolute: true })
 export function cleanPath(src, config) {
-    return src
-        .slice(config.dir.length)
-        .replace(new RegExp(`\.(${(config.extensions ?? []).join("|")})$`), "");
+  return src.slice(config.dir.length).replace(new RegExp(`\.(${(config.extensions ?? []).join("|")})$`), "")
 }
 export function analyzeModule(src) {
-    return parse(esbuild.transformSync(fs.readFileSync(src, "utf-8"), {
-        jsx: "transform",
-        format: "esm",
-        loader: "tsx"
-    }).code, src);
+  return parse(
+    esbuild.transformSync(fs.readFileSync(src, "utf-8"), {
+      jsx: "transform",
+      format: "esm",
+      loader: "tsx",
+    }).code,
+    src,
+  )
 }
 export class BaseFileSystemRouter extends EventTarget {
-    routes;
-    config;
-    /**
-     *
-     * @param {} config
-     */
-    constructor(config) {
-        super();
-        this.routes = [];
-        this.config = config;
+  routes
+  config
+  /**
+   *
+   * @param {} config
+   */
+  constructor(config) {
+    super()
+    this.routes = []
+    this.config = config
+  }
+  glob() {
+    return posix.join(fg.convertPathToPattern(this.config.dir), "**/*") + `.{${this.config.extensions.join(",")}}`
+  }
+  async buildRoutes() {
+    await init
+    for (var src of glob(this.glob())) {
+      await this.addRoute(src)
     }
-    glob() {
-        return (posix.join(fg.convertPathToPattern(this.config.dir), "**/*") +
-            `.{${this.config.extensions.join(",")}}`);
+    return this.routes
+  }
+  isRoute(src) {
+    return Boolean(micromatch(src, this.glob())?.length)
+  }
+  toPath(src) {
+    throw new Error("Not implemented")
+  }
+  toRoute(src) {
+    let path = this.toPath(src)
+    if (path === undefined) return
+    const [_, exports] = analyzeModule(src)
+    if (!exports.find((e) => e.n === "default")) {
+      console.warn("No default export", src)
     }
-    async buildRoutes() {
-        await init;
-        for (var src of glob(this.glob())) {
-            await this.addRoute(src);
+    return {
+      $component: {
+        src: src,
+        pick: ["default", "$css"],
+      },
+      path,
+      // filePath: src
+    }
+  }
+  /**
+   * To be attached by vite plugin to the vite dev server
+   */
+  update = undefined
+  _addRoute(route) {
+    this.routes = this.routes.filter((r) => r.path !== route.path)
+    this.routes.push(route)
+  }
+  async addRoute(src) {
+    src = normalize(src)
+    if (this.isRoute(src)) {
+      try {
+        const route = this.toRoute(src)
+        if (route) {
+          this._addRoute(route)
+          this.reload(route.path)
         }
-        return this.routes;
+      } catch (e) {
+        console.error(e)
+      }
     }
-    isRoute(src) {
-        return Boolean(micromatch(src, this.glob())?.length);
-    }
-    toPath(src) {
-        throw new Error("Not implemented");
-    }
-    toRoute(src) {
-        let path = this.toPath(src);
-        if (path === undefined)
-            return;
-        const [_, exports] = analyzeModule(src);
-        if (!exports.find(e => e.n === "default")) {
-            console.warn("No default export", src);
+  }
+  reload(route) {
+    this.dispatchEvent(
+      new Event("reload", {
+        // @ts-ignore
+        detail: {
+          route,
+        },
+      }),
+    )
+  }
+  async updateRoute(src) {
+    src = normalize(src)
+    if (this.isRoute(src)) {
+      try {
+        const route = this.toRoute(src)
+        if (route) {
+          this._addRoute(route)
+          this.reload(route.path)
         }
-        return {
-            $component: {
-                src: src,
-                pick: ["default", "$css"]
-            },
-            path
-            // filePath: src
-        };
+      } catch (e) {
+        console.error(e)
+      }
+      // this.update?.();
     }
-    /**
-     * To be attached by vite plugin to the vite dev server
-     */
-    update = undefined;
-    _addRoute(route) {
-        this.routes = this.routes.filter(r => r.path !== route.path);
-        this.routes.push(route);
+  }
+  removeRoute(src) {
+    src = normalize(src)
+    if (this.isRoute(src)) {
+      const path = this.toPath(src)
+      if (path === undefined) {
+        return
+      }
+      this.routes = this.routes.filter((r) => r.path !== path)
+      this.dispatchEvent(new Event("reload", {}))
     }
-    async addRoute(src) {
-        src = normalize(src);
-        if (this.isRoute(src)) {
-            try {
-                const route = this.toRoute(src);
-                if (route) {
-                    this._addRoute(route);
-                    this.reload(route.path);
-                }
-            }
-            catch (e) {
-                console.error(e);
-            }
-        }
+  }
+  buildRoutesPromise
+  async getRoutes() {
+    if (!this.buildRoutesPromise) {
+      this.buildRoutesPromise = this.buildRoutes()
     }
-    reload(route) {
-        this.dispatchEvent(new Event("reload", {
-            // @ts-ignore
-            detail: {
-                route
-            }
-        }));
-    }
-    async updateRoute(src) {
-        src = normalize(src);
-        if (this.isRoute(src)) {
-            try {
-                const route = this.toRoute(src);
-                if (route) {
-                    this._addRoute(route);
-                    this.reload(route.path);
-                }
-            }
-            catch (e) {
-                console.error(e);
-            }
-            // this.update?.();
-        }
-    }
-    removeRoute(src) {
-        src = normalize(src);
-        if (this.isRoute(src)) {
-            const path = this.toPath(src);
-            if (path === undefined) {
-                return;
-            }
-            this.routes = this.routes.filter(r => r.path !== path);
-            this.dispatchEvent(new Event("reload", {}));
-        }
-    }
-    buildRoutesPromise;
-    async getRoutes() {
-        if (!this.buildRoutesPromise) {
-            this.buildRoutesPromise = this.buildRoutes();
-        }
-        await this.buildRoutesPromise;
-        return this.routes;
-    }
+    await this.buildRoutesPromise
+    return this.routes
+  }
 }

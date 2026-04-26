@@ -11,42 +11,36 @@
 
 /** Named colors from the 16-color palette */
 export type NamedColor =
-  | 'black'
-  | 'red'
-  | 'green'
-  | 'yellow'
-  | 'blue'
-  | 'magenta'
-  | 'cyan'
-  | 'white'
-  | 'brightBlack'
-  | 'brightRed'
-  | 'brightGreen'
-  | 'brightYellow'
-  | 'brightBlue'
-  | 'brightMagenta'
-  | 'brightCyan'
-  | 'brightWhite'
+  | "black"
+  | "red"
+  | "green"
+  | "yellow"
+  | "blue"
+  | "magenta"
+  | "cyan"
+  | "white"
+  | "brightBlack"
+  | "brightRed"
+  | "brightGreen"
+  | "brightYellow"
+  | "brightBlue"
+  | "brightMagenta"
+  | "brightCyan"
+  | "brightWhite"
 
 /** Color specification - can be named, indexed (256), or RGB */
 export type Color =
-  | { type: 'named'; name: NamedColor }
-  | { type: 'indexed'; index: number } // 0-255
-  | { type: 'rgb'; r: number; g: number; b: number }
-  | { type: 'default' }
+  | { type: "named"; name: NamedColor }
+  | { type: "indexed"; index: number } // 0-255
+  | { type: "rgb"; r: number; g: number; b: number }
+  | { type: "default" }
 
 // =============================================================================
 // Text Styles
 // =============================================================================
 
 /** Underline style variants */
-export type UnderlineStyle =
-  | 'none'
-  | 'single'
-  | 'double'
-  | 'curly'
-  | 'dotted'
-  | 'dashed'
+export type UnderlineStyle = "none" | "single" | "double" | "curly" | "dotted" | "dashed"
 
 /** Text style attributes - represents current styling state */
 export type TextStyle = {
@@ -70,15 +64,15 @@ export function defaultStyle(): TextStyle {
     bold: false,
     dim: false,
     italic: false,
-    underline: 'none',
+    underline: "none",
     blink: false,
     inverse: false,
     hidden: false,
     strikethrough: false,
     overline: false,
-    fg: { type: 'default' },
-    bg: { type: 'default' },
-    underlineColor: { type: 'default' },
+    fg: { type: "default" },
+    bg: { type: "default" },
+    underlineColor: { type: "default" },
   }
 }
 
@@ -104,17 +98,13 @@ export function stylesEqual(a: TextStyle, b: TextStyle): boolean {
 export function colorsEqual(a: Color, b: Color): boolean {
   if (a.type !== b.type) return false
   switch (a.type) {
-    case 'named':
+    case "named":
       return a.name === (b as typeof a).name
-    case 'indexed':
+    case "indexed":
       return a.index === (b as typeof a).index
-    case 'rgb':
-      return (
-        a.r === (b as typeof a).r &&
-        a.g === (b as typeof a).g &&
-        a.b === (b as typeof a).b
-      )
-    case 'default':
+    case "rgb":
+      return a.r === (b as typeof a).r && a.g === (b as typeof a).g && a.b === (b as typeof a).b
+    case "default":
       return true
   }
 }
@@ -123,69 +113,67 @@ export function colorsEqual(a: Color, b: Color): boolean {
 // Cursor Actions
 // =============================================================================
 
-export type CursorDirection = 'up' | 'down' | 'forward' | 'back'
+export type CursorDirection = "up" | "down" | "forward" | "back"
 
 export type CursorAction =
-  | { type: 'move'; direction: CursorDirection; count: number }
-  | { type: 'position'; row: number; col: number }
-  | { type: 'column'; col: number }
-  | { type: 'row'; row: number }
-  | { type: 'save' }
-  | { type: 'restore' }
-  | { type: 'show' }
-  | { type: 'hide' }
+  | { type: "move"; direction: CursorDirection; count: number }
+  | { type: "position"; row: number; col: number }
+  | { type: "column"; col: number }
+  | { type: "row"; row: number }
+  | { type: "save" }
+  | { type: "restore" }
+  | { type: "show" }
+  | { type: "hide" }
   | {
-      type: 'style'
-      style: 'block' | 'underline' | 'bar'
+      type: "style"
+      style: "block" | "underline" | "bar"
       blinking: boolean
     }
-  | { type: 'nextLine'; count: number }
-  | { type: 'prevLine'; count: number }
+  | { type: "nextLine"; count: number }
+  | { type: "prevLine"; count: number }
 
 // =============================================================================
 // Erase Actions
 // =============================================================================
 
 export type EraseAction =
-  | { type: 'display'; region: 'toEnd' | 'toStart' | 'all' | 'scrollback' }
-  | { type: 'line'; region: 'toEnd' | 'toStart' | 'all' }
-  | { type: 'chars'; count: number }
+  | { type: "display"; region: "toEnd" | "toStart" | "all" | "scrollback" }
+  | { type: "line"; region: "toEnd" | "toStart" | "all" }
+  | { type: "chars"; count: number }
 
 // =============================================================================
 // Scroll Actions
 // =============================================================================
 
 export type ScrollAction =
-  | { type: 'up'; count: number }
-  | { type: 'down'; count: number }
-  | { type: 'setRegion'; top: number; bottom: number }
+  | { type: "up"; count: number }
+  | { type: "down"; count: number }
+  | { type: "setRegion"; top: number; bottom: number }
 
 // =============================================================================
 // Mode Actions
 // =============================================================================
 
 export type ModeAction =
-  | { type: 'alternateScreen'; enabled: boolean }
-  | { type: 'bracketedPaste'; enabled: boolean }
-  | { type: 'mouseTracking'; mode: 'off' | 'normal' | 'button' | 'any' }
-  | { type: 'focusEvents'; enabled: boolean }
+  | { type: "alternateScreen"; enabled: boolean }
+  | { type: "bracketedPaste"; enabled: boolean }
+  | { type: "mouseTracking"; mode: "off" | "normal" | "button" | "any" }
+  | { type: "focusEvents"; enabled: boolean }
 
 // =============================================================================
 // Link Actions (OSC 8)
 // =============================================================================
 
-export type LinkAction =
-  | { type: 'start'; url: string; params?: Record<string, string> }
-  | { type: 'end' }
+export type LinkAction = { type: "start"; url: string; params?: Record<string, string> } | { type: "end" }
 
 // =============================================================================
 // Title Actions (OSC 0/1/2)
 // =============================================================================
 
 export type TitleAction =
-  | { type: 'windowTitle'; title: string }
-  | { type: 'iconName'; name: string }
-  | { type: 'both'; title: string }
+  | { type: "windowTitle"; title: string }
+  | { type: "iconName"; name: string }
+  | { type: "both"; title: string }
 
 // =============================================================================
 // Tab Status Action (OSC 21337)
@@ -209,7 +197,7 @@ export type TabStatusAction = {
 
 /** A segment of styled text */
 export type TextSegment = {
-  type: 'text'
+  type: "text"
   text: string
   style: TextStyle
 }
@@ -222,15 +210,15 @@ export type Grapheme = {
 
 /** All possible parsed actions */
 export type Action =
-  | { type: 'text'; graphemes: Grapheme[]; style: TextStyle }
-  | { type: 'cursor'; action: CursorAction }
-  | { type: 'erase'; action: EraseAction }
-  | { type: 'scroll'; action: ScrollAction }
-  | { type: 'mode'; action: ModeAction }
-  | { type: 'link'; action: LinkAction }
-  | { type: 'title'; action: TitleAction }
-  | { type: 'tabStatus'; action: TabStatusAction }
-  | { type: 'sgr'; params: string } // Select Graphic Rendition (style change)
-  | { type: 'bell' }
-  | { type: 'reset' } // Full terminal reset (ESC c)
-  | { type: 'unknown'; sequence: string } // Unrecognized sequence
+  | { type: "text"; graphemes: Grapheme[]; style: TextStyle }
+  | { type: "cursor"; action: CursorAction }
+  | { type: "erase"; action: EraseAction }
+  | { type: "scroll"; action: ScrollAction }
+  | { type: "mode"; action: ModeAction }
+  | { type: "link"; action: LinkAction }
+  | { type: "title"; action: TitleAction }
+  | { type: "tabStatus"; action: TabStatusAction }
+  | { type: "sgr"; params: string } // Select Graphic Rendition (style change)
+  | { type: "bell" }
+  | { type: "reset" } // Full terminal reset (ESC c)
+  | { type: "unknown"; sequence: string } // Unrecognized sequence

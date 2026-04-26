@@ -7,12 +7,7 @@ import {
   type SandboxExecRequest,
   type SandboxExecResult,
 } from "./types"
-import {
-  OPENCODE_PROCESS_ROLE,
-  OPENCODE_RUN_ID,
-  ensureRunID,
-  sanitizedProcessEnv,
-} from "@/util/opencode-process"
+import { OPENCODE_PROCESS_ROLE, OPENCODE_RUN_ID, ensureRunID, sanitizedProcessEnv } from "@/util/opencode-process"
 
 type Pending = {
   onStdout: (chunk: string) => void
@@ -69,44 +64,41 @@ export const layer = Layer.effect(
       for (const item of waiters) item([])
       waiters = []
     }
-    const parser = createFrameParser(
-      (frame) => {
-        if (frame.type === "broker.hello") {
-          ready = frame.protocol_version === SANDBOX_PROTOCOL_VERSION
-          return
-        }
-        if (frame.type === "broker.capabilities") {
-          capabilities = frame.backends
-          const current = waiters
-          waiters = []
-          for (const item of current) item(frame.backends)
-          return
-        }
-        if (frame.type === "exec.exit") {
-          const item = pending.get(frame.result.request_id)
-          if (!item) return
-          pending.delete(frame.result.request_id)
-          item.resolve(frame.result)
-          return
-        }
-        if (!("request_id" in frame)) return
-        const item = pending.get(frame.request_id)
+    const parser = createFrameParser((frame) => {
+      if (frame.type === "broker.hello") {
+        ready = frame.protocol_version === SANDBOX_PROTOCOL_VERSION
+        return
+      }
+      if (frame.type === "broker.capabilities") {
+        capabilities = frame.backends
+        const current = waiters
+        waiters = []
+        for (const item of current) item(frame.backends)
+        return
+      }
+      if (frame.type === "exec.exit") {
+        const item = pending.get(frame.result.request_id)
         if (!item) return
-        if (frame.type === "exec.stdout") {
-          item.onStdout(frame.chunk)
-          return
-        }
-        if (frame.type === "exec.stderr") {
-          item.onStderr(frame.chunk)
-          return
-        }
-        if (frame.type === "exec.error") {
-          pending.delete(frame.request_id)
-          item.reject(new Error(frame.error))
-        }
-      },
-      fail,
-    )
+        pending.delete(frame.result.request_id)
+        item.resolve(frame.result)
+        return
+      }
+      if (!("request_id" in frame)) return
+      const item = pending.get(frame.request_id)
+      if (!item) return
+      if (frame.type === "exec.stdout") {
+        item.onStdout(frame.chunk)
+        return
+      }
+      if (frame.type === "exec.stderr") {
+        item.onStderr(frame.chunk)
+        return
+      }
+      if (frame.type === "exec.error") {
+        pending.delete(frame.request_id)
+        item.reject(new Error(frame.error))
+      }
+    }, fail)
     ;(async () => {
       try {
         const reader = proc.stdout.getReader()
@@ -197,7 +189,7 @@ export const layer = Layer.effect(
               protocol_version: SANDBOX_PROTOCOL_VERSION,
               request: input.request,
             })
-          })
+          }),
       )
       return result
     })

@@ -6,14 +6,7 @@ import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
 
-export type MetadataValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | readonly MetadataValue[]
-  | Metadata
+export type MetadataValue = string | number | boolean | null | undefined | readonly MetadataValue[] | Metadata
 export interface Metadata {
   [key: string]: MetadataValue
 }
@@ -83,7 +76,9 @@ export function toMetadataValue(value: unknown): MetadataValue {
 }
 
 export function toMetadata(value: Record<string, unknown>): Metadata {
-  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toMetadataValueInternal(item, 1, new WeakSet())]))
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, toMetadataValueInternal(item, 1, new WeakSet())]),
+  )
 }
 
 // TODO: remove this hack

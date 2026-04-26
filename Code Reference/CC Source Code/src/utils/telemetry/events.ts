@@ -1,8 +1,8 @@
-import type { Attributes } from '@opentelemetry/api'
-import { getEventLogger, getPromptId } from 'src/bootstrap/state.js'
-import { logForDebugging } from '../debug.js'
-import { isEnvTruthy } from '../envUtils.js'
-import { getTelemetryAttributes } from '../telemetryAttributes.js'
+import type { Attributes } from "@opentelemetry/api"
+import { getEventLogger, getPromptId } from "src/bootstrap/state.js"
+import { logForDebugging } from "../debug.js"
+import { isEnvTruthy } from "../envUtils.js"
+import { getTelemetryAttributes } from "../telemetryAttributes.js"
 
 // Monotonically increasing counter for ordering events within a session
 let eventSequence = 0
@@ -15,7 +15,7 @@ function isUserPromptLoggingEnabled() {
 }
 
 export function redactIfDisabled(content: string): string {
-  return isUserPromptLoggingEnabled() ? content : '<REDACTED>'
+  return isUserPromptLoggingEnabled() ? content : "<REDACTED>"
 }
 
 export async function logOTelEvent(
@@ -26,30 +26,27 @@ export async function logOTelEvent(
   if (!eventLogger) {
     if (!hasWarnedNoEventLogger) {
       hasWarnedNoEventLogger = true
-      logForDebugging(
-        `[3P telemetry] Event dropped (no event logger initialized): ${eventName}`,
-        { level: 'warn' },
-      )
+      logForDebugging(`[3P telemetry] Event dropped (no event logger initialized): ${eventName}`, { level: "warn" })
     }
     return
   }
 
   // Skip logging in test environment
-  if (process.env.NODE_ENV === 'test') {
+  if (process.env.NODE_ENV === "test") {
     return
   }
 
   const attributes: Attributes = {
     ...getTelemetryAttributes(),
-    'event.name': eventName,
-    'event.timestamp': new Date().toISOString(),
-    'event.sequence': eventSequence++,
+    "event.name": eventName,
+    "event.timestamp": new Date().toISOString(),
+    "event.sequence": eventSequence++,
   }
 
   // Add prompt ID to events (but not metrics, where it would cause unbounded cardinality)
   const promptId = getPromptId()
   if (promptId) {
-    attributes['prompt.id'] = promptId
+    attributes["prompt.id"] = promptId
   }
 
   // Workspace directory from the desktop app (host path). Events only —
@@ -57,7 +54,7 @@ export async function logOTelEvent(
   // the BQ metrics pipeline must never see them.
   const workspaceDir = process.env.CLAUDE_CODE_WORKSPACE_HOST_PATHS
   if (workspaceDir) {
-    attributes['workspace.host_paths'] = workspaceDir.split('|')
+    attributes["workspace.host_paths"] = workspaceDir.split("|")
   }
 
   // Add metadata as attributes - all values are already strings

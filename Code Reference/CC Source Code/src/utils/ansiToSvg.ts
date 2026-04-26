@@ -3,7 +3,7 @@
  * Supports basic ANSI color codes (foreground colors)
  */
 
-import { escapeXml } from './xml.js'
+import { escapeXml } from "./xml.js"
 
 export type AnsiColor = {
   r: number
@@ -52,7 +52,7 @@ export type ParsedLine = TextSpan[]
  */
 export function parseAnsi(text: string): ParsedLine[] {
   const lines: ParsedLine[] = []
-  const rawLines = text.split('\n')
+  const rawLines = text.split("\n")
 
   for (const line of rawLines) {
     const spans: TextSpan[] = []
@@ -62,18 +62,18 @@ export function parseAnsi(text: string): ParsedLine[] {
 
     while (i < line.length) {
       // Check for ANSI escape sequence
-      if (line[i] === '\x1b' && line[i + 1] === '[') {
+      if (line[i] === "\x1b" && line[i + 1] === "[") {
         // Find the end of the escape sequence
         let j = i + 2
         while (j < line.length && !/[A-Za-z]/.test(line[j]!)) {
           j++
         }
 
-        if (line[j] === 'm') {
+        if (line[j] === "m") {
           // Color/style code
           const codes = line
             .slice(i + 2, j)
-            .split(';')
+            .split(";")
             .map(Number)
 
           let k = 0
@@ -123,7 +123,7 @@ export function parseAnsi(text: string): ParsedLine[] {
 
       // Regular character - find extent of same-styled text
       const textStart = i
-      while (i < line.length && line[i] !== '\x1b') {
+      while (i < line.length && line[i] !== "\x1b") {
         i++
       }
 
@@ -135,7 +135,7 @@ export function parseAnsi(text: string): ParsedLine[] {
 
     // Add empty span if line is empty (to preserve line)
     if (spans.length === 0) {
-      spans.push({ text: '', color: DEFAULT_FG, bold: false })
+      spans.push({ text: "", color: DEFAULT_FG, bold: false })
     }
 
     lines.push(spans)
@@ -204,12 +204,9 @@ export type AnsiToSvgOptions = {
  * Uses <tspan> elements within a single <text> per line so the renderer
  * handles character spacing natively (no manual charWidth calculation)
  */
-export function ansiToSvg(
-  ansiText: string,
-  options: AnsiToSvgOptions = {},
-): string {
+export function ansiToSvg(ansiText: string, options: AnsiToSvgOptions = {}): string {
   const {
-    fontFamily = 'Menlo, Monaco, monospace',
+    fontFamily = "Menlo, Monaco, monospace",
     fontSize = 14,
     lineHeight = 22,
     paddingX = 24,
@@ -221,19 +218,14 @@ export function ansiToSvg(
   const lines = parseAnsi(ansiText)
 
   // Trim trailing empty lines
-  while (
-    lines.length > 0 &&
-    lines[lines.length - 1]!.every(span => span.text.trim() === '')
-  ) {
+  while (lines.length > 0 && lines[lines.length - 1]!.every((span) => span.text.trim() === "")) {
     lines.pop()
   }
 
   // Estimate width based on max line length (for SVG dimensions only)
   // For monospace fonts, character width is roughly 0.6 * fontSize
   const charWidthEstimate = fontSize * 0.6
-  const maxLineLength = Math.max(
-    ...lines.map(spans => spans.reduce((acc, s) => acc + s.text.length, 0)),
-  )
+  const maxLineLength = Math.max(...lines.map((spans) => spans.reduce((acc, s) => acc + s.text.length, 0)))
   const width = Math.ceil(maxLineLength * charWidthEstimate + paddingX * 2)
   const height = lines.length * lineHeight + paddingY * 2
 
@@ -247,8 +239,7 @@ export function ansiToSvg(
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     const spans = lines[lineIndex]!
-    const y =
-      paddingY + (lineIndex + 1) * lineHeight - (lineHeight - fontSize) / 2
+    const y = paddingY + (lineIndex + 1) * lineHeight - (lineHeight - fontSize) / 2
 
     // Build a single <text> element with <tspan> children for each colored segment
     // xml:space="preserve" prevents SVG from collapsing whitespace
@@ -258,7 +249,7 @@ export function ansiToSvg(
       if (!span.text) continue
 
       const colorStr = `rgb(${span.color.r}, ${span.color.g}, ${span.color.b})`
-      const boldClass = span.bold ? ' class="b"' : ''
+      const boldClass = span.bold ? ' class="b"' : ""
 
       svg += `<tspan fill="${colorStr}"${boldClass}>${escapeXml(span.text)}</tspan>`
     }

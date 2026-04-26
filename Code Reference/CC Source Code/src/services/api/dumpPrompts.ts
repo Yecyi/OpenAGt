@@ -1,13 +1,13 @@
-import type { ClientOptions } from '@anthropic-ai/sdk'
-import { createHash } from 'crypto'
-import { promises as fs } from 'fs'
-import { dirname, join } from 'path'
-import { getSessionId } from 'src/bootstrap/state.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
+import type { ClientOptions } from "@anthropic-ai/sdk"
+import { createHash } from "crypto"
+import { promises as fs } from "fs"
+import { dirname, join } from "path"
+import { getSessionId } from "src/bootstrap/state.js"
+import { getClaudeConfigHomeDir } from "../../utils/envUtils.js"
+import { jsonParse, jsonStringify } from "../../utils/slowOperations.js"
 
 function hashString(str: string): string {
-  return createHash('sha256').update(str).digest('hex')
+  return createHash("sha256").update(str).digest("hex")
 }
 
 // Cache last few API requests for ant users (e.g., for /issue command)
@@ -46,7 +46,7 @@ export function clearAllDumpState(): void {
 }
 
 export function addApiRequestToCache(requestData: unknown): void {
-  if (process.env.USER_TYPE !== 'ant') return
+  if (process.env.USER_TYPE !== "ant") return
   cachedApiRequests.push({
     timestamp: new Date().toISOString(),
     request: requestData,
@@ -57,17 +57,13 @@ export function addApiRequestToCache(requestData: unknown): void {
 }
 
 export function getDumpPromptsPath(agentIdOrSessionId?: string): string {
-  return join(
-    getClaudeConfigHomeDir(),
-    'dump-prompts',
-    `${agentIdOrSessionId ?? getSessionId()}.jsonl`,
-  )
+  return join(getClaudeConfigHomeDir(), "dump-prompts", `${agentIdOrSessionId ?? getSessionId()}.jsonl`)
 }
 
 function appendToFile(filePath: string, entries: string[]): void {
   if (entries.length === 0) return
   fs.mkdir(dirname(filePath), { recursive: true })
-    .then(() => fs.appendFile(filePath, entries.join('\n') + '\n'))
+    .then(() => fs.appendFile(filePath, entries.join("\n") + "\n"))
     .catch(() => {})
 }
 
@@ -75,29 +71,21 @@ function initFingerprint(req: Record<string, unknown>): string {
   const tools = req.tools as Array<{ name?: string }> | undefined
   const system = req.system as unknown[] | string | undefined
   const sysLen =
-    typeof system === 'string'
+    typeof system === "string"
       ? system.length
       : Array.isArray(system)
-        ? system.reduce(
-            (n: number, b) => n + ((b as { text?: string }).text?.length ?? 0),
-            0,
-          )
+        ? system.reduce((n: number, b) => n + ((b as { text?: string }).text?.length ?? 0), 0)
         : 0
-  const toolNames = tools?.map(t => t.name ?? '').join(',') ?? ''
+  const toolNames = tools?.map((t) => t.name ?? "").join(",") ?? ""
   return `${req.model}|${toolNames}|${sysLen}`
 }
 
-function dumpRequest(
-  body: string,
-  ts: string,
-  state: DumpState,
-  filePath: string,
-): void {
+function dumpRequest(body: string, ts: string, state: DumpState, filePath: string): void {
   try {
     const req = jsonParse(body) as Record<string, unknown>
     addApiRequestToCache(req)
 
-    if (process.env.USER_TYPE !== 'ant') return
+    if (process.env.USER_TYPE !== "ant") return
     const entries: string[] = []
     const messages = (req.messages ?? []) as Array<{ role?: string }>
 
@@ -116,23 +104,17 @@ function dumpRequest(
         state.lastInitDataHash = initDataHash
         // Reuse initDataStr rather than re-serializing initData inside a wrapper.
         // timestamp from toISOString() contains no chars needing JSON escaping.
-        entries.push(
-          `{"type":"init","timestamp":"${ts}","data":${initDataStr}}`,
-        )
+        entries.push(`{"type":"init","timestamp":"${ts}","data":${initDataStr}}`)
       } else if (initDataHash !== state.lastInitDataHash) {
         state.lastInitDataHash = initDataHash
-        entries.push(
-          `{"type":"system_update","timestamp":"${ts}","data":${initDataStr}}`,
-        )
+        entries.push(`{"type":"system_update","timestamp":"${ts}","data":${initDataStr}}`)
       }
     }
 
     // Write only new user messages (assistant messages captured in response)
     for (const msg of messages.slice(state.messageCountSeen)) {
-      if (msg.role === 'user') {
-        entries.push(
-          jsonStringify({ type: 'message', timestamp: ts, data: msg }),
-        )
+      if (msg.role === "user") {
+        entries.push(jsonStringify({ type: "message", timestamp: ts, data: msg }))
       }
     }
     state.messageCountSeen = messages.length
@@ -143,23 +125,21 @@ function dumpRequest(
   }
 }
 
-export function createDumpPromptsFetch(
-  agentIdOrSessionId: string,
-): ClientOptions['fetch'] {
+export function createDumpPromptsFetch(agentIdOrSessionId: string): ClientOptions["fetch"] {
   const filePath = getDumpPromptsPath(agentIdOrSessionId)
 
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const state = dumpState.get(agentIdOrSessionId) ?? {
       initialized: false,
       messageCountSeen: 0,
-      lastInitDataHash: '',
-      lastInitFingerprint: '',
+      lastInitDataHash: "",
+      lastInitFingerprint: "",
     }
     dumpState.set(agentIdOrSessionId, state)
 
     let timestamp: string | undefined
 
-    if (init?.method === 'POST' && init.body) {
+    if (init?.method === "POST" && init.body) {
       timestamp = new Date().toISOString()
       // Parsing + stringifying the request (system prompt + tool schemas = MBs)
       // takes hundreds of ms. Defer so it doesn't block the actual API call —
@@ -171,20 +151,18 @@ export function createDumpPromptsFetch(
     const response = await globalThis.fetch(input, init)
 
     // Save response async
-    if (timestamp && response.ok && process.env.USER_TYPE === 'ant') {
+    if (timestamp && response.ok && process.env.USER_TYPE === "ant") {
       const cloned = response.clone()
       void (async () => {
         try {
-          const isStreaming = cloned.headers
-            .get('content-type')
-            ?.includes('text/event-stream')
+          const isStreaming = cloned.headers.get("content-type")?.includes("text/event-stream")
 
           let data: unknown
           if (isStreaming && cloned.body) {
             // Parse SSE stream into chunks
             const reader = cloned.body.getReader()
             const decoder = new TextDecoder()
-            let buffer = ''
+            let buffer = ""
             try {
               while (true) {
                 const { done, value } = await reader.read()
@@ -195,9 +173,9 @@ export function createDumpPromptsFetch(
               reader.releaseLock()
             }
             const chunks: unknown[] = []
-            for (const event of buffer.split('\n\n')) {
-              for (const line of event.split('\n')) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            for (const event of buffer.split("\n\n")) {
+              for (const line of event.split("\n")) {
+                if (line.startsWith("data: ") && line !== "data: [DONE]") {
                   try {
                     chunks.push(jsonParse(line.slice(6)))
                   } catch {
@@ -211,10 +189,7 @@ export function createDumpPromptsFetch(
             data = await cloned.json()
           }
 
-          await fs.appendFile(
-            filePath,
-            jsonStringify({ type: 'response', timestamp, data }) + '\n',
-          )
+          await fs.appendFile(filePath, jsonStringify({ type: "response", timestamp, data }) + "\n")
         } catch {
           // Best effort
         }

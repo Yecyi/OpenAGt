@@ -1,25 +1,18 @@
-import { feature } from 'bun:bundle'
-import type { BetaMessageStreamParams } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import { readdir, readFile, stat } from 'fs/promises'
-import memoize from 'lodash-es/memoize.js'
-import { join } from 'path'
-import type { QuerySource } from 'src/constants/querySource.js'
-import {
-  setLastAPIRequest,
-  setLastAPIRequestMessages,
-} from '../bootstrap/state.js'
-import { TICK_TAG } from '../constants/xml.js'
-import {
-  type LogOption,
-  type SerializedMessage,
-  sortLogs,
-} from '../types/logs.js'
-import { CACHE_PATHS } from './cachePaths.js'
-import { stripDisplayTags, stripDisplayTagsAllowEmpty } from './displayTags.js'
-import { isEnvTruthy } from './envUtils.js'
-import { toError } from './errors.js'
-import { isEssentialTrafficOnly } from './privacyLevel.js'
-import { jsonParse } from './slowOperations.js'
+import { feature } from "bun:bundle"
+import type { BetaMessageStreamParams } from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs"
+import { readdir, readFile, stat } from "fs/promises"
+import memoize from "lodash-es/memoize.js"
+import { join } from "path"
+import type { QuerySource } from "src/constants/querySource.js"
+import { setLastAPIRequest, setLastAPIRequestMessages } from "../bootstrap/state.js"
+import { TICK_TAG } from "../constants/xml.js"
+import { type LogOption, type SerializedMessage, sortLogs } from "../types/logs.js"
+import { CACHE_PATHS } from "./cachePaths.js"
+import { stripDisplayTags, stripDisplayTagsAllowEmpty } from "./displayTags.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { toError } from "./errors.js"
+import { isEssentialTrafficOnly } from "./privacyLevel.js"
+import { jsonParse } from "./slowOperations.js"
 
 /**
  * Gets the display title for a log/session with fallback logic.
@@ -27,10 +20,7 @@ import { jsonParse } from './slowOperations.js'
  * Strips display-unfriendly tags (like <ide_opened_file>) from the result.
  * Falls back to a truncated session ID when no other title is available.
  */
-export function getLogDisplayTitle(
-  log: LogOption,
-  defaultTitle?: string,
-): string {
+export function getLogDisplayTitle(log: LogOption, defaultTitle?: string): string {
   // Skip firstPrompt if it's a tick/goal message (autonomous mode auto-prompt)
   const isAutonomousPrompt = log.firstPrompt?.startsWith(`<${TICK_TAG}>`)
   // Strip display-unfriendly tags (command-name, ide_opened_file, etc.) early
@@ -38,9 +28,7 @@ export function getLogDisplayTitle(
   // to the next fallback instead of showing raw XML tags.
   // Note: stripDisplayTags returns the original when stripping yields empty,
   // so we call stripDisplayTagsAllowEmpty to detect command-only prompts.
-  const strippedFirstPrompt = log.firstPrompt
-    ? stripDisplayTagsAllowEmpty(log.firstPrompt)
-    : ''
+  const strippedFirstPrompt = log.firstPrompt ? stripDisplayTagsAllowEmpty(log.firstPrompt) : ""
   const useFirstPrompt = strippedFirstPrompt && !isAutonomousPrompt
   const title =
     log.agentName ||
@@ -49,16 +37,16 @@ export function getLogDisplayTitle(
     (useFirstPrompt ? strippedFirstPrompt : undefined) ||
     defaultTitle ||
     // For autonomous sessions without other context, show a meaningful label
-    (isAutonomousPrompt ? 'Autonomous session' : undefined) ||
+    (isAutonomousPrompt ? "Autonomous session" : undefined) ||
     // Fall back to truncated session ID for lite logs with no metadata
-    (log.sessionId ? log.sessionId.slice(0, 8) : '') ||
-    ''
+    (log.sessionId ? log.sessionId.slice(0, 8) : "") ||
+    ""
   // Strip display-unfriendly tags (like <ide_opened_file>) for cleaner titles
   return stripDisplayTags(title).trim()
 }
 
 export function dateToFilename(date: Date): string {
-  return date.toISOString().replace(/[:.]/g, '-')
+  return date.toISOString().replace(/[:.]/g, "-")
 }
 
 // In-memory error log for recent errors
@@ -66,10 +54,7 @@ export function dateToFilename(date: Date): string {
 const MAX_IN_MEMORY_ERRORS = 100
 let inMemoryErrorLog: Array<{ error: string; timestamp: string }> = []
 
-function addToInMemoryErrorLog(errorInfo: {
-  error: string
-  timestamp: string
-}): void {
+function addToInMemoryErrorLog(errorInfo: { error: string; timestamp: string }): void {
   if (inMemoryErrorLog.length >= MAX_IN_MEMORY_ERRORS) {
     inMemoryErrorLog.shift() // Remove oldest error
   }
@@ -89,9 +74,9 @@ export type ErrorLogSink = {
 
 // Queued events for events logged before sink is attached
 type QueuedErrorEvent =
-  | { type: 'error'; error: Error }
-  | { type: 'mcpError'; serverName: string; error: unknown }
-  | { type: 'mcpDebug'; serverName: string; message: string }
+  | { type: "error"; error: Error }
+  | { type: "mcpError"; serverName: string; error: unknown }
+  | { type: "mcpDebug"; serverName: string; message: string }
 
 const errorQueue: QueuedErrorEvent[] = []
 
@@ -119,13 +104,13 @@ export function attachErrorLogSink(newSink: ErrorLogSink): void {
 
     for (const event of queuedEvents) {
       switch (event.type) {
-        case 'error':
+        case "error":
           errorLogSink.logError(event.error)
           break
-        case 'mcpError':
+        case "mcpError":
           errorLogSink.logMCPError(event.serverName, event.error)
           break
-        case 'mcpDebug':
+        case "mcpDebug":
           errorLogSink.logMCPDebug(event.serverName, event.message)
           break
       }
@@ -152,14 +137,14 @@ export function attachErrorLogSink(newSink: ErrorLogSink): void {
  * - In-memory: Call `getInMemoryErrors()` to get recent errors for the current session
  */
 const isHardFailMode = memoize((): boolean => {
-  return process.argv.includes('--hard-fail')
+  return process.argv.includes("--hard-fail")
 })
 
 export function logError(error: unknown): void {
   const err = toError(error)
-  if (feature('HARD_FAIL') && isHardFailMode()) {
+  if (feature("HARD_FAIL") && isHardFailMode()) {
     // biome-ignore lint/suspicious/noConsole:: intentional crash output
-    console.error('[HARD FAIL] logError called with:', err.stack || err.message)
+    console.error("[HARD FAIL] logError called with:", err.stack || err.message)
     // eslint-disable-next-line custom-rules/no-process-exit
     process.exit(1)
   }
@@ -188,7 +173,7 @@ export function logError(error: unknown): void {
 
     // If sink not attached, queue the event
     if (errorLogSink === null) {
-      errorQueue.push({ type: 'error', error: err })
+      errorQueue.push({ type: "error", error: err })
       return
     }
 
@@ -215,9 +200,7 @@ export function loadErrorLogs(): Promise<LogOption[]> {
  * @param index Index in the sorted list of logs (0-based)
  * @returns Log data or null if not found
  */
-export async function getErrorLogByIndex(
-  index: number,
-): Promise<LogOption | null> {
+export async function getErrorLogByIndex(index: number): Promise<LogOption | null> {
   const logs = await loadErrorLogs()
   return logs[index] || null
 }
@@ -239,21 +222,20 @@ async function loadLogList(path: string): Promise<LogOption[]> {
   const logData = await Promise.all(
     files.map(async (file, i) => {
       const fullPath = join(path, file.name)
-      const content = await readFile(fullPath, { encoding: 'utf8' })
+      const content = await readFile(fullPath, { encoding: "utf8" })
       const messages = jsonParse(content) as SerializedMessage[]
       const firstMessage = messages[0]
       const lastMessage = messages[messages.length - 1]
       const firstPrompt =
-        firstMessage?.type === 'user' &&
-        typeof firstMessage?.message?.content === 'string'
+        firstMessage?.type === "user" && typeof firstMessage?.message?.content === "string"
           ? firstMessage?.message?.content
-          : 'No prompt'
+          : "No prompt"
 
       // For new random filenames, we'll get stats from the file itself
       const fileStats = await stat(fullPath)
 
       // Check if it's a sidechain by looking at filename
-      const isSidechain = fullPath.includes('sidechain')
+      const isSidechain = fullPath.includes("sidechain")
 
       // For new files, use the file modified time as date
       const date = dateToFilename(fileStats.mtime)
@@ -264,19 +246,15 @@ async function loadLogList(path: string): Promise<LogOption[]> {
         messages,
         value: i, // hack: overwritten after sorting, right below this
         created: parseISOString(firstMessage?.timestamp || date),
-        modified: lastMessage?.timestamp
-          ? parseISOString(lastMessage.timestamp)
-          : parseISOString(date),
-        firstPrompt:
-          firstPrompt.split('\n')[0]?.slice(0, 50) +
-            (firstPrompt.length > 50 ? '…' : '') || 'No prompt',
+        modified: lastMessage?.timestamp ? parseISOString(lastMessage.timestamp) : parseISOString(date),
+        firstPrompt: firstPrompt.split("\n")[0]?.slice(0, 50) + (firstPrompt.length > 50 ? "…" : "") || "No prompt",
         messageCount: messages.length,
         isSidechain,
       }
     }),
   )
 
-  return sortLogs(logData.filter(_ => _ !== null)).map((_, i) => ({
+  return sortLogs(logData.filter((_) => _ !== null)).map((_, i) => ({
     ..._,
     value: i,
   }))
@@ -301,7 +279,7 @@ export function logMCPError(serverName: string, error: unknown): void {
   try {
     // If sink not attached, queue the event
     if (errorLogSink === null) {
-      errorQueue.push({ type: 'mcpError', serverName, error })
+      errorQueue.push({ type: "mcpError", serverName, error })
       return
     }
 
@@ -315,7 +293,7 @@ export function logMCPDebug(serverName: string, message: string): void {
   try {
     // If sink not attached, queue the event
     if (errorLogSink === null) {
-      errorQueue.push({ type: 'mcpDebug', serverName, message })
+      errorQueue.push({ type: "mcpDebug", serverName, message })
       return
     }
 
@@ -328,13 +306,10 @@ export function logMCPDebug(serverName: string, message: string): void {
 /**
  * Captures the last API request for inclusion in bug reports.
  */
-export function captureAPIRequest(
-  params: BetaMessageStreamParams,
-  querySource?: QuerySource,
-): void {
+export function captureAPIRequest(params: BetaMessageStreamParams, querySource?: QuerySource): void {
   // startsWith, not exact match — users with non-default output styles get
   // variants like 'repl_main_thread:outputStyle:Explanatory' (querySource.ts).
-  if (!querySource || !querySource.startsWith('repl_main_thread')) {
+  if (!querySource || !querySource.startsWith("repl_main_thread")) {
     return
   }
 
@@ -348,7 +323,7 @@ export function captureAPIRequest(
   // CLAUDE.md-injected payload the API received. Overwritten each turn;
   // dumpPrompts.ts already holds 5 full request bodies for ants, so this is
   // not a new retention class.
-  setLastAPIRequestMessages(process.env.USER_TYPE === 'ant' ? messages : null)
+  setLastAPIRequestMessages(process.env.USER_TYPE === "ant" ? messages : null)
 }
 
 /**

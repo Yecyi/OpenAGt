@@ -13,7 +13,7 @@
  * dynamicTeamContext, then env vars.
  */
 
-import { AsyncLocalStorage } from 'async_hooks'
+import { AsyncLocalStorage } from "async_hooks"
 
 /**
  * Runtime context for in-process teammates.
@@ -56,10 +56,7 @@ export function getTeammateContext(): TeammateContext | undefined {
  * @param fn - The function to run with the context
  * @returns The return value of fn
  */
-export function runWithTeammateContext<T>(
-  context: TeammateContext,
-  fn: () => T,
-): T {
+export function runWithTeammateContext<T>(context: TeammateContext, fn: () => T): T {
   return teammateContextStorage.run(context, fn)
 }
 

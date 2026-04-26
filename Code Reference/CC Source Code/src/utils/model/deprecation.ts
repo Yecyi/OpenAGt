@@ -4,7 +4,7 @@
  * Contains information about deprecated models and their retirement dates.
  */
 
-import { type APIProvider, getAPIProvider } from './providers.js'
+import { type APIProvider, getAPIProvider } from "./providers.js"
 
 type DeprecatedModelInfo = {
   isDeprecated: true
@@ -31,28 +31,28 @@ type DeprecationEntry = {
  * To add a new deprecated model, add an entry to this object.
  */
 const DEPRECATED_MODELS: Record<string, DeprecationEntry> = {
-  'claude-3-opus': {
-    modelName: 'Claude 3 Opus',
+  "claude-3-opus": {
+    modelName: "Claude 3 Opus",
     retirementDates: {
-      firstParty: 'January 5, 2026',
-      bedrock: 'January 15, 2026',
-      vertex: 'January 5, 2026',
-      foundry: 'January 5, 2026',
+      firstParty: "January 5, 2026",
+      bedrock: "January 15, 2026",
+      vertex: "January 5, 2026",
+      foundry: "January 5, 2026",
     },
   },
-  'claude-3-7-sonnet': {
-    modelName: 'Claude 3.7 Sonnet',
+  "claude-3-7-sonnet": {
+    modelName: "Claude 3.7 Sonnet",
     retirementDates: {
-      firstParty: 'February 19, 2026',
-      bedrock: 'April 28, 2026',
-      vertex: 'May 11, 2026',
-      foundry: 'February 19, 2026',
+      firstParty: "February 19, 2026",
+      bedrock: "April 28, 2026",
+      vertex: "May 11, 2026",
+      foundry: "February 19, 2026",
     },
   },
-  'claude-3-5-haiku': {
-    modelName: 'Claude 3.5 Haiku',
+  "claude-3-5-haiku": {
+    modelName: "Claude 3.5 Haiku",
     retirementDates: {
-      firstParty: 'February 19, 2026',
+      firstParty: "February 19, 2026",
       bedrock: null,
       vertex: null,
       foundry: null,
@@ -85,9 +85,7 @@ function getDeprecatedModelInfo(modelId: string): DeprecationInfo {
 /**
  * Get a deprecation warning message for a model, or null if not deprecated
  */
-export function getModelDeprecationWarning(
-  modelId: string | null,
-): string | null {
+export function getModelDeprecationWarning(modelId: string | null): string | null {
   if (!modelId) {
     return null
   }

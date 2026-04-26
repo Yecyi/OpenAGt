@@ -3,22 +3,22 @@
  * Extracts file paths and substitution patterns to enable file-edit-style rendering
  */
 
-import { randomBytes } from 'crypto'
-import { tryParseShellCommand } from '../../utils/bash/shellQuote.js'
+import { randomBytes } from "crypto"
+import { tryParseShellCommand } from "../../utils/bash/shellQuote.js"
 
 // BRE→ERE conversion placeholders (null-byte sentinels, never appear in user input)
-const BACKSLASH_PLACEHOLDER = '\x00BACKSLASH\x00'
-const PLUS_PLACEHOLDER = '\x00PLUS\x00'
-const QUESTION_PLACEHOLDER = '\x00QUESTION\x00'
-const PIPE_PLACEHOLDER = '\x00PIPE\x00'
-const LPAREN_PLACEHOLDER = '\x00LPAREN\x00'
-const RPAREN_PLACEHOLDER = '\x00RPAREN\x00'
-const BACKSLASH_PLACEHOLDER_RE = new RegExp(BACKSLASH_PLACEHOLDER, 'g')
-const PLUS_PLACEHOLDER_RE = new RegExp(PLUS_PLACEHOLDER, 'g')
-const QUESTION_PLACEHOLDER_RE = new RegExp(QUESTION_PLACEHOLDER, 'g')
-const PIPE_PLACEHOLDER_RE = new RegExp(PIPE_PLACEHOLDER, 'g')
-const LPAREN_PLACEHOLDER_RE = new RegExp(LPAREN_PLACEHOLDER, 'g')
-const RPAREN_PLACEHOLDER_RE = new RegExp(RPAREN_PLACEHOLDER, 'g')
+const BACKSLASH_PLACEHOLDER = "\x00BACKSLASH\x00"
+const PLUS_PLACEHOLDER = "\x00PLUS\x00"
+const QUESTION_PLACEHOLDER = "\x00QUESTION\x00"
+const PIPE_PLACEHOLDER = "\x00PIPE\x00"
+const LPAREN_PLACEHOLDER = "\x00LPAREN\x00"
+const RPAREN_PLACEHOLDER = "\x00RPAREN\x00"
+const BACKSLASH_PLACEHOLDER_RE = new RegExp(BACKSLASH_PLACEHOLDER, "g")
+const PLUS_PLACEHOLDER_RE = new RegExp(PLUS_PLACEHOLDER, "g")
+const QUESTION_PLACEHOLDER_RE = new RegExp(QUESTION_PLACEHOLDER, "g")
+const PIPE_PLACEHOLDER_RE = new RegExp(PIPE_PLACEHOLDER, "g")
+const LPAREN_PLACEHOLDER_RE = new RegExp(LPAREN_PLACEHOLDER, "g")
+const RPAREN_PLACEHOLDER_RE = new RegExp(RPAREN_PLACEHOLDER, "g")
 
 export type SedEditInfo = {
   /** The file path being edited */
@@ -61,14 +61,9 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
   // Extract string tokens only
   const args: string[] = []
   for (const token of tokens) {
-    if (typeof token === 'string') {
+    if (typeof token === "string") {
       args.push(token)
-    } else if (
-      typeof token === 'object' &&
-      token !== null &&
-      'op' in token &&
-      token.op === 'glob'
-    ) {
+    } else if (typeof token === "object" && token !== null && "op" in token && token.op === "glob") {
       // Glob patterns are too complex for this simple parser
       return null
     }
@@ -85,7 +80,7 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
     const arg = args[i]!
 
     // Handle -i flag (with or without backup suffix)
-    if (arg === '-i' || arg === '--in-place') {
+    if (arg === "-i" || arg === "--in-place") {
       hasInPlaceFlag = true
       i++
       // On macOS, -i requires a suffix argument (even if empty string)
@@ -94,17 +89,13 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
       if (i < args.length) {
         const nextArg = args[i]
         // If next arg is empty string or starts with dot, it's a backup suffix
-        if (
-          typeof nextArg === 'string' &&
-          !nextArg.startsWith('-') &&
-          (nextArg === '' || nextArg.startsWith('.'))
-        ) {
+        if (typeof nextArg === "string" && !nextArg.startsWith("-") && (nextArg === "" || nextArg.startsWith("."))) {
           i++ // Skip the backup suffix
         }
       }
       continue
     }
-    if (arg.startsWith('-i')) {
+    if (arg.startsWith("-i")) {
       // -i.bak or similar (inline suffix)
       hasInPlaceFlag = true
       i++
@@ -112,15 +103,15 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
     }
 
     // Handle extended regex flags
-    if (arg === '-E' || arg === '-r' || arg === '--regexp-extended') {
+    if (arg === "-E" || arg === "-r" || arg === "--regexp-extended") {
       extendedRegex = true
       i++
       continue
     }
 
     // Handle -e flag with expression
-    if (arg === '-e' || arg === '--expression') {
-      if (i + 1 < args.length && typeof args[i + 1] === 'string') {
+    if (arg === "-e" || arg === "--expression") {
+      if (i + 1 < args.length && typeof args[i + 1] === "string") {
         // Only support single expression
         if (expression !== null) return null
         expression = args[i + 1]!
@@ -129,15 +120,15 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
       }
       return null
     }
-    if (arg.startsWith('--expression=')) {
+    if (arg.startsWith("--expression=")) {
       if (expression !== null) return null
-      expression = arg.slice('--expression='.length)
+      expression = arg.slice("--expression=".length)
       i++
       continue
     }
 
     // Skip other flags we don't understand
-    if (arg.startsWith('-')) {
+    if (arg.startsWith("-")) {
       // Unknown flag - not safe to parse
       return null
     }
@@ -172,20 +163,20 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
   const rest = expression.slice(2) // Skip 's/'
 
   // Find pattern and replacement by tracking escaped characters
-  let pattern = ''
-  let replacement = ''
-  let flags = ''
-  let state: 'pattern' | 'replacement' | 'flags' = 'pattern'
+  let pattern = ""
+  let replacement = ""
+  let flags = ""
+  let state: "pattern" | "replacement" | "flags" = "pattern"
   let j = 0
 
   while (j < rest.length) {
     const char = rest[j]!
 
-    if (char === '\\' && j + 1 < rest.length) {
+    if (char === "\\" && j + 1 < rest.length) {
       // Escaped character
-      if (state === 'pattern') {
+      if (state === "pattern") {
         pattern += char + rest[j + 1]
-      } else if (state === 'replacement') {
+      } else if (state === "replacement") {
         replacement += char + rest[j + 1]
       } else {
         flags += char + rest[j + 1]
@@ -194,11 +185,11 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
       continue
     }
 
-    if (char === '/') {
-      if (state === 'pattern') {
-        state = 'replacement'
-      } else if (state === 'replacement') {
-        state = 'flags'
+    if (char === "/") {
+      if (state === "pattern") {
+        state = "replacement"
+      } else if (state === "replacement") {
+        state = "flags"
       } else {
         // Extra delimiter in flags - unexpected
         return null
@@ -207,9 +198,9 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
       continue
     }
 
-    if (state === 'pattern') {
+    if (state === "pattern") {
       pattern += char
-    } else if (state === 'replacement') {
+    } else if (state === "replacement") {
       replacement += char
     } else {
       flags += char
@@ -218,7 +209,7 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
   }
 
   // Must have found all three parts (pattern, replacement delimiter, and optional flags)
-  if (state !== 'flags') {
+  if (state !== "flags") {
     return null
   }
 
@@ -241,32 +232,29 @@ export function parseSedEditCommand(command: string): SedEditInfo | null {
  * Apply a sed substitution to file content
  * Returns the new content after applying the substitution
  */
-export function applySedSubstitution(
-  content: string,
-  sedInfo: SedEditInfo,
-): string {
+export function applySedSubstitution(content: string, sedInfo: SedEditInfo): string {
   // Convert sed pattern to JavaScript regex
-  let regexFlags = ''
+  let regexFlags = ""
 
   // Handle global flag
-  if (sedInfo.flags.includes('g')) {
-    regexFlags += 'g'
+  if (sedInfo.flags.includes("g")) {
+    regexFlags += "g"
   }
 
   // Handle case-insensitive flag (i or I in sed)
-  if (sedInfo.flags.includes('i') || sedInfo.flags.includes('I')) {
-    regexFlags += 'i'
+  if (sedInfo.flags.includes("i") || sedInfo.flags.includes("I")) {
+    regexFlags += "i"
   }
 
   // Handle multiline flag (m or M in sed)
-  if (sedInfo.flags.includes('m') || sedInfo.flags.includes('M')) {
-    regexFlags += 'm'
+  if (sedInfo.flags.includes("m") || sedInfo.flags.includes("M")) {
+    regexFlags += "m"
   }
 
   // Convert sed pattern to JavaScript regex pattern
   let jsPattern = sedInfo.pattern
     // Unescape \/ to /
-    .replace(/\\\//g, '/')
+    .replace(/\\\//g, "/")
 
   // In BRE mode (no -E flag), metacharacters have opposite escaping:
   // BRE: \+ means "one or more", + is literal
@@ -283,34 +271,34 @@ export function applySedSubstitution(
       .replace(/\\\(/g, LPAREN_PLACEHOLDER)
       .replace(/\\\)/g, RPAREN_PLACEHOLDER)
       // Step 3: Escape unescaped metacharacters (these are literal in BRE)
-      .replace(/\+/g, '\\+')
-      .replace(/\?/g, '\\?')
-      .replace(/\|/g, '\\|')
-      .replace(/\(/g, '\\(')
-      .replace(/\)/g, '\\)')
+      .replace(/\+/g, "\\+")
+      .replace(/\?/g, "\\?")
+      .replace(/\|/g, "\\|")
+      .replace(/\(/g, "\\(")
+      .replace(/\)/g, "\\)")
       // Step 4: Replace placeholders with their JS equivalents
-      .replace(BACKSLASH_PLACEHOLDER_RE, '\\\\')
-      .replace(PLUS_PLACEHOLDER_RE, '+')
-      .replace(QUESTION_PLACEHOLDER_RE, '?')
-      .replace(PIPE_PLACEHOLDER_RE, '|')
-      .replace(LPAREN_PLACEHOLDER_RE, '(')
-      .replace(RPAREN_PLACEHOLDER_RE, ')')
+      .replace(BACKSLASH_PLACEHOLDER_RE, "\\\\")
+      .replace(PLUS_PLACEHOLDER_RE, "+")
+      .replace(QUESTION_PLACEHOLDER_RE, "?")
+      .replace(PIPE_PLACEHOLDER_RE, "|")
+      .replace(LPAREN_PLACEHOLDER_RE, "(")
+      .replace(RPAREN_PLACEHOLDER_RE, ")")
   }
 
   // Unescape sed-specific escapes in replacement
   // Convert \n to newline, & to $& (match), etc.
   // Use a unique placeholder with random salt to prevent injection attacks
-  const salt = randomBytes(8).toString('hex')
+  const salt = randomBytes(8).toString("hex")
   const ESCAPED_AMP_PLACEHOLDER = `___ESCAPED_AMPERSAND_${salt}___`
   const jsReplacement = sedInfo.replacement
     // Unescape \/ to /
-    .replace(/\\\//g, '/')
+    .replace(/\\\//g, "/")
     // First escape \& to a placeholder
     .replace(/\\&/g, ESCAPED_AMP_PLACEHOLDER)
     // Convert & to $& (full match) - use $$& to get literal $& in output
-    .replace(/&/g, '$$&')
+    .replace(/&/g, "$$&")
     // Convert placeholder back to literal &
-    .replace(new RegExp(ESCAPED_AMP_PLACEHOLDER, 'g'), '&')
+    .replace(new RegExp(ESCAPED_AMP_PLACEHOLDER, "g"), "&")
 
   try {
     const regex = new RegExp(jsPattern, regexFlags)

@@ -1,9 +1,5 @@
-import { useEffect, useState } from 'react'
-import {
-  type ClaudeAILimits,
-  currentLimits,
-  statusListeners,
-} from './claudeAiLimits.js'
+import { useEffect, useState } from "react"
+import { type ClaudeAILimits, currentLimits, statusListeners } from "./claudeAiLimits.js"
 
 export function useClaudeAiLimits(): ClaudeAILimits {
   const [limits, setLimits] = useState<ClaudeAILimits>({ ...currentLimits })

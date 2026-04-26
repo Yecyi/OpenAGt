@@ -1,6 +1,6 @@
-import { env } from '../../../utils/env.js'
-import { execFileNoThrow } from '../../../utils/execFileNoThrow.js'
-import { TMUX_COMMAND } from '../constants.js'
+import { env } from "../../../utils/env.js"
+import { execFileNoThrow } from "../../../utils/execFileNoThrow.js"
+import { TMUX_COMMAND } from "../constants.js"
 
 /**
  * Captured at module load time to detect if the user started Claude from within tmux.
@@ -71,7 +71,7 @@ export function getLeaderPaneId(): string | null {
  * Checks if tmux is available on the system (installed and in PATH).
  */
 export async function isTmuxAvailable(): Promise<boolean> {
-  const result = await execFileNoThrow(TMUX_COMMAND, ['-V'])
+  const result = await execFileNoThrow(TMUX_COMMAND, ["-V"])
   return result.code === 0
 }
 
@@ -95,10 +95,9 @@ export function isInITerm2(): boolean {
   // Check multiple indicators for iTerm2
   const termProgram = process.env.TERM_PROGRAM
   const hasItermSessionId = !!process.env.ITERM_SESSION_ID
-  const terminalIsITerm = env.terminal === 'iTerm.app'
+  const terminalIsITerm = env.terminal === "iTerm.app"
 
-  isInITerm2Cached =
-    termProgram === 'iTerm.app' || hasItermSessionId || terminalIsITerm
+  isInITerm2Cached = termProgram === "iTerm.app" || hasItermSessionId || terminalIsITerm
 
   return isInITerm2Cached
 }
@@ -106,7 +105,7 @@ export function isInITerm2(): boolean {
 /**
  * The it2 CLI command name.
  */
-export const IT2_COMMAND = 'it2'
+export const IT2_COMMAND = "it2"
 
 /**
  * Checks if the it2 CLI tool is available AND can reach the iTerm2 Python API.
@@ -115,7 +114,7 @@ export const IT2_COMMAND = 'it2'
  * 'session split' to fail later with no fallback.
  */
 export async function isIt2CliAvailable(): Promise<boolean> {
-  const result = await execFileNoThrow(IT2_COMMAND, ['session', 'list'])
+  const result = await execFileNoThrow(IT2_COMMAND, ["session", "list"])
   return result.code === 0
 }
 

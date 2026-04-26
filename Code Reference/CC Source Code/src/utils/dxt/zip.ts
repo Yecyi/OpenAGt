@@ -1,8 +1,8 @@
-import { isAbsolute, normalize } from 'path'
-import { logForDebugging } from '../debug.js'
-import { isENOENT } from '../errors.js'
-import { getFsImplementation } from '../fsOperations.js'
-import { containsPathTraversal } from '../path.js'
+import { isAbsolute, normalize } from "path"
+import { logForDebugging } from "../debug.js"
+import { isENOENT } from "../errors.js"
+import { getFsImplementation } from "../fsOperations.js"
+import { containsPathTraversal } from "../path.js"
 
 const LIMITS = {
   MAX_FILE_SIZE: 512 * 1024 * 1024, // 512MB per file
@@ -60,10 +60,7 @@ export function isPathSafe(filePath: string): boolean {
 /**
  * Validates a single file during zip extraction
  */
-export function validateZipFile(
-  file: ZipFileMetadata,
-  state: ZipValidationState,
-): FileValidationResult {
+export function validateZipFile(file: ZipFileMetadata, state: ZipValidationState): FileValidationResult {
   state.fileCount++
 
   let error: string | undefined
@@ -110,10 +107,8 @@ export function validateZipFile(
  * Int32Array(32769), rev Uint16Array(32768), etc.) being allocated at startup
  * when this module is reached via the plugin loader chain.
  */
-export async function unzipFile(
-  zipData: Buffer,
-): Promise<Record<string, Uint8Array>> {
-  const { unzipSync } = await import('fflate')
+export async function unzipFile(zipData: Buffer): Promise<Record<string, Uint8Array>> {
+  const { unzipSync } = await import("fflate")
   const compressedSize = zipData.length
 
   const state: ZipValidationState = {
@@ -124,7 +119,7 @@ export async function unzipFile(
   }
 
   const result = unzipSync(new Uint8Array(zipData), {
-    filter: file => {
+    filter: (file) => {
       const validationResult = validateZipFile(file, state)
       if (!validationResult.isValid) {
         throw new Error(validationResult.error!)
@@ -187,7 +182,7 @@ export function parseZipModes(data: Uint8Array): Record<string, number> {
     const extraLen = buf.readUInt16LE(off + 30)
     const commentLen = buf.readUInt16LE(off + 32)
     const externalAttr = buf.readUInt32LE(off + 38)
-    const name = buf.toString('utf8', off + 46, off + 46 + nameLen)
+    const name = buf.toString("utf8", off + 46, off + 46 + nameLen)
 
     // versionMadeBy high byte = host OS. 3 = Unix. For Unix zips, the high
     // 16 bits of externalAttr hold st_mode (file type + permission bits).
@@ -206,9 +201,7 @@ export function parseZipModes(data: Uint8Array): Record<string, number> {
  * Reads a zip file from disk asynchronously and unzips it.
  * Returns its contents as a record of file paths to Uint8Array data.
  */
-export async function readAndUnzipFile(
-  filePath: string,
-): Promise<Record<string, Uint8Array>> {
+export async function readAndUnzipFile(filePath: string): Promise<Record<string, Uint8Array>> {
   const fs = getFsImplementation()
 
   try {

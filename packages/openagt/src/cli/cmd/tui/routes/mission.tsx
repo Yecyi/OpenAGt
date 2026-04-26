@@ -39,7 +39,15 @@ type CoordinatorProjection = {
     goal: string
     mode: "manual" | "assisted" | "autonomous"
     workflow: string
-    state: "settling_intent" | "awaiting_approval" | "planned" | "active" | "blocked" | "completed" | "failed" | "cancelled"
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
     summary?: string
     intent: {
       risk_level: "low" | "medium" | "high"
@@ -150,7 +158,9 @@ export function Mission() {
   const canApprove = createMemo(() => run()?.state === "awaiting_approval")
   const canResume = createMemo(() => run()?.state === "active" || run()?.state === "blocked")
   const canRetry = createMemo(() => run()?.state === "failed" || run()?.state === "cancelled")
-  const canCancel = createMemo(() => run()?.state === "active" || run()?.state === "blocked" || run()?.state === "awaiting_approval")
+  const canCancel = createMemo(
+    () => run()?.state === "active" || run()?.state === "blocked" || run()?.state === "awaiting_approval",
+  )
 
   return (
     <box flexDirection="column" width="100%" height="100%" paddingLeft={2} paddingRight={2} paddingTop={1} gap={1}>
@@ -196,12 +206,13 @@ export function Mission() {
               <text fg={theme.textMuted} onMouseUp={() => void refresh()}>
                 refresh
               </text>
-              <text fg={theme.textMuted} onMouseUp={() => router.navigate({ type: "session", sessionID: data().run.sessionID })}>
+              <text
+                fg={theme.textMuted}
+                onMouseUp={() => router.navigate({ type: "session", sessionID: data().run.sessionID })}
+              >
                 root session
               </text>
-              <Show when={busy()}>
-                {(name) => <Spinner color={theme.textMuted}>{name()}...</Spinner>}
-              </Show>
+              <Show when={busy()}>{(name) => <Spinner color={theme.textMuted}>{name()}...</Spinner>}</Show>
             </box>
 
             <box flexDirection="row" gap={2}>
@@ -222,7 +233,19 @@ export function Mission() {
                     <box flexDirection="column" paddingLeft={1}>
                       <box flexDirection="row" gap={1}>
                         <text fg={theme.text}>{group.id}</text>
-                        <text fg={theme[group.status === "failed" ? "error" : group.status === "running" ? "info" : group.status === "completed" ? "success" : "textMuted"]}>
+                        <text
+                          fg={
+                            theme[
+                              group.status === "failed"
+                                ? "error"
+                                : group.status === "running"
+                                  ? "info"
+                                  : group.status === "completed"
+                                    ? "success"
+                                    : "textMuted"
+                            ]
+                          }
+                        >
                           {group.status}
                         </text>
                         <text fg={theme.textMuted}>merge: {group.merge_status}</text>
@@ -252,9 +275,12 @@ export function Mission() {
                       <box flexDirection="row" gap={1}>
                         <text fg={theme.text}>{node.id}</text>
                         <text fg={theme.textMuted}>
-                          [{node.role}/{node.task_kind}/{node.risk}{node.parallel_group ? `/group:${node.parallel_group}` : ""}]
+                          [{node.role}/{node.task_kind}/{node.risk}
+                          {node.parallel_group ? `/group:${node.parallel_group}` : ""}]
                         </text>
-                        <text fg={theme[node.risk === "high" ? "error" : node.risk === "medium" ? "warning" : "success"]}>
+                        <text
+                          fg={theme[node.risk === "high" ? "error" : node.risk === "medium" ? "warning" : "success"]}
+                        >
                           {task()?.status ?? "pending"}
                         </text>
                         <Show when={modelLabel(node, task())}>
@@ -264,7 +290,9 @@ export function Mission() {
                           {(value) => (
                             <text
                               fg={theme.info}
-                              onMouseUp={() => router.navigate({ type: "session", sessionID: value().child_session_id })}
+                              onMouseUp={() =>
+                                router.navigate({ type: "session", sessionID: value().child_session_id })
+                              }
                             >
                               open
                             </text>

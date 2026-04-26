@@ -9,10 +9,7 @@ export const Decision = Schema.Literals(["allow", "confirm", "block"])
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type Decision = Schema.Schema.Type<typeof Decision>
 
-export const PatternToken = Schema.Union([
-  Schema.String,
-  Schema.mutable(Schema.Array(Schema.String)),
-])
+export const PatternToken = Schema.Union([Schema.String, Schema.mutable(Schema.Array(Schema.String))])
   .annotate({ identifier: "ExecPolicyPatternTokenConfig" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type PatternToken = Schema.Schema.Type<typeof PatternToken>

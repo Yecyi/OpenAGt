@@ -1,6 +1,6 @@
-import { Event } from './event.js'
+import { Event } from "./event.js"
 
-type EventPhase = 'none' | 'capturing' | 'at_target' | 'bubbling'
+type EventPhase = "none" | "capturing" | "at_target" | "bubbling"
 
 type TerminalEventInit = {
   bubbles?: boolean
@@ -24,7 +24,7 @@ export class TerminalEvent extends Event {
 
   private _target: EventTarget | null = null
   private _currentTarget: EventTarget | null = null
-  private _eventPhase: EventPhase = 'none'
+  private _eventPhase: EventPhase = "none"
   private _propagationStopped = false
   private _defaultPrevented = false
 

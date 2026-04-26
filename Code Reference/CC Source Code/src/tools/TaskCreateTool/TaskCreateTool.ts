@@ -1,34 +1,21 @@
-import { z } from 'zod/v4'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import {
-  executeTaskCreatedHooks,
-  getTaskCreatedHookMessage,
-} from '../../utils/hooks.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import {
-  createTask,
-  deleteTask,
-  getTaskListId,
-  isTodoV2Enabled,
-} from '../../utils/tasks.js'
-import { getAgentName, getTeamName } from '../../utils/teammate.js'
-import { TASK_CREATE_TOOL_NAME } from './constants.js'
-import { DESCRIPTION, getPrompt } from './prompt.js'
+import { z } from "zod/v4"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { executeTaskCreatedHooks, getTaskCreatedHookMessage } from "../../utils/hooks.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { createTask, deleteTask, getTaskListId, isTodoV2Enabled } from "../../utils/tasks.js"
+import { getAgentName, getTeamName } from "../../utils/teammate.js"
+import { TASK_CREATE_TOOL_NAME } from "./constants.js"
+import { DESCRIPTION, getPrompt } from "./prompt.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    subject: z.string().describe('A brief title for the task'),
-    description: z.string().describe('What needs to be done'),
+    subject: z.string().describe("A brief title for the task"),
+    description: z.string().describe("What needs to be done"),
     activeForm: z
       .string()
       .optional()
-      .describe(
-        'Present continuous form shown in spinner when in_progress (e.g., "Running tests")',
-      ),
-    metadata: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe('Arbitrary metadata to attach to the task'),
+      .describe('Present continuous form shown in spinner when in_progress (e.g., "Running tests")'),
+    metadata: z.record(z.string(), z.unknown()).optional().describe("Arbitrary metadata to attach to the task"),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -47,7 +34,7 @@ export type Output = z.infer<OutputSchema>
 
 export const TaskCreateTool = buildTool({
   name: TASK_CREATE_TOOL_NAME,
-  searchHint: 'create a task in the task list',
+  searchHint: "create a task in the task list",
   maxResultSizeChars: 100_000,
   async description() {
     return DESCRIPTION
@@ -62,7 +49,7 @@ export const TaskCreateTool = buildTool({
     return outputSchema()
   },
   userFacingName() {
-    return 'TaskCreate'
+    return "TaskCreate"
   },
   shouldDefer: true,
   isEnabled() {
@@ -82,7 +69,7 @@ export const TaskCreateTool = buildTool({
       subject,
       description,
       activeForm,
-      status: 'pending',
+      status: "pending",
       owner: undefined,
       blocks: [],
       blockedBy: [],
@@ -109,13 +96,13 @@ export const TaskCreateTool = buildTool({
 
     if (blockingErrors.length > 0) {
       await deleteTask(getTaskListId(), taskId)
-      throw new Error(blockingErrors.join('\n'))
+      throw new Error(blockingErrors.join("\n"))
     }
 
     // Auto-expand task list when creating tasks
-    context.setAppState(prev => {
-      if (prev.expandedView === 'tasks') return prev
-      return { ...prev, expandedView: 'tasks' as const }
+    context.setAppState((prev) => {
+      if (prev.expandedView === "tasks") return prev
+      return { ...prev, expandedView: "tasks" as const }
     })
 
     return {
@@ -131,7 +118,7 @@ export const TaskCreateTool = buildTool({
     const { task } = content as Output
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content: `Task #${task.id} created successfully: ${task.subject}`,
     }
   },

@@ -1,18 +1,13 @@
 import {
   getModelStrings as getModelStringsState,
   setModelStrings as setModelStringsState,
-} from 'src/bootstrap/state.js'
-import { logError } from '../log.js'
-import { sequential } from '../sequential.js'
-import { getInitialSettings } from '../settings/settings.js'
-import { findFirstMatch, getBedrockInferenceProfiles } from './bedrock.js'
-import {
-  ALL_MODEL_CONFIGS,
-  CANONICAL_ID_TO_KEY,
-  type CanonicalModelId,
-  type ModelKey,
-} from './configs.js'
-import { type APIProvider, getAPIProvider } from './providers.js'
+} from "src/bootstrap/state.js"
+import { logError } from "../log.js"
+import { sequential } from "../sequential.js"
+import { getInitialSettings } from "../settings/settings.js"
+import { findFirstMatch, getBedrockInferenceProfiles } from "./bedrock.js"
+import { ALL_MODEL_CONFIGS, CANONICAL_ID_TO_KEY, type CanonicalModelId, type ModelKey } from "./configs.js"
+import { type APIProvider, getAPIProvider } from "./providers.js"
 
 /**
  * Maps each model version to its provider-specific model ID string.
@@ -31,7 +26,7 @@ function getBuiltinModelStrings(provider: APIProvider): ModelStrings {
 }
 
 async function getBedrockModelStrings(): Promise<ModelStrings> {
-  const fallback = getBuiltinModelStrings('bedrock')
+  const fallback = getBuiltinModelStrings("bedrock")
   let profiles: string[] | undefined
   try {
     profiles = await getBedrockInferenceProfiles()
@@ -122,7 +117,7 @@ function initModelStrings(): void {
     return
   }
   // Initial with default values for non-Bedrock providers
-  if (getAPIProvider() !== 'bedrock') {
+  if (getAPIProvider() !== "bedrock") {
     setModelStringsState(getBuiltinModelStrings(getAPIProvider()))
     return
   }
@@ -156,7 +151,7 @@ export async function ensureModelStringsInitialized(): Promise<void> {
   }
 
   // For non-Bedrock, initialize synchronously
-  if (getAPIProvider() !== 'bedrock') {
+  if (getAPIProvider() !== "bedrock") {
     setModelStringsState(getBuiltinModelStrings(getAPIProvider()))
     return
   }

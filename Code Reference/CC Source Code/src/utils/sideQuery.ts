@@ -1,22 +1,16 @@
-import type Anthropic from '@anthropic-ai/sdk'
-import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages.js'
-import {
-  getLastApiCompletionTimestamp,
-  setLastApiCompletionTimestamp,
-} from '../bootstrap/state.js'
-import { STRUCTURED_OUTPUTS_BETA_HEADER } from '../constants/betas.js'
-import type { QuerySource } from '../constants/querySource.js'
-import {
-  getAttributionHeader,
-  getCLISyspromptPrefix,
-} from '../constants/system.js'
-import { logEvent } from '../services/analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../services/analytics/metadata.js'
-import { getAPIMetadata } from '../services/api/claude.js'
-import { getAnthropicClient } from '../services/api/client.js'
-import { getModelBetas, modelSupportsStructuredOutputs } from './betas.js'
-import { computeFingerprint } from './fingerprint.js'
-import { normalizeModelStringForAPI } from './model/model.js'
+import type Anthropic from "@anthropic-ai/sdk"
+import type { BetaToolUnion } from "@anthropic-ai/sdk/resources/beta/messages.js"
+import { getLastApiCompletionTimestamp, setLastApiCompletionTimestamp } from "../bootstrap/state.js"
+import { STRUCTURED_OUTPUTS_BETA_HEADER } from "../constants/betas.js"
+import type { QuerySource } from "../constants/querySource.js"
+import { getAttributionHeader, getCLISyspromptPrefix } from "../constants/system.js"
+import { logEvent } from "../services/analytics/index.js"
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from "../services/analytics/metadata.js"
+import { getAPIMetadata } from "../services/api/claude.js"
+import { getAnthropicClient } from "../services/api/client.js"
+import { getModelBetas, modelSupportsStructuredOutputs } from "./betas.js"
+import { computeFingerprint } from "./fingerprint.js"
+import { normalizeModelStringForAPI } from "./model/model.js"
 
 type MessageParam = Anthropic.MessageParam
 type TextBlockParam = Anthropic.TextBlockParam
@@ -67,15 +61,15 @@ export type SideQueryOptions = {
  * Extract text from first user message for fingerprint computation.
  */
 function extractFirstUserMessageText(messages: MessageParam[]): string {
-  const firstUserMessage = messages.find(m => m.role === 'user')
-  if (!firstUserMessage) return ''
+  const firstUserMessage = messages.find((m) => m.role === "user")
+  if (!firstUserMessage) return ""
 
   const content = firstUserMessage.content
-  if (typeof content === 'string') return content
+  if (typeof content === "string") return content
 
   // Array of content blocks - find first text block
-  const textBlock = content.find(block => block.type === 'text')
-  return textBlock?.type === 'text' ? textBlock.text : ''
+  const textBlock = content.find((block) => block.type === "text")
+  return textBlock?.type === "text" ? textBlock.text : ""
 }
 
 /**
@@ -124,15 +118,11 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
   const client = await getAnthropicClient({
     maxRetries,
     model,
-    source: 'side_query',
+    source: "side_query",
   })
   const betas = [...getModelBetas(model)]
   // Add structured-outputs beta if using output_format and provider supports it
-  if (
-    output_format &&
-    modelSupportsStructuredOutputs(model) &&
-    !betas.includes(STRUCTURED_OUTPUTS_BETA_HEADER)
-  ) {
+  if (output_format && modelSupportsStructuredOutputs(model) && !betas.includes(STRUCTURED_OUTPUTS_BETA_HEADER)) {
     betas.push(STRUCTURED_OUTPUTS_BETA_HEADER)
   }
 
@@ -146,32 +136,28 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
   // Build system as array to keep attribution header in its own block
   // (prevents server-side parsing from including system content in cc_entrypoint)
   const systemBlocks: TextBlockParam[] = [
-    attributionHeader ? { type: 'text', text: attributionHeader } : null,
+    attributionHeader ? { type: "text", text: attributionHeader } : null,
     // Skip CLI system prompt prefix for internal classifiers that provide their own prompt
     ...(skipSystemPromptPrefix
       ? []
       : [
           {
-            type: 'text' as const,
+            type: "text" as const,
             text: getCLISyspromptPrefix({
               isNonInteractive: false,
               hasAppendSystemPrompt: false,
             }),
           },
         ]),
-    ...(Array.isArray(system)
-      ? system
-      : system
-        ? [{ type: 'text' as const, text: system }]
-        : []),
+    ...(Array.isArray(system) ? system : system ? [{ type: "text" as const, text: system }] : []),
   ].filter((block): block is TextBlockParam => block !== null)
 
   let thinkingConfig: BetaThinkingConfigParam | undefined
   if (thinking === false) {
-    thinkingConfig = { type: 'disabled' }
+    thinkingConfig = { type: "disabled" }
   } else if (thinking !== undefined) {
     thinkingConfig = {
-      type: 'enabled',
+      type: "enabled",
       budget_tokens: Math.min(thinking, max_tokens - 1),
     }
   }
@@ -197,24 +183,19 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     { signal },
   )
 
-  const requestId =
-    (response as { _request_id?: string | null })._request_id ?? undefined
+  const requestId = (response as { _request_id?: string | null })._request_id ?? undefined
   const now = Date.now()
   const lastCompletion = getLastApiCompletionTimestamp()
-  logEvent('tengu_api_success', {
-    requestId:
-      requestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    querySource:
-      opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    model:
-      normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  logEvent("tengu_api_success", {
+    requestId: requestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    querySource: opts.querySource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    model: normalizedModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     cachedInputTokens: response.usage.cache_read_input_tokens ?? 0,
     uncachedInputTokens: response.usage.cache_creation_input_tokens ?? 0,
     durationMsIncludingRetries: now - start,
-    timeSinceLastApiCallMs:
-      lastCompletion !== null ? now - lastCompletion : undefined,
+    timeSinceLastApiCallMs: lastCompletion !== null ? now - lastCompletion : undefined,
   })
   setLastApiCompletionTimestamp(now)
 

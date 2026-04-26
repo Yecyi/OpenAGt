@@ -1,25 +1,22 @@
-import { feature } from 'bun:bundle'
-import { stat } from 'fs/promises'
-import memoize from 'lodash-es/memoize.js'
-import { env, JETBRAINS_IDES } from './env.js'
-import { isEnvTruthy } from './envUtils.js'
-import { execFileNoThrow } from './execFileNoThrow.js'
-import { getAncestorCommandsAsync } from './genericProcessUtils.js'
+import { feature } from "bun:bundle"
+import { stat } from "fs/promises"
+import memoize from "lodash-es/memoize.js"
+import { env, JETBRAINS_IDES } from "./env.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { execFileNoThrow } from "./execFileNoThrow.js"
+import { getAncestorCommandsAsync } from "./genericProcessUtils.js"
 
 // Functions that require execFileNoThrow and thus cannot be in env.ts
 
 const getIsDocker = memoize(async (): Promise<boolean> => {
-  if (process.platform !== 'linux') return false
+  if (process.platform !== "linux") return false
   // Check for .dockerenv file
-  const { code } = await execFileNoThrow('test', ['-f', '/.dockerenv'])
+  const { code } = await execFileNoThrow("test", ["-f", "/.dockerenv"])
   return code === 0
 })
 
 function getIsBubblewrapSandbox(): boolean {
-  return (
-    process.platform === 'linux' &&
-    isEnvTruthy(process.env.CLAUDE_CODE_BUBBLEWRAP)
-  )
+  return process.platform === "linux" && isEnvTruthy(process.env.CLAUDE_CODE_BUBBLEWRAP)
 }
 
 // Cache for the runtime musl detection fallback (node/unbundled only).
@@ -31,8 +28,8 @@ let muslRuntimeCache: boolean | null = null
 // Native builds never reach this (feature flags short-circuit), so this only
 // matters for unbundled node on Linux. Installer calls on native builds are
 // unaffected since feature() resolves at compile time.
-if (process.platform === 'linux') {
-  const muslArch = process.arch === 'x64' ? 'x86_64' : 'aarch64'
+if (process.platform === "linux") {
+  const muslArch = process.arch === "x64" ? "x86_64" : "aarch64"
   void stat(`/lib/libc.musl-${muslArch}.so.1`).then(
     () => {
       muslRuntimeCache = true
@@ -50,25 +47,23 @@ if (process.platform === 'linux') {
  * whose result is cached at module load. If the cache isn't populated yet, returns false.
  */
 function isMuslEnvironment(): boolean {
-  if (feature('IS_LIBC_MUSL')) return true
-  if (feature('IS_LIBC_GLIBC')) return false
+  if (feature("IS_LIBC_MUSL")) return true
+  if (feature("IS_LIBC_GLIBC")) return false
 
   // Fallback for node: runtime detection via pre-populated cache
-  if (process.platform !== 'linux') return false
+  if (process.platform !== "linux") return false
   return muslRuntimeCache ?? false
 }
 
 // Cache for async JetBrains detection
 let jetBrainsIDECache: string | null | undefined
 
-async function detectJetBrainsIDEFromParentProcessAsync(): Promise<
-  string | null
-> {
+async function detectJetBrainsIDEFromParentProcessAsync(): Promise<string | null> {
   if (jetBrainsIDECache !== undefined) {
     return jetBrainsIDECache
   }
 
-  if (process.platform === 'darwin') {
+  if (process.platform === "darwin") {
     jetBrainsIDECache = null
     return null // macOS uses bundle ID detection which is already handled
   }
@@ -95,15 +90,13 @@ async function detectJetBrainsIDEFromParentProcessAsync(): Promise<
   return null
 }
 
-export async function getTerminalWithJetBrainsDetectionAsync(): Promise<
-  string | null
-> {
+export async function getTerminalWithJetBrainsDetectionAsync(): Promise<string | null> {
   // Check for JetBrains terminal on Linux/Windows
-  if (process.env.TERMINAL_EMULATOR === 'JetBrains-JediTerm') {
+  if (process.env.TERMINAL_EMULATOR === "JetBrains-JediTerm") {
     // For macOS, bundle ID detection above already handles JetBrains IDEs
-    if (env.platform !== 'darwin') {
+    if (env.platform !== "darwin") {
       const specificIDE = await detectJetBrainsIDEFromParentProcessAsync()
-      return specificIDE || 'pycharm'
+      return specificIDE || "pycharm"
     }
   }
   return env.terminal
@@ -113,16 +106,16 @@ export async function getTerminalWithJetBrainsDetectionAsync(): Promise<
 // Used for backward compatibility - callers should migrate to async version
 export function getTerminalWithJetBrainsDetection(): string | null {
   // Check for JetBrains terminal on Linux/Windows
-  if (process.env.TERMINAL_EMULATOR === 'JetBrains-JediTerm') {
+  if (process.env.TERMINAL_EMULATOR === "JetBrains-JediTerm") {
     // For macOS, bundle ID detection above already handles JetBrains IDEs
-    if (env.platform !== 'darwin') {
+    if (env.platform !== "darwin") {
       // Return cached value if available, otherwise fall back to generic detection
       // The async version should be called early in app initialization to populate cache
       if (jetBrainsIDECache !== undefined) {
-        return jetBrainsIDECache || 'pycharm'
+        return jetBrainsIDECache || "pycharm"
       }
       // Fall back to generic 'pycharm' if cache not populated yet
-      return 'pycharm'
+      return "pycharm"
     }
   }
   return env.terminal
@@ -134,7 +127,7 @@ export function getTerminalWithJetBrainsDetection(): string | null {
  * After this resolves, getTerminalWithJetBrainsDetection() will return accurate results.
  */
 export async function initJetBrainsDetection(): Promise<void> {
-  if (process.env.TERMINAL_EMULATOR === 'JetBrains-JediTerm') {
+  if (process.env.TERMINAL_EMULATOR === "JetBrains-JediTerm") {
     await detectJetBrainsIDEFromParentProcessAsync()
   }
 }

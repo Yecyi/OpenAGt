@@ -1,4 +1,4 @@
-import { FILE_EDIT_TOOL_NAME } from '../FileEditTool/constants.js'
+import { FILE_EDIT_TOOL_NAME } from "../FileEditTool/constants.js"
 
 export const PROMPT = `Use this tool to create and manage a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
 It also helps the user understand the progress of the task and overall progress of their requests.
@@ -181,4 +181,4 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 `
 
 export const DESCRIPTION =
-  'Update the todo list for the current session. To be used proactively and often to track progress and pending tasks. Make sure that at least one task is in_progress at all times. Always provide both content (imperative) and activeForm (present continuous) for each task.'
+  "Update the todo list for the current session. To be used proactively and often to track progress and pending tasks. Make sure that at least one task is in_progress at all times. Always provide both content (imperative) and activeForm (present continuous) for each task."

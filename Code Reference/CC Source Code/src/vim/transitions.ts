@@ -5,7 +5,7 @@
  * To understand what happens in any state, look up that state's transition function.
  */
 
-import { resolveMotion } from './motions.js'
+import { resolveMotion } from "./motions.js"
 import {
   executeIndent,
   executeJoin,
@@ -21,7 +21,7 @@ import {
   executeToggleCase,
   executeX,
   type OperatorContext,
-} from './operators.js'
+} from "./operators.js"
 import {
   type CommandState,
   FIND_KEYS,
@@ -35,7 +35,7 @@ import {
   TEXT_OBJ_SCOPES,
   TEXT_OBJ_TYPES,
   type TextObjScope,
-} from './types.js'
+} from "./types.js"
 
 /**
  * Context passed to transition functions.
@@ -56,33 +56,29 @@ export type TransitionResult = {
 /**
  * Main transition function. Dispatches based on current state type.
  */
-export function transition(
-  state: CommandState,
-  input: string,
-  ctx: TransitionContext,
-): TransitionResult {
+export function transition(state: CommandState, input: string, ctx: TransitionContext): TransitionResult {
   switch (state.type) {
-    case 'idle':
+    case "idle":
       return fromIdle(input, ctx)
-    case 'count':
+    case "count":
       return fromCount(state, input, ctx)
-    case 'operator':
+    case "operator":
       return fromOperator(state, input, ctx)
-    case 'operatorCount':
+    case "operatorCount":
       return fromOperatorCount(state, input, ctx)
-    case 'operatorFind':
+    case "operatorFind":
       return fromOperatorFind(state, input, ctx)
-    case 'operatorTextObj':
+    case "operatorTextObj":
       return fromOperatorTextObj(state, input, ctx)
-    case 'find':
+    case "find":
       return fromFind(state, input, ctx)
-    case 'g':
+    case "g":
       return fromG(state, input, ctx)
-    case 'operatorG':
+    case "operatorG":
       return fromOperatorG(state, input, ctx)
-    case 'replace':
+    case "replace":
       return fromReplace(state, input, ctx)
-    case 'indent':
+    case "indent":
       return fromIndent(state, input, ctx)
   }
 }
@@ -95,13 +91,9 @@ export function transition(
  * Handle input that's valid in both idle and count states.
  * Returns null if input is not recognized.
  */
-function handleNormalInput(
-  input: string,
-  count: number,
-  ctx: TransitionContext,
-): TransitionResult | null {
+function handleNormalInput(input: string, count: number, ctx: TransitionContext): TransitionResult | null {
   if (isOperatorKey(input)) {
-    return { next: { type: 'operator', op: OPERATORS[input], count } }
+    return { next: { type: "operator", op: OPERATORS[input], count } }
   }
 
   if (SIMPLE_MOTIONS.has(input)) {
@@ -114,36 +106,36 @@ function handleNormalInput(
   }
 
   if (FIND_KEYS.has(input)) {
-    return { next: { type: 'find', find: input as FindType, count } }
+    return { next: { type: "find", find: input as FindType, count } }
   }
 
-  if (input === 'g') return { next: { type: 'g', count } }
-  if (input === 'r') return { next: { type: 'replace', count } }
-  if (input === '>' || input === '<') {
-    return { next: { type: 'indent', dir: input, count } }
+  if (input === "g") return { next: { type: "g", count } }
+  if (input === "r") return { next: { type: "replace", count } }
+  if (input === ">" || input === "<") {
+    return { next: { type: "indent", dir: input, count } }
   }
-  if (input === '~') {
+  if (input === "~") {
     return { execute: () => executeToggleCase(count, ctx) }
   }
-  if (input === 'x') {
+  if (input === "x") {
     return { execute: () => executeX(count, ctx) }
   }
-  if (input === 'J') {
+  if (input === "J") {
     return { execute: () => executeJoin(count, ctx) }
   }
-  if (input === 'p' || input === 'P') {
-    return { execute: () => executePaste(input === 'p', count, ctx) }
+  if (input === "p" || input === "P") {
+    return { execute: () => executePaste(input === "p", count, ctx) }
   }
-  if (input === 'D') {
-    return { execute: () => executeOperatorMotion('delete', '$', 1, ctx) }
+  if (input === "D") {
+    return { execute: () => executeOperatorMotion("delete", "$", 1, ctx) }
   }
-  if (input === 'C') {
-    return { execute: () => executeOperatorMotion('change', '$', 1, ctx) }
+  if (input === "C") {
+    return { execute: () => executeOperatorMotion("change", "$", 1, ctx) }
   }
-  if (input === 'Y') {
-    return { execute: () => executeLineOp('yank', count, ctx) }
+  if (input === "Y") {
+    return { execute: () => executeLineOp("yank", count, ctx) }
   }
-  if (input === 'G') {
+  if (input === "G") {
     return {
       execute: () => {
         // count=1 means no count given, go to last line
@@ -156,44 +148,41 @@ function handleNormalInput(
       },
     }
   }
-  if (input === '.') {
+  if (input === ".") {
     return { execute: () => ctx.onDotRepeat?.() }
   }
-  if (input === ';' || input === ',') {
-    return { execute: () => executeRepeatFind(input === ',', count, ctx) }
+  if (input === ";" || input === ",") {
+    return { execute: () => executeRepeatFind(input === ",", count, ctx) }
   }
-  if (input === 'u') {
+  if (input === "u") {
     return { execute: () => ctx.onUndo?.() }
   }
-  if (input === 'i') {
+  if (input === "i") {
     return { execute: () => ctx.enterInsert(ctx.cursor.offset) }
   }
-  if (input === 'I') {
+  if (input === "I") {
     return {
-      execute: () =>
-        ctx.enterInsert(ctx.cursor.firstNonBlankInLogicalLine().offset),
+      execute: () => ctx.enterInsert(ctx.cursor.firstNonBlankInLogicalLine().offset),
     }
   }
-  if (input === 'a') {
+  if (input === "a") {
     return {
       execute: () => {
-        const newOffset = ctx.cursor.isAtEnd()
-          ? ctx.cursor.offset
-          : ctx.cursor.right().offset
+        const newOffset = ctx.cursor.isAtEnd() ? ctx.cursor.offset : ctx.cursor.right().offset
         ctx.enterInsert(newOffset)
       },
     }
   }
-  if (input === 'A') {
+  if (input === "A") {
     return {
       execute: () => ctx.enterInsert(ctx.cursor.endOfLogicalLine().offset),
     }
   }
-  if (input === 'o') {
-    return { execute: () => executeOpenLine('below', ctx) }
+  if (input === "o") {
+    return { execute: () => executeOpenLine("below", ctx) }
   }
-  if (input === 'O') {
-    return { execute: () => executeOpenLine('above', ctx) }
+  if (input === "O") {
+    return { execute: () => executeOpenLine("above", ctx) }
   }
 
   return null
@@ -212,7 +201,7 @@ function handleOperatorInput(
   if (isTextObjScopeKey(input)) {
     return {
       next: {
-        type: 'operatorTextObj',
+        type: "operatorTextObj",
         op,
         count,
         scope: TEXT_OBJ_SCOPES[input],
@@ -222,7 +211,7 @@ function handleOperatorInput(
 
   if (FIND_KEYS.has(input)) {
     return {
-      next: { type: 'operatorFind', op, count, find: input as FindType },
+      next: { type: "operatorFind", op, count, find: input as FindType },
     }
   }
 
@@ -230,12 +219,12 @@ function handleOperatorInput(
     return { execute: () => executeOperatorMotion(op, input, count, ctx) }
   }
 
-  if (input === 'G') {
+  if (input === "G") {
     return { execute: () => executeOperatorG(op, count, ctx) }
   }
 
-  if (input === 'g') {
-    return { next: { type: 'operatorG', op, count } }
+  if (input === "g") {
+    return { next: { type: "operatorG", op, count } }
   }
 
   return null
@@ -248,9 +237,9 @@ function handleOperatorInput(
 function fromIdle(input: string, ctx: TransitionContext): TransitionResult {
   // 0 is line-start motion, not a count prefix
   if (/[1-9]/.test(input)) {
-    return { next: { type: 'count', digits: input } }
+    return { next: { type: "count", digits: input } }
   }
-  if (input === '0') {
+  if (input === "0") {
     return {
       execute: () => ctx.setOffset(ctx.cursor.startOfLogicalLine().offset),
     }
@@ -262,26 +251,22 @@ function fromIdle(input: string, ctx: TransitionContext): TransitionResult {
   return {}
 }
 
-function fromCount(
-  state: { type: 'count'; digits: string },
-  input: string,
-  ctx: TransitionContext,
-): TransitionResult {
+function fromCount(state: { type: "count"; digits: string }, input: string, ctx: TransitionContext): TransitionResult {
   if (/[0-9]/.test(input)) {
     const newDigits = state.digits + input
     const count = Math.min(parseInt(newDigits, 10), MAX_VIM_COUNT)
-    return { next: { type: 'count', digits: String(count) } }
+    return { next: { type: "count", digits: String(count) } }
   }
 
   const count = parseInt(state.digits, 10)
   const result = handleNormalInput(input, count, ctx)
   if (result) return result
 
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromOperator(
-  state: { type: 'operator'; op: Operator; count: number },
+  state: { type: "operator"; op: Operator; count: number },
   input: string,
   ctx: TransitionContext,
 ): TransitionResult {
@@ -293,7 +278,7 @@ function fromOperator(
   if (/[0-9]/.test(input)) {
     return {
       next: {
-        type: 'operatorCount',
+        type: "operatorCount",
         op: state.op,
         count: state.count,
         digits: input,
@@ -304,12 +289,12 @@ function fromOperator(
   const result = handleOperatorInput(state.op, state.count, input, ctx)
   if (result) return result
 
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromOperatorCount(
   state: {
-    type: 'operatorCount'
+    type: "operatorCount"
     op: Operator
     count: number
     digits: string
@@ -328,12 +313,12 @@ function fromOperatorCount(
   const result = handleOperatorInput(state.op, effectiveCount, input, ctx)
   if (result) return result
 
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromOperatorFind(
   state: {
-    type: 'operatorFind'
+    type: "operatorFind"
     op: Operator
     count: number
     find: FindType
@@ -342,14 +327,13 @@ function fromOperatorFind(
   ctx: TransitionContext,
 ): TransitionResult {
   return {
-    execute: () =>
-      executeOperatorFind(state.op, state.find, input, state.count, ctx),
+    execute: () => executeOperatorFind(state.op, state.find, input, state.count, ctx),
   }
 }
 
 function fromOperatorTextObj(
   state: {
-    type: 'operatorTextObj'
+    type: "operatorTextObj"
     op: Operator
     count: number
     scope: TextObjScope
@@ -359,15 +343,14 @@ function fromOperatorTextObj(
 ): TransitionResult {
   if (TEXT_OBJ_TYPES.has(input)) {
     return {
-      execute: () =>
-        executeOperatorTextObj(state.op, state.scope, input, state.count, ctx),
+      execute: () => executeOperatorTextObj(state.op, state.scope, input, state.count, ctx),
     }
   }
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromFind(
-  state: { type: 'find'; find: FindType; count: number },
+  state: { type: "find"; find: FindType; count: number },
   input: string,
   ctx: TransitionContext,
 ): TransitionResult {
@@ -382,12 +365,8 @@ function fromFind(
   }
 }
 
-function fromG(
-  state: { type: 'g'; count: number },
-  input: string,
-  ctx: TransitionContext,
-): TransitionResult {
-  if (input === 'j' || input === 'k') {
+function fromG(state: { type: "g"; count: number }, input: string, ctx: TransitionContext): TransitionResult {
+  if (input === "j" || input === "k") {
     return {
       execute: () => {
         const target = resolveMotion(`g${input}`, ctx.cursor, state.count)
@@ -395,12 +374,12 @@ function fromG(
       },
     }
   }
-  if (input === 'g') {
+  if (input === "g") {
     // If count provided (e.g., 5gg), go to that line. Otherwise go to first line.
     if (state.count > 1) {
       return {
         execute: () => {
-          const lines = ctx.text.split('\n')
+          const lines = ctx.text.split("\n")
           const targetLine = Math.min(state.count - 1, lines.length - 1)
           let offset = 0
           for (let i = 0; i < targetLine; i++) {
@@ -414,59 +393,54 @@ function fromG(
       execute: () => ctx.setOffset(ctx.cursor.startOfFirstLine().offset),
     }
   }
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromOperatorG(
-  state: { type: 'operatorG'; op: Operator; count: number },
+  state: { type: "operatorG"; op: Operator; count: number },
   input: string,
   ctx: TransitionContext,
 ): TransitionResult {
-  if (input === 'j' || input === 'k') {
+  if (input === "j" || input === "k") {
     return {
-      execute: () =>
-        executeOperatorMotion(state.op, `g${input}`, state.count, ctx),
+      execute: () => executeOperatorMotion(state.op, `g${input}`, state.count, ctx),
     }
   }
-  if (input === 'g') {
+  if (input === "g") {
     return { execute: () => executeOperatorGg(state.op, state.count, ctx) }
   }
   // Any other input cancels the operator
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 function fromReplace(
-  state: { type: 'replace'; count: number },
+  state: { type: "replace"; count: number },
   input: string,
   ctx: TransitionContext,
 ): TransitionResult {
   // Backspace/Delete arrive as empty input in literal-char states. In vim,
   // r<BS> cancels the replace; without this guard, executeReplace("") would
   // delete the character under the cursor instead.
-  if (input === '') return { next: { type: 'idle' } }
+  if (input === "") return { next: { type: "idle" } }
   return { execute: () => executeReplace(input, state.count, ctx) }
 }
 
 function fromIndent(
-  state: { type: 'indent'; dir: '>' | '<'; count: number },
+  state: { type: "indent"; dir: ">" | "<"; count: number },
   input: string,
   ctx: TransitionContext,
 ): TransitionResult {
   if (input === state.dir) {
     return { execute: () => executeIndent(state.dir, state.count, ctx) }
   }
-  return { next: { type: 'idle' } }
+  return { next: { type: "idle" } }
 }
 
 // ============================================================================
 // Helper functions for special commands
 // ============================================================================
 
-function executeRepeatFind(
-  reverse: boolean,
-  count: number,
-  ctx: TransitionContext,
-): void {
+function executeRepeatFind(reverse: boolean, count: number, ctx: TransitionContext): void {
   const lastFind = ctx.getLastFind()
   if (!lastFind) return
 
@@ -475,10 +449,10 @@ function executeRepeatFind(
   if (reverse) {
     // Flip the direction
     const flipMap: Record<FindType, FindType> = {
-      f: 'F',
-      F: 'f',
-      t: 'T',
-      T: 't',
+      f: "F",
+      F: "f",
+      t: "T",
+      T: "t",
     }
     findType = flipMap[findType]
   }

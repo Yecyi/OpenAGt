@@ -105,9 +105,16 @@ export function Home() {
         })
         if (!effort) return
         try {
-          const session = (await sdk.client.session.create({ title: text.slice(0, 80) || "Mission" }, { throwOnError: true })).data
+          const session = (
+            await sdk.client.session.create({ title: text.slice(0, 80) || "Mission" }, { throwOnError: true })
+          ).data
           const intent = (await sdk.client.coordinator.intent.settle({ goal: text }, { throwOnError: true })).data
-          const plan = (await sdk.client.coordinator.plan2.generate({ goal: text, intent, effort, workflow: intent.workflow }, { throwOnError: true })).data
+          const plan = (
+            await sdk.client.coordinator.plan2.generate(
+              { goal: text, intent, effort, workflow: intent.workflow },
+              { throwOnError: true },
+            )
+          ).data
           const mode = intent.risk_level === "high" ? "assisted" : "autonomous"
           const run = (
             await sdk.client.coordinator.run(
@@ -193,8 +200,12 @@ export function Home() {
   const EffortControl = () => (
     <box width="100%" maxWidth={HOME_WIDTH} paddingTop={1} flexShrink={0} gap={1} flexDirection="column">
       <box flexDirection="row" justifyContent="space-between" gap={2}>
-        <text fg={theme.textMuted} wrapMode="none">Agent effort</text>
-        <text fg={theme.textMuted} wrapMode="none">/effort</text>
+        <text fg={theme.textMuted} wrapMode="none">
+          Agent effort
+        </text>
+        <text fg={theme.textMuted} wrapMode="none">
+          /effort
+        </text>
       </box>
       <box flexDirection="row" gap={1} flexWrap="wrap">
         <For each={effortOptions}>
@@ -207,7 +218,10 @@ export function Home() {
                 backgroundColor={selected() ? theme.backgroundElement : undefined}
                 onMouseUp={() => local.effort.set(item.value)}
               >
-                <text fg={selected() ? theme.warning : theme.textMuted} attributes={selected() ? TextAttributes.BOLD : undefined}>
+                <text
+                  fg={selected() ? theme.warning : theme.textMuted}
+                  attributes={selected() ? TextAttributes.BOLD : undefined}
+                >
                   {item.title.toLowerCase()}
                 </text>
               </box>

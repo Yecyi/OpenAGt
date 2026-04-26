@@ -1,15 +1,15 @@
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { join as posixJoin } from 'path/posix'
-import { getSessionEnvVars } from '../sessionEnvVars.js'
-import type { ShellProvider } from './shellProvider.js'
+import { tmpdir } from "os"
+import { join } from "path"
+import { join as posixJoin } from "path/posix"
+import { getSessionEnvVars } from "../sessionEnvVars.js"
+import type { ShellProvider } from "./shellProvider.js"
 
 /**
  * PowerShell invocation flags + command. Shared by the provider's getSpawnArgs
  * and the hook spawn path in hooks.ts so the flag set stays in one place.
  */
 export function buildPowerShellArgs(cmd: string): string[] {
-  return ['-NoProfile', '-NonInteractive', '-Command', cmd]
+  return ["-NoProfile", "-NonInteractive", "-Command", cmd]
 }
 
 /**
@@ -21,14 +21,14 @@ export function buildPowerShellArgs(cmd: string): string[] {
  * quotes. Review 2964609818.
  */
 function encodePowerShellCommand(psCommand: string): string {
-  return Buffer.from(psCommand, 'utf16le').toString('base64')
+  return Buffer.from(psCommand, "utf16le").toString("base64")
 }
 
 export function createPowerShellProvider(shellPath: string): ShellProvider {
   let currentSandboxTmpDir: string | undefined
 
   return {
-    type: 'powershell' as ShellProvider['type'],
+    type: "powershell" as ShellProvider["type"],
     shellPath,
     detached: false,
 
@@ -86,11 +86,11 @@ export function createPowerShellProvider(shellPath: string): ShellProvider {
       const commandString = opts.useSandbox
         ? [
             `'${shellPath.replace(/'/g, `'\\''`)}'`,
-            '-NoProfile',
-            '-NonInteractive',
-            '-EncodedCommand',
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
             encodePowerShellCommand(psCommand),
-          ].join(' ')
+          ].join(" ")
         : psCommand
 
       return { commandString, cwdFilePath }

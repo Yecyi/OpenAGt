@@ -1,13 +1,13 @@
-import axios from 'axios'
-import { hasProfileScope, isClaudeAISubscriber } from '../../utils/auth.js'
-import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { errorMessage } from '../../utils/errors.js'
-import { getAuthHeaders, withOAuth401Retry } from '../../utils/http.js'
-import { logError } from '../../utils/log.js'
-import { memoizeWithTTLAsync } from '../../utils/memoize.js'
-import { isEssentialTrafficOnly } from '../../utils/privacyLevel.js'
-import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
+import axios from "axios"
+import { hasProfileScope, isClaudeAISubscriber } from "../../utils/auth.js"
+import { getGlobalConfig, saveGlobalConfig } from "../../utils/config.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { errorMessage } from "../../utils/errors.js"
+import { getAuthHeaders, withOAuth401Retry } from "../../utils/http.js"
+import { logError } from "../../utils/log.js"
+import { memoizeWithTTLAsync } from "../../utils/memoize.js"
+import { isEssentialTrafficOnly } from "../../utils/privacyLevel.js"
+import { getClaudeCodeUserAgent } from "../../utils/userAgent.js"
 
 type MetricsEnabledResponse = {
   metrics_logging_enabled: boolean
@@ -37,8 +37,8 @@ async function _fetchMetricsEnabled(): Promise<MetricsEnabledResponse> {
   }
 
   const headers = {
-    'Content-Type': 'application/json',
-    'User-Agent': getClaudeCodeUserAgent(),
+    "Content-Type": "application/json",
+    "User-Agent": getClaudeCodeUserAgent(),
     ...authResult.headers,
   }
 
@@ -63,28 +63,21 @@ async function _checkMetricsEnabledAPI(): Promise<MetricsStatus> {
       also403Revoked: true,
     })
 
-    logForDebugging(
-      `Metrics opt-out API response: enabled=${data.metrics_logging_enabled}`,
-    )
+    logForDebugging(`Metrics opt-out API response: enabled=${data.metrics_logging_enabled}`)
 
     return {
       enabled: data.metrics_logging_enabled,
       hasError: false,
     }
   } catch (error) {
-    logForDebugging(
-      `Failed to check metrics opt-out status: ${errorMessage(error)}`,
-    )
+    logForDebugging(`Failed to check metrics opt-out status: ${errorMessage(error)}`)
     logError(error)
     return { enabled: false, hasError: true }
   }
 }
 
 // Create memoized version with custom error handling
-const memoizedCheckMetrics = memoizeWithTTLAsync(
-  _checkMetricsEnabledAPI,
-  CACHE_TTL_MS,
-)
+const memoizedCheckMetrics = memoizeWithTTLAsync(_checkMetricsEnabledAPI, CACHE_TTL_MS)
 
 /**
  * Fetch (in-memory memoized) and persist to disk on change.
@@ -105,7 +98,7 @@ async function refreshMetricsStatus(): Promise<MetricsStatus> {
     return result
   }
 
-  saveGlobalConfig(current => ({
+  saveGlobalConfig((current) => ({
     ...current,
     metricsStatusCache: {
       enabled: result.enabled,

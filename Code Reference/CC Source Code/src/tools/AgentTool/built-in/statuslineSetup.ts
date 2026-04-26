@@ -1,4 +1,4 @@
-import type { BuiltInAgentDefinition } from '../loadAgentsDir.js'
+import type { BuiltInAgentDefinition } from "../loadAgentsDir.js"
 
 const STATUSLINE_SYSTEM_PROMPT = `You are a status line setup agent for Claude Code. Your job is to create or update the statusLine command in the user's Claude Code settings.
 
@@ -132,13 +132,12 @@ Guidelines:
 `
 
 export const STATUSLINE_SETUP_AGENT: BuiltInAgentDefinition = {
-  agentType: 'statusline-setup',
-  whenToUse:
-    "Use this agent to configure the user's Claude Code status line setting.",
-  tools: ['Read', 'Edit'],
-  source: 'built-in',
-  baseDir: 'built-in',
-  model: 'sonnet',
-  color: 'orange',
+  agentType: "statusline-setup",
+  whenToUse: "Use this agent to configure the user's Claude Code status line setting.",
+  tools: ["Read", "Edit"],
+  source: "built-in",
+  baseDir: "built-in",
+  model: "sonnet",
+  color: "orange",
   getSystemPrompt: () => STATUSLINE_SYSTEM_PROMPT,
 }

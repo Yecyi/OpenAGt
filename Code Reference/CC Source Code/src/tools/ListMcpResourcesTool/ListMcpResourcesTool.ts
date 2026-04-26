@@ -1,23 +1,17 @@
-import { z } from 'zod/v4'
-import {
-  ensureConnectedClient,
-  fetchResourcesForClient,
-} from '../../services/mcp/client.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { errorMessage } from '../../utils/errors.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { logMCPError } from '../../utils/log.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { isOutputLineTruncated } from '../../utils/terminal.js'
-import { DESCRIPTION, LIST_MCP_RESOURCES_TOOL_NAME, PROMPT } from './prompt.js'
-import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
+import { z } from "zod/v4"
+import { ensureConnectedClient, fetchResourcesForClient } from "../../services/mcp/client.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { errorMessage } from "../../utils/errors.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { logMCPError } from "../../utils/log.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { isOutputLineTruncated } from "../../utils/terminal.js"
+import { DESCRIPTION, LIST_MCP_RESOURCES_TOOL_NAME, PROMPT } from "./prompt.js"
+import { renderToolResultMessage, renderToolUseMessage } from "./UI.js"
 
 const inputSchema = lazySchema(() =>
   z.object({
-    server: z
-      .string()
-      .optional()
-      .describe('Optional server name to filter resources by'),
+    server: z.string().optional().describe("Optional server name to filter resources by"),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -25,11 +19,11 @@ type InputSchema = ReturnType<typeof inputSchema>
 const outputSchema = lazySchema(() =>
   z.array(
     z.object({
-      uri: z.string().describe('Resource URI'),
-      name: z.string().describe('Resource name'),
-      mimeType: z.string().optional().describe('MIME type of the resource'),
-      description: z.string().optional().describe('Resource description'),
-      server: z.string().describe('Server that provides this resource'),
+      uri: z.string().describe("Resource URI"),
+      name: z.string().describe("Resource name"),
+      mimeType: z.string().optional().describe("MIME type of the resource"),
+      description: z.string().optional().describe("Resource description"),
+      server: z.string().describe("Server that provides this resource"),
     }),
   ),
 )
@@ -45,11 +39,11 @@ export const ListMcpResourcesTool = buildTool({
     return true
   },
   toAutoClassifierInput(input) {
-    return input.server ?? ''
+    return input.server ?? ""
   },
   shouldDefer: true,
   name: LIST_MCP_RESOURCES_TOOL_NAME,
-  searchHint: 'list resources from connected MCP servers',
+  searchHint: "list resources from connected MCP servers",
   maxResultSizeChars: 100_000,
   async description() {
     return DESCRIPTION
@@ -66,13 +60,11 @@ export const ListMcpResourcesTool = buildTool({
   async call(input, { options: { mcpClients } }) {
     const { server: targetServer } = input
 
-    const clientsToProcess = targetServer
-      ? mcpClients.filter(client => client.name === targetServer)
-      : mcpClients
+    const clientsToProcess = targetServer ? mcpClients.filter((client) => client.name === targetServer) : mcpClients
 
     if (targetServer && clientsToProcess.length === 0) {
       throw new Error(
-        `Server "${targetServer}" not found. Available servers: ${mcpClients.map(c => c.name).join(', ')}`,
+        `Server "${targetServer}" not found. Available servers: ${mcpClients.map((c) => c.name).join(", ")}`,
       )
     }
 
@@ -82,8 +74,8 @@ export const ListMcpResourcesTool = buildTool({
     // ensureConnectedClient is a no-op when healthy (memoize hit), but after
     // onclose it returns a fresh connection so the re-fetch succeeds.
     const results = await Promise.all(
-      clientsToProcess.map(async client => {
-        if (client.type !== 'connected') return []
+      clientsToProcess.map(async (client) => {
+        if (client.type !== "connected") return []
         try {
           const fresh = await ensureConnectedClient(client)
           return await fetchResourcesForClient(fresh)
@@ -100,7 +92,7 @@ export const ListMcpResourcesTool = buildTool({
     }
   },
   renderToolUseMessage,
-  userFacingName: () => 'listMcpResources',
+  userFacingName: () => "listMcpResources",
   renderToolResultMessage,
   isResultTruncated(output: Output): boolean {
     return isOutputLineTruncated(jsonStringify(output))
@@ -109,14 +101,13 @@ export const ListMcpResourcesTool = buildTool({
     if (!content || content.length === 0) {
       return {
         tool_use_id: toolUseID,
-        type: 'tool_result',
-        content:
-          'No resources found. MCP servers may still provide tools even if they have no resources.',
+        type: "tool_result",
+        content: "No resources found. MCP servers may still provide tools even if they have no resources.",
       }
     }
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content: jsonStringify(content),
     }
   },

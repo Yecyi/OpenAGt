@@ -22,7 +22,10 @@ export const TaskWaitTool = Tool.define(
     return {
       description: "Wait for one or more tasks to reach a terminal state.",
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskWaitMetadata>, never, never> =>
+      execute: (
+        params: z.infer<typeof parameters>,
+        ctx,
+      ): Effect.Effect<Tool.ExecuteResult<TaskWaitMetadata>, never, never> =>
         Effect.gen(function* () {
           const result = yield* tasks.wait({
             parentSessionID: ctx.sessionID,

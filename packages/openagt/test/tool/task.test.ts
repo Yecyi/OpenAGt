@@ -72,7 +72,11 @@ const seed = Effect.fn("TaskToolTest.seed")(function* (title = "Pinned") {
   return { chat, assistant }
 })
 
-function stubOps(opts?: { onPrompt?: (input: SessionPrompt.PromptInput) => void; onCancel?: (sessionID: SessionID) => void; text?: string }): TaskPromptOps {
+function stubOps(opts?: {
+  onPrompt?: (input: SessionPrompt.PromptInput) => void
+  onCancel?: (sessionID: SessionID) => void
+  text?: string
+}): TaskPromptOps {
   return {
     cancel(sessionID) {
       opts?.onCancel?.(sessionID)
@@ -232,6 +236,57 @@ describe("tool.task", () => {
         expect(result.metadata.sessionId).toBe(child.id)
         expect(result.output).toContain(`task_id: ${child.id}`)
         expect(seen?.sessionID).toBe(child.id)
+      }),
+    ),
+  )
+
+  it.live("execute does not overwrite an existing completed task record", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const { chat, assistant } = yield* seed()
+        const child = yield* sessions.create({ parentID: chat.id, title: "Existing completed child" })
+        const record = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: child.id,
+          taskKind: "research",
+          subagentType: "general",
+          description: "completed task",
+          prompt: "already done",
+          dependsOn: [],
+        })
+        yield* tasks.complete({ taskID: record.task_id, parentSessionID: chat.id, output: "previous result" })
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let prompted = false
+
+        const result = yield* def.execute(
+          {
+            description: "completed task",
+            prompt: "try to rerun",
+            subagent_type: "general",
+            task_id: child.id,
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps: stubOps({ onPrompt: () => (prompted = true) }) },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        const records = yield* tasks.list(chat.id)
+
+        expect(prompted).toBe(false)
+        expect(records).toHaveLength(1)
+        expect(records[0]?.status).toBe("completed")
+        expect(records[0]?.result_summary).toBe("previous result")
+        expect(result.metadata.status).toBe("completed")
+        expect(result.output).toContain("previous result")
       }),
     ),
   )
@@ -499,7 +554,7 @@ describe("tool.task", () => {
         yield* def.execute(
           {
             description: "inspect project",
-            prompt: "explore repository structure",
+            prompt: "explore repository structure thoroughly and summarize architecture algorithms",
             subagent_type: "explore",
             task_kind: "research",
           },
@@ -522,6 +577,55 @@ describe("tool.task", () => {
           multiedit: false,
           apply_patch: false,
         })
+        expect(seen?.system).toBeUndefined()
+        expect(seen?.runtime?.stepBudget).toBe(48)
+        expect(seen?.runtime?.timeoutMs).toBeGreaterThan(90_000)
+      }),
+    ),
+  )
+
+  it.live("max-step subagent result is returned as retryable partial output", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const promptOps = stubOps({
+          text: "CRITICAL - STEP BUDGET REACHED\nEvidence gathered: package layout only.\nRemaining gaps: algorithms.",
+        })
+
+        const result = yield* def.execute(
+          {
+            description: "inspect project",
+            prompt: "explore repository structure thoroughly and summarize architecture algorithms",
+            subagent_type: "explore",
+            task_kind: "research",
+            return_mode: "summary",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        const tasks = yield* TaskRuntime.Service
+        const record = (yield* tasks.list(chat.id)).find((item) => item.task_id === result.metadata.taskId)
+
+        expect(result.metadata.status).toBe("partial")
+        expect(result.metadata.partial).toBe(true)
+        expect(result.metadata.retryable).toBe(true)
+        expect(result.metadata.limitReason).toBe("step_budget")
+        expect(record?.status).toBe("partial")
+        expect(record?.metadata?.partial).toBe(true)
+        expect(record?.metadata?.limit_reason).toBe("step_budget")
+        expect(result.output).toContain('<partial_task_result status="partial" reason="step_budget">')
+        expect(result.output).toContain("Remaining work")
       }),
     ),
   )
@@ -565,18 +669,22 @@ describe("tool.task", () => {
           metadata: () => Effect.sync(() => calls.push("metadata")),
           ask: () => Effect.sync(() => calls.push("ask")),
         }
-        const fiber = yield* task.execute(
-          {
-            description: "inspect slow",
-            prompt: "wait until stopped",
-            subagent_type: "general",
-            task_kind: "research",
-          },
-          ctx,
-        ).pipe(Effect.forkScoped)
+        const fiber = yield* task
+          .execute(
+            {
+              description: "inspect slow",
+              prompt: "wait until stopped",
+              subagent_type: "general",
+              task_kind: "research",
+            },
+            ctx,
+          )
+          .pipe(Effect.forkScoped)
         const taskID = yield* Deferred.await(started).pipe(
           Effect.timeout("1 second"),
-          Effect.catchTag("TimeoutError", () => Effect.fail(new Error(`Task prompt did not start: ${calls.join(",")}`))),
+          Effect.catchTag("TimeoutError", () =>
+            Effect.fail(new Error(`Task prompt did not start: ${calls.join(",")}`)),
+          ),
         )
 
         const stopped = yield* taskStop.execute(
@@ -606,6 +714,7 @@ describe("tool.task", () => {
         const { chat, assistant } = yield* seed()
         const task = yield* TaskTool.pipe(Effect.flatMap((tool) => tool.init()))
         const tasks = yield* TaskRuntime.Service
+        const sessionSvc = yield* Session.Service
         const started = yield* Deferred.make<SessionID>()
         const cancelled = yield* Deferred.make<SessionID>()
         const promptOps: TaskPromptOps = {
@@ -616,29 +725,34 @@ describe("tool.task", () => {
           prompt: (input) =>
             Effect.gen(function* () {
               Deferred.doneUnsafe(started, Effect.succeed(input.sessionID))
+              const partial = reply(input, "partial evidence before timeout")
+              yield* sessionSvc.updateMessage(partial.info)
+              yield* Effect.forEach(partial.parts, (part) => sessionSvc.updatePart(part), { concurrency: "unbounded" })
               yield* Effect.never
               return reply(input, "unreachable")
             }),
         }
-        const fiber = yield* task.execute(
-          {
-            description: "inspect timeout",
-            prompt: "wait forever",
-            subagent_type: "general",
-            task_kind: "research",
-            metadata: { timeout_ms: 20 },
-          },
-          {
-            sessionID: chat.id,
-            messageID: assistant.id,
-            agent: "build",
-            abort: new AbortController().signal,
-            extra: { promptOps },
-            messages: [],
-            metadata: () => Effect.void,
-            ask: () => Effect.void,
-          },
-        ).pipe(Effect.forkScoped)
+        const fiber = yield* task
+          .execute(
+            {
+              description: "inspect timeout",
+              prompt: "wait forever",
+              subagent_type: "general",
+              task_kind: "research",
+              metadata: { timeout_ms: 20 },
+            },
+            {
+              sessionID: chat.id,
+              messageID: assistant.id,
+              agent: "build",
+              abort: new AbortController().signal,
+              extra: { promptOps },
+              messages: [],
+              metadata: () => Effect.void,
+              ask: () => Effect.void,
+            },
+          )
+          .pipe(Effect.forkScoped)
 
         const taskID = yield* Deferred.await(started).pipe(Effect.timeout("1 second"))
         const result = yield* Fiber.join(fiber)
@@ -647,7 +761,9 @@ describe("tool.task", () => {
 
         expect(result.metadata.status).toBe("failed")
         expect(result.metadata.retryable).toBe(true)
-        expect(result.output).toContain("<task_result status=\"failed\">")
+        expect(result.metadata.partialSummary).toContain("partial evidence before timeout")
+        expect(result.output).toContain('<task_result status="failed">')
+        expect(result.output).toContain('<partial_task_result status="partial">')
         expect(cancelledID).toBe(taskID)
         expect(record?.status).toBe("failed")
         expect(record?.error_summary).toContain("Subagent timed out after")
@@ -725,6 +841,51 @@ describe("tool.task", () => {
         expect(result).toHaveLength(1)
         expect(result[0]?.task_id).toBe(first.task_id)
         expect(result[0]?.status).toBe("completed")
+      }),
+    ),
+  )
+
+  it.live("partial tasks are terminal but do not satisfy dependencies", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const tasks = yield* TaskRuntime.Service
+        const { chat } = yield* seed()
+        const first = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_partial" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "partial task",
+          prompt: "do first",
+          dependsOn: [],
+        })
+        const second = yield* tasks.create({
+          parentSessionID: chat.id,
+          childSessionID: "ses_child_depends_on_partial" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "dependent task",
+          prompt: "do second",
+          dependsOn: [first.task_id],
+        })
+
+        yield* tasks.partial({
+          taskID: first.task_id,
+          parentSessionID: chat.id,
+          output: "step budget reached",
+          reason: "step_budget",
+        })
+
+        const waited = yield* tasks.wait({
+          parentSessionID: chat.id,
+          taskIDs: [first.task_id],
+          mode: "all",
+          timeoutMs: 1000,
+        })
+        const canRun = yield* tasks.canRun({ parentSessionID: chat.id, task: second })
+
+        expect(waited[0]?.status).toBe("partial")
+        expect(canRun).toBe(false)
       }),
     ),
   )

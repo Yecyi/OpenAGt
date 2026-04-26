@@ -1,32 +1,32 @@
-import type { BetaMessageStreamParams } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import type { Attributes, Meter, MetricOptions } from '@opentelemetry/api'
-import type { logs } from '@opentelemetry/api-logs'
-import type { LoggerProvider } from '@opentelemetry/sdk-logs'
-import type { MeterProvider } from '@opentelemetry/sdk-metrics'
-import type { BasicTracerProvider } from '@opentelemetry/sdk-trace-base'
-import { realpathSync } from 'fs'
-import sumBy from 'lodash-es/sumBy.js'
-import { cwd } from 'process'
-import type { HookEvent, ModelUsage } from 'src/entrypoints/agentSdkTypes.js'
-import type { AgentColorName } from 'src/tools/AgentTool/agentColorManager.js'
-import type { HookCallbackMatcher } from 'src/types/hooks.js'
+import type { BetaMessageStreamParams } from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs"
+import type { Attributes, Meter, MetricOptions } from "@opentelemetry/api"
+import type { logs } from "@opentelemetry/api-logs"
+import type { LoggerProvider } from "@opentelemetry/sdk-logs"
+import type { MeterProvider } from "@opentelemetry/sdk-metrics"
+import type { BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
+import { realpathSync } from "fs"
+import sumBy from "lodash-es/sumBy.js"
+import { cwd } from "process"
+import type { HookEvent, ModelUsage } from "src/entrypoints/agentSdkTypes.js"
+import type { AgentColorName } from "src/tools/AgentTool/agentColorManager.js"
+import type { HookCallbackMatcher } from "src/types/hooks.js"
 // Indirection for browser-sdk build (package.json "browser" field swaps
 // crypto.ts for crypto.browser.ts). Pure leaf re-export of node:crypto —
 // zero circular-dep risk. Path-alias import bypasses bootstrap-isolation
 // (rule only checks ./ and / prefixes); explicit disable documents intent.
 // eslint-disable-next-line custom-rules/bootstrap-isolation
-import { randomUUID } from 'src/utils/crypto.js'
-import type { ModelSetting } from 'src/utils/model/model.js'
-import type { ModelStrings } from 'src/utils/model/modelStrings.js'
-import type { SettingSource } from 'src/utils/settings/constants.js'
-import { resetSettingsCache } from 'src/utils/settings/settingsCache.js'
-import type { PluginHookMatcher } from 'src/utils/settings/types.js'
-import { createSignal } from 'src/utils/signal.js'
+import { randomUUID } from "src/utils/crypto.js"
+import type { ModelSetting } from "src/utils/model/model.js"
+import type { ModelStrings } from "src/utils/model/modelStrings.js"
+import type { SettingSource } from "src/utils/settings/constants.js"
+import { resetSettingsCache } from "src/utils/settings/settingsCache.js"
+import type { PluginHookMatcher } from "src/utils/settings/types.js"
+import { createSignal } from "src/utils/signal.js"
 
 // Union type for registered hooks - can be SDK callbacks or native plugin hooks
 type RegisteredHookMatcher = HookCallbackMatcher | PluginHookMatcher
 
-import type { SessionId } from 'src/types/ids.js'
+import type { SessionId } from "src/types/ids.js"
 
 // DO NOT ADD MORE STATE HERE - BE JUDICIOUS WITH GLOBAL STATE
 
@@ -35,8 +35,8 @@ import type { SessionId } from 'src/types/ids.js'
 // hasDevChannels bit) so passing both flags doesn't let the dev dialog's
 // acceptance leak allowlist-bypass to the --channels entries.
 export type ChannelEntry =
-  | { kind: 'plugin'; name: string; marketplace: string; dev?: boolean }
-  | { kind: 'server'; name: string; dev?: boolean }
+  | { kind: "plugin"; name: string; marketplace: string; dev?: boolean }
+  | { kind: "server"; name: string; dev?: boolean }
 
 export type AttributedCounter = {
   add(value: number, additionalAttributes?: Attributes): void
@@ -79,7 +79,7 @@ type State = {
   userMsgOptIn: boolean
   clientType: string
   sessionSource: string | undefined
-  questionPreviewFormat: 'markdown' | 'html' | undefined
+  questionPreviewFormat: "markdown" | "html" | undefined
   flagSettingsPath: string | undefined
   flagSettingsInline: Record<string, unknown> | null
   allowedSettingSources: SettingSource[]
@@ -111,11 +111,11 @@ type State = {
   agentColorMap: Map<string, AgentColorName>
   agentColorIndex: number
   // Last API request for bug reports
-  lastAPIRequest: Omit<BetaMessageStreamParams, 'messages'> | null
+  lastAPIRequest: Omit<BetaMessageStreamParams, "messages"> | null
   // Messages from the last API request (ant-only; reference, not clone).
   // Captures the exact post-compaction, CLAUDE.md-injected message set sent
   // to the API so /share's serialized_conversation.json reflects reality.
-  lastAPIRequestMessages: BetaMessageStreamParams['messages'] | null
+  lastAPIRequestMessages: BetaMessageStreamParams["messages"] | null
   // Last auto-mode classifier request(s) for /share transcript
   lastClassifierRequests: unknown[] | null
   // CLAUDE.md content cached by context.ts for the auto-mode classifier.
@@ -260,18 +260,14 @@ type State = {
 function getInitialState(): State {
   // Resolve symlinks in cwd to match behavior of shell.ts setCwd
   // This ensures consistency with how paths are sanitized for session storage
-  let resolvedCwd = ''
-  if (
-    typeof process !== 'undefined' &&
-    typeof process.cwd === 'function' &&
-    typeof realpathSync === 'function'
-  ) {
+  let resolvedCwd = ""
+  if (typeof process !== "undefined" && typeof process.cwd === "function" && typeof realpathSync === "function") {
     const rawCwd = cwd()
     try {
-      resolvedCwd = realpathSync(rawCwd).normalize('NFC')
+      resolvedCwd = realpathSync(rawCwd).normalize("NFC")
     } catch {
       // File Provider EPERM on CloudStorage mounts (lstat per path component).
-      resolvedCwd = rawCwd.normalize('NFC')
+      resolvedCwd = rawCwd.normalize("NFC")
     }
   }
   const state: State = {
@@ -302,7 +298,7 @@ function getInitialState(): State {
     strictToolResultPairing: false,
     sdkAgentProgressSummariesEnabled: false,
     userMsgOptIn: false,
-    clientType: 'cli',
+    clientType: "cli",
     sessionSource: undefined,
     questionPreviewFormat: undefined,
     sessionIngressToken: undefined,
@@ -310,13 +306,7 @@ function getInitialState(): State {
     apiKeyFromFd: undefined,
     flagSettingsPath: undefined,
     flagSettingsInline: null,
-    allowedSettingSources: [
-      'userSettings',
-      'projectSettings',
-      'localSettings',
-      'flagSettings',
-      'policySettings',
-    ],
+    allowedSettingSources: ["userSettings", "projectSettings", "localSettings", "flagSettings", "policySettings"],
     // Telemetry state
     meter: null,
     sessionCounter: null,
@@ -388,7 +378,7 @@ function getInitialState(): State {
     mainThreadAgentType: undefined,
     // Remote mode
     isRemoteMode: false,
-    ...(process.env.USER_TYPE === 'ant'
+    ...(process.env.USER_TYPE === "ant"
       ? {
           replBridgeActive: false,
         }
@@ -432,9 +422,7 @@ export function getSessionId(): SessionId {
   return STATE.sessionId
 }
 
-export function regenerateSessionId(
-  options: { setCurrentAsParent?: boolean } = {},
-): SessionId {
+export function regenerateSessionId(options: { setCurrentAsParent?: boolean } = {}): SessionId {
   if (options.setCurrentAsParent) {
     STATE.parentSessionId = STATE.sessionId
   }
@@ -465,10 +453,7 @@ export function getParentSessionId(): SessionId | undefined {
  *   cross-project resume). Every call resets the project dir; it never
  *   carries over from the previous session.
  */
-export function switchSession(
-  sessionId: SessionId,
-  projectDir: string | null = null,
-): void {
+export function switchSession(sessionId: SessionId, projectDir: string | null = null): void {
   // Drop the outgoing session's plan-slug entry so the Map stays bounded
   // across repeated /resume. Only the current session's slug is ever read
   // (plans.ts getPlanSlug defaults to getSessionId()).
@@ -513,7 +498,7 @@ export function getProjectRoot(): string {
 }
 
 export function setOriginalCwd(cwd: string): void {
-  STATE.originalCwd = cwd.normalize('NFC')
+  STATE.originalCwd = cwd.normalize("NFC")
 }
 
 /**
@@ -521,7 +506,7 @@ export function setOriginalCwd(cwd: string): void {
  * call this — skills/history should stay anchored to where the session started.
  */
 export function setProjectRoot(cwd: string): void {
-  STATE.projectRoot = cwd.normalize('NFC')
+  STATE.projectRoot = cwd.normalize("NFC")
 }
 
 export function getCwdState(): string {
@@ -529,7 +514,7 @@ export function getCwdState(): string {
 }
 
 export function setCwdState(cwd: string): void {
-  STATE.cwd = cwd.normalize('NFC')
+  STATE.cwd = cwd.normalize("NFC")
 }
 
 export function getDirectConnectServerUrl(): string | undefined {
@@ -540,10 +525,7 @@ export function setDirectConnectServerUrl(url: string): void {
   STATE.directConnectServerUrl = url
 }
 
-export function addToTotalDurationState(
-  duration: number,
-  durationWithoutRetries: number,
-): void {
+export function addToTotalDurationState(duration: number, durationWithoutRetries: number): void {
   STATE.totalAPIDuration += duration
   STATE.totalAPIDurationWithoutRetries += durationWithoutRetries
 }
@@ -554,11 +536,7 @@ export function resetTotalDurationStateAndCost_FOR_TESTS_ONLY(): void {
   STATE.totalCostUSD = 0
 }
 
-export function addToTotalCostState(
-  cost: number,
-  modelUsage: ModelUsage,
-  model: string,
-): void {
+export function addToTotalCostState(cost: number, modelUsage: ModelUsage, model: string): void {
   STATE.modelUsage[model] = modelUsage
   STATE.totalCostUSD += cost
 }
@@ -644,9 +622,7 @@ export function getStatsStore(): {
   return STATE.statsStore
 }
 
-export function setStatsStore(
-  store: { observe(name: string, value: number): void } | null,
-): void {
+export function setStatsStore(store: { observe(name: string, value: number): void } | null): void {
   STATE.statsStore = store
 }
 
@@ -702,23 +678,23 @@ export function getTotalLinesRemoved(): number {
 }
 
 export function getTotalInputTokens(): number {
-  return sumBy(Object.values(STATE.modelUsage), 'inputTokens')
+  return sumBy(Object.values(STATE.modelUsage), "inputTokens")
 }
 
 export function getTotalOutputTokens(): number {
-  return sumBy(Object.values(STATE.modelUsage), 'outputTokens')
+  return sumBy(Object.values(STATE.modelUsage), "outputTokens")
 }
 
 export function getTotalCacheReadInputTokens(): number {
-  return sumBy(Object.values(STATE.modelUsage), 'cacheReadInputTokens')
+  return sumBy(Object.values(STATE.modelUsage), "cacheReadInputTokens")
 }
 
 export function getTotalCacheCreationInputTokens(): number {
-  return sumBy(Object.values(STATE.modelUsage), 'cacheCreationInputTokens')
+  return sumBy(Object.values(STATE.modelUsage), "cacheCreationInputTokens")
 }
 
 export function getTotalWebSearchRequests(): number {
-  return sumBy(Object.values(STATE.modelUsage), 'webSearchRequests')
+  return sumBy(Object.values(STATE.modelUsage), "webSearchRequests")
 }
 
 let outputTokensAtTurnStart = 0
@@ -819,7 +795,7 @@ export async function waitForScrollIdle(): Promise<void> {
   while (scrollDraining) {
     // bootstrap-isolation forbids importing sleep() from src/utils/
     // eslint-disable-next-line no-restricted-syntax
-    await new Promise(r => setTimeout(r, SCROLL_DRAIN_IDLE_MS).unref?.())
+    await new Promise((r) => setTimeout(r, SCROLL_DRAIN_IDLE_MS).unref?.())
   }
 }
 
@@ -843,9 +819,7 @@ export function getInitialMainLoopModel(): ModelSetting {
   return STATE.initialMainLoopModel
 }
 
-export function setMainLoopModelOverride(
-  model: ModelSetting | undefined,
-): void {
+export function setMainLoopModelOverride(model: ModelSetting | undefined): void {
   STATE.mainLoopModelOverride = model
 }
 
@@ -917,8 +891,8 @@ export function setCostStateForRestore({
 
 // Only used in tests
 export function resetStateForTests(): void {
-  if (process.env.NODE_ENV !== 'test') {
-    throw new Error('resetStateForTests can only be called in tests')
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("resetStateForTests can only be called in tests")
   }
   Object.entries(getInitialState()).forEach(([key, value]) => {
     STATE[key as keyof State] = value as never
@@ -952,37 +926,34 @@ export function setMeter(
   STATE.meter = meter
 
   // Initialize all counters using the provided factory
-  STATE.sessionCounter = createCounter('claude_code.session.count', {
-    description: 'Count of CLI sessions started',
+  STATE.sessionCounter = createCounter("claude_code.session.count", {
+    description: "Count of CLI sessions started",
   })
-  STATE.locCounter = createCounter('claude_code.lines_of_code.count', {
+  STATE.locCounter = createCounter("claude_code.lines_of_code.count", {
     description:
       "Count of lines of code modified, with the 'type' attribute indicating whether lines were added or removed",
   })
-  STATE.prCounter = createCounter('claude_code.pull_request.count', {
-    description: 'Number of pull requests created',
+  STATE.prCounter = createCounter("claude_code.pull_request.count", {
+    description: "Number of pull requests created",
   })
-  STATE.commitCounter = createCounter('claude_code.commit.count', {
-    description: 'Number of git commits created',
+  STATE.commitCounter = createCounter("claude_code.commit.count", {
+    description: "Number of git commits created",
   })
-  STATE.costCounter = createCounter('claude_code.cost.usage', {
-    description: 'Cost of the Claude Code session',
-    unit: 'USD',
+  STATE.costCounter = createCounter("claude_code.cost.usage", {
+    description: "Cost of the Claude Code session",
+    unit: "USD",
   })
-  STATE.tokenCounter = createCounter('claude_code.token.usage', {
-    description: 'Number of tokens used',
-    unit: 'tokens',
+  STATE.tokenCounter = createCounter("claude_code.token.usage", {
+    description: "Number of tokens used",
+    unit: "tokens",
   })
-  STATE.codeEditToolDecisionCounter = createCounter(
-    'claude_code.code_edit_tool.decision',
-    {
-      description:
-        'Count of code editing tool permission decisions (accept/reject) for Edit, Write, and NotebookEdit tools',
-    },
-  )
-  STATE.activeTimeCounter = createCounter('claude_code.active_time.total', {
-    description: 'Total active time in seconds',
-    unit: 's',
+  STATE.codeEditToolDecisionCounter = createCounter("claude_code.code_edit_tool.decision", {
+    description:
+      "Count of code editing tool permission decisions (accept/reject) for Edit, Write, and NotebookEdit tools",
+  })
+  STATE.activeTimeCounter = createCounter("claude_code.active_time.total", {
+    description: "Total active time in seconds",
+    unit: "s",
   })
 }
 
@@ -1034,9 +1005,7 @@ export function getEventLogger(): ReturnType<typeof logs.getLogger> | null {
   return STATE.eventLogger
 }
 
-export function setEventLogger(
-  logger: ReturnType<typeof logs.getLogger> | null,
-): void {
+export function setEventLogger(logger: ReturnType<typeof logs.getLogger> | null): void {
   STATE.eventLogger = logger
 }
 
@@ -1117,11 +1086,11 @@ export function setSessionSource(source: string): void {
   STATE.sessionSource = source
 }
 
-export function getQuestionPreviewFormat(): 'markdown' | 'html' | undefined {
+export function getQuestionPreviewFormat(): "markdown" | "html" | undefined {
   return STATE.questionPreviewFormat
 }
 
-export function setQuestionPreviewFormat(format: 'markdown' | 'html'): void {
+export function setQuestionPreviewFormat(format: "markdown" | "html"): void {
   STATE.questionPreviewFormat = format
 }
 
@@ -1141,9 +1110,7 @@ export function getFlagSettingsInline(): Record<string, unknown> | null {
   return STATE.flagSettingsInline
 }
 
-export function setFlagSettingsInline(
-  settings: Record<string, unknown> | null,
-): void {
+export function setFlagSettingsInline(settings: Record<string, unknown> | null): void {
   STATE.flagSettingsInline = settings
 }
 
@@ -1171,28 +1138,19 @@ export function setApiKeyFromFd(key: string | null): void {
   STATE.apiKeyFromFd = key
 }
 
-export function setLastAPIRequest(
-  params: Omit<BetaMessageStreamParams, 'messages'> | null,
-): void {
+export function setLastAPIRequest(params: Omit<BetaMessageStreamParams, "messages"> | null): void {
   STATE.lastAPIRequest = params
 }
 
-export function getLastAPIRequest(): Omit<
-  BetaMessageStreamParams,
-  'messages'
-> | null {
+export function getLastAPIRequest(): Omit<BetaMessageStreamParams, "messages"> | null {
   return STATE.lastAPIRequest
 }
 
-export function setLastAPIRequestMessages(
-  messages: BetaMessageStreamParams['messages'] | null,
-): void {
+export function setLastAPIRequestMessages(messages: BetaMessageStreamParams["messages"] | null): void {
   STATE.lastAPIRequestMessages = messages
 }
 
-export function getLastAPIRequestMessages():
-  | BetaMessageStreamParams['messages']
-  | null {
+export function getLastAPIRequestMessages(): BetaMessageStreamParams["messages"] | null {
   return STATE.lastAPIRequestMessages
 }
 
@@ -1212,10 +1170,7 @@ export function getCachedClaudeMdContent(): string | null {
   return STATE.cachedClaudeMdContent
 }
 
-export function addToInMemoryErrorLog(errorInfo: {
-  error: string
-  timestamp: string
-}): void {
+export function addToInMemoryErrorLog(errorInfo: { error: string; timestamp: string }): void {
   const MAX_IN_MEMORY_ERRORS = 100
   if (STATE.inMemoryErrorLog.length >= MAX_IN_MEMORY_ERRORS) {
     STATE.inMemoryErrorLog.shift() // Remove oldest error
@@ -1233,7 +1188,7 @@ export function setAllowedSettingSources(sources: SettingSource[]): void {
 
 export function preferThirdPartyAuthentication(): boolean {
   // IDE extension should behave as 1P for authentication reasons.
-  return getIsNonInteractiveSession() && STATE.clientType !== 'claude-vscode'
+  return getIsNonInteractiveSession() && STATE.clientType !== "claude-vscode"
 }
 
 export function setInlinePlugins(plugins: Array<string>): void {
@@ -1307,7 +1262,7 @@ export function addSessionCronTask(task: SessionCronTask): void {
 export function removeSessionCronTasks(ids: readonly string[]): number {
   if (ids.length === 0) return 0
   const idSet = new Set(ids)
-  const remaining = STATE.sessionCronTasks.filter(t => !idSet.has(t.id))
+  const remaining = STATE.sessionCronTasks.filter((t) => !idSet.has(t.id))
   const removed = STATE.sessionCronTasks.length - remaining.length
   if (removed === 0) return 0
   STATE.sessionCronTasks = remaining
@@ -1346,18 +1301,15 @@ export function setNeedsPlanModeExitAttachment(value: boolean): void {
   STATE.needsPlanModeExitAttachment = value
 }
 
-export function handlePlanModeTransition(
-  fromMode: string,
-  toMode: string,
-): void {
+export function handlePlanModeTransition(fromMode: string, toMode: string): void {
   // If switching TO plan mode, clear any pending exit attachment
   // This prevents sending both plan_mode and plan_mode_exit when user toggles quickly
-  if (toMode === 'plan' && fromMode !== 'plan') {
+  if (toMode === "plan" && fromMode !== "plan") {
     STATE.needsPlanModeExitAttachment = false
   }
 
   // If switching out of plan mode, trigger the plan_mode_exit attachment
-  if (fromMode === 'plan' && toMode !== 'plan') {
+  if (fromMode === "plan" && toMode !== "plan") {
     STATE.needsPlanModeExitAttachment = true
   }
 }
@@ -1370,21 +1322,15 @@ export function setNeedsAutoModeExitAttachment(value: boolean): void {
   STATE.needsAutoModeExitAttachment = value
 }
 
-export function handleAutoModeTransition(
-  fromMode: string,
-  toMode: string,
-): void {
+export function handleAutoModeTransition(fromMode: string, toMode: string): void {
   // Auto↔plan transitions are handled by prepareContextForPlanMode (auto may
   // stay active through plan if opted in) and ExitPlanMode (restores mode).
   // Skip both directions so this function only handles direct auto transitions.
-  if (
-    (fromMode === 'auto' && toMode === 'plan') ||
-    (fromMode === 'plan' && toMode === 'auto')
-  ) {
+  if ((fromMode === "auto" && toMode === "plan") || (fromMode === "plan" && toMode === "auto")) {
     return
   }
-  const fromIsAuto = fromMode === 'auto'
-  const toIsAuto = toMode === 'auto'
+  const fromIsAuto = fromMode === "auto"
+  const toIsAuto = toMode === "auto"
 
   // If switching TO auto mode, clear any pending exit attachment
   // This prevents sending both auto_mode and auto_mode_exit when user toggles quickly
@@ -1416,9 +1362,7 @@ export function getInitJsonSchema(): Record<string, unknown> | null {
   return STATE.initJsonSchema
 }
 
-export function registerHookCallbacks(
-  hooks: Partial<Record<HookEvent, RegisteredHookMatcher[]>>,
-): void {
+export function registerHookCallbacks(hooks: Partial<Record<HookEvent, RegisteredHookMatcher[]>>): void {
   if (!STATE.registeredHooks) {
     STATE.registeredHooks = {}
   }
@@ -1433,9 +1377,7 @@ export function registerHookCallbacks(
   }
 }
 
-export function getRegisteredHooks(): Partial<
-  Record<HookEvent, RegisteredHookMatcher[]>
-> | null {
+export function getRegisteredHooks(): Partial<Record<HookEvent, RegisteredHookMatcher[]>> | null {
   return STATE.registeredHooks
 }
 
@@ -1451,7 +1393,7 @@ export function clearRegisteredPluginHooks(): void {
   const filtered: Partial<Record<HookEvent, RegisteredHookMatcher[]>> = {}
   for (const [event, matchers] of Object.entries(STATE.registeredHooks)) {
     // Keep only callback hooks (those without pluginRoot)
-    const callbackHooks = matchers.filter(m => !('pluginRoot' in m))
+    const callbackHooks = matchers.filter((m) => !("pluginRoot" in m))
     if (callbackHooks.length > 0) {
       filtered[event as HookEvent] = callbackHooks
     }
@@ -1474,9 +1416,7 @@ export function getSessionCreatedTeams(): Set<string> {
 }
 
 // Teleported session tracking for reliability logging
-export function setTeleportedSessionInfo(info: {
-  sessionId: string | null
-}): void {
+export function setTeleportedSessionInfo(info: { sessionId: string | null }): void {
   STATE.teleportedSessionInfo = {
     isTeleported: true,
     hasLoggedFirstMessage: false,
@@ -1513,7 +1453,7 @@ export function addInvokedSkill(
   content: string,
   agentId: string | null = null,
 ): void {
-  const key = `${agentId ?? ''}:${skillName}`
+  const key = `${agentId ?? ""}:${skillName}`
   STATE.invokedSkills.set(key, {
     skillName,
     skillPath,
@@ -1527,9 +1467,7 @@ export function getInvokedSkills(): Map<string, InvokedSkillInfo> {
   return STATE.invokedSkills
 }
 
-export function getInvokedSkillsForAgent(
-  agentId: string | undefined | null,
-): Map<string, InvokedSkillInfo> {
+export function getInvokedSkillsForAgent(agentId: string | undefined | null): Map<string, InvokedSkillInfo> {
   const normalizedId = agentId ?? null
   const filtered = new Map<string, InvokedSkillInfo>()
   for (const [key, skill] of STATE.invokedSkills) {
@@ -1540,9 +1478,7 @@ export function getInvokedSkillsForAgent(
   return filtered
 }
 
-export function clearInvokedSkills(
-  preservedAgentIds?: ReadonlySet<string>,
-): void {
+export function clearInvokedSkills(preservedAgentIds?: ReadonlySet<string>): void {
   if (!preservedAgentIds || preservedAgentIds.size === 0) {
     STATE.invokedSkills.clear()
     return
@@ -1567,17 +1503,15 @@ const MAX_SLOW_OPERATIONS = 10
 const SLOW_OPERATION_TTL_MS = 10000
 
 export function addSlowOperation(operation: string, durationMs: number): void {
-  if (process.env.USER_TYPE !== 'ant') return
+  if (process.env.USER_TYPE !== "ant") return
   // Skip tracking for editor sessions (user editing a prompt file in $EDITOR)
   // These are intentionally slow since the user is drafting text
-  if (operation.includes('exec') && operation.includes('claude-prompt-')) {
+  if (operation.includes("exec") && operation.includes("claude-prompt-")) {
     return
   }
   const now = Date.now()
   // Remove stale operations
-  STATE.slowOperations = STATE.slowOperations.filter(
-    op => now - op.timestamp < SLOW_OPERATION_TTL_MS,
-  )
+  STATE.slowOperations = STATE.slowOperations.filter((op) => now - op.timestamp < SLOW_OPERATION_TTL_MS)
   // Add new operation
   STATE.slowOperations.push({ operation, durationMs, timestamp: now })
   // Keep only the most recent operations
@@ -1605,12 +1539,8 @@ export function getSlowOperations(): ReadonlyArray<{
   const now = Date.now()
   // Only allocate a new array when something actually expired; otherwise keep
   // the reference stable across polls while ops are still fresh.
-  if (
-    STATE.slowOperations.some(op => now - op.timestamp >= SLOW_OPERATION_TTL_MS)
-  ) {
-    STATE.slowOperations = STATE.slowOperations.filter(
-      op => now - op.timestamp < SLOW_OPERATION_TTL_MS,
-    )
+  if (STATE.slowOperations.some((op) => now - op.timestamp >= SLOW_OPERATION_TTL_MS)) {
+    STATE.slowOperations = STATE.slowOperations.filter((op) => now - op.timestamp < SLOW_OPERATION_TTL_MS)
     if (STATE.slowOperations.length === 0) {
       return EMPTY_SLOW_OPERATIONS
     }
@@ -1642,10 +1572,7 @@ export function getSystemPromptSectionCache(): Map<string, string | null> {
   return STATE.systemPromptSectionCache
 }
 
-export function setSystemPromptSectionCacheEntry(
-  name: string,
-  value: string | null,
-): void {
+export function setSystemPromptSectionCacheEntry(name: string, value: string | null): void {
   STATE.systemPromptSectionCache.set(name, value)
 }
 
@@ -1667,9 +1594,7 @@ export function getAdditionalDirectoriesForClaudeMd(): string[] {
   return STATE.additionalDirectoriesForClaudeMd
 }
 
-export function setAdditionalDirectoriesForClaudeMd(
-  directories: string[],
-): void {
+export function setAdditionalDirectoriesForClaudeMd(directories: string[]): void {
   STATE.additionalDirectoriesForClaudeMd = directories
 }
 
@@ -1755,4 +1680,3 @@ export function getPromptId(): string | null {
 export function setPromptId(id: string | null): void {
   STATE.promptId = id
 }
-

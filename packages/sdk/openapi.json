@@ -20668,6 +20668,1878 @@
         ]
       }
     },
+    "/coordinator/run/{runID}/continue": {
+      "post": {
+        "operationId": "coordinator.continue",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "directory",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "runID",
+            "schema": {
+              "type": "string",
+              "pattern": "^cor.*"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Continued coordinator run with approved budget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^cor.*"
+                    },
+                    "sessionID": {
+                      "type": "string"
+                    },
+                    "goal": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "object",
+                      "properties": {
+                        "goal": {
+                          "type": "string"
+                        },
+                        "task_type": {
+                          "type": "string",
+                          "enum": [
+                            "coding",
+                            "review",
+                            "debugging",
+                            "research",
+                            "writing",
+                            "data-analysis",
+                            "planning",
+                            "personal-admin",
+                            "documentation",
+                            "environment-audit",
+                            "automation",
+                            "file-data-organization",
+                            "general-operations"
+                          ]
+                        },
+                        "success_criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "risk_level": {
+                          "type": "string",
+                          "enum": ["low", "medium", "high"]
+                        },
+                        "needs_user_clarification": {
+                          "type": "boolean"
+                        },
+                        "clarification_questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "workflow": {
+                          "type": "string",
+                          "enum": [
+                            "coding",
+                            "review",
+                            "debugging",
+                            "research",
+                            "writing",
+                            "data-analysis",
+                            "planning",
+                            "personal-admin",
+                            "documentation",
+                            "environment-audit",
+                            "automation",
+                            "file-data-organization",
+                            "general-operations"
+                          ]
+                        },
+                        "workflow_confidence": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": ["low", "medium", "high"]
+                        },
+                        "secondary_workflows": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "coding",
+                              "review",
+                              "debugging",
+                              "research",
+                              "writing",
+                              "data-analysis",
+                              "planning",
+                              "personal-admin",
+                              "documentation",
+                              "environment-audit",
+                              "automation",
+                              "file-data-organization",
+                              "general-operations"
+                            ]
+                          }
+                        },
+                        "expected_output": {
+                          "type": "string"
+                        },
+                        "permission_expectations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "goal",
+                        "task_type",
+                        "success_criteria",
+                        "risk_level",
+                        "needs_user_clarification",
+                        "clarification_questions",
+                        "workflow",
+                        "expected_output",
+                        "permission_expectations"
+                      ]
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["manual", "assisted", "autonomous"]
+                    },
+                    "workflow": {
+                      "type": "string",
+                      "enum": [
+                        "coding",
+                        "review",
+                        "debugging",
+                        "research",
+                        "writing",
+                        "data-analysis",
+                        "planning",
+                        "personal-admin",
+                        "documentation",
+                        "environment-audit",
+                        "automation",
+                        "file-data-organization",
+                        "general-operations"
+                      ]
+                    },
+                    "effort": {
+                      "type": "string",
+                      "enum": ["low", "medium", "high", "deep"]
+                    },
+                    "effort_profile": {
+                      "type": "object",
+                      "properties": {
+                        "planning_rounds": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 8
+                        },
+                        "expert_count_min": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16
+                        },
+                        "expert_count_max": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16
+                        },
+                        "verifier_count_min": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8
+                        },
+                        "reducer_enabled": {
+                          "type": "boolean"
+                        },
+                        "reviewer_enabled": {
+                          "type": "boolean"
+                        },
+                        "debugger_enabled": {
+                          "type": "boolean"
+                        },
+                        "revise_policy": {
+                          "type": "string",
+                          "enum": ["none", "critical_only", "all_artifacts"]
+                        },
+                        "max_revise_nodes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 64
+                        },
+                        "max_revision_per_artifact": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8
+                        },
+                        "reasoning_effort": {
+                          "type": "string",
+                          "enum": ["low", "medium", "high"]
+                        },
+                        "timeout_multiplier": {
+                          "type": "number",
+                          "minimum": 0.25,
+                          "maximum": 10
+                        }
+                      },
+                      "required": [
+                        "planning_rounds",
+                        "expert_count_min",
+                        "expert_count_max",
+                        "verifier_count_min",
+                        "reducer_enabled",
+                        "reviewer_enabled",
+                        "debugger_enabled",
+                        "revise_policy",
+                        "max_revise_nodes",
+                        "max_revision_per_artifact",
+                        "timeout_multiplier"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "settling_intent",
+                        "awaiting_approval",
+                        "planned",
+                        "active",
+                        "blocked",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "goal": {
+                          "type": "string"
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "prompt": {
+                                "type": "string"
+                              },
+                              "task_kind": {
+                                "type": "string",
+                                "enum": ["research", "implement", "verify", "generic"]
+                              },
+                              "subagent_type": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "default": "coordinator",
+                                "type": "string",
+                                "enum": [
+                                  "coordinator",
+                                  "planner",
+                                  "researcher",
+                                  "reducer",
+                                  "implementer",
+                                  "verifier",
+                                  "reviewer",
+                                  "debugger",
+                                  "reviser",
+                                  "writer",
+                                  "analyst",
+                                  "style-editor",
+                                  "factuality-checker",
+                                  "citation-auditor",
+                                  "contradiction-checker",
+                                  "constraint-checker",
+                                  "alternative-planner",
+                                  "risk-reviewer",
+                                  "inbox-classifier",
+                                  "priority-sorter",
+                                  "scheduler",
+                                  "privacy-reviewer",
+                                  "follow-up-planner",
+                                  "trigger-designer",
+                                  "dry-run-verifier",
+                                  "rollback-planner",
+                                  "doc-researcher",
+                                  "structure-writer",
+                                  "environment-auditor",
+                                  "blocker-classifier",
+                                  "remediation-planner",
+                                  "inventory-agent",
+                                  "organizer",
+                                  "safety-verifier",
+                                  "executor",
+                                  "memory-curator",
+                                  "automation-planner"
+                                ]
+                              },
+                              "model": {
+                                "type": "object",
+                                "properties": {
+                                  "providerID": {
+                                    "type": "string"
+                                  },
+                                  "modelID": {
+                                    "type": "string"
+                                  },
+                                  "variant": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["providerID", "modelID"]
+                              },
+                              "risk": {
+                                "default": "medium",
+                                "type": "string",
+                                "enum": ["low", "medium", "high"]
+                              },
+                              "depends_on": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "write_scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "read_scope": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "parallel_group": {
+                                "type": "string"
+                              },
+                              "assigned_scope": {
+                                "default": [],
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "excluded_scope": {
+                                "default": [],
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "merge_status": {
+                                "default": "none",
+                                "type": "string",
+                                "enum": ["none", "waiting", "merged", "conflict"]
+                              },
+                              "conflicts": {
+                                "default": [],
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "acceptance_checks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "output_schema": {
+                                "default": "summary",
+                                "type": "string",
+                                "enum": [
+                                  "plan",
+                                  "research",
+                                  "implementation",
+                                  "verification",
+                                  "review",
+                                  "revise",
+                                  "debug",
+                                  "document",
+                                  "analysis",
+                                  "outline",
+                                  "draft",
+                                  "environment-diagnosis",
+                                  "automation-plan",
+                                  "organization-plan",
+                                  "memory",
+                                  "research-synthesis",
+                                  "summary"
+                                ]
+                              },
+                              "requires_user_input": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": ["high", "normal", "low"]
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": ["user", "coordinator", "scheduler", "gateway"]
+                              },
+                              "expert_id": {
+                                "type": "string"
+                              },
+                              "expert_role": {
+                                "type": "string"
+                              },
+                              "workflow": {
+                                "type": "string",
+                                "enum": [
+                                  "coding",
+                                  "review",
+                                  "debugging",
+                                  "research",
+                                  "writing",
+                                  "data-analysis",
+                                  "planning",
+                                  "personal-admin",
+                                  "documentation",
+                                  "environment-audit",
+                                  "automation",
+                                  "file-data-organization",
+                                  "general-operations"
+                                ]
+                              },
+                              "artifact_type": {
+                                "type": "string"
+                              },
+                              "artifact_id": {
+                                "type": "string"
+                              },
+                              "revision_of": {
+                                "type": "string"
+                              },
+                              "quality_gate_id": {
+                                "type": "string"
+                              },
+                              "memory_namespace": {
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"]
+                              },
+                              "revise_policy": {
+                                "type": "string",
+                                "enum": ["none", "critical_only", "all_artifacts"]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "description",
+                              "prompt",
+                              "task_kind",
+                              "subagent_type",
+                              "depends_on",
+                              "write_scope",
+                              "read_scope",
+                              "acceptance_checks",
+                              "priority",
+                              "origin"
+                            ]
+                          }
+                        },
+                        "effort": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": ["low", "medium", "high", "deep"]
+                        },
+                        "workflow": {
+                          "default": "general-operations",
+                          "type": "string",
+                          "enum": [
+                            "coding",
+                            "review",
+                            "debugging",
+                            "research",
+                            "writing",
+                            "data-analysis",
+                            "planning",
+                            "personal-admin",
+                            "documentation",
+                            "environment-audit",
+                            "automation",
+                            "file-data-organization",
+                            "general-operations"
+                          ]
+                        },
+                        "effort_profile": {
+                          "default": {
+                            "planning_rounds": 1,
+                            "expert_count_min": 1,
+                            "expert_count_max": 2,
+                            "verifier_count_min": 1,
+                            "reducer_enabled": false,
+                            "reviewer_enabled": true,
+                            "debugger_enabled": false,
+                            "revise_policy": "critical_only",
+                            "max_revise_nodes": 1,
+                            "max_revision_per_artifact": 1,
+                            "timeout_multiplier": 1
+                          },
+                          "type": "object",
+                          "properties": {
+                            "planning_rounds": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 8
+                            },
+                            "expert_count_min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
+                            },
+                            "expert_count_max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
+                            },
+                            "verifier_count_min": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "reducer_enabled": {
+                              "type": "boolean"
+                            },
+                            "reviewer_enabled": {
+                              "type": "boolean"
+                            },
+                            "debugger_enabled": {
+                              "type": "boolean"
+                            },
+                            "revise_policy": {
+                              "type": "string",
+                              "enum": ["none", "critical_only", "all_artifacts"]
+                            },
+                            "max_revise_nodes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 64
+                            },
+                            "max_revision_per_artifact": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "reasoning_effort": {
+                              "type": "string",
+                              "enum": ["low", "medium", "high"]
+                            },
+                            "timeout_multiplier": {
+                              "type": "number",
+                              "minimum": 0.25,
+                              "maximum": 10
+                            }
+                          },
+                          "required": [
+                            "planning_rounds",
+                            "expert_count_min",
+                            "expert_count_max",
+                            "verifier_count_min",
+                            "reducer_enabled",
+                            "reviewer_enabled",
+                            "debugger_enabled",
+                            "revise_policy",
+                            "max_revise_nodes",
+                            "max_revision_per_artifact",
+                            "timeout_multiplier"
+                          ]
+                        },
+                        "parallel_policy": {
+                          "default": {
+                            "mode": "safe",
+                            "max_parallel_agents": 4,
+                            "max_parallel_tools": 8,
+                            "read_only_parallel_allowed": true,
+                            "write_parallel_requires_disjoint_scope": true,
+                            "merge_strategy": "research-synthesis",
+                            "conflict_resolution_strategy": "targeted-research"
+                          },
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "default": "safe",
+                              "type": "string",
+                              "enum": ["off", "safe", "aggressive"]
+                            },
+                            "max_parallel_agents": {
+                              "default": 4,
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 16
+                            },
+                            "max_parallel_tools": {
+                              "default": 8,
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 32
+                            },
+                            "read_only_parallel_allowed": {
+                              "default": true,
+                              "type": "boolean"
+                            },
+                            "write_parallel_requires_disjoint_scope": {
+                              "default": true,
+                              "type": "boolean"
+                            },
+                            "merge_strategy": {
+                              "default": "research-synthesis",
+                              "type": "string",
+                              "enum": ["none", "research-synthesis", "verification-evidence"]
+                            },
+                            "conflict_resolution_strategy": {
+                              "default": "targeted-research",
+                              "type": "string",
+                              "enum": ["block", "targeted-research", "reviewer-judgement"]
+                            }
+                          }
+                        },
+                        "expert_lanes": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "workflow": {
+                                "type": "string",
+                                "enum": [
+                                  "coding",
+                                  "review",
+                                  "debugging",
+                                  "research",
+                                  "writing",
+                                  "data-analysis",
+                                  "planning",
+                                  "personal-admin",
+                                  "documentation",
+                                  "environment-audit",
+                                  "automation",
+                                  "file-data-organization",
+                                  "general-operations"
+                                ]
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "coordinator",
+                                  "planner",
+                                  "researcher",
+                                  "reducer",
+                                  "implementer",
+                                  "verifier",
+                                  "reviewer",
+                                  "debugger",
+                                  "reviser",
+                                  "writer",
+                                  "analyst",
+                                  "style-editor",
+                                  "factuality-checker",
+                                  "citation-auditor",
+                                  "contradiction-checker",
+                                  "constraint-checker",
+                                  "alternative-planner",
+                                  "risk-reviewer",
+                                  "inbox-classifier",
+                                  "priority-sorter",
+                                  "scheduler",
+                                  "privacy-reviewer",
+                                  "follow-up-planner",
+                                  "trigger-designer",
+                                  "dry-run-verifier",
+                                  "rollback-planner",
+                                  "doc-researcher",
+                                  "structure-writer",
+                                  "environment-auditor",
+                                  "blocker-classifier",
+                                  "remediation-planner",
+                                  "inventory-agent",
+                                  "organizer",
+                                  "safety-verifier",
+                                  "executor",
+                                  "memory-curator",
+                                  "automation-planner"
+                                ]
+                              },
+                              "expert_id": {
+                                "type": "string"
+                              },
+                              "node_ids": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "memory_namespace": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["id", "workflow", "role", "expert_id", "node_ids", "memory_namespace"]
+                          }
+                        },
+                        "quality_gates": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "plan_revise",
+                                  "input_revise",
+                                  "output_revise",
+                                  "handoff_revise",
+                                  "reducer_revise",
+                                  "verifier_revise",
+                                  "debugger_revise",
+                                  "final_revise"
+                                ]
+                              },
+                              "node_id": {
+                                "type": "string"
+                              },
+                              "artifact_id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "default": "pending",
+                                "type": "string",
+                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                              },
+                              "required": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "confidence": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"]
+                              },
+                              "issues": {
+                                "default": [],
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["id", "kind"]
+                          }
+                        },
+                        "revise_points": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "plan_revise",
+                                  "input_revise",
+                                  "output_revise",
+                                  "handoff_revise",
+                                  "reducer_revise",
+                                  "verifier_revise",
+                                  "debugger_revise",
+                                  "final_revise"
+                                ]
+                              },
+                              "target_node_id": {
+                                "type": "string"
+                              },
+                              "artifact_id": {
+                                "type": "string"
+                              },
+                              "required": {
+                                "default": true,
+                                "type": "boolean"
+                              },
+                              "node_id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "default": "pending",
+                                "type": "string",
+                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                              }
+                            },
+                            "required": ["id", "kind"]
+                          }
+                        },
+                        "memory_context": {
+                          "default": {
+                            "scopes": ["profile", "workspace"],
+                            "workflow_tags": [],
+                            "expert_tags": [],
+                            "note_ids": []
+                          },
+                          "type": "object",
+                          "properties": {
+                            "scopes": {
+                              "default": ["profile", "workspace"],
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["profile", "workspace", "session"]
+                              }
+                            },
+                            "workflow_tags": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "expert_tags": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "note_ids": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "long_task": {
+                          "default": {
+                            "is_long_task": false,
+                            "task_size": "small",
+                            "timeline_required": false,
+                            "reasons": []
+                          },
+                          "type": "object",
+                          "properties": {
+                            "is_long_task": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "task_size": {
+                              "default": "small",
+                              "type": "string",
+                              "enum": ["small", "medium", "large", "huge"]
+                            },
+                            "timeline_required": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "reasons": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "todo_timeline": {
+                          "default": {
+                            "required": false,
+                            "todos": [],
+                            "phases": []
+                          },
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "todos": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "default": "pending",
+                                    "type": "string",
+                                    "enum": ["pending", "active", "done", "partial", "blocked", "skipped"]
+                                  },
+                                  "priority": {
+                                    "default": "normal",
+                                    "type": "string",
+                                    "enum": ["high", "normal", "low"]
+                                  },
+                                  "budget_weight": {
+                                    "default": 1,
+                                    "type": "number",
+                                    "minimum": 0.1,
+                                    "maximum": 100
+                                  },
+                                  "acceptance_hint": {
+                                    "default": "",
+                                    "type": "string"
+                                  },
+                                  "depends_on": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "assigned_stage": {
+                                    "default": "expert",
+                                    "type": "string",
+                                    "enum": ["plan", "research", "expert", "reduce", "verify", "final"]
+                                  },
+                                  "node_ids": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "expert_lane_ids": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": ["id", "title"]
+                              }
+                            },
+                            "phases": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "todo_ids": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "expected_outputs": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "checkpoint_after": {
+                                    "default": false,
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["id", "title"]
+                              }
+                            }
+                          }
+                        },
+                        "budget_profile": {
+                          "default": {
+                            "scale": "normal",
+                            "auto_continue": "checkpoint",
+                            "mission_ceiling": {
+                              "max_rounds": 12,
+                              "max_model_calls": 32,
+                              "max_tool_calls": 160,
+                              "max_subagents": 8,
+                              "max_wallclock_ms": 2700000,
+                              "max_estimated_tokens": 500000
+                            },
+                            "phase_ceiling": {
+                              "max_rounds": 12,
+                              "max_model_calls": 32,
+                              "max_tool_calls": 160,
+                              "max_subagents": 8,
+                              "max_wallclock_ms": 2700000,
+                              "max_estimated_tokens": 500000
+                            },
+                            "todo_budget": {},
+                            "checkpoint_reserve": {
+                              "max_rounds": 2,
+                              "max_model_calls": 3,
+                              "max_tool_calls": 12,
+                              "max_subagents": 1,
+                              "max_wallclock_ms": 600000,
+                              "max_estimated_tokens": 50000
+                            },
+                            "absolute_ceiling": {
+                              "max_rounds": 12,
+                              "max_model_calls": 32,
+                              "max_tool_calls": 160,
+                              "max_subagents": 8,
+                              "max_wallclock_ms": 2700000,
+                              "max_estimated_tokens": 500000
+                            },
+                            "single_checkpoint_ceiling": {
+                              "max_rounds": 24,
+                              "max_model_calls": 40,
+                              "max_tool_calls": 240,
+                              "max_subagents": 16,
+                              "max_wallclock_ms": 2700000,
+                              "max_estimated_tokens": 1000000
+                            },
+                            "no_progress_stop": {
+                              "checkpoint_window": 5,
+                              "min_new_completed_todo_weight": 0.05,
+                              "min_new_evidence_items": 3,
+                              "min_quality_delta": 0.03
+                            }
+                          },
+                          "type": "object",
+                          "properties": {
+                            "scale": {
+                              "default": "normal",
+                              "type": "string",
+                              "enum": ["small", "normal", "large", "max"]
+                            },
+                            "auto_continue": {
+                              "default": "checkpoint",
+                              "type": "string",
+                              "enum": ["never", "checkpoint", "safe"]
+                            },
+                            "mission_ceiling": {
+                              "default": {
+                                "max_rounds": 12,
+                                "max_model_calls": 32,
+                                "max_tool_calls": 160,
+                                "max_subagents": 8,
+                                "max_wallclock_ms": 2700000,
+                                "max_estimated_tokens": 500000
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "phase_ceiling": {
+                              "default": {
+                                "max_rounds": 12,
+                                "max_model_calls": 32,
+                                "max_tool_calls": 160,
+                                "max_subagents": 8,
+                                "max_wallclock_ms": 2700000,
+                                "max_estimated_tokens": 500000
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "todo_budget": {
+                              "default": {},
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "max_rounds": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 10000
+                                  },
+                                  "max_model_calls": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 20000
+                                  },
+                                  "max_tool_calls": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100000
+                                  },
+                                  "max_subagents": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 10000
+                                  },
+                                  "max_wallclock_ms": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1209600000
+                                  },
+                                  "max_estimated_tokens": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100000000
+                                  }
+                                },
+                                "required": [
+                                  "max_rounds",
+                                  "max_model_calls",
+                                  "max_tool_calls",
+                                  "max_subagents",
+                                  "max_wallclock_ms",
+                                  "max_estimated_tokens"
+                                ]
+                              }
+                            },
+                            "checkpoint_reserve": {
+                              "default": {
+                                "max_rounds": 2,
+                                "max_model_calls": 3,
+                                "max_tool_calls": 12,
+                                "max_subagents": 1,
+                                "max_wallclock_ms": 600000,
+                                "max_estimated_tokens": 50000
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "absolute_ceiling": {
+                              "default": {
+                                "max_rounds": 12,
+                                "max_model_calls": 32,
+                                "max_tool_calls": 160,
+                                "max_subagents": 8,
+                                "max_wallclock_ms": 2700000,
+                                "max_estimated_tokens": 500000
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "single_checkpoint_ceiling": {
+                              "default": {
+                                "max_rounds": 24,
+                                "max_model_calls": 40,
+                                "max_tool_calls": 240,
+                                "max_subagents": 16,
+                                "max_wallclock_ms": 2700000,
+                                "max_estimated_tokens": 1000000
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "no_progress_stop": {
+                              "default": {
+                                "checkpoint_window": 5,
+                                "min_new_completed_todo_weight": 0.05,
+                                "min_new_evidence_items": 3,
+                                "min_quality_delta": 0.03
+                              },
+                              "type": "object",
+                              "properties": {
+                                "checkpoint_window": {
+                                  "default": 5,
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 20
+                                },
+                                "min_new_completed_todo_weight": {
+                                  "default": 0.05,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "min_new_evidence_items": {
+                                  "default": 3,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                },
+                                "min_quality_delta": {
+                                  "default": 0.03,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "budget_state": {
+                          "default": {
+                            "soft_budget_used": 0,
+                            "absolute_ceiling_used": 0,
+                            "checkpoint_count": 0,
+                            "budget_limited": false,
+                            "ceiling_hit": false
+                          },
+                          "type": "object",
+                          "properties": {
+                            "soft_budget_used": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "absolute_ceiling_used": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "checkpoint_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "budget_limited": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "ceiling_hit": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          }
+                        },
+                        "progress_snapshot": {
+                          "default": {
+                            "done": 0,
+                            "partial": 0,
+                            "blocked": 0,
+                            "pending": 0,
+                            "progress_score": 0,
+                            "evidence_coverage": 0,
+                            "verifier_quality": 0,
+                            "tool_success_rate": 1,
+                            "remaining_work_score": 1,
+                            "failure_penalty": 0,
+                            "confidence": "medium"
+                          },
+                          "type": "object",
+                          "properties": {
+                            "done": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "partial": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "blocked": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "pending": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "progress_score": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "evidence_coverage": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "verifier_quality": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "tool_success_rate": {
+                              "default": 1,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "remaining_work_score": {
+                              "default": 1,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "failure_penalty": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "confidence": {
+                              "default": "medium",
+                              "type": "string",
+                              "enum": ["low", "medium", "high"]
+                            }
+                          }
+                        },
+                        "checkpoint_memory": {
+                          "default": {
+                            "todo_state": [],
+                            "completed_artifacts": [],
+                            "evidence_index": [],
+                            "unresolved_claims": [],
+                            "blocked_reasons": [],
+                            "quality_scores": {},
+                            "next_recommended_todos": [],
+                            "compressed_context": ""
+                          },
+                          "type": "object",
+                          "properties": {
+                            "run_id": {
+                              "type": "string"
+                            },
+                            "checkpoint_id": {
+                              "type": "string"
+                            },
+                            "todo_state": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "default": "pending",
+                                    "type": "string",
+                                    "enum": ["pending", "active", "done", "partial", "blocked", "skipped"]
+                                  },
+                                  "priority": {
+                                    "default": "normal",
+                                    "type": "string",
+                                    "enum": ["high", "normal", "low"]
+                                  },
+                                  "budget_weight": {
+                                    "default": 1,
+                                    "type": "number",
+                                    "minimum": 0.1,
+                                    "maximum": 100
+                                  },
+                                  "acceptance_hint": {
+                                    "default": "",
+                                    "type": "string"
+                                  },
+                                  "depends_on": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "assigned_stage": {
+                                    "default": "expert",
+                                    "type": "string",
+                                    "enum": ["plan", "research", "expert", "reduce", "verify", "final"]
+                                  },
+                                  "node_ids": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "expert_lane_ids": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": ["id", "title"]
+                              }
+                            },
+                            "completed_artifacts": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "evidence_index": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "unresolved_claims": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "blocked_reasons": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "quality_scores": {
+                              "default": {},
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "number"
+                              }
+                            },
+                            "next_recommended_todos": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "compressed_context": {
+                              "default": "",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "continuation_request": {
+                          "type": "object",
+                          "properties": {
+                            "reason": {
+                              "type": "string"
+                            },
+                            "requested_budget_delta": {
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "next_todos": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "expected_value": {
+                              "type": "string"
+                            },
+                            "requires_user_approval": {
+                              "default": true,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["reason", "requested_budget_delta", "expected_value"]
+                        },
+                        "budget_limited": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "specialization_fallback": {
+                          "default": false,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["goal", "nodes"]
+                    },
+                    "task_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "number"
+                        },
+                        "updated": {
+                          "type": "number"
+                        },
+                        "finished": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["created", "updated"]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sessionID",
+                    "goal",
+                    "intent",
+                    "mode",
+                    "workflow",
+                    "effort",
+                    "effort_profile",
+                    "state",
+                    "plan",
+                    "task_ids",
+                    "time"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "budget_delta": {
+                    "type": "object",
+                    "properties": {
+                      "max_rounds": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "max_model_calls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20000
+                      },
+                      "max_tool_calls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000
+                      },
+                      "max_subagents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "max_wallclock_ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1209600000
+                      },
+                      "max_estimated_tokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000000
+                      }
+                    }
+                  },
+                  "autoContinue": {
+                    "type": "string",
+                    "enum": ["never", "checkpoint", "safe"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@openagt/sdk\n\nconst client = createOpencodeClient()\nawait client.coordinator.continue({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/coordinator/run/{runID}/summarize": {
       "post": {
         "operationId": "coordinator.summarize",

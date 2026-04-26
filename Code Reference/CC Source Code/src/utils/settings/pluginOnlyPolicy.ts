@@ -1,5 +1,5 @@
-import { getSettingsForSource } from './settings.js'
-import type { CUSTOMIZATION_SURFACES } from './types.js'
+import { getSettingsForSource } from "./settings.js"
+import type { CUSTOMIZATION_SURFACES } from "./types.js"
 
 export type CustomizationSurface = (typeof CUSTOMIZATION_SURFACES)[number]
 
@@ -16,11 +16,8 @@ export type CustomizationSurface = (typeof CUSTOMIZATION_SURFACES)[number]
  * `true` locks all four surfaces; array form locks only those listed.
  * Absent/undefined → nothing locked (the default).
  */
-export function isRestrictedToPluginOnly(
-  surface: CustomizationSurface,
-): boolean {
-  const policy =
-    getSettingsForSource('policySettings')?.strictPluginOnlyCustomization
+export function isRestrictedToPluginOnly(surface: CustomizationSurface): boolean {
+  const policy = getSettingsForSource("policySettings")?.strictPluginOnlyCustomization
   if (policy === true) return true
   if (Array.isArray(policy)) return policy.includes(surface)
   return false
@@ -38,11 +35,11 @@ export function isRestrictedToPluginOnly(
  * Command.source ('builtin' no hyphen, plus 'bundled').
  */
 const ADMIN_TRUSTED_SOURCES: ReadonlySet<string> = new Set([
-  'plugin',
-  'policySettings',
-  'built-in',
-  'builtin',
-  'bundled',
+  "plugin",
+  "policySettings",
+  "built-in",
+  "builtin",
+  "bundled",
 ])
 
 /**

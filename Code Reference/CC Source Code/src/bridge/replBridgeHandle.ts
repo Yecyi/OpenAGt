@@ -1,6 +1,6 @@
-import { updateSessionBridgeId } from '../utils/concurrentSessions.js'
-import type { ReplBridgeHandle } from './replBridge.js'
-import { toCompatSessionId } from './sessionIdCompat.js'
+import { updateSessionBridgeId } from "../utils/concurrentSessions.js"
+import type { ReplBridgeHandle } from "./replBridge.js"
+import { toCompatSessionId } from "./sessionIdCompat.js"
 
 /**
  * Global pointer to the active REPL bridge handle, so callers outside

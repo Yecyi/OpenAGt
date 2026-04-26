@@ -31,8 +31,7 @@ export type CommandSemantic = (
  */
 const DEFAULT_SEMANTIC: CommandSemantic = (exitCode, _stdout, _stderr) => ({
   isError: exitCode !== 0,
-  message:
-    exitCode !== 0 ? `Command failed with exit code ${exitCode}` : undefined,
+  message: exitCode !== 0 ? `Command failed with exit code ${exitCode}` : undefined,
 })
 
 /**
@@ -40,7 +39,7 @@ const DEFAULT_SEMANTIC: CommandSemantic = (exitCode, _stdout, _stderr) => ({
  */
 const GREP_SEMANTIC: CommandSemantic = (exitCode, _stdout, _stderr) => ({
   isError: exitCode >= 2,
-  message: exitCode === 1 ? 'No matches found' : undefined,
+  message: exitCode === 1 ? "No matches found" : undefined,
 })
 
 /**
@@ -61,12 +60,12 @@ const GREP_SEMANTIC: CommandSemantic = (exitCode, _stdout, _stderr) => ({
  */
 const COMMAND_SEMANTICS: Map<string, CommandSemantic> = new Map([
   // External grep/ripgrep (Git for Windows, scoop, choco)
-  ['grep', GREP_SEMANTIC],
-  ['rg', GREP_SEMANTIC],
+  ["grep", GREP_SEMANTIC],
+  ["rg", GREP_SEMANTIC],
 
   // findstr.exe: Windows native text search
   // 0 = match found, 1 = no match, 2 = error
-  ['findstr', GREP_SEMANTIC],
+  ["findstr", GREP_SEMANTIC],
 
   // robocopy.exe: Windows native robust file copy
   // Exit codes are a BITFIELD — 0-7 are success, 8+ indicates at least one failure:
@@ -78,16 +77,16 @@ const COMMAND_SEMANTICS: Map<string, CommandSemantic> = new Map([
   //  16 = serious error (robocopy did not copy any files)
   // This is the single most common "CI failed but nothing's wrong" Windows gotcha.
   [
-    'robocopy',
+    "robocopy",
     (exitCode, _stdout, _stderr) => ({
       isError: exitCode >= 8,
       message:
         exitCode === 0
-          ? 'No files copied (already in sync)'
+          ? "No files copied (already in sync)"
           : exitCode >= 1 && exitCode < 8
             ? exitCode & 1
-              ? 'Files copied successfully'
-              : 'Robocopy completed (no errors)'
+              ? "Files copied successfully"
+              : "Robocopy completed (no errors)"
             : undefined,
     }),
   ],
@@ -100,14 +99,14 @@ const COMMAND_SEMANTICS: Map<string, CommandSemantic> = new Map([
 function extractBaseCommand(segment: string): string {
   // Strip PowerShell call operators: & "cmd", . "cmd"
   // (& and . at segment start followed by whitespace invoke the next token)
-  const stripped = segment.trim().replace(/^[&.]\s+/, '')
-  const firstToken = stripped.split(/\s+/)[0] || ''
+  const stripped = segment.trim().replace(/^[&.]\s+/, "")
+  const firstToken = stripped.split(/\s+/)[0] || ""
   // Strip surrounding quotes if command was invoked as & "grep.exe"
-  const unquoted = firstToken.replace(/^["']|["']$/g, '')
+  const unquoted = firstToken.replace(/^["']|["']$/g, "")
   // Strip path: C:\bin\grep.exe → grep.exe, .\rg.exe → rg.exe
   const basename = unquoted.split(/[\\/]/).pop() || unquoted
   // Strip .exe suffix (Windows is case-insensitive)
-  return basename.toLowerCase().replace(/\.exe$/, '')
+  return basename.toLowerCase().replace(/\.exe$/, "")
 }
 
 /**
@@ -119,7 +118,7 @@ function extractBaseCommand(segment: string): string {
  * for exit-code interpretation (false negatives just fall back to default).
  */
 function heuristicallyExtractBaseCommand(command: string): string {
-  const segments = command.split(/[;|]/).filter(s => s.trim())
+  const segments = command.split(/[;|]/).filter((s) => s.trim())
   const last = segments[segments.length - 1] || command
   return extractBaseCommand(last)
 }

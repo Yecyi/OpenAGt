@@ -11,11 +11,7 @@ import { Effect } from "effect"
 import { MessageV2 } from "../message-v2"
 import { Token, Log } from "@/util"
 import { Provider } from "@/provider"
-import {
-  MICRO_COMPACT_TIME_THRESHOLD_MS,
-  applyMicroCompact,
-  summarizeToolResult,
-} from "./micro"
+import { MICRO_COMPACT_TIME_THRESHOLD_MS, applyMicroCompact, summarizeToolResult } from "./micro"
 import {
   DEFAULT_AUTO_COMPACT_CONFIG,
   needsAutoCompact,
@@ -91,10 +87,7 @@ export class CompactionCoordinator {
   /**
    * Decide which compaction layer to run
    */
-  decide(
-    messages: MessageV2.WithParts[],
-    model: Provider.Model,
-  ): CompactionDecision {
+  decide(messages: MessageV2.WithParts[], model: Provider.Model): CompactionDecision {
     if (!this.config.enableThreeLayer) {
       return { layer: "none", reason: "three-layer compaction disabled", shouldCompact: false }
     }
@@ -282,11 +275,7 @@ export class CompactionCoordinator {
         if (!("output" in toolPart.state)) return part
 
         // Check semantic preservation
-        const preserveDecision = semanticPreserver.shouldPreserve(
-          toolPart.tool,
-          toolPart.state.output ?? "",
-          {},
-        )
+        const preserveDecision = semanticPreserver.shouldPreserve(toolPart.tool, toolPart.state.output ?? "", {})
 
         if (preserveDecision.preserve) {
           log.debug("skipping compaction for semantic preservation", {
@@ -333,9 +322,7 @@ export class CompactionCoordinator {
   /**
    * Prepare full compaction context
    */
-  prepareFullCompact(
-    messages: MessageV2.WithParts[],
-  ): {
+  prepareFullCompact(messages: MessageV2.WithParts[]): {
     prompt: string
     context: ReturnType<typeof buildCompactContext>
     existingSummary: ReturnType<typeof findExistingSummary>
@@ -399,10 +386,7 @@ export function needsCompaction(
   return coordinator.decide(messages, model).shouldCompact
 }
 
-export function getRecommendedLayer(
-  messages: MessageV2.WithParts[],
-  model: Provider.Model,
-): CompactionLayer | "none" {
+export function getRecommendedLayer(messages: MessageV2.WithParts[], model: Provider.Model): CompactionLayer | "none" {
   const coordinator = new CompactionCoordinator()
   return coordinator.decide(messages, model).layer
 }

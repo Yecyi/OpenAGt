@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
+import { isBroadAgentTask } from "../../src/agent/task-classifier"
 
 describe("coordinator intent planning", () => {
+  test("broad task classifier requires project or depth context for architecture and algorithms", () => {
+    expect(isBroadAgentTask("explain the quicksort algorithm")).toBe(false)
+    expect(isBroadAgentTask("draft an architecture decision record")).toBe(false)
+    expect(isBroadAgentTask("dive deeper into this project and outline architecture and algorithms")).toBe(true)
+    expect(isBroadAgentTask("深入分析这个项目的架构和算法")).toBe(true)
+  })
+
   test("builds a coding workflow with parallel research, reducer, verifier group, and reviewer", () => {
     const intent = settleIntentProfile({ goal: "implement mission control backend API" })
     const plan = defaultPlanForIntent(intent)
@@ -137,6 +145,7 @@ describe("coordinator intent planning", () => {
       "todo_expert",
       "todo_reduce",
       "todo_verify",
+      "todo_final",
     ])
     expect(plan.todo_timeline.todos.every((item) => item.node_ids.length > 0)).toBe(true)
     expect(plan.nodes.at(-1)?.id).toBe("budget_checkpoint_synthesis")

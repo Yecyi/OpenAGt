@@ -1,19 +1,19 @@
-import { feature } from 'bun:bundle'
-import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs'
-import type { PendingClassifierCheck } from '../../../types/permissions.js'
-import { isAgentSwarmsEnabled } from '../../../utils/agentSwarmsEnabled.js'
-import { toError } from '../../../utils/errors.js'
-import { logError } from '../../../utils/log.js'
-import type { PermissionDecision } from '../../../utils/permissions/PermissionResult.js'
-import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js'
+import { feature } from "bun:bundle"
+import type { ContentBlockParam } from "@anthropic-ai/sdk/resources/messages.mjs"
+import type { PendingClassifierCheck } from "../../../types/permissions.js"
+import { isAgentSwarmsEnabled } from "../../../utils/agentSwarmsEnabled.js"
+import { toError } from "../../../utils/errors.js"
+import { logError } from "../../../utils/log.js"
+import type { PermissionDecision } from "../../../utils/permissions/PermissionResult.js"
+import type { PermissionUpdate } from "../../../utils/permissions/PermissionUpdateSchema.js"
 import {
   createPermissionRequest,
   isSwarmWorker,
   sendPermissionRequestViaMailbox,
-} from '../../../utils/swarm/permissionSync.js'
-import { registerPermissionCallback } from '../../useSwarmPermissionPoller.js'
-import type { PermissionContext } from '../PermissionContext.js'
-import { createResolveOnce } from '../PermissionContext.js'
+} from "../../../utils/swarm/permissionSync.js"
+import { registerPermissionCallback } from "../../useSwarmPermissionPoller.js"
+import type { PermissionContext } from "../PermissionContext.js"
+import { createResolveOnce } from "../PermissionContext.js"
 
 type SwarmWorkerPermissionParams = {
   ctx: PermissionContext
@@ -37,9 +37,7 @@ type SwarmWorkerPermissionParams = {
  * Returns null if swarms are not enabled or this is not a swarm worker,
  * so the caller can fall through to interactive handling.
  */
-async function handleSwarmWorkerPermission(
-  params: SwarmWorkerPermissionParams,
-): Promise<PermissionDecision | null> {
+async function handleSwarmWorkerPermission(params: SwarmWorkerPermissionParams): Promise<PermissionDecision | null> {
   if (!isAgentSwarmsEnabled() || !isSwarmWorker()) {
     return null
   }
@@ -49,7 +47,7 @@ async function handleSwarmWorkerPermission(
   // For bash commands, try classifier auto-approval before forwarding to
   // the leader. Agents await the classifier result (rather than racing it
   // against user interaction like the main agent).
-  const classifierResult = feature('BASH_CLASSIFIER')
+  const classifierResult = feature("BASH_CLASSIFIER")
     ? await ctx.tryClassifier?.(params.pendingClassifierCheck, updatedInput)
     : null
   if (classifierResult) {
@@ -59,12 +57,12 @@ async function handleSwarmWorkerPermission(
   // Forward permission request to the leader via mailbox
   try {
     const clearPendingRequest = (): void =>
-      ctx.toolUseContext.setAppState(prev => ({
+      ctx.toolUseContext.setAppState((prev) => ({
         ...prev,
         pendingWorkerRequest: null,
       }))
 
-    const decision = await new Promise<PermissionDecision>(resolve => {
+    const decision = await new Promise<PermissionDecision>((resolve) => {
       const { resolve: resolveOnce, claim } = createResolveOnce(resolve)
 
       // Create the permission request
@@ -91,28 +89,17 @@ async function handleSwarmWorkerPermission(
           clearPendingRequest()
 
           // Merge the updated input with the original input
-          const finalInput =
-            allowedInput && Object.keys(allowedInput).length > 0
-              ? allowedInput
-              : ctx.input
+          const finalInput = allowedInput && Object.keys(allowedInput).length > 0 ? allowedInput : ctx.input
 
-          resolveOnce(
-            await ctx.handleUserAllow(
-              finalInput,
-              permissionUpdates,
-              feedback,
-              undefined,
-              contentBlocks,
-            ),
-          )
+          resolveOnce(await ctx.handleUserAllow(finalInput, permissionUpdates, feedback, undefined, contentBlocks))
         },
         onReject(feedback?: string, contentBlocks?: ContentBlockParam[]) {
           if (!claim()) return
           clearPendingRequest()
 
           ctx.logDecision({
-            decision: 'reject',
-            source: { type: 'user_reject', hasFeedback: !!feedback },
+            decision: "reject",
+            source: { type: "user_reject", hasFeedback: !!feedback },
           })
 
           resolveOnce(ctx.cancelAndAbort(feedback, undefined, contentBlocks))
@@ -123,7 +110,7 @@ async function handleSwarmWorkerPermission(
       void sendPermissionRequestViaMailbox(request)
 
       // Show visual indicator that we're waiting for leader approval
-      ctx.toolUseContext.setAppState(prev => ({
+      ctx.toolUseContext.setAppState((prev) => ({
         ...prev,
         pendingWorkerRequest: {
           toolName: ctx.tool.name,
@@ -135,7 +122,7 @@ async function handleSwarmWorkerPermission(
       // If the abort signal fires while waiting for the leader response,
       // resolve the promise with a cancel decision so it does not hang.
       ctx.toolUseContext.abortController.signal.addEventListener(
-        'abort',
+        "abort",
         () => {
           if (!claim()) return
           clearPendingRequest()

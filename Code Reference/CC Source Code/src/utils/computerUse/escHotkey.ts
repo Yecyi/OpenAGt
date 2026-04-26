@@ -1,6 +1,6 @@
-import { logForDebugging } from '../debug.js'
-import { releasePump, retainPump } from './drainRunLoop.js'
-import { requireComputerUseSwift } from './swiftLoader.js'
+import { logForDebugging } from "../debug.js"
+import { releasePump, retainPump } from "./drainRunLoop.js"
+import { requireComputerUseSwift } from "./swiftLoader.js"
 
 /**
  * Global Escape → abort. Mirrors Cowork's `escAbort.ts` but without Electron:
@@ -28,12 +28,12 @@ export function registerEscHotkey(onEscape: () => void): boolean {
   if (!cu.hotkey.registerEscape(onEscape)) {
     // CGEvent.tapCreate failed — typically missing Accessibility permission.
     // CU still works, just without ESC abort. Mirrors Cowork's escAbort.ts:81.
-    logForDebugging('[cu-esc] registerEscape returned false', { level: 'warn' })
+    logForDebugging("[cu-esc] registerEscape returned false", { level: "warn" })
     return false
   }
   retainPump()
   registered = true
-  logForDebugging('[cu-esc] registered')
+  logForDebugging("[cu-esc] registered")
   return true
 }
 
@@ -44,7 +44,7 @@ export function unregisterEscHotkey(): void {
   } finally {
     releasePump()
     registered = false
-    logForDebugging('[cu-esc] unregistered')
+    logForDebugging("[cu-esc] unregistered")
   }
 }
 

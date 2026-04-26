@@ -1,7 +1,7 @@
-import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
-import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
+import { AGENT_TOOL_NAME } from "../AgentTool/constants.js"
+import { BASH_TOOL_NAME } from "../BashTool/toolName.js"
 
-export const GREP_TOOL_NAME = 'Grep'
+export const GREP_TOOL_NAME = "Grep"
 
 export function getDescription(): string {
   return `A powerful search tool built on ripgrep

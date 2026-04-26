@@ -1,11 +1,7 @@
-import { useContext, useMemo, useSyncExternalStore } from 'react'
-import StdinContext from '../components/StdinContext.js'
-import instances from '../instances.js'
-import {
-  type FocusMove,
-  type SelectionState,
-  shiftAnchor,
-} from '../selection.js'
+import { useContext, useMemo, useSyncExternalStore } from "react"
+import StdinContext from "../components/StdinContext.js"
+import instances from "../instances.js"
+import { type FocusMove, type SelectionState, shiftAnchor } from "../selection.js"
 
 /**
  * Access to text selection operations on the Ink instance (fullscreen only).
@@ -33,11 +29,7 @@ export function useSelection(): {
   moveFocus: (move: FocusMove) => void
   /** Capture text from rows about to scroll out of the viewport (call
    *  BEFORE scrollBy so the screen buffer still has the outgoing rows). */
-  captureScrolledRows: (
-    firstRow: number,
-    lastRow: number,
-    side: 'above' | 'below',
-  ) => void
+  captureScrolledRows: (firstRow: number, lastRow: number, side: "above" | "below") => void
   /** Set the selection highlight bg color (theme-piping; solid bg
    *  replaces the old SGR-7 inverse so syntax highlighting stays readable
    *  under selection). Call once on mount + whenever theme changes. */
@@ -54,8 +46,8 @@ export function useSelection(): {
   return useMemo(() => {
     if (!ink) {
       return {
-        copySelection: () => '',
-        copySelectionNoClear: () => '',
+        copySelection: () => "",
+        copySelectionNoClear: () => "",
         clearSelection: () => {},
         hasSelection: () => false,
         getState: () => null,
@@ -74,13 +66,10 @@ export function useSelection(): {
       hasSelection: () => ink.hasTextSelection(),
       getState: () => ink.selection,
       subscribe: (cb: () => void) => ink.subscribeToSelectionChange(cb),
-      shiftAnchor: (dRow: number, minRow: number, maxRow: number) =>
-        shiftAnchor(ink.selection, dRow, minRow, maxRow),
-      shiftSelection: (dRow, minRow, maxRow) =>
-        ink.shiftSelectionForScroll(dRow, minRow, maxRow),
+      shiftAnchor: (dRow: number, minRow: number, maxRow: number) => shiftAnchor(ink.selection, dRow, minRow, maxRow),
+      shiftSelection: (dRow, minRow, maxRow) => ink.shiftSelectionForScroll(dRow, minRow, maxRow),
       moveFocus: (move: FocusMove) => ink.moveSelectionFocus(move),
-      captureScrolledRows: (firstRow, lastRow, side) =>
-        ink.captureScrolledRows(firstRow, lastRow, side),
+      captureScrolledRows: (firstRow, lastRow, side) => ink.captureScrolledRows(firstRow, lastRow, side),
       setSelectionBgColor: (color: string) => ink.setSelectionBgColor(color),
     }
   }, [ink])

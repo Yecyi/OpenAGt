@@ -59,9 +59,7 @@ export interface ShellInvocation {
  */
 export function getShellInvocation(command: string, cwd: string): ShellInvocation {
   const sh = Shell.preferred()
-  const shellName = (
-    process.platform === "win32" ? path.win32.basename(sh, ".exe") : path.basename(sh)
-  ).toLowerCase()
+  const shellName = (process.platform === "win32" ? path.win32.basename(sh, ".exe") : path.basename(sh)).toLowerCase()
 
   const invocations: Record<string, { args: string[] }> = {
     nu: { args: ["-c", command] },

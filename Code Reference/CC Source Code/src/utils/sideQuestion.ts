@@ -6,11 +6,11 @@
  * while keeping the side question response separate from main conversation.
  */
 
-import { formatAPIError } from '../services/api/errorUtils.js'
-import type { NonNullableUsage } from '../services/api/logging.js'
-import type { Message, SystemAPIErrorMessage } from '../types/message.js'
-import { type CacheSafeParams, runForkedAgent } from './forkedAgent.js'
-import { createUserMessage, extractTextContent } from './messages.js'
+import { formatAPIError } from "../services/api/errorUtils.js"
+import type { NonNullableUsage } from "../services/api/logging.js"
+import type { Message, SystemAPIErrorMessage } from "../types/message.js"
+import { type CacheSafeParams, runForkedAgent } from "./forkedAgent.js"
+import { createUserMessage, extractTextContent } from "./messages.js"
 
 // Pattern to detect "/btw" at start of input (case-insensitive, word boundary)
 const BTW_PATTERN = /^\/btw\b/gi
@@ -84,12 +84,12 @@ ${question}`
     // Adaptive thinking on a quick Q&A has negligible overhead.
     cacheSafeParams,
     canUseTool: async () => ({
-      behavior: 'deny' as const,
-      message: 'Side questions cannot use tools',
-      decisionReason: { type: 'other' as const, reason: 'side_question' },
+      behavior: "deny" as const,
+      message: "Side questions cannot use tools",
+      decisionReason: { type: "other" as const, reason: "side_question" },
     }),
-    querySource: 'side_question',
-    forkLabel: 'side_question',
+    querySource: "side_question",
+    forkLabel: "side_question",
     maxTurns: 1, // Single turn only - no tool use loops
     // No future request shares this suffix; skip writing cache entries.
     skipCacheWrite: true,
@@ -124,19 +124,17 @@ ${question}`
  */
 function extractSideQuestionResponse(messages: Message[]): string | null {
   // Flatten all assistant content blocks across the per-block messages.
-  const assistantBlocks = messages.flatMap(m =>
-    m.type === 'assistant' ? m.message.content : [],
-  )
+  const assistantBlocks = messages.flatMap((m) => (m.type === "assistant" ? m.message.content : []))
 
   if (assistantBlocks.length > 0) {
     // Concatenate all text blocks (there's normally at most one, but be safe).
-    const text = extractTextContent(assistantBlocks, '\n\n').trim()
+    const text = extractTextContent(assistantBlocks, "\n\n").trim()
     if (text) return text
 
     // No text — check if the model tried to call a tool despite instructions.
-    const toolUse = assistantBlocks.find(b => b.type === 'tool_use')
+    const toolUse = assistantBlocks.find((b) => b.type === "tool_use")
     if (toolUse) {
-      const toolName = 'name' in toolUse ? toolUse.name : 'a tool'
+      const toolName = "name" in toolUse ? toolUse.name : "a tool"
       return `(The model tried to call ${toolName} instead of answering directly. Try rephrasing or ask in the main conversation.)`
     }
   }
@@ -144,8 +142,7 @@ function extractSideQuestionResponse(messages: Message[]): string | null {
   // No assistant content — likely API error exhausted retries. Surface the
   // first system api_error message so the user sees what happened.
   const apiErr = messages.find(
-    (m): m is SystemAPIErrorMessage =>
-      m.type === 'system' && 'subtype' in m && m.subtype === 'api_error',
+    (m): m is SystemAPIErrorMessage => m.type === "system" && "subtype" in m && m.subtype === "api_error",
   )
   if (apiErr) {
     return `(API error: ${formatAPIError(apiErr.error)})`

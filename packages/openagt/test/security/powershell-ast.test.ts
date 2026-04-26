@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { parsePowerShellAst, isDangerous, getDangerousReasons, getCommandStructure } from "../../src/security/powershell-ast"
+import {
+  parsePowerShellAst,
+  isDangerous,
+  getDangerousReasons,
+  getCommandStructure,
+} from "../../src/security/powershell-ast"
 import { detect, isAllowed } from "../../src/security/dangerous-command-detector"
 
 describe("parsePowerShellAst", () => {

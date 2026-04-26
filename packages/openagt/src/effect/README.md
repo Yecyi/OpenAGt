@@ -78,12 +78,9 @@ effect/
 
 ```typescript
 // src/effect/run-service.ts
-export function makeRuntime<I, S, E>(
-  service: Context.Service<I, S>,
-  layer: Layer.Layer<I, E>
-) {
+export function makeRuntime<I, S, E>(service: Context.Service<I, S>, layer: Layer.Layer<I, E>) {
   let rt: ManagedRuntime | undefined
-  const getRuntime = () => rt ??= ManagedRuntime.make(layer)
+  const getRuntime = () => (rt ??= ManagedRuntime.make(layer))
 
   return {
     runSync: <A>(fn: (svc: S) => Effect<A>) => getRuntime().runSync(attach(fn)),
@@ -95,6 +92,7 @@ export function makeRuntime<I, S, E>(
 ```
 
 **使用模式：**
+
 ```typescript
 // 定义 Service
 export class BusService extends Context.Service<BusService>()("@opencode/Bus") {
@@ -120,25 +118,28 @@ await runPromise((svc) => svc.publish(def, data))
 // src/effect/instance-state.ts
 export function attachWith<A, E, R>(
   effect: Effect<A, E, R>,
-  refs: { instance?: InstanceContext; workspace?: string }
+  refs: { instance?: InstanceContext; workspace?: string },
 ): Effect<A, E, R> {
   // 将当前实例上下文附加到 Effect
 }
 
 // 使用
-const state = yield* InstanceState.make<State>(
-  Effect.fn("Bus.state")(function* () {
-    const pubsub = yield* PubSub.unbounded<Payload>()
-    yield* Effect.addFinalizer(() => PubSub.shutdown(pubsub))
-    return { pubsub }
-  })
-)
+const state =
+  yield *
+  InstanceState.make<State>(
+    Effect.fn("Bus.state")(function* () {
+      const pubsub = yield* PubSub.unbounded<Payload>()
+      yield* Effect.addFinalizer(() => PubSub.shutdown(pubsub))
+      return { pubsub }
+    }),
+  )
 
 // 读取状态
-const s = yield* InstanceState.get(state)
+const s = yield * InstanceState.get(state)
 ```
 
 **关键特性：**
+
 - **自动清理**：`addFinalizer` 在实例销毁时执行
 - **作用域隔离**：每个工作目录有独立状态
 - **延迟初始化**：状态在首次访问时创建
@@ -161,6 +162,7 @@ export class MemoMap {
 ```
 
 **使用场景：**
+
 - 当多个 Layer 都依赖同一个底层 Service 时（如 Database），MemoMap 确保只初始化一次
 - 避免在 `Layer.provide` 组合中重复创建资源连接
 
@@ -170,16 +172,14 @@ Effect/Promise 桥接，用于在 Effect 上下文外部调用 Effect 程序。
 
 ```typescript
 // src/effect/bridge.ts
-export async function bridge<A, E, R>(
-  effect: Effect<A, E, R>,
-  layer: Layer.Layer<R, never>
-): Promise<A> {
+export async function bridge<A, E, R>(effect: Effect<A, E, R>, layer: Layer.Layer<R, never>): Promise<A> {
   const runtime = await Runtime.default()
   return runtime.runPromise(effect.pipe(Effect.provide(layer)))
 }
 ```
 
 **典型用途：**
+
 - HTTP 请求处理（Express/Hono 路由 → Effect 程序）
 - 测试中桥接 Jest/Bun test → Effect
 - 事件回调中调用 Effect Service
@@ -237,7 +237,7 @@ export const DatabaseLayer = Layer.effect(
         return Effect.promise(() => pool.end())
       }
     })()
-  })
+  }),
 )
 
 // ❌ 错误：同步创建
@@ -272,17 +272,14 @@ Layer.effect(
     yield* Effect.addFinalizer(() =>
       Effect.gen(function* () {
         yield* cleanup()
-      })
+      }),
     )
 
     // ✅ 使用 acquireRelease
-    const resource = yield* Effect.acquireRelease(
-      acquire(),
-      release
-    )
+    const resource = yield* Effect.acquireRelease(acquire(), release)
 
     return Service.of({ resource })
-  })
+  }),
 )
 ```
 
@@ -291,44 +288,36 @@ Layer.effect(
 ### 并行执行
 
 ```typescript
-const [users, posts] = yield* Effect.all(
-  [fetchUsers(), fetchPosts()],
-  { concurrency: "unbounded" }
-)
+const [users, posts] = yield * Effect.all([fetchUsers(), fetchPosts()], { concurrency: "unbounded" })
 
 // 限制并发
-const results = yield* Effect.forEach(
-  urls,
-  (url) => fetch(url),
-  { concurrency: 5 }
-)
+const results = yield * Effect.forEach(urls, (url) => fetch(url), { concurrency: 5 })
 ```
 
 ### 管道操作
 
 ```typescript
-Effect.succeed(data)
-  .pipe(
-    Effect.map((d) => process(d)),
-    Effect.flatMap((d) => save(d)),
-    Effect.mapError((e) => new AppError(e))
-  )
+Effect.succeed(data).pipe(
+  Effect.map((d) => process(d)),
+  Effect.flatMap((d) => save(d)),
+  Effect.mapError((e) => new AppError(e)),
+)
 ```
 
 ### Ref 状态管理
 
 ```typescript
-const counter = yield* Ref.make(0)
-yield* Ref.update(counter, (n) => n + 1)
-const value = yield* Ref.get(counter)
+const counter = yield * Ref.make(0)
+yield * Ref.update(counter, (n) => n + 1)
+const value = yield * Ref.get(counter)
 ```
 
 ### Queue 生产者-消费者
 
 ```typescript
-const queue = yield* Queue.bounded<string>(100)
-yield* Queue.offer(queue, "item")
-const item = yield* Queue.take(queue)
+const queue = yield * Queue.bounded<string>(100)
+yield * Queue.offer(queue, "item")
+const item = yield * Queue.take(queue)
 ```
 
 ## Effect 与 OpenAGt 集成
@@ -390,9 +379,7 @@ const layer = Layer.effect(
 ```typescript
 import { Effect, TracingLevel } from "effect"
 
-const program = myEffect.pipe(
-  Effect.withTracing({ level: TracingLevel.All })
-)
+const program = myEffect.pipe(Effect.withTracing({ level: TracingLevel.All }))
 ```
 
 ### 查看 Effect 图

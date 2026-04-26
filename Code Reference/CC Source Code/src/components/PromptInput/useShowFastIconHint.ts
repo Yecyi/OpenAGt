@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react"
 
 const HINT_DISPLAY_DURATION_MS = 5000
 

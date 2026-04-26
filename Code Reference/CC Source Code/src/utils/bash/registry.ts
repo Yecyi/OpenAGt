@@ -1,5 +1,5 @@
-import { memoizeWithLRU } from '../memoize.js'
-import specs from './specs/index.js'
+import { memoizeWithLRU } from "../memoize.js"
+import specs from "./specs/index.js"
 
 export type CommandSpec = {
   name: string
@@ -27,12 +27,10 @@ export type Option = {
   isRequired?: boolean
 }
 
-export async function loadFigSpec(
-  command: string,
-): Promise<CommandSpec | null> {
-  if (!command || command.includes('/') || command.includes('\\')) return null
-  if (command.includes('..')) return null
-  if (command.startsWith('-') && command !== '-') return null
+export async function loadFigSpec(command: string): Promise<CommandSpec | null> {
+  if (!command || command.includes("/") || command.includes("\\")) return null
+  if (command.includes("..")) return null
+  if (command.startsWith("-") && command !== "-") return null
 
   try {
     const module = await import(`@withfig/autocomplete/build/${command}.js`)
@@ -43,10 +41,7 @@ export async function loadFigSpec(
 }
 export const getCommandSpec = memoizeWithLRU(
   async (command: string): Promise<CommandSpec | null> => {
-    const spec =
-      specs.find(s => s.name === command) ||
-      (await loadFigSpec(command)) ||
-      null
+    const spec = specs.find((s) => s.name === command) || (await loadFigSpec(command)) || null
     return spec
   },
   (command: string) => command,

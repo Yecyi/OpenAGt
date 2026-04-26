@@ -1,55 +1,44 @@
-import { z } from 'zod/v4'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import type { PermissionUpdate } from '../../types/permissions.js'
-import { formatFileSize } from '../../utils/format.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
-import { getRuleByContentsForTool } from '../../utils/permissions/permissions.js'
-import { isPreapprovedHost } from './preapproved.js'
-import { DESCRIPTION, WEB_FETCH_TOOL_NAME } from './prompt.js'
-import {
-  getToolUseSummary,
-  renderToolResultMessage,
-  renderToolUseMessage,
-  renderToolUseProgressMessage,
-} from './UI.js'
+import { z } from "zod/v4"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import type { PermissionUpdate } from "../../types/permissions.js"
+import { formatFileSize } from "../../utils/format.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import type { PermissionDecision } from "../../utils/permissions/PermissionResult.js"
+import { getRuleByContentsForTool } from "../../utils/permissions/permissions.js"
+import { isPreapprovedHost } from "./preapproved.js"
+import { DESCRIPTION, WEB_FETCH_TOOL_NAME } from "./prompt.js"
+import { getToolUseSummary, renderToolResultMessage, renderToolUseMessage, renderToolUseProgressMessage } from "./UI.js"
 import {
   applyPromptToMarkdown,
   type FetchedContent,
   getURLMarkdownContent,
   isPreapprovedUrl,
   MAX_MARKDOWN_LENGTH,
-} from './utils.js'
+} from "./utils.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    url: z.string().url().describe('The URL to fetch content from'),
-    prompt: z.string().describe('The prompt to run on the fetched content'),
+    url: z.string().url().describe("The URL to fetch content from"),
+    prompt: z.string().describe("The prompt to run on the fetched content"),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
 
 const outputSchema = lazySchema(() =>
   z.object({
-    bytes: z.number().describe('Size of the fetched content in bytes'),
-    code: z.number().describe('HTTP response code'),
-    codeText: z.string().describe('HTTP response code text'),
-    result: z
-      .string()
-      .describe('Processed result from applying the prompt to the content'),
-    durationMs: z
-      .number()
-      .describe('Time taken to fetch and process the content'),
-    url: z.string().describe('The URL that was fetched'),
+    bytes: z.number().describe("Size of the fetched content in bytes"),
+    code: z.number().describe("HTTP response code"),
+    codeText: z.string().describe("HTTP response code text"),
+    result: z.string().describe("Processed result from applying the prompt to the content"),
+    durationMs: z.number().describe("Time taken to fetch and process the content"),
+    url: z.string().describe("The URL that was fetched"),
   }),
 )
 type OutputSchema = ReturnType<typeof outputSchema>
 
 export type Output = z.infer<OutputSchema>
 
-function webFetchToolInputToPermissionRuleContent(input: {
-  [k: string]: unknown
-}): string {
+function webFetchToolInputToPermissionRuleContent(input: { [k: string]: unknown }): string {
   try {
     const parsedInput = WebFetchTool.inputSchema.safeParse(input)
     if (!parsedInput.success) {
@@ -65,7 +54,7 @@ function webFetchToolInputToPermissionRuleContent(input: {
 
 export const WebFetchTool = buildTool({
   name: WEB_FETCH_TOOL_NAME,
-  searchHint: 'fetch and extract content from a URL',
+  searchHint: "fetch and extract content from a URL",
   // 100K chars - tool result persistence threshold
   maxResultSizeChars: 100_000,
   shouldDefer: true,
@@ -79,12 +68,12 @@ export const WebFetchTool = buildTool({
     }
   },
   userFacingName() {
-    return 'Fetch'
+    return "Fetch"
   },
   getToolUseSummary,
   getActivityDescription(input) {
     const summary = getToolUseSummary(input)
-    return summary ? `Fetching ${summary}` : 'Fetching web page'
+    return summary ? `Fetching ${summary}` : "Fetching web page"
   },
   get inputSchema(): InputSchema {
     return inputSchema()
@@ -111,9 +100,9 @@ export const WebFetchTool = buildTool({
       const parsedUrl = new URL(url)
       if (isPreapprovedHost(parsedUrl.hostname, parsedUrl.pathname)) {
         return {
-          behavior: 'allow',
+          behavior: "allow",
           updatedInput: input,
-          decisionReason: { type: 'other', reason: 'Preapproved host' },
+          decisionReason: { type: "other", reason: "Preapproved host" },
         }
       }
     } catch {
@@ -123,57 +112,45 @@ export const WebFetchTool = buildTool({
     // Check for a rule specific to the tool input (matching hostname)
     const ruleContent = webFetchToolInputToPermissionRuleContent(input)
 
-    const denyRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'deny',
-    ).get(ruleContent)
+    const denyRule = getRuleByContentsForTool(permissionContext, WebFetchTool, "deny").get(ruleContent)
     if (denyRule) {
       return {
-        behavior: 'deny',
+        behavior: "deny",
         message: `${WebFetchTool.name} denied access to ${ruleContent}.`,
         decisionReason: {
-          type: 'rule',
+          type: "rule",
           rule: denyRule,
         },
       }
     }
 
-    const askRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'ask',
-    ).get(ruleContent)
+    const askRule = getRuleByContentsForTool(permissionContext, WebFetchTool, "ask").get(ruleContent)
     if (askRule) {
       return {
-        behavior: 'ask',
+        behavior: "ask",
         message: `Claude requested permissions to use ${WebFetchTool.name}, but you haven't granted it yet.`,
         decisionReason: {
-          type: 'rule',
+          type: "rule",
           rule: askRule,
         },
         suggestions: buildSuggestions(ruleContent),
       }
     }
 
-    const allowRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'allow',
-    ).get(ruleContent)
+    const allowRule = getRuleByContentsForTool(permissionContext, WebFetchTool, "allow").get(ruleContent)
     if (allowRule) {
       return {
-        behavior: 'allow',
+        behavior: "allow",
         updatedInput: input,
         decisionReason: {
-          type: 'rule',
+          type: "rule",
           rule: allowRule,
         },
       }
     }
 
     return {
-      behavior: 'ask',
+      behavior: "ask",
       message: `Claude requested permissions to use ${WebFetchTool.name}, but you haven't granted it yet.`,
       suggestions: buildSuggestions(ruleContent),
     }
@@ -196,7 +173,7 @@ ${DESCRIPTION}`
       return {
         result: false,
         message: `Error: Invalid URL "${url}". The URL provided could not be parsed.`,
-        meta: { reason: 'invalid_url' },
+        meta: { reason: "invalid_url" },
         errorCode: 1,
       }
     }
@@ -205,24 +182,21 @@ ${DESCRIPTION}`
   renderToolUseMessage,
   renderToolUseProgressMessage,
   renderToolResultMessage,
-  async call(
-    { url, prompt },
-    { abortController, options: { isNonInteractiveSession } },
-  ) {
+  async call({ url, prompt }, { abortController, options: { isNonInteractiveSession } }) {
     const start = Date.now()
 
     const response = await getURLMarkdownContent(url, abortController)
 
     // Check if we got a redirect to a different host
-    if ('type' in response && response.type === 'redirect') {
+    if ("type" in response && response.type === "redirect") {
       const statusText =
         response.statusCode === 301
-          ? 'Moved Permanently'
+          ? "Moved Permanently"
           : response.statusCode === 308
-            ? 'Permanent Redirect'
+            ? "Permanent Redirect"
             : response.statusCode === 307
-              ? 'Temporary Redirect'
-              : 'Found'
+              ? "Temporary Redirect"
+              : "Found"
 
       const message = `REDIRECT DETECTED: The URL redirects to a different host.
 
@@ -248,24 +222,12 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
       }
     }
 
-    const {
-      content,
-      bytes,
-      code,
-      codeText,
-      contentType,
-      persistedPath,
-      persistedSize,
-    } = response as FetchedContent
+    const { content, bytes, code, codeText, contentType, persistedPath, persistedSize } = response as FetchedContent
 
     const isPreapproved = isPreapprovedUrl(url)
 
     let result: string
-    if (
-      isPreapproved &&
-      contentType.includes('text/markdown') &&
-      content.length < MAX_MARKDOWN_LENGTH
-    ) {
+    if (isPreapproved && contentType.includes("text/markdown") && content.length < MAX_MARKDOWN_LENGTH) {
       result = content
     } else {
       result = await applyPromptToMarkdown(
@@ -300,7 +262,7 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
   mapToolResultToToolResultBlockParam({ result }, toolUseID) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content: result,
     }
   },
@@ -309,10 +271,10 @@ To complete your request, I need to fetch content from the redirected URL. Pleas
 function buildSuggestions(ruleContent: string): PermissionUpdate[] {
   return [
     {
-      type: 'addRules',
-      destination: 'localSettings',
+      type: "addRules",
+      destination: "localSettings",
       rules: [{ toolName: WEB_FETCH_TOOL_NAME, ruleContent }],
-      behavior: 'allow',
+      behavior: "allow",
     },
   ]
 }

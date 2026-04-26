@@ -106,10 +106,9 @@ function parseToolParams(input?: string) {
     try {
       return JSON.parse(trimmed)
     } catch (jsonError) {
-      throw new Error(
-        `Failed to parse --params. Use valid JSON only. JSON error: ${jsonError}.`,
-        { cause: jsonError instanceof Error ? jsonError : new Error(String(jsonError)) },
-      )
+      throw new Error(`Failed to parse --params. Use valid JSON only. JSON error: ${jsonError}.`, {
+        cause: jsonError instanceof Error ? jsonError : new Error(String(jsonError)),
+      })
     }
   })
 

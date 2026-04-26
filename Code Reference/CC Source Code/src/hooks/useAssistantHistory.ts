@@ -1,23 +1,17 @@
-import { randomUUID } from 'crypto'
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from 'react'
+import { randomUUID } from "crypto"
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from "react"
 import {
   createHistoryAuthCtx,
   fetchLatestEvents,
   fetchOlderEvents,
   type HistoryAuthCtx,
   type HistoryPage,
-} from '../assistant/sessionHistory.js'
-import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js'
-import type { RemoteSessionConfig } from '../remote/RemoteSessionManager.js'
-import { convertSDKMessage } from '../remote/sdkMessageAdapter.js'
-import type { Message, SystemInformationalMessage } from '../types/message.js'
-import { logForDebugging } from '../utils/debug.js'
+} from "../assistant/sessionHistory.js"
+import type { ScrollBoxHandle } from "../ink/components/ScrollBox.js"
+import type { RemoteSessionConfig } from "../remote/RemoteSessionManager.js"
+import { convertSDKMessage } from "../remote/sdkMessageAdapter.js"
+import type { Message, SystemInformationalMessage } from "../types/message.js"
+import { logForDebugging } from "../utils/debug.js"
 
 type Props = {
   /** Gated on viewerOnly — non-viewer sessions have no remote history to page. */
@@ -41,10 +35,9 @@ const PREFETCH_THRESHOLD_ROWS = 40
  *  events convert to zero visible messages (everything filtered). */
 const MAX_FILL_PAGES = 10
 
-const SENTINEL_LOADING = 'loading older messages…'
-const SENTINEL_LOADING_FAILED =
-  'failed to load older messages — scroll up to retry'
-const SENTINEL_START = 'start of session'
+const SENTINEL_LOADING = "loading older messages…"
+const SENTINEL_LOADING_FAILED = "failed to load older messages — scroll up to retry"
+const SENTINEL_START = "start of session"
 
 /** Convert a HistoryPage to REPL Message[] using the same opts as viewer mode. */
 function pageToMessages(page: HistoryPage): Message[] {
@@ -54,7 +47,7 @@ function pageToMessages(page: HistoryPage): Message[] {
       convertUserTextMessages: true,
       convertToolResults: true,
     })
-    if (c.type === 'message') out.push(c.message)
+    if (c.type === "message") out.push(c.message)
   }
   return out
 }
@@ -69,12 +62,7 @@ function pageToMessages(page: HistoryPage): Message[] {
  * No-op unless config.viewerOnly. REPL only calls this hook inside a
  * feature('KAIROS') gate, so build-time elimination is handled there.
  */
-export function useAssistantHistory({
-  config,
-  setMessages,
-  scrollRef,
-  onPrepend,
-}: Props): Result {
+export function useAssistantHistory({ config, setMessages, scrollRef, onPrepend }: Props): Result {
   const enabled = config?.viewerOnly === true
 
   // Cursor state: ref-only (no re-render on cursor change). `null` = no
@@ -100,13 +88,13 @@ export function useAssistantHistory({
 
   function mkSentinel(text: string): SystemInformationalMessage {
     return {
-      type: 'system',
-      subtype: 'informational',
+      type: "system",
+      subtype: "informational",
       content: text,
       isMeta: false,
       timestamp: new Date().toISOString(),
       uuid: sentinelUuidRef.current,
-      level: 'info',
+      level: "info",
     }
   }
 
@@ -119,21 +107,18 @@ export function useAssistantHistory({
 
       if (!isInitial) {
         const s = scrollRef.current
-        anchorRef.current = s
-          ? { beforeHeight: s.getFreshScrollHeight(), count: msgs.length }
-          : null
+        anchorRef.current = s ? { beforeHeight: s.getFreshScrollHeight(), count: msgs.length } : null
       }
 
       const sentinel = page.hasMore ? null : mkSentinel(SENTINEL_START)
-      setMessages(prev => {
+      setMessages((prev) => {
         // Drop existing sentinel (index 0, known stable UUID — O(1)).
-        const base =
-          prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
+        const base = prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
         return sentinel ? [sentinel, ...msgs, ...base] : [...msgs, ...base]
       })
 
       logForDebugging(
-        `[useAssistantHistory] ${isInitial ? 'initial' : 'older'} page: ${msgs.length} msgs (raw ${page.events.length}), hasMore=${page.hasMore}`,
+        `[useAssistantHistory] ${isInitial ? "initial" : "older"} page: ${msgs.length} msgs (raw ${page.events.length}), hasMore=${page.hasMore}`,
       )
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollRef is a stable ref; mkSentinel reads refs only
@@ -167,9 +152,8 @@ export function useAssistantHistory({
     if (!cursor || !ctx) return // null=exhausted, undefined=initial pending
     inflightRef.current = true
     // Swap sentinel to "loading…" — O(1) slice since sentinel is at index 0.
-    setMessages(prev => {
-      const base =
-        prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
+    setMessages((prev) => {
+      const base = prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
       return [mkSentinel(SENTINEL_LOADING), ...base]
     })
     try {
@@ -177,9 +161,8 @@ export function useAssistantHistory({
       if (!page) {
         // Fetch failed — revert sentinel back to "start" placeholder so the user
         // can retry on next scroll-up. Cursor is preserved (not nulled out).
-        setMessages(prev => {
-          const base =
-            prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
+        setMessages((prev) => {
+          const base = prev[0]?.uuid === sentinelUuidRef.current ? prev.slice(1) : prev
           return [mkSentinel(SENTINEL_LOADING_FAILED), ...base]
         })
         return
@@ -216,11 +199,7 @@ export function useAssistantHistory({
   // to ≥ viewport. So `content < viewport` is never true; `<=` detects "no
   // overflow yet" correctly. Stops once there's at least something to scroll.
   useEffect(() => {
-    if (
-      fillBudgetRef.current <= 0 ||
-      !cursorRef.current ||
-      inflightRef.current
-    ) {
+    if (fillBudgetRef.current <= 0 || !cursorRef.current || inflightRef.current) {
       return
     }
     const s = scrollRef.current

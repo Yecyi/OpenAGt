@@ -1,12 +1,12 @@
-import { execa } from 'execa'
-import { execSync_DEPRECATED } from './execSyncWrapper.js'
+import { execa } from "execa"
+import { execSync_DEPRECATED } from "./execSyncWrapper.js"
 
 async function whichNodeAsync(command: string): Promise<string | null> {
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     // On Windows, use where.exe and return the first result
     const result = await execa(`where.exe ${command}`, {
       shell: true,
-      stderr: 'ignore',
+      stderr: "ignore",
       reject: false,
     })
     if (result.exitCode !== 0 || !result.stdout) {
@@ -21,7 +21,7 @@ async function whichNodeAsync(command: string): Promise<string | null> {
   // eslint-disable-next-line custom-rules/no-cross-platform-process-issues
   const result = await execa(`which ${command}`, {
     shell: true,
-    stderr: 'ignore',
+    stderr: "ignore",
     reject: false,
   })
   if (result.exitCode !== 0 || !result.stdout) {
@@ -31,11 +31,11 @@ async function whichNodeAsync(command: string): Promise<string | null> {
 }
 
 function whichNodeSync(command: string): string | null {
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
       const result = execSync_DEPRECATED(`where.exe ${command}`, {
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
       })
       const output = result.toString().trim()
       return output.split(/\r?\n/)[0] || null
@@ -46,8 +46,8 @@ function whichNodeSync(command: string): string | null {
 
   try {
     const result = execSync_DEPRECATED(`which ${command}`, {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
     })
     return result.toString().trim() || null
   } catch {
@@ -55,10 +55,7 @@ function whichNodeSync(command: string): string | null {
   }
 }
 
-const bunWhich =
-  typeof Bun !== 'undefined' && typeof Bun.which === 'function'
-    ? Bun.which
-    : null
+const bunWhich = typeof Bun !== "undefined" && typeof Bun.which === "function" ? Bun.which : null
 
 /**
  * Finds the full path to a command executable.
@@ -69,7 +66,7 @@ const bunWhich =
  * @returns The full path to the command, or null if not found
  */
 export const which: (command: string) => Promise<string | null> = bunWhich
-  ? async command => bunWhich(command)
+  ? async (command) => bunWhich(command)
   : whichNodeAsync
 
 /**
@@ -78,5 +75,4 @@ export const which: (command: string) => Promise<string | null> = bunWhich
  * @param command - The command name to look up
  * @returns The full path to the command, or null if not found
  */
-export const whichSync: (command: string) => string | null =
-  bunWhich ?? whichNodeSync
+export const whichSync: (command: string) => string | null = bunWhich ?? whichNodeSync

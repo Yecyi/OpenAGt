@@ -47,10 +47,7 @@ export function shouldFallback(error: unknown, config: FallbackConfig): boolean 
   return true
 }
 
-export function getNextFallback(
-  currentIndex: number,
-  config: FallbackConfig,
-): FallbackEntry | undefined {
+export function getNextFallback(currentIndex: number, config: FallbackConfig): FallbackEntry | undefined {
   if (currentIndex >= config.chain.length - 1) return undefined
   return config.chain[currentIndex + 1]
 }

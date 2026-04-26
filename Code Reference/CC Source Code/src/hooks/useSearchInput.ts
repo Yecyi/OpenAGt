@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react'
-import { KeyboardEvent } from '../ink/events/keyboard-event.js'
+import { useCallback, useState } from "react"
+import { KeyboardEvent } from "../ink/events/keyboard-event.js"
 // eslint-disable-next-line custom-rules/prefer-use-keybindings -- backward-compat bridge until consumers wire handleKeyDown to <Box onKeyDown>
-import { useInput } from '../ink.js'
+import { useInput } from "../ink.js"
 import {
   Cursor,
   getLastKill,
@@ -11,8 +11,8 @@ import {
   resetYankState,
   updateYankLength,
   yankPop,
-} from '../utils/Cursor.js'
-import { useTerminalSize } from './useTerminalSize.js'
+} from "../utils/Cursor.js"
+import { useTerminalSize } from "./useTerminalSize.js"
 
 type UseSearchInputOptions = {
   isActive: boolean
@@ -40,17 +40,17 @@ type UseSearchInputReturn = {
 }
 
 function isKillKey(e: KeyboardEvent): boolean {
-  if (e.ctrl && (e.key === 'k' || e.key === 'u' || e.key === 'w')) {
+  if (e.ctrl && (e.key === "k" || e.key === "u" || e.key === "w")) {
     return true
   }
-  if (e.meta && e.key === 'backspace') {
+  if (e.meta && e.key === "backspace") {
     return true
   }
   return false
 }
 
 function isYankKey(e: KeyboardEvent): boolean {
-  return (e.ctrl || e.meta) && e.key === 'y'
+  return (e.ctrl || e.meta) && e.key === "y"
 }
 
 // Special key names that fall through the explicit handlers above the
@@ -61,24 +61,24 @@ function isYankKey(e: KeyboardEvent): boolean {
 // matching the old useInput(input) behavior where cursor.insert(input)
 // inserted the full chunk.
 const UNHANDLED_SPECIAL_KEYS = new Set([
-  'pageup',
-  'pagedown',
-  'insert',
-  'wheelup',
-  'wheeldown',
-  'mouse',
-  'f1',
-  'f2',
-  'f3',
-  'f4',
-  'f5',
-  'f6',
-  'f7',
-  'f8',
-  'f9',
-  'f10',
-  'f11',
-  'f12',
+  "pageup",
+  "pagedown",
+  "insert",
+  "wheelup",
+  "wheeldown",
+  "mouse",
+  "f1",
+  "f2",
+  "f3",
+  "f4",
+  "f5",
+  "f6",
+  "f7",
+  "f8",
+  "f9",
+  "f10",
+  "f11",
+  "f12",
 ])
 
 export function useSearchInput({
@@ -88,7 +88,7 @@ export function useSearchInput({
   onExitUp,
   columns,
   passthroughCtrlKeys = [],
-  initialQuery = '',
+  initialQuery = "",
   backspaceExitsOnEmpty = true,
 }: UseSearchInputOptions): UseSearchInputReturn {
   const { columns: terminalColumns } = useTerminalSize()
@@ -122,24 +122,24 @@ export function useSearchInput({
     }
 
     // Exit conditions
-    if (e.key === 'return' || e.key === 'down') {
+    if (e.key === "return" || e.key === "down") {
       e.preventDefault()
       onExit()
       return
     }
-    if (e.key === 'up') {
+    if (e.key === "up") {
       e.preventDefault()
       if (onExitUp) {
         onExitUp()
       }
       return
     }
-    if (e.key === 'escape') {
+    if (e.key === "escape") {
       e.preventDefault()
       if (onCancel) {
         onCancel()
       } else if (query.length > 0) {
-        setQueryState('')
+        setQueryState("")
         setCursorOffset(0)
       } else {
         onExit()
@@ -148,12 +148,12 @@ export function useSearchInput({
     }
 
     // Backspace/Delete
-    if (e.key === 'backspace') {
+    if (e.key === "backspace") {
       e.preventDefault()
       if (e.meta) {
         // Meta+Backspace: kill word before
         const { cursor: newCursor, killed } = cursor.deleteWordBefore()
-        pushToKillRing(killed, 'prepend')
+        pushToKillRing(killed, "prepend")
         setQueryState(newCursor.text)
         setCursorOffset(newCursor.offset)
         return
@@ -170,7 +170,7 @@ export function useSearchInput({
       return
     }
 
-    if (e.key === 'delete') {
+    if (e.key === "delete") {
       e.preventDefault()
       const newCursor = cursor.del()
       setQueryState(newCursor.text)
@@ -179,13 +179,13 @@ export function useSearchInput({
     }
 
     // Arrow keys with modifiers (word jump)
-    if (e.key === 'left' && (e.ctrl || e.meta || e.fn)) {
+    if (e.key === "left" && (e.ctrl || e.meta || e.fn)) {
       e.preventDefault()
       const newCursor = cursor.prevWord()
       setCursorOffset(newCursor.offset)
       return
     }
-    if (e.key === 'right' && (e.ctrl || e.meta || e.fn)) {
+    if (e.key === "right" && (e.ctrl || e.meta || e.fn)) {
       e.preventDefault()
       const newCursor = cursor.nextWord()
       setCursorOffset(newCursor.offset)
@@ -193,13 +193,13 @@ export function useSearchInput({
     }
 
     // Plain arrow keys
-    if (e.key === 'left') {
+    if (e.key === "left") {
       e.preventDefault()
       const newCursor = cursor.left()
       setCursorOffset(newCursor.offset)
       return
     }
-    if (e.key === 'right') {
+    if (e.key === "right") {
       e.preventDefault()
       const newCursor = cursor.right()
       setCursorOffset(newCursor.offset)
@@ -207,12 +207,12 @@ export function useSearchInput({
     }
 
     // Home/End
-    if (e.key === 'home') {
+    if (e.key === "home") {
       e.preventDefault()
       setCursorOffset(0)
       return
     }
-    if (e.key === 'end') {
+    if (e.key === "end") {
       e.preventDefault()
       setCursorOffset(query.length)
       return
@@ -222,19 +222,19 @@ export function useSearchInput({
     if (e.ctrl) {
       e.preventDefault()
       switch (e.key.toLowerCase()) {
-        case 'a':
+        case "a":
           setCursorOffset(0)
           return
-        case 'e':
+        case "e":
           setCursorOffset(query.length)
           return
-        case 'b':
+        case "b":
           setCursorOffset(cursor.left().offset)
           return
-        case 'f':
+        case "f":
           setCursorOffset(cursor.right().offset)
           return
-        case 'd': {
+        case "d": {
           if (query.length === 0) {
             ;(onCancel ?? onExit)()
             return
@@ -244,7 +244,7 @@ export function useSearchInput({
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'h': {
+        case "h": {
           if (query.length === 0) {
             if (backspaceExitsOnEmpty) (onCancel ?? onExit)()
             return
@@ -254,28 +254,28 @@ export function useSearchInput({
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'k': {
+        case "k": {
           const { cursor: newCursor, killed } = cursor.deleteToLineEnd()
-          pushToKillRing(killed, 'append')
+          pushToKillRing(killed, "append")
           setQueryState(newCursor.text)
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'u': {
+        case "u": {
           const { cursor: newCursor, killed } = cursor.deleteToLineStart()
-          pushToKillRing(killed, 'prepend')
+          pushToKillRing(killed, "prepend")
           setQueryState(newCursor.text)
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'w': {
+        case "w": {
           const { cursor: newCursor, killed } = cursor.deleteWordBefore()
-          pushToKillRing(killed, 'prepend')
+          pushToKillRing(killed, "prepend")
           setQueryState(newCursor.text)
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'y': {
+        case "y": {
           const text = getLastKill()
           if (text.length > 0) {
             const startOffset = cursor.offset
@@ -286,8 +286,8 @@ export function useSearchInput({
           }
           return
         }
-        case 'g':
-        case 'c':
+        case "g":
+        case "c":
           // Cancel (abandon search). ctrl+g is less's cancel key. Only
           // fires if onCancel provided — otherwise falls through and
           // returns silently (11 call sites, most expect ctrl+c to no-op).
@@ -303,19 +303,19 @@ export function useSearchInput({
     if (e.meta) {
       e.preventDefault()
       switch (e.key.toLowerCase()) {
-        case 'b':
+        case "b":
           setCursorOffset(cursor.prevWord().offset)
           return
-        case 'f':
+        case "f":
           setCursorOffset(cursor.nextWord().offset)
           return
-        case 'd': {
+        case "d": {
           const newCursor = cursor.deleteWordAfter()
           setQueryState(newCursor.text)
           setCursorOffset(newCursor.offset)
           return
         }
-        case 'y': {
+        case "y": {
           const popResult = yankPop()
           if (popResult) {
             const { text, start, length } = popResult
@@ -334,7 +334,7 @@ export function useSearchInput({
     }
 
     // Tab: ignore
-    if (e.key === 'tab') {
+    if (e.key === "tab") {
       return
     }
 

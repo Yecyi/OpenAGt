@@ -1380,7 +1380,9 @@ export const GithubRunCommand = cmd({
       }
 
       async function defaultBranch() {
-        return await withRetry(() => octoRest.rest.repos.get({ owner, repo })).then((result) => result.data.default_branch)
+        return await withRetry(() => octoRest.rest.repos.get({ owner, repo })).then(
+          (result) => result.data.default_branch,
+        )
       }
 
       async function fetchIssue() {

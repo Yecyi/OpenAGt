@@ -4,16 +4,16 @@
 // like memory does, and so it's writable even when the memory path comes
 // from an env/settings override whose parent may not be.
 
-import { mkdir, readFile, stat, unlink, utimes, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { getOriginalCwd } from '../../bootstrap/state.js'
-import { getAutoMemPath } from '../../memdir/paths.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { isProcessRunning } from '../../utils/genericProcessUtils.js'
-import { listCandidates } from '../../utils/listSessionsImpl.js'
-import { getProjectDir } from '../../utils/sessionStorage.js'
+import { mkdir, readFile, stat, unlink, utimes, writeFile } from "fs/promises"
+import { join } from "path"
+import { getOriginalCwd } from "../../bootstrap/state.js"
+import { getAutoMemPath } from "../../memdir/paths.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { isProcessRunning } from "../../utils/genericProcessUtils.js"
+import { listCandidates } from "../../utils/listSessionsImpl.js"
+import { getProjectDir } from "../../utils/sessionStorage.js"
 
-const LOCK_FILE = '.consolidate-lock'
+const LOCK_FILE = ".consolidate-lock"
 
 // Stale past this even if the PID is live (PID reuse guard).
 const HOLDER_STALE_MS = 60 * 60 * 1000
@@ -49,7 +49,7 @@ export async function tryAcquireConsolidationLock(): Promise<number | null> {
   let mtimeMs: number | undefined
   let holderPid: number | undefined
   try {
-    const [s, raw] = await Promise.all([stat(path), readFile(path, 'utf8')])
+    const [s, raw] = await Promise.all([stat(path), readFile(path, "utf8")])
     mtimeMs = s.mtimeMs
     const parsed = parseInt(raw.trim(), 10)
     holderPid = Number.isFinite(parsed) ? parsed : undefined
@@ -74,7 +74,7 @@ export async function tryAcquireConsolidationLock(): Promise<number | null> {
   // Two reclaimers both write → last wins the PID. Loser bails on re-read.
   let verify: string
   try {
-    verify = await readFile(path, 'utf8')
+    verify = await readFile(path, "utf8")
   } catch {
     return null
   }
@@ -88,22 +88,18 @@ export async function tryAcquireConsolidationLock(): Promise<number | null> {
  * otherwise our still-running process would look like it's holding.
  * priorMtime 0 → unlink (restore no-file).
  */
-export async function rollbackConsolidationLock(
-  priorMtime: number,
-): Promise<void> {
+export async function rollbackConsolidationLock(priorMtime: number): Promise<void> {
   const path = lockPath()
   try {
     if (priorMtime === 0) {
       await unlink(path)
       return
     }
-    await writeFile(path, '')
+    await writeFile(path, "")
     const t = priorMtime / 1000 // utimes wants seconds
     await utimes(path, t, t)
   } catch (e: unknown) {
-    logForDebugging(
-      `[autoDream] rollback failed: ${(e as Error).message} — next trigger delayed to minHours`,
-    )
+    logForDebugging(`[autoDream] rollback failed: ${(e as Error).message} — next trigger delayed to minHours`)
   }
 }
 
@@ -115,12 +111,10 @@ export async function rollbackConsolidationLock(
  * Caller excludes the current session. Scans per-cwd transcripts — it's
  * a skip-gate, so undercounting worktree sessions is safe.
  */
-export async function listSessionsTouchedSince(
-  sinceMs: number,
-): Promise<string[]> {
+export async function listSessionsTouchedSince(sinceMs: number): Promise<string[]> {
   const dir = getProjectDir(getOriginalCwd())
   const candidates = await listCandidates(dir, true)
-  return candidates.filter(c => c.mtime > sinceMs).map(c => c.sessionId)
+  return candidates.filter((c) => c.mtime > sinceMs).map((c) => c.sessionId)
 }
 
 /**
@@ -133,8 +127,6 @@ export async function recordConsolidation(): Promise<void> {
     await mkdir(getAutoMemPath(), { recursive: true })
     await writeFile(lockPath(), String(process.pid))
   } catch (e: unknown) {
-    logForDebugging(
-      `[autoDream] recordConsolidation write failed: ${(e as Error).message}`,
-    )
+    logForDebugging(`[autoDream] recordConsolidation write failed: ${(e as Error).message}`)
   }
 }

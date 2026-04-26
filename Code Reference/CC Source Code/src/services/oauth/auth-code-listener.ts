@@ -1,10 +1,10 @@
-import type { IncomingMessage, ServerResponse } from 'http'
-import { createServer, type Server } from 'http'
-import type { AddressInfo } from 'net'
-import { logEvent } from 'src/services/analytics/index.js'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { logError } from '../../utils/log.js'
-import { shouldUseClaudeAIAuth } from './client.js'
+import type { IncomingMessage, ServerResponse } from "http"
+import { createServer, type Server } from "http"
+import type { AddressInfo } from "net"
+import { logEvent } from "src/services/analytics/index.js"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { logError } from "../../utils/log.js"
+import { shouldUseClaudeAIAuth } from "./client.js"
 
 /**
  * Temporary localhost HTTP server that listens for OAuth authorization code redirects.
@@ -24,7 +24,7 @@ export class AuthCodeListener {
   private pendingResponse: ServerResponse | null = null // Response object for final redirect
   private callbackPath: string // Configurable callback path
 
-  constructor(callbackPath: string = '/callback') {
+  constructor(callbackPath: string = "/callback") {
     this.localServer = createServer()
     this.callbackPath = callbackPath
   }
@@ -36,14 +36,12 @@ export class AuthCodeListener {
    */
   async start(port?: number): Promise<number> {
     return new Promise((resolve, reject) => {
-      this.localServer.once('error', err => {
-        reject(
-          new Error(`Failed to start OAuth callback server: ${err.message}`),
-        )
+      this.localServer.once("error", (err) => {
+        reject(new Error(`Failed to start OAuth callback server: ${err.message}`))
       })
 
       // Listen on specified port or 0 to let the OS assign an available port
-      this.localServer.listen(port ?? 0, 'localhost', () => {
+      this.localServer.listen(port ?? 0, "localhost", () => {
         const address = this.localServer.address() as AddressInfo
         this.port = address.port
         resolve(this.port)
@@ -59,10 +57,7 @@ export class AuthCodeListener {
     return this.pendingResponse !== null
   }
 
-  async waitForAuthorization(
-    state: string,
-    onReady: () => Promise<void>,
-  ): Promise<string> {
+  async waitForAuthorization(state: string, onReady: () => Promise<void>): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       this.promiseResolver = resolve
       this.promiseRejecter = reject
@@ -77,17 +72,14 @@ export class AuthCodeListener {
    * @param scopes The OAuth scopes that were granted
    * @param customHandler Optional custom handler to serve response instead of redirecting
    */
-  handleSuccessRedirect(
-    scopes: string[],
-    customHandler?: (res: ServerResponse, scopes: string[]) => void,
-  ): void {
+  handleSuccessRedirect(scopes: string[], customHandler?: (res: ServerResponse, scopes: string[]) => void): void {
     if (!this.pendingResponse) return
 
     // If custom handler provided, use it instead of default redirect
     if (customHandler) {
       customHandler(this.pendingResponse, scopes)
       this.pendingResponse = null
-      logEvent('tengu_oauth_automatic_redirect', { custom_handler: true })
+      logEvent("tengu_oauth_automatic_redirect", { custom_handler: true })
       return
     }
 
@@ -101,7 +93,7 @@ export class AuthCodeListener {
     this.pendingResponse.end()
     this.pendingResponse = null
 
-    logEvent('tengu_oauth_automatic_redirect', {})
+    logEvent("tengu_oauth_automatic_redirect", {})
   }
 
   /**
@@ -119,23 +111,20 @@ export class AuthCodeListener {
     this.pendingResponse.end()
     this.pendingResponse = null
 
-    logEvent('tengu_oauth_automatic_redirect_error', {})
+    logEvent("tengu_oauth_automatic_redirect_error", {})
   }
 
   private startLocalListener(onReady: () => Promise<void>): void {
     // Server is already created and listening, just set up handlers
-    this.localServer.on('request', this.handleRedirect.bind(this))
-    this.localServer.on('error', this.handleError.bind(this))
+    this.localServer.on("request", this.handleRedirect.bind(this))
+    this.localServer.on("error", this.handleError.bind(this))
 
     // Server is already listening, so we can call onReady immediately
     void onReady()
   }
 
   private handleRedirect(req: IncomingMessage, res: ServerResponse): void {
-    const parsedUrl = new URL(
-      req.url || '',
-      `http://${req.headers.host || 'localhost'}`,
-    )
+    const parsedUrl = new URL(req.url || "", `http://${req.headers.host || "localhost"}`)
 
     if (parsedUrl.pathname !== this.callbackPath) {
       res.writeHead(404)
@@ -143,28 +132,24 @@ export class AuthCodeListener {
       return
     }
 
-    const authCode = parsedUrl.searchParams.get('code') ?? undefined
-    const state = parsedUrl.searchParams.get('state') ?? undefined
+    const authCode = parsedUrl.searchParams.get("code") ?? undefined
+    const state = parsedUrl.searchParams.get("state") ?? undefined
 
     this.validateAndRespond(authCode, state, res)
   }
 
-  private validateAndRespond(
-    authCode: string | undefined,
-    state: string | undefined,
-    res: ServerResponse,
-  ): void {
+  private validateAndRespond(authCode: string | undefined, state: string | undefined, res: ServerResponse): void {
     if (!authCode) {
       res.writeHead(400)
-      res.end('Authorization code not found')
-      this.reject(new Error('No authorization code received'))
+      res.end("Authorization code not found")
+      this.reject(new Error("No authorization code received"))
       return
     }
 
     if (state !== this.expectedState) {
       res.writeHead(400)
-      res.end('Invalid state parameter')
-      this.reject(new Error('Invalid state parameter'))
+      res.end("Invalid state parameter")
+      this.reject(new Error("Invalid state parameter"))
       return
     }
 

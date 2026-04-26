@@ -12,9 +12,9 @@
  * dropped but mean tokens rose — the throw path yields a ~100-byte error
  * tool-result while truncation yields ~25K tokens of content at the cap.
  */
-import memoize from 'lodash-es/memoize.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { MAX_OUTPUT_SIZE } from 'src/utils/file.js'
+import memoize from "lodash-es/memoize.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "src/services/analytics/growthbook.js"
+import { MAX_OUTPUT_SIZE } from "src/utils/file.js"
 export const DEFAULT_MAX_OUTPUT_TOKENS = 25000
 
 /**
@@ -51,37 +51,24 @@ export type FileReadingLimits = {
  * through to the hardcoded defaults (no route to cap=0).
  */
 export const getDefaultFileReadingLimits = memoize((): FileReadingLimits => {
-  const override =
-    getFeatureValue_CACHED_MAY_BE_STALE<Partial<FileReadingLimits> | null>(
-      'tengu_amber_wren',
-      {},
-    )
+  const override = getFeatureValue_CACHED_MAY_BE_STALE<Partial<FileReadingLimits> | null>("tengu_amber_wren", {})
 
   const maxSizeBytes =
-    typeof override?.maxSizeBytes === 'number' &&
-    Number.isFinite(override.maxSizeBytes) &&
-    override.maxSizeBytes > 0
+    typeof override?.maxSizeBytes === "number" && Number.isFinite(override.maxSizeBytes) && override.maxSizeBytes > 0
       ? override.maxSizeBytes
       : MAX_OUTPUT_SIZE
 
   const envMaxTokens = getEnvMaxTokens()
   const maxTokens =
     envMaxTokens ??
-    (typeof override?.maxTokens === 'number' &&
-    Number.isFinite(override.maxTokens) &&
-    override.maxTokens > 0
+    (typeof override?.maxTokens === "number" && Number.isFinite(override.maxTokens) && override.maxTokens > 0
       ? override.maxTokens
       : DEFAULT_MAX_OUTPUT_TOKENS)
 
   const includeMaxSizeInPrompt =
-    typeof override?.includeMaxSizeInPrompt === 'boolean'
-      ? override.includeMaxSizeInPrompt
-      : undefined
+    typeof override?.includeMaxSizeInPrompt === "boolean" ? override.includeMaxSizeInPrompt : undefined
 
-  const targetedRangeNudge =
-    typeof override?.targetedRangeNudge === 'boolean'
-      ? override.targetedRangeNudge
-      : undefined
+  const targetedRangeNudge = typeof override?.targetedRangeNudge === "boolean" ? override.targetedRangeNudge : undefined
 
   return {
     maxSizeBytes,

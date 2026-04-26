@@ -18,34 +18,45 @@
  * Usage:       node scripts/build.mjs
  */
 
-import { readdir, readFile, writeFile, mkdir, cp, rm, stat } from 'node:fs/promises'   // 异步的操作文件的函数
-import { join, dirname } from 'node:path'   // 路径操作函数
-import { execSync } from 'node:child_process'   // 子进程操作函数
-import { fileURLToPath } from 'node:url'   // 文件URL操作函数会保证路径文件名的跨平台.
+import { readdir, readFile, writeFile, mkdir, cp, rm, stat } from "node:fs/promises" // 异步的操作文件的函数
+import { join, dirname } from "node:path" // 路径操作函数
+import { execSync } from "node:child_process" // 子进程操作函数
+import { fileURLToPath } from "node:url" // 文件URL操作函数会保证路径文件名的跨平台.
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT = join(__dirname, '..')//定义root目录
-const VERSION = '2.1.88'
-const BUILD = join(ROOT, 'build-src')//定义build目录
-const ENTRY = join(BUILD, 'entry.ts')
+const ROOT = join(__dirname, "..") //定义root目录
+const VERSION = "2.1.88"
+const BUILD = join(ROOT, "build-src") //定义build目录
+const ENTRY = join(BUILD, "entry.ts")
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-async function* walk(dir) {// function * 加*表示这是一个生成器函数
+async function* walk(dir) {
+  // function * 加*表示这是一个生成器函数
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const p = join(dir, e.name)
-    if (e.isDirectory() && e.name !== 'node_modules') yield* walk(p) // yield *是继续执行walk生成的生成器.
+    if (e.isDirectory() && e.name !== "node_modules")
+      yield* walk(p) // yield *是继续执行walk生成的生成器.
     else yield p
   }
 }
 
-async function exists(p) { try { await stat(p); return true } catch { return false } }
+async function exists(p) {
+  try {
+    await stat(p)
+    return true
+  } catch {
+    return false
+  }
+}
 
 async function ensureEsbuild() {
-  try { execSync('npx esbuild --version', { stdio: 'pipe' }) } //pipe模式父进程不打印.
-  catch {
-    console.log('📦 Installing esbuild...')
-    execSync('npm install --save-dev esbuild', { cwd: ROOT, stdio: 'inherit' })// 使用当前目录是root目录, inherit表示子进程的输入输出会在父进程的终端显示.
+  try {
+    execSync("npx esbuild --version", { stdio: "pipe" })
+  } catch {
+    //pipe模式父进程不打印.
+    console.log("📦 Installing esbuild...")
+    execSync("npm install --save-dev esbuild", { cwd: ROOT, stdio: "inherit" }) // 使用当前目录是root目录, inherit表示子进程的输入输出会在父进程的终端显示.
   }
 }
 
@@ -55,8 +66,8 @@ async function ensureEsbuild() {
 
 await rm(BUILD, { recursive: true, force: true })
 await mkdir(BUILD, { recursive: true })
-await cp(join(ROOT, 'src'), join(BUILD, 'src'), { recursive: true })// 把代码从root复制到build目录.
-console.log('✅ Phase 1: Copied src/ → build-src/')
+await cp(join(ROOT, "src"), join(BUILD, "src"), { recursive: true }) // 把代码从root复制到build目录.
+console.log("✅ Phase 1: Copied src/ → build-src/")
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 2: Transform source
@@ -65,27 +76,28 @@ console.log('✅ Phase 1: Copied src/ → build-src/')
 let transformCount = 0 //转化文件的计数.
 
 // MACRO replacements
-const MACROS = { // 一个变量替换宏, 用于在代码中替换MACRO的值.
-  'MACRO.VERSION': `'${VERSION}'`,
-  'MACRO.BUILD_TIME': `''`,
-  'MACRO.FEEDBACK_CHANNEL': `'https://github.com/anthropics/claude-code/issues'`,
-  'MACRO.ISSUES_EXPLAINER': `'https://github.com/anthropics/claude-code/issues/new/choose'`,
-  'MACRO.FEEDBACK_CHANNEL_URL': `'https://github.com/anthropics/claude-code/issues'`,
-  'MACRO.ISSUES_EXPLAINER_URL': `'https://github.com/anthropics/claude-code/issues/new/choose'`,
-  'MACRO.NATIVE_PACKAGE_URL': `'@anthropic-ai/claude-code'`,
-  'MACRO.PACKAGE_URL': `'@anthropic-ai/claude-code'`,
-  'MACRO.VERSION_CHANGELOG': `''`,
+const MACROS = {
+  // 一个变量替换宏, 用于在代码中替换MACRO的值.
+  "MACRO.VERSION": `'${VERSION}'`,
+  "MACRO.BUILD_TIME": `''`,
+  "MACRO.FEEDBACK_CHANNEL": `'https://github.com/anthropics/claude-code/issues'`,
+  "MACRO.ISSUES_EXPLAINER": `'https://github.com/anthropics/claude-code/issues/new/choose'`,
+  "MACRO.FEEDBACK_CHANNEL_URL": `'https://github.com/anthropics/claude-code/issues'`,
+  "MACRO.ISSUES_EXPLAINER_URL": `'https://github.com/anthropics/claude-code/issues/new/choose'`,
+  "MACRO.NATIVE_PACKAGE_URL": `'@anthropic-ai/claude-code'`,
+  "MACRO.PACKAGE_URL": `'@anthropic-ai/claude-code'`,
+  "MACRO.VERSION_CHANGELOG": `''`,
 }
 
-for await (const file of walk(join(BUILD, 'src'))) {
+for await (const file of walk(join(BUILD, "src"))) {
   if (!file.match(/\.[tj]sx?$/)) continue //跳过非 TypeScript/JavaScript 文件
 
-  let src = await readFile(file, 'utf8')
+  let src = await readFile(file, "utf8")
   let changed = false
 
   // 2a. feature('X') → false
   if (/\bfeature\s*\(\s*['"][A-Z_]+['"]\s*\)/.test(src)) {
-    src = src.replace(/\bfeature\s*\(\s*['"][A-Z_]+['"]\s*\)/g, 'false')
+    src = src.replace(/\bfeature\s*\(\s*['"][A-Z_]+['"]\s*\)/g, "false")
     changed = true
   }
 
@@ -99,18 +111,21 @@ for await (const file of walk(join(BUILD, 'src'))) {
 
   // 2c. Remove bun:bundle import (feature() is already replaced)
   if (src.includes("from 'bun:bundle'") || src.includes('from "bun:bundle"')) {
-    src = src.replace(/import\s*\{\s*feature\s*\}\s*from\s*['"]bun:bundle['"];?\n?/g, '// feature() replaced with false at build time\n')
+    src = src.replace(
+      /import\s*\{\s*feature\s*\}\s*from\s*['"]bun:bundle['"];?\n?/g,
+      "// feature() replaced with false at build time\n",
+    )
     changed = true
   }
 
   // 2d. Remove type-only import of global.d.ts
   if (src.includes("import '../global.d.ts'") || src.includes("import './global.d.ts'")) {
-    src = src.replace(/import\s*['"][.\/]*global\.d\.ts['"];?\n?/g, '')
+    src = src.replace(/import\s*['"][.\/]*global\.d\.ts['"];?\n?/g, "")
     changed = true
   }
 
   if (changed) {
-    await writeFile(file, src, 'utf8')
+    await writeFile(file, src, "utf8")
     transformCount++
   }
 }
@@ -120,12 +135,16 @@ console.log(`✅ Phase 2: Transformed ${transformCount} files`)
 // PHASE 3: Create entry wrapper
 // ══════════════════════════════════════════════════════════════════════════════
 
-await writeFile(ENTRY, `#!/usr/bin/env node
+await writeFile(
+  ENTRY,
+  `#!/usr/bin/env node
 // Claude Code v${VERSION} — built from source
 // Copyright (c) Anthropic PBC. All rights reserved.
 import './src/entrypoints/cli.tsx'
-`, 'utf8')  // 写入入口文件. 文件名是entry
-console.log('✅ Phase 3: Created entry wrapper')
+`,
+  "utf8",
+) // 写入入口文件. 文件名是entry
+console.log("✅ Phase 3: Created entry wrapper")
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE 4: Iterative stub + bundle
@@ -133,43 +152,48 @@ console.log('✅ Phase 3: Created entry wrapper')
 
 await ensureEsbuild()
 
-const OUT_DIR = join(ROOT, 'dist')
+const OUT_DIR = join(ROOT, "dist")
 await mkdir(OUT_DIR, { recursive: true })
-const OUT_FILE = join(OUT_DIR, 'cli.js')
+const OUT_FILE = join(OUT_DIR, "cli.js")
 
 // Run up to 5 rounds of: esbuild → collect missing → create stubs → retry
 const MAX_ROUNDS = 5
 let succeeded = false
 
-for (let round = 1; round <= MAX_ROUNDS; round++) {//最多运行 5 轮构建, 尝试5次.
+for (let round = 1; round <= MAX_ROUNDS; round++) {
+  //最多运行 5 轮构建, 尝试5次.
   console.log(`\n🔨 Phase 4 round ${round}/${MAX_ROUNDS}: Bundling...`)
 
-  let esbuildOutput = ''
+  let esbuildOutput = ""
   try {
-    esbuildOutput = execSync([
-      'npx esbuild',
-      `"${ENTRY}"`,
-      '--bundle',
-      '--platform=node',
-      '--target=node18',
-      '--format=esm',
-      `--outfile="${OUT_FILE}"`,
-      `--banner:js=$'#!/usr/bin/env node\\n// Claude Code v${VERSION} (built from source)\\n// Copyright (c) Anthropic PBC. All rights reserved.\\n'`,
-      '--packages=external',
-      '--external:bun:*',
-      '--allow-overwrite',
-      '--log-level=error',
-      '--log-limit=0',
-      '--sourcemap',
-    ].join(' '), {
-      cwd: ROOT,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
-    }).stderr?.toString() || ''
+    esbuildOutput =
+      execSync(
+        [
+          "npx esbuild",
+          `"${ENTRY}"`,
+          "--bundle",
+          "--platform=node",
+          "--target=node18",
+          "--format=esm",
+          `--outfile="${OUT_FILE}"`,
+          `--banner:js=$'#!/usr/bin/env node\\n// Claude Code v${VERSION} (built from source)\\n// Copyright (c) Anthropic PBC. All rights reserved.\\n'`,
+          "--packages=external",
+          "--external:bun:*",
+          "--allow-overwrite",
+          "--log-level=error",
+          "--log-limit=0",
+          "--sourcemap",
+        ].join(" "),
+        {
+          cwd: ROOT,
+          stdio: ["pipe", "pipe", "pipe"],
+          shell: true,
+        },
+      ).stderr?.toString() || ""
     succeeded = true
     break
   } catch (e) {
-    esbuildOutput = (e.stderr?.toString() || '') + (e.stdout?.toString() || '')
+    esbuildOutput = (e.stderr?.toString() || "") + (e.stdout?.toString() || "")
   }
 
   // Parse missing modules
@@ -178,16 +202,19 @@ for (let round = 1; round <= MAX_ROUNDS; round++) {//最多运行 5 轮构建, �
   let m
   while ((m = missingRe.exec(esbuildOutput)) !== null) {
     const mod = m[1]
-    if (!mod.startsWith('node:') && !mod.startsWith('bun:') && !mod.startsWith('/')) {
+    if (!mod.startsWith("node:") && !mod.startsWith("bun:") && !mod.startsWith("/")) {
       missing.add(mod)
     }
   }
 
   if (missing.size === 0) {
     // No more missing modules but still errors — check what
-    const errLines = esbuildOutput.split('\n').filter(l => l.includes('ERROR')).slice(0, 5)
-    console.log('❌ Unrecoverable errors:')
-    errLines.forEach(l => console.log('   ' + l))
+    const errLines = esbuildOutput
+      .split("\n")
+      .filter((l) => l.includes("ERROR"))
+      .slice(0, 5)
+    console.log("❌ Unrecoverable errors:")
+    errLines.forEach((l) => console.log("   " + l))
     break
   }
 
@@ -198,14 +225,14 @@ for (let round = 1; round <= MAX_ROUNDS; round++) {//最多运行 5 轮构建, �
   for (const mod of missing) {
     // Resolve relative path from the file that imports it — but since we
     // don't have that info easily, create stubs at multiple likely locations
-    const cleanMod = mod.replace(/^\.\//, '')
+    const cleanMod = mod.replace(/^\.\//, "")
 
     // Text assets → empty file
     if (/\.(txt|md|json)$/.test(cleanMod)) {
-      const p = join(BUILD, 'src', cleanMod)
+      const p = join(BUILD, "src", cleanMod)
       await mkdir(dirname(p), { recursive: true }).catch(() => {})
-      if (!await exists(p)) {
-        await writeFile(p, cleanMod.endsWith('.json') ? '{}' : '', 'utf8')
+      if (!(await exists(p))) {
+        await writeFile(p, cleanMod.endsWith(".json") ? "{}" : "", "utf8")
         stubCount++
       }
       continue
@@ -213,13 +240,20 @@ for (let round = 1; round <= MAX_ROUNDS; round++) {//最多运行 5 轮构建, �
 
     // JS/TS modules → export empty
     if (/\.[tj]sx?$/.test(cleanMod)) {
-      for (const base of [join(BUILD, 'src'), join(BUILD, 'src', 'src')]) {
+      for (const base of [join(BUILD, "src"), join(BUILD, "src", "src")]) {
         const p = join(base, cleanMod)
         await mkdir(dirname(p), { recursive: true }).catch(() => {})
-        if (!await exists(p)) {
-          const name = cleanMod.split('/').pop().replace(/\.[tj]sx?$/, '')
-          const safeName = name.replace(/[^a-zA-Z0-9_$]/g, '_') || 'stub'
-          await writeFile(p, `// Auto-generated stub\nexport default function ${safeName}() {}\nexport const ${safeName} = () => {}\n`, 'utf8')
+        if (!(await exists(p))) {
+          const name = cleanMod
+            .split("/")
+            .pop()
+            .replace(/\.[tj]sx?$/, "")
+          const safeName = name.replace(/[^a-zA-Z0-9_$]/g, "_") || "stub"
+          await writeFile(
+            p,
+            `// Auto-generated stub\nexport default function ${safeName}() {}\nexport const ${safeName} = () => {}\n`,
+            "utf8",
+          )
           stubCount++
         }
       }
@@ -235,11 +269,11 @@ if (succeeded) {
   console.log(`\n   Usage:  node ${OUT_FILE} --version`)
   console.log(`           node ${OUT_FILE} -p "Hello"`)
 } else {
-  console.error('\n❌ Build failed after all rounds.')
-  console.error('   The transformed source is in build-src/ for inspection.')
-  console.error('\n   To fix manually:')
-  console.error('   1. Check build-src/ for the transformed files')
-  console.error('   2. Create missing stubs in build-src/src/')
-  console.error('   3. Re-run: node scripts/build.mjs')
+  console.error("\n❌ Build failed after all rounds.")
+  console.error("   The transformed source is in build-src/ for inspection.")
+  console.error("\n   To fix manually:")
+  console.error("   1. Check build-src/ for the transformed files")
+  console.error("   2. Create missing stubs in build-src/src/")
+  console.error("   3. Re-run: node scripts/build.mjs")
   process.exit(1)
 }

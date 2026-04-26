@@ -47,15 +47,27 @@ const DANGEROUS_ONELINER_PATTERNS: Array<{ pattern: RegExp; name: string; reason
   { pattern: /curl\s+.*\|\s*(?:sh|bash|ksh|zsh|fish)/i, name: "curl-pipe-sh", reason: "curl piped to shell execution" },
   { pattern: /wget\s+.*\|\s*(?:sh|bash|ksh|zsh|fish)/i, name: "wget-pipe-sh", reason: "wget piped to shell execution" },
   // tar extraction with execution
-  { pattern: /tar\s+.*[-][xc]f\s+.*\|\s*(?:sh|bash|perl|python)/i, name: "tar-pipe-sh", reason: "tar extraction piped to shell" },
+  {
+    pattern: /tar\s+.*[-][xc]f\s+.*\|\s*(?:sh|bash|perl|python)/i,
+    name: "tar-pipe-sh",
+    reason: "tar extraction piped to shell",
+  },
   // dd with execution
   { pattern: /dd\s+.*\|\s*(?:sh|bash|ksh|zsh)/i, name: "dd-pipe-sh", reason: "dd piped to shell execution" },
   // cat with execution
   { pattern: /cat\s+.*\|\s*(?:sh|bash|ksh|zsh)/i, name: "cat-pipe-sh", reason: "cat piped to shell execution" },
   // python/perl one-liners with -c execution
-  { pattern: /(?:python|perl|ruby|php|node)\s+-[rc]\s+/i, name: "interpreter-c-flag", reason: "Interpreter with -c flag can execute arbitrary code" },
+  {
+    pattern: /(?:python|perl|ruby|php|node)\s+-[rc]\s+/i,
+    name: "interpreter-c-flag",
+    reason: "Interpreter with -c flag can execute arbitrary code",
+  },
   // base64 decode and execute
-  { pattern: /base64\s+(-d|--decode).*\|\s*(?:sh|bash|ksh|zsh)/i, name: "base64-pipe-sh", reason: "base64 decode piped to shell" },
+  {
+    pattern: /base64\s+(-d|--decode).*\|\s*(?:sh|bash|ksh|zsh)/i,
+    name: "base64-pipe-sh",
+    reason: "base64 decode piped to shell",
+  },
 ]
 
 /**
@@ -168,14 +180,7 @@ export class WrapperStripper {
   becomesDangerousAfterStrip(command: string): boolean {
     const stripped = this.strip(command)
     // Check if the stripped command starts with a dangerous pattern
-    const dangerousPrefixes = [
-      /^rm\s+-rf/i,
-      /^dd\s+/i,
-      /^mkfs/i,
-      /^format/i,
-      /^fdisk/i,
-      /^parted/i,
-    ]
+    const dangerousPrefixes = [/^rm\s+-rf/i, /^dd\s+/i, /^mkfs/i, /^format/i, /^fdisk/i, /^parted/i]
     return dangerousPrefixes.some((pattern) => pattern.test(stripped))
   }
 

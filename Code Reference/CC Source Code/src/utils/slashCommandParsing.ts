@@ -26,13 +26,13 @@ export function parseSlashCommand(input: string): ParsedSlashCommand | null {
   const trimmedInput = input.trim()
 
   // Check if input starts with '/'
-  if (!trimmedInput.startsWith('/')) {
+  if (!trimmedInput.startsWith("/")) {
     return null
   }
 
   // Remove the leading '/' and split by spaces
   const withoutSlash = trimmedInput.slice(1)
-  const words = withoutSlash.split(' ')
+  const words = withoutSlash.split(" ")
 
   if (!words[0]) {
     return null
@@ -43,14 +43,14 @@ export function parseSlashCommand(input: string): ParsedSlashCommand | null {
   let argsStartIndex = 1
 
   // Check for MCP commands (second word is '(MCP)')
-  if (words.length > 1 && words[1] === '(MCP)') {
-    commandName = commandName + ' (MCP)'
+  if (words.length > 1 && words[1] === "(MCP)") {
+    commandName = commandName + " (MCP)"
     isMcp = true
     argsStartIndex = 2
   }
 
   // Extract arguments (everything after command name)
-  const args = words.slice(argsStartIndex).join(' ')
+  const args = words.slice(argsStartIndex).join(" ")
 
   return {
     commandName,

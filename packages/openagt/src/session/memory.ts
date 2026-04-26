@@ -125,11 +125,7 @@ export function parseMemorySections(content: string): MemorySections {
 /**
  * Update a specific section in memory content (incremental edit)
  */
-export function updateMemorySection(
-  content: string,
-  section: keyof MemorySections,
-  newContent: string,
-): string {
+export function updateMemorySection(content: string, section: keyof MemorySections, newContent: string): string {
   const sectionPatterns: Record<keyof MemorySections, string> = {
     title: "# Session Title",
     currentState: "# Current State",
@@ -329,10 +325,7 @@ export function estimateMessageTokens(messages: Array<{ tokens?: { input?: numbe
  * Count tool calls in messages
  */
 export function countToolCalls(messages: Array<{ parts?: Array<{ type?: string }> }>): number {
-  return messages.reduce(
-    (count, msg) => count + (msg.parts?.filter((p) => p.type === "tool").length ?? 0),
-    0,
-  )
+  return messages.reduce((count, msg) => count + (msg.parts?.filter((p) => p.type === "tool").length ?? 0), 0)
 }
 
 export * as SessionMemory from "./memory"

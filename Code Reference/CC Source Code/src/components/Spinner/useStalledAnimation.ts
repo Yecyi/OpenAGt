@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef } from "react"
 
 // Hook to handle the transition to red when tokens stop flowing.
 // Driven by the parent's animation clock time instead of independent intervals,
@@ -67,9 +67,7 @@ export function useStalledAnimation(
   }
 
   // When reducedMotion is enabled, use instant intensity change
-  const effectiveIntensity = reducedMotion
-    ? intensity
-    : stalledIntensityRef.current
+  const effectiveIntensity = reducedMotion ? intensity : stalledIntensityRef.current
 
   return { isStalled, stalledIntensity: effectiveIntensity }
 }

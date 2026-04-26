@@ -3,7 +3,7 @@ import {
   clearSystemPromptSectionState,
   getSystemPromptSectionCache,
   setSystemPromptSectionCacheEntry,
-} from '../bootstrap/state.js'
+} from "../bootstrap/state.js"
 
 type ComputeFn = () => string | null | Promise<string | null>
 
@@ -17,10 +17,7 @@ type SystemPromptSection = {
  * Create a memoized system prompt section.
  * Computed once, cached until /clear or /compact.
  */
-export function systemPromptSection(
-  name: string,
-  compute: ComputeFn,
-): SystemPromptSection {
+export function systemPromptSection(name: string, compute: ComputeFn): SystemPromptSection {
   return { name, compute, cacheBreak: false }
 }
 
@@ -40,13 +37,11 @@ export function DANGEROUS_uncachedSystemPromptSection(
 /**
  * Resolve all system prompt sections, returning prompt strings.
  */
-export async function resolveSystemPromptSections(
-  sections: SystemPromptSection[],
-): Promise<(string | null)[]> {
+export async function resolveSystemPromptSections(sections: SystemPromptSection[]): Promise<(string | null)[]> {
   const cache = getSystemPromptSectionCache()
 
   return Promise.all(
-    sections.map(async s => {
+    sections.map(async (s) => {
       if (!s.cacheBreak && cache.has(s.name)) {
         return cache.get(s.name) ?? null
       }

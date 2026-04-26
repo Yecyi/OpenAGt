@@ -1,17 +1,14 @@
-import { feature } from 'bun:bundle'
-import { microcompactMessages } from '../../services/compact/microCompact.js'
-import type { AppState } from '../../state/AppStateStore.js'
-import type { Tools, ToolUseContext } from '../../Tool.js'
-import type { AgentDefinitionsResult } from '../../tools/AgentTool/loadAgentsDir.js'
-import type { Message } from '../../types/message.js'
-import {
-  analyzeContextUsage,
-  type ContextData,
-} from '../../utils/analyzeContext.js'
-import { formatTokens } from '../../utils/format.js'
-import { getMessagesAfterCompactBoundary } from '../../utils/messages.js'
-import { getSourceDisplayName } from '../../utils/settings/constants.js'
-import { plural } from '../../utils/stringUtils.js'
+import { feature } from "bun:bundle"
+import { microcompactMessages } from "../../services/compact/microCompact.js"
+import type { AppState } from "../../state/AppStateStore.js"
+import type { Tools, ToolUseContext } from "../../Tool.js"
+import type { AgentDefinitionsResult } from "../../tools/AgentTool/loadAgentsDir.js"
+import type { Message } from "../../types/message.js"
+import { analyzeContextUsage, type ContextData } from "../../utils/analyzeContext.js"
+import { formatTokens } from "../../utils/format.js"
+import { getMessagesAfterCompactBoundary } from "../../utils/messages.js"
+import { getSourceDisplayName } from "../../utils/settings/constants.js"
+import { plural } from "../../utils/stringUtils.js"
 
 /**
  * Shared data-collection path for `/context` (slash command) and the SDK
@@ -31,26 +28,18 @@ type CollectContextDataInput = {
   }
 }
 
-export async function collectContextData(
-  context: CollectContextDataInput,
-): Promise<ContextData> {
+export async function collectContextData(context: CollectContextDataInput): Promise<ContextData> {
   const {
     messages,
     getAppState,
-    options: {
-      mainLoopModel,
-      tools,
-      agentDefinitions,
-      customSystemPrompt,
-      appendSystemPrompt,
-    },
+    options: { mainLoopModel, tools, agentDefinitions, customSystemPrompt, appendSystemPrompt },
   } = context
 
   let apiView = getMessagesAfterCompactBoundary(messages)
-  if (feature('CONTEXT_COLLAPSE')) {
+  if (feature("CONTEXT_COLLAPSE")) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const { projectView } =
-      require('../../services/contextCollapse/operations.js') as typeof import('../../services/contextCollapse/operations.js')
+      require("../../services/contextCollapse/operations.js") as typeof import("../../services/contextCollapse/operations.js")
     /* eslint-enable @typescript-eslint/no-require-imports */
     apiView = projectView(apiView)
   }
@@ -67,22 +56,16 @@ export async function collectContextData(
     undefined, // terminalWidth
     // analyzeContextUsage only reads options.{customSystemPrompt,appendSystemPrompt}
     // but its signature declares the full Pick<ToolUseContext, 'options'>.
-    { options: { customSystemPrompt, appendSystemPrompt } } as Pick<
-      ToolUseContext,
-      'options'
-    >,
+    { options: { customSystemPrompt, appendSystemPrompt } } as Pick<ToolUseContext, "options">,
     undefined, // mainThreadAgentDefinition
     apiView, // original messages for API usage extraction
   )
 }
 
-export async function call(
-  _args: string,
-  context: ToolUseContext,
-): Promise<{ type: 'text'; value: string }> {
+export async function call(_args: string, context: ToolUseContext): Promise<{ type: "text"; value: string }> {
   const data = await collectContextData(context)
   return {
-    type: 'text' as const,
+    type: "text" as const,
     value: formatContextAsMarkdownTable(data),
   }
 }
@@ -110,10 +93,10 @@ function formatContextAsMarkdownTable(data: ContextData): string {
   // Context-collapse status. Always show when the runtime gate is on —
   // the user needs to know which strategy is managing their context
   // even before anything has fired.
-  if (feature('CONTEXT_COLLAPSE')) {
+  if (feature("CONTEXT_COLLAPSE")) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const { getStats, isContextCollapseEnabled } =
-      require('../../services/contextCollapse/index.js') as typeof import('../../services/contextCollapse/index.js')
+      require("../../services/contextCollapse/index.js") as typeof import("../../services/contextCollapse/index.js")
     /* eslint-enable @typescript-eslint/no-require-imports */
     if (isContextCollapseEnabled()) {
       const s = getStats()
@@ -122,16 +105,16 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       const parts = []
       if (s.collapsedSpans > 0) {
         parts.push(
-          `${s.collapsedSpans} ${plural(s.collapsedSpans, 'span')} summarized (${s.collapsedMessages} messages)`,
+          `${s.collapsedSpans} ${plural(s.collapsedSpans, "span")} summarized (${s.collapsedMessages} messages)`,
         )
       }
       if (s.stagedSpans > 0) parts.push(`${s.stagedSpans} staged`)
       const summary =
         parts.length > 0
-          ? parts.join(', ')
+          ? parts.join(", ")
           : h.totalSpawns > 0
-            ? `${h.totalSpawns} ${plural(h.totalSpawns, 'spawn')}, nothing staged yet`
-            : 'waiting for first trigger'
+            ? `${h.totalSpawns} ${plural(h.totalSpawns, "spawn")}, nothing staged yet`
+            : "waiting for first trigger"
       output += `**Context strategy:** collapse (${summary})\n`
 
       if (h.totalErrors > 0) {
@@ -139,20 +122,17 @@ function formatContextAsMarkdownTable(data: ContextData): string {
         if (h.lastError) {
           output += ` (last: ${h.lastError.slice(0, 80)})`
         }
-        output += '\n'
+        output += "\n"
       } else if (h.emptySpawnWarningEmitted) {
         output += `**Collapse idle:** ${h.totalEmptySpawns} consecutive empty runs\n`
       }
     }
   }
-  output += '\n'
+  output += "\n"
 
   // Main categories table
   const visibleCategories = categories.filter(
-    cat =>
-      cat.tokens > 0 &&
-      cat.name !== 'Free space' &&
-      cat.name !== 'Autocompact buffer',
+    (cat) => cat.tokens > 0 && cat.name !== "Free space" && cat.name !== "Autocompact buffer",
   )
 
   if (visibleCategories.length > 0) {
@@ -165,23 +145,15 @@ function formatContextAsMarkdownTable(data: ContextData): string {
       output += `| ${cat.name} | ${formatTokens(cat.tokens)} | ${percentDisplay}% |\n`
     }
 
-    const freeSpaceCategory = categories.find(c => c.name === 'Free space')
+    const freeSpaceCategory = categories.find((c) => c.name === "Free space")
     if (freeSpaceCategory && freeSpaceCategory.tokens > 0) {
-      const percentDisplay = (
-        (freeSpaceCategory.tokens / rawMaxTokens) *
-        100
-      ).toFixed(1)
+      const percentDisplay = ((freeSpaceCategory.tokens / rawMaxTokens) * 100).toFixed(1)
       output += `| Free space | ${formatTokens(freeSpaceCategory.tokens)} | ${percentDisplay}% |\n`
     }
 
-    const autocompactCategory = categories.find(
-      c => c.name === 'Autocompact buffer',
-    )
+    const autocompactCategory = categories.find((c) => c.name === "Autocompact buffer")
     if (autocompactCategory && autocompactCategory.tokens > 0) {
-      const percentDisplay = (
-        (autocompactCategory.tokens / rawMaxTokens) *
-        100
-      ).toFixed(1)
+      const percentDisplay = ((autocompactCategory.tokens / rawMaxTokens) * 100).toFixed(1)
       output += `| Autocompact buffer | ${formatTokens(autocompactCategory.tokens)} | ${percentDisplay}% |\n`
     }
 
@@ -200,11 +172,7 @@ function formatContextAsMarkdownTable(data: ContextData): string {
   }
 
   // System tools (ant-only)
-  if (
-    systemTools &&
-    systemTools.length > 0 &&
-    process.env.USER_TYPE === 'ant'
-  ) {
+  if (systemTools && systemTools.length > 0 && process.env.USER_TYPE === "ant") {
     output += `### [ANT-ONLY] System Tools\n\n`
     output += `| Tool | Tokens |\n`
     output += `|------|--------|\n`
@@ -215,11 +183,7 @@ function formatContextAsMarkdownTable(data: ContextData): string {
   }
 
   // System prompt sections (ant-only)
-  if (
-    systemPromptSections &&
-    systemPromptSections.length > 0 &&
-    process.env.USER_TYPE === 'ant'
-  ) {
+  if (systemPromptSections && systemPromptSections.length > 0 && process.env.USER_TYPE === "ant") {
     output += `### [ANT-ONLY] System Prompt Sections\n\n`
     output += `| Section | Tokens |\n`
     output += `|---------|--------|\n`
@@ -237,26 +201,26 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     for (const agent of agents) {
       let sourceDisplay: string
       switch (agent.source) {
-        case 'projectSettings':
-          sourceDisplay = 'Project'
+        case "projectSettings":
+          sourceDisplay = "Project"
           break
-        case 'userSettings':
-          sourceDisplay = 'User'
+        case "userSettings":
+          sourceDisplay = "User"
           break
-        case 'localSettings':
-          sourceDisplay = 'Local'
+        case "localSettings":
+          sourceDisplay = "Local"
           break
-        case 'flagSettings':
-          sourceDisplay = 'Flag'
+        case "flagSettings":
+          sourceDisplay = "Flag"
           break
-        case 'policySettings':
-          sourceDisplay = 'Policy'
+        case "policySettings":
+          sourceDisplay = "Policy"
           break
-        case 'plugin':
-          sourceDisplay = 'Plugin'
+        case "plugin":
+          sourceDisplay = "Plugin"
           break
-        case 'built-in':
-          sourceDisplay = 'Built-in'
+        case "built-in":
+          sourceDisplay = "Built-in"
           break
         default:
           sourceDisplay = String(agent.source)
@@ -289,7 +253,7 @@ function formatContextAsMarkdownTable(data: ContextData): string {
   }
 
   // Message breakdown (ant-only)
-  if (messageBreakdown && process.env.USER_TYPE === 'ant') {
+  if (messageBreakdown && process.env.USER_TYPE === "ant") {
     output += `### [ANT-ONLY] Message Breakdown\n\n`
     output += `| Category | Tokens |\n`
     output += `|----------|--------|\n`

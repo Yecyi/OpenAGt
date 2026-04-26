@@ -1,4 +1,4 @@
-export const WEB_FETCH_TOOL_NAME = 'WebFetch'
+export const WEB_FETCH_TOOL_NAME = "WebFetch"
 
 export const DESCRIPTION = `
 - Fetches content from a specified URL and processes it using an AI model

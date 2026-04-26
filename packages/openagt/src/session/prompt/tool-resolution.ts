@@ -14,11 +14,7 @@ import {
   type ToolCallItem as PartitionToolCallItem,
   type ToolBatch,
 } from "@/tool/partition"
-import {
-  extractPathsFromInput as extractPaths,
-  pathsOverlap,
-  detectPathConflicts,
-} from "@/tool/path-overlap"
+import { extractPathsFromInput as extractPaths, pathsOverlap, detectPathConflicts } from "@/tool/path-overlap"
 import { MCP } from "@/mcp"
 import { Plugin } from "@/plugin"
 import { Agent } from "@/agent/agent"
@@ -74,15 +70,23 @@ export interface ToolContext {
   agent: string
   messages: MessageV2.WithParts[]
   metadata: (val: { title?: string; metadata?: Record<string, any> }) => Effect.Effect<void>
-  ask: (req: { permission: string; metadata: Record<string, any>; patterns: string[]; always: string[] }) => Effect.Effect<void>
+  ask: (req: {
+    permission: string
+    metadata: Record<string, any>
+    patterns: string[]
+    always: string[]
+  }) => Effect.Effect<void>
 }
 
 /**
  * Create a tool scheduler with path conflict detection
  */
-export function createToolScheduler() {
+export function createToolScheduler(options?: { maxParallelSafeTasks?: number }) {
   let running: RunningToolCall[] = []
   let unsafeTail = Promise.resolve()
+  let activeSafeTasks = 0
+  const safeTaskWaiters: Array<() => void> = []
+  const maxParallelSafeTasks = Math.max(1, options?.maxParallelSafeTasks ?? 8)
 
   const normalizeToolInput = (value: unknown): Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
@@ -98,10 +102,20 @@ export function createToolScheduler() {
     return extractPaths(call.input)
   }
 
-  const schedule = <T>(
-    call: PartitionToolCallItem,
-    execute: () => Promise<T>,
-  ) => {
+  const withSafeTaskSlot = async <T>(execute: () => Promise<T>) => {
+    while (activeSafeTasks >= maxParallelSafeTasks) {
+      await new Promise<void>((resolve) => safeTaskWaiters.push(resolve))
+    }
+    activeSafeTasks++
+    try {
+      return await execute()
+    } finally {
+      activeSafeTasks--
+      safeTaskWaiters.shift()?.()
+    }
+  }
+
+  const schedule = <T>(call: PartitionToolCallItem, execute: () => Promise<T>) => {
     const safe = isConcurrencySafe(call.toolName, call.input)
     const paths = schedulingPaths(call)
     const blockers = running
@@ -124,8 +138,12 @@ export function createToolScheduler() {
     running.push(entry)
 
     const start = () => Promise.all(blockers).then(() => execute())
-    const pending = safe ? start() : unsafeTail.then(start, start)
-    if (!safe) unsafeTail = pending.then(() => undefined, () => undefined)
+    const pending = safe ? (call.toolName === "task" ? withSafeTaskSlot(start) : start()) : unsafeTail.then(start, start)
+    if (!safe)
+      unsafeTail = pending.then(
+        () => undefined,
+        () => undefined,
+      )
 
     entry.done = pending.finally(() => {
       running = running.filter((active) => active.toolCallId !== call.toolCallId)

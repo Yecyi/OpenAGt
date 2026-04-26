@@ -518,8 +518,14 @@ export const layer: Layer.Layer<
             state: {
               ...part.state,
               status: "error",
-              error: "Tool execution aborted",
-              metadata: { ...metadata, interrupted: true },
+              error: "Tool execution interrupted during session cleanup",
+              metadata: {
+                ...metadata,
+                interrupted: true,
+                interruption_origin: "session_cleanup",
+                root_cause: "tool_result_missing_after_session_interrupt",
+                active_tool: part.tool,
+              },
               time: { start: "time" in part.state ? part.state.time.start : end, end },
             },
           })

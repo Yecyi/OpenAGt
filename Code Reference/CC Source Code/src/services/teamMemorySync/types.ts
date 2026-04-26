@@ -5,8 +5,8 @@
  * Based on the backend API contract from anthropic/anthropic#250711.
  */
 
-import { z } from 'zod/v4'
-import { lazySchema } from '../../utils/lazySchema.js'
+import { z } from "zod/v4"
+import { lazySchema } from "../../utils/lazySchema.js"
 
 /**
  * Content portion of team memory data - flat key-value storage.
@@ -48,7 +48,7 @@ export const TeamMemoryTooManyEntriesSchema = lazySchema(() =>
   z.object({
     error: z.object({
       details: z.object({
-        error_code: z.literal('team_memory_too_many_entries'),
+        error_code: z.literal("team_memory_too_many_entries"),
         max_entries: z.number().int().positive(),
         received_entries: z.number().int().positive(),
       }),
@@ -82,7 +82,7 @@ export type TeamMemorySyncFetchResult = {
   checksum?: string // ETag from response header
   error?: string
   skipRetry?: boolean
-  errorType?: 'auth' | 'timeout' | 'network' | 'parse' | 'unknown'
+  errorType?: "auth" | "timeout" | "network" | "parse" | "unknown"
   httpStatus?: number
 }
 
@@ -97,7 +97,7 @@ export type TeamMemoryHashesResult = {
   checksum?: string
   entryChecksums?: Record<string, string>
   error?: string
-  errorType?: 'auth' | 'timeout' | 'network' | 'parse' | 'unknown'
+  errorType?: "auth" | "timeout" | "network" | "parse" | "unknown"
   httpStatus?: number
 }
 
@@ -112,14 +112,7 @@ export type TeamMemorySyncPushResult = {
   error?: string
   /** Files skipped because they contain detected secrets (PSR M22174). */
   skippedSecrets?: SkippedSecretFile[]
-  errorType?:
-    | 'auth'
-    | 'timeout'
-    | 'network'
-    | 'conflict'
-    | 'unknown'
-    | 'no_oauth'
-    | 'no_repo'
+  errorType?: "auth" | "timeout" | "network" | "conflict" | "unknown" | "no_oauth" | "no_repo"
   httpStatus?: number
 }
 
@@ -132,7 +125,7 @@ export type TeamMemorySyncUploadResult = {
   lastModified?: string
   conflict?: boolean // true if 412 Precondition Failed
   error?: string
-  errorType?: 'auth' | 'timeout' | 'network' | 'unknown'
+  errorType?: "auth" | "timeout" | "network" | "unknown"
   httpStatus?: number
   /**
    * Structured error_code from a parsed 413 body (anthropic/anthropic#293258).
@@ -141,7 +134,7 @@ export type TeamMemorySyncUploadResult = {
    * union.  Passed straight through to the tengu_team_mem_sync_push event
    * as a Datadog-filterable facet.
    */
-  serverErrorCode?: 'team_memory_too_many_entries'
+  serverErrorCode?: "team_memory_too_many_entries"
   /**
    * Server-enforced max_entries, populated when serverErrorCode is
    * team_memory_too_many_entries. Lets the caller cache the effective

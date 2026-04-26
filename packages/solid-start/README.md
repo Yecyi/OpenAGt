@@ -65,12 +65,12 @@ Learn more about [routing](https://docs.solidjs.com/solid-start/building-your-ap
 Configure adapters in `app.config.ts` to deploy to platforms like Vercel, Netlify, Cloudflare, and others
 
 ```ts
-import { defineConfig } from "@solidjs/start/config";
+import { defineConfig } from "@solidjs/start/config"
 
 export default defineConfig({
   ssr: true, // false for client-side rendering only
   server: { preset: "netlify" },
-});
+})
 ```
 
 Presets also include runtimes like Node.js, Bun, or Deno. For example, a preset like `node-server` enables hosting on your server.  

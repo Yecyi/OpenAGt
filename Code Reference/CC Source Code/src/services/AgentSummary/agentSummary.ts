@@ -10,25 +10,20 @@
  * key matching but denied via canUseTool callback.
  */
 
-import type { TaskContext } from '../../Task.js'
-import { updateAgentSummary } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
-import { filterIncompleteToolCalls } from '../../tools/AgentTool/runAgent.js'
-import type { AgentId } from '../../types/ids.js'
-import { logForDebugging } from '../../utils/debug.js'
-import {
-  type CacheSafeParams,
-  runForkedAgent,
-} from '../../utils/forkedAgent.js'
-import { logError } from '../../utils/log.js'
-import { createUserMessage } from '../../utils/messages.js'
-import { getAgentTranscript } from '../../utils/sessionStorage.js'
+import type { TaskContext } from "../../Task.js"
+import { updateAgentSummary } from "../../tasks/LocalAgentTask/LocalAgentTask.js"
+import { filterIncompleteToolCalls } from "../../tools/AgentTool/runAgent.js"
+import type { AgentId } from "../../types/ids.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { type CacheSafeParams, runForkedAgent } from "../../utils/forkedAgent.js"
+import { logError } from "../../utils/log.js"
+import { createUserMessage } from "../../utils/messages.js"
+import { getAgentTranscript } from "../../utils/sessionStorage.js"
 
 const SUMMARY_INTERVAL_MS = 30_000
 
 function buildSummaryPrompt(previousSummary: string | null): string {
-  const prevLine = previousSummary
-    ? `\nPrevious: "${previousSummary}" — say something NEW.\n`
-    : ''
+  const prevLine = previousSummary ? `\nPrevious: "${previousSummary}" — say something NEW.\n` : ""
 
   return `Describe your most recent action in 3-5 words using present tense (-ing). Name the file or function, not the branch. Do not use tools.
 ${prevLine}
@@ -47,7 +42,7 @@ export function startAgentSummarization(
   taskId: string,
   agentId: AgentId,
   cacheSafeParams: CacheSafeParams,
-  setAppState: TaskContext['setAppState'],
+  setAppState: TaskContext["setAppState"],
 ): { stop: () => void } {
   // Drop forkContextMessages from the closure — runSummary rebuilds it each
   // tick from getAgentTranscript(). Without this, the original fork messages
@@ -83,18 +78,16 @@ export function startAgentSummarization(
         forkContextMessages: cleanMessages,
       }
 
-      logForDebugging(
-        `[AgentSummary] Forking for summary, ${cleanMessages.length} messages in context`,
-      )
+      logForDebugging(`[AgentSummary] Forking for summary, ${cleanMessages.length} messages in context`)
 
       // Create abort controller for this summary
       summaryAbortController = new AbortController()
 
       // Deny tools via callback, NOT by passing tools:[] - that busts cache
       const canUseTool = async () => ({
-        behavior: 'deny' as const,
-        message: 'No tools needed for summary',
-        decisionReason: { type: 'other' as const, reason: 'summary only' },
+        behavior: "deny" as const,
+        message: "No tools needed for summary",
+        decisionReason: { type: "other" as const, reason: "summary only" },
       })
 
       // DO NOT set maxOutputTokens here. The fork piggybacks on the main
@@ -107,13 +100,11 @@ export function startAgentSummarization(
       // from forkParams.toolUseContext (the subagent's LIVE state captured at
       // onCacheSafeParams time). No explicit override needed.
       const result = await runForkedAgent({
-        promptMessages: [
-          createUserMessage({ content: buildSummaryPrompt(previousSummary) }),
-        ],
+        promptMessages: [createUserMessage({ content: buildSummaryPrompt(previousSummary) })],
         cacheSafeParams: forkParams,
         canUseTool,
-        querySource: 'agent_summary',
-        forkLabel: 'agent_summary',
+        querySource: "agent_summary",
+        forkLabel: "agent_summary",
         overrides: { abortController: summaryAbortController },
         skipTranscript: true,
       })
@@ -122,20 +113,16 @@ export function startAgentSummarization(
 
       // Extract summary text from result
       for (const msg of result.messages) {
-        if (msg.type !== 'assistant') continue
+        if (msg.type !== "assistant") continue
         // Skip API error messages
         if (msg.isApiErrorMessage) {
-          logForDebugging(
-            `[AgentSummary] Skipping API error message for ${taskId}`,
-          )
+          logForDebugging(`[AgentSummary] Skipping API error message for ${taskId}`)
           continue
         }
-        const textBlock = msg.message.content.find(b => b.type === 'text')
-        if (textBlock?.type === 'text' && textBlock.text.trim()) {
+        const textBlock = msg.message.content.find((b) => b.type === "text")
+        if (textBlock?.type === "text" && textBlock.text.trim()) {
           const summaryText = textBlock.text.trim()
-          logForDebugging(
-            `[AgentSummary] Summary result for ${taskId}: ${summaryText}`,
-          )
+          logForDebugging(`[AgentSummary] Summary result for ${taskId}: ${summaryText}`)
           previousSummary = summaryText
           updateAgentSummary(taskId, summaryText, setAppState)
           break

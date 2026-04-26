@@ -2,22 +2,13 @@
  * Package manager detection for Claude CLI
  */
 
-import { readFile } from 'fs/promises'
-import memoize from 'lodash-es/memoize.js'
-import { logForDebugging } from '../debug.js'
-import { execFileNoThrow } from '../execFileNoThrow.js'
-import { getPlatform } from '../platform.js'
+import { readFile } from "fs/promises"
+import memoize from "lodash-es/memoize.js"
+import { logForDebugging } from "../debug.js"
+import { execFileNoThrow } from "../execFileNoThrow.js"
+import { getPlatform } from "../platform.js"
 
-export type PackageManager =
-  | 'homebrew'
-  | 'winget'
-  | 'pacman'
-  | 'deb'
-  | 'rpm'
-  | 'apk'
-  | 'mise'
-  | 'asdf'
-  | 'unknown'
+export type PackageManager = "homebrew" | "winget" | "pacman" | "deb" | "rpm" | "apk" | "mise" | "asdf" | "unknown"
 
 /**
  * Parses /etc/os-release to extract the distro ID and ID_LIKE fields.
@@ -26,30 +17,22 @@ export type PackageManager =
  * Returns null if the file is unreadable (pre-systemd or non-standard systems);
  * callers fall through to the exec in that case as a conservative fallback.
  */
-export const getOsRelease = memoize(
-  async (): Promise<{ id: string; idLike: string[] } | null> => {
-    try {
-      const content = await readFile('/etc/os-release', 'utf8')
-      const idMatch = content.match(/^ID=["']?(\S+?)["']?\s*$/m)
-      const idLikeMatch = content.match(/^ID_LIKE=["']?(.+?)["']?\s*$/m)
-      return {
-        id: idMatch?.[1] ?? '',
-        idLike: idLikeMatch?.[1]?.split(' ') ?? [],
-      }
-    } catch {
-      return null
+export const getOsRelease = memoize(async (): Promise<{ id: string; idLike: string[] } | null> => {
+  try {
+    const content = await readFile("/etc/os-release", "utf8")
+    const idMatch = content.match(/^ID=["']?(\S+?)["']?\s*$/m)
+    const idLikeMatch = content.match(/^ID_LIKE=["']?(.+?)["']?\s*$/m)
+    return {
+      id: idMatch?.[1] ?? "",
+      idLike: idLikeMatch?.[1]?.split(" ") ?? [],
     }
-  },
-)
+  } catch {
+    return null
+  }
+})
 
-function isDistroFamily(
-  osRelease: { id: string; idLike: string[] },
-  families: string[],
-): boolean {
-  return (
-    families.includes(osRelease.id) ||
-    osRelease.idLike.some(like => families.includes(like))
-  )
+function isDistroFamily(osRelease: { id: string; idLike: string[] }, families: string[]): boolean {
+  return families.includes(osRelease.id) || osRelease.idLike.some((like) => families.includes(like))
 }
 
 /**
@@ -60,7 +43,7 @@ function isDistroFamily(
  * mise installs to: ~/.local/share/mise/installs/<tool>/<version>/
  */
 export function detectMise(): boolean {
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
   // Check if the executable is within a mise installs directory
   if (/[/\\]mise[/\\]installs[/\\]/i.test(execPath)) {
@@ -79,7 +62,7 @@ export function detectMise(): boolean {
  * asdf installs to: ~/.asdf/installs/<tool>/<version>/
  */
 export function detectAsdf(): boolean {
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
   // Check if the executable is within an asdf installs directory
   if (/[/\\]\.?asdf[/\\]installs[/\\]/i.test(execPath)) {
@@ -104,16 +87,16 @@ export function detectHomebrew(): boolean {
   const platform = getPlatform()
 
   // Homebrew is only for macOS and Linux
-  if (platform !== 'macos' && platform !== 'linux' && platform !== 'wsl') {
+  if (platform !== "macos" && platform !== "linux" && platform !== "wsl") {
     return false
   }
 
   // Get the path of the currently running executable
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
   // Check if the executable is within a Homebrew Caskroom directory
   // This is specific to Homebrew cask installations
-  if (execPath.includes('/Caskroom/')) {
+  if (execPath.includes("/Caskroom/")) {
     logForDebugging(`Detected Homebrew cask installation: ${execPath}`)
     return true
   }
@@ -134,17 +117,14 @@ export function detectWinget(): boolean {
   const platform = getPlatform()
 
   // Winget is only for Windows
-  if (platform !== 'windows') {
+  if (platform !== "windows") {
     return false
   }
 
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
   // Check for WinGet paths (handles both forward and backslashes)
-  const wingetPatterns = [
-    /Microsoft[/\\]WinGet[/\\]Packages/i,
-    /Microsoft[/\\]WinGet[/\\]Links/i,
-  ]
+  const wingetPatterns = [/Microsoft[/\\]WinGet[/\\]Packages/i, /Microsoft[/\\]WinGet[/\\]Links/i]
 
   for (const pattern of wingetPatterns) {
     if (pattern.test(execPath)) {
@@ -167,18 +147,18 @@ export function detectWinget(): boolean {
 export const detectPacman = memoize(async (): Promise<boolean> => {
   const platform = getPlatform()
 
-  if (platform !== 'linux') {
+  if (platform !== "linux") {
     return false
   }
 
   const osRelease = await getOsRelease()
-  if (osRelease && !isDistroFamily(osRelease, ['arch'])) {
+  if (osRelease && !isDistroFamily(osRelease, ["arch"])) {
     return false
   }
 
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
-  const result = await execFileNoThrow('pacman', ['-Qo', execPath], {
+  const result = await execFileNoThrow("pacman", ["-Qo", execPath], {
     timeout: 5000,
     useCwd: false,
   })
@@ -200,18 +180,18 @@ export const detectPacman = memoize(async (): Promise<boolean> => {
 export const detectDeb = memoize(async (): Promise<boolean> => {
   const platform = getPlatform()
 
-  if (platform !== 'linux') {
+  if (platform !== "linux") {
     return false
   }
 
   const osRelease = await getOsRelease()
-  if (osRelease && !isDistroFamily(osRelease, ['debian'])) {
+  if (osRelease && !isDistroFamily(osRelease, ["debian"])) {
     return false
   }
 
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
-  const result = await execFileNoThrow('dpkg', ['-S', execPath], {
+  const result = await execFileNoThrow("dpkg", ["-S", execPath], {
     timeout: 5000,
     useCwd: false,
   })
@@ -233,18 +213,18 @@ export const detectDeb = memoize(async (): Promise<boolean> => {
 export const detectRpm = memoize(async (): Promise<boolean> => {
   const platform = getPlatform()
 
-  if (platform !== 'linux') {
+  if (platform !== "linux") {
     return false
   }
 
   const osRelease = await getOsRelease()
-  if (osRelease && !isDistroFamily(osRelease, ['fedora', 'rhel', 'suse'])) {
+  if (osRelease && !isDistroFamily(osRelease, ["fedora", "rhel", "suse"])) {
     return false
   }
 
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
-  const result = await execFileNoThrow('rpm', ['-qf', execPath], {
+  const result = await execFileNoThrow("rpm", ["-qf", execPath], {
     timeout: 5000,
     useCwd: false,
   })
@@ -267,25 +247,21 @@ export const detectRpm = memoize(async (): Promise<boolean> => {
 export const detectApk = memoize(async (): Promise<boolean> => {
   const platform = getPlatform()
 
-  if (platform !== 'linux') {
+  if (platform !== "linux") {
     return false
   }
 
   const osRelease = await getOsRelease()
-  if (osRelease && !isDistroFamily(osRelease, ['alpine'])) {
+  if (osRelease && !isDistroFamily(osRelease, ["alpine"])) {
     return false
   }
 
-  const execPath = process.execPath || process.argv[0] || ''
+  const execPath = process.execPath || process.argv[0] || ""
 
-  const result = await execFileNoThrow(
-    'apk',
-    ['info', '--who-owns', execPath],
-    {
-      timeout: 5000,
-      useCwd: false,
-    },
-  )
+  const result = await execFileNoThrow("apk", ["info", "--who-owns", execPath], {
+    timeout: 5000,
+    useCwd: false,
+  })
 
   if (result.code === 0 && result.stdout) {
     logForDebugging(`Detected apk installation: ${result.stdout.trim()}`)
@@ -301,36 +277,36 @@ export const detectApk = memoize(async (): Promise<boolean> => {
  */
 export const getPackageManager = memoize(async (): Promise<PackageManager> => {
   if (detectHomebrew()) {
-    return 'homebrew'
+    return "homebrew"
   }
 
   if (detectWinget()) {
-    return 'winget'
+    return "winget"
   }
 
   if (detectMise()) {
-    return 'mise'
+    return "mise"
   }
 
   if (detectAsdf()) {
-    return 'asdf'
+    return "asdf"
   }
 
   if (await detectPacman()) {
-    return 'pacman'
+    return "pacman"
   }
 
   if (await detectApk()) {
-    return 'apk'
+    return "apk"
   }
 
   if (await detectDeb()) {
-    return 'deb'
+    return "deb"
   }
 
   if (await detectRpm()) {
-    return 'rpm'
+    return "rpm"
   }
 
-  return 'unknown'
+  return "unknown"
 })

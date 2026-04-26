@@ -1,26 +1,26 @@
-import { useCallback, useEffect } from 'react'
-import type { Command } from '../commands.js'
-import { useNotifications } from '../context/notifications.js'
+import { useCallback, useEffect } from "react"
+import type { Command } from "../commands.js"
+import { useNotifications } from "../context/notifications.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import { reinitializeLspServerManager } from '../services/lsp/manager.js'
-import { useAppState, useSetAppState } from '../state/AppState.js'
-import type { AgentDefinition } from '../tools/AgentTool/loadAgentsDir.js'
-import { count } from '../utils/array.js'
-import { logForDebugging } from '../utils/debug.js'
-import { logForDiagnosticsNoPII } from '../utils/diagLogs.js'
-import { toError } from '../utils/errors.js'
-import { logError } from '../utils/log.js'
-import { loadPluginAgents } from '../utils/plugins/loadPluginAgents.js'
-import { getPluginCommands } from '../utils/plugins/loadPluginCommands.js'
-import { loadPluginHooks } from '../utils/plugins/loadPluginHooks.js'
-import { loadPluginLspServers } from '../utils/plugins/lspPluginIntegration.js'
-import { loadPluginMcpServers } from '../utils/plugins/mcpPluginIntegration.js'
-import { detectAndUninstallDelistedPlugins } from '../utils/plugins/pluginBlocklist.js'
-import { getFlaggedPlugins } from '../utils/plugins/pluginFlagging.js'
-import { loadAllPlugins } from '../utils/plugins/pluginLoader.js'
+} from "../services/analytics/index.js"
+import { reinitializeLspServerManager } from "../services/lsp/manager.js"
+import { useAppState, useSetAppState } from "../state/AppState.js"
+import type { AgentDefinition } from "../tools/AgentTool/loadAgentsDir.js"
+import { count } from "../utils/array.js"
+import { logForDebugging } from "../utils/debug.js"
+import { logForDiagnosticsNoPII } from "../utils/diagLogs.js"
+import { toError } from "../utils/errors.js"
+import { logError } from "../utils/log.js"
+import { loadPluginAgents } from "../utils/plugins/loadPluginAgents.js"
+import { getPluginCommands } from "../utils/plugins/loadPluginCommands.js"
+import { loadPluginHooks } from "../utils/plugins/loadPluginHooks.js"
+import { loadPluginLspServers } from "../utils/plugins/lspPluginIntegration.js"
+import { loadPluginMcpServers } from "../utils/plugins/mcpPluginIntegration.js"
+import { detectAndUninstallDelistedPlugins } from "../utils/plugins/pluginBlocklist.js"
+import { getFlaggedPlugins } from "../utils/plugins/pluginFlagging.js"
+import { loadAllPlugins } from "../utils/plugins/pluginLoader.js"
 
 /**
  * Hook to manage plugin state and synchronize with AppState.
@@ -40,7 +40,7 @@ export function useManagePlugins({
   enabled?: boolean
 } = {}) {
   const setAppState = useSetAppState()
-  const needsRefresh = useAppState(s => s.plugins.needsRefresh)
+  const needsRefresh = useAppState((s) => s.plugins.needsRefresh)
   const { addNotification } = useNotifications()
 
   // Initial plugin load. Runs once on mount. NOT used for refresh — all
@@ -60,10 +60,10 @@ export function useManagePlugins({
       const flagged = getFlaggedPlugins()
       if (Object.keys(flagged).length > 0) {
         addNotification({
-          key: 'plugin-delisted-flagged',
-          text: 'Plugins flagged. Check /plugins',
-          color: 'warning',
-          priority: 'high',
+          key: "plugin-delisted-flagged",
+          text: "Plugins flagged. Check /plugins",
+          color: "warning",
+          priority: "high",
         })
       }
 
@@ -75,11 +75,10 @@ export function useManagePlugins({
       try {
         commands = await getPluginCommands()
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         errors.push({
-          type: 'generic-error',
-          source: 'plugin-commands',
+          type: "generic-error",
+          source: "plugin-commands",
           error: `Failed to load plugin commands: ${errorMessage}`,
         })
       }
@@ -87,11 +86,10 @@ export function useManagePlugins({
       try {
         agents = await loadPluginAgents()
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         errors.push({
-          type: 'generic-error',
-          source: 'plugin-agents',
+          type: "generic-error",
+          source: "plugin-agents",
           error: `Failed to load plugin agents: ${errorMessage}`,
         })
       }
@@ -99,11 +97,10 @@ export function useManagePlugins({
       try {
         await loadPluginHooks()
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         errors.push({
-          type: 'generic-error',
-          source: 'plugin-hooks',
+          type: "generic-error",
+          source: "plugin-hooks",
           error: `Failed to load plugin hooks: ${errorMessage}`,
         })
       }
@@ -118,7 +115,7 @@ export function useManagePlugins({
       // Runs BEFORE setAppState so any errors pushed by these loaders make it
       // into AppState.plugins.errors (Doctor UI), not just telemetry.
       const mcpServerCounts = await Promise.all(
-        enabled.map(async p => {
+        enabled.map(async (p) => {
           if (p.mcpServers) return Object.keys(p.mcpServers).length
           const servers = await loadPluginMcpServers(p, errors)
           if (servers) p.mcpServers = servers
@@ -134,7 +131,7 @@ export function useManagePlugins({
       // invalidation happened between main.tsx:3203 and REPL mount (e.g.
       // seed marketplace registration or policySettings hot-reload).
       const lspServerCounts = await Promise.all(
-        enabled.map(async p => {
+        enabled.map(async (p) => {
           if (p.lspServers) return Object.keys(p.lspServers).length
           const servers = await loadPluginLspServers(p, errors)
           if (servers) p.lspServers = servers
@@ -145,24 +142,19 @@ export function useManagePlugins({
       reinitializeLspServerManager()
 
       // Update AppState - merge errors to preserve LSP errors
-      setAppState(prevState => {
+      setAppState((prevState) => {
         // Keep existing LSP/non-plugin-loading errors (source 'lsp-manager' or 'plugin:*')
         const existingLspErrors = prevState.plugins.errors.filter(
-          e => e.source === 'lsp-manager' || e.source.startsWith('plugin:'),
+          (e) => e.source === "lsp-manager" || e.source.startsWith("plugin:"),
         )
         // Deduplicate: remove existing LSP errors that are also in new errors
         const newErrorKeys = new Set(
-          errors.map(e =>
-            e.type === 'generic-error'
-              ? `generic-error:${e.source}:${e.error}`
-              : `${e.type}:${e.source}`,
+          errors.map((e) =>
+            e.type === "generic-error" ? `generic-error:${e.source}:${e.error}` : `${e.type}:${e.source}`,
           ),
         )
-        const filteredExisting = existingLspErrors.filter(e => {
-          const key =
-            e.type === 'generic-error'
-              ? `generic-error:${e.source}:${e.error}`
-              : `${e.type}:${e.source}`
+        const filteredExisting = existingLspErrors.filter((e) => {
+          const key = e.type === "generic-error" ? `generic-error:${e.source}:${e.error}` : `${e.type}:${e.source}`
           return !newErrorKeys.has(key)
         })
         const mergedErrors = [...filteredExisting, ...errors]
@@ -189,8 +181,7 @@ export function useManagePlugins({
         return (
           sum +
           Object.values(p.hooksConfig).reduce(
-            (s, matchers) =>
-              s + (matchers?.reduce((h, m) => h + m.hooks.length, 0) ?? 0),
+            (s, matchers) => s + (matchers?.reduce((h, m) => h + m.hooks.length, 0) ?? 0),
             0,
           )
         )
@@ -199,8 +190,8 @@ export function useManagePlugins({
       return {
         enabled_count: enabled.length,
         disabled_count: disabled.length,
-        inline_count: count(enabled, p => p.source.endsWith('@inline')),
-        marketplace_count: count(enabled, p => !p.source.endsWith('@inline')),
+        inline_count: count(enabled, (p) => p.source.endsWith("@inline")),
+        marketplace_count: count(enabled, (p) => !p.source.endsWith("@inline")),
         error_count: errors.length,
         skill_count: commands.length,
         agent_count: agents.length,
@@ -211,13 +202,11 @@ export function useManagePlugins({
         // Kept separate from base metrics so it doesn't flow into
         // logForDiagnosticsNoPII.
         ant_enabled_names:
-          process.env.USER_TYPE === 'ant' && enabled.length > 0
+          process.env.USER_TYPE === "ant" && enabled.length > 0
             ? (enabled
-                .map(p => p.name)
+                .map((p) => p.name)
                 .sort()
-                .join(
-                  ',',
-                ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
+                .join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
             : undefined,
       }
     } catch (error) {
@@ -226,14 +215,14 @@ export function useManagePlugins({
       logError(errorObj)
       logForDebugging(`Error loading plugins: ${error}`)
       // Set empty state on error, but preserve LSP errors and add the new error
-      setAppState(prevState => {
+      setAppState((prevState) => {
         // Keep existing LSP/non-plugin-loading errors
         const existingLspErrors = prevState.plugins.errors.filter(
-          e => e.source === 'lsp-manager' || e.source.startsWith('plugin:'),
+          (e) => e.source === "lsp-manager" || e.source.startsWith("plugin:"),
         )
         const newError = {
-          type: 'generic-error' as const,
-          source: 'plugin-system',
+          type: "generic-error" as const,
+          source: "plugin-system",
           error: errorObj.message,
         }
         return {
@@ -268,19 +257,19 @@ export function useManagePlugins({
   // Load plugins on mount and emit telemetry
   useEffect(() => {
     if (!enabled) return
-    void initialPluginLoad().then(metrics => {
+    void initialPluginLoad().then((metrics) => {
       const { ant_enabled_names, ...baseMetrics } = metrics
       const allMetrics = {
         ...baseMetrics,
         has_custom_plugin_cache_dir: !!process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR,
       }
-      logEvent('tengu_plugins_loaded', {
+      logEvent("tengu_plugins_loaded", {
         ...allMetrics,
         ...(ant_enabled_names !== undefined && {
           enabled_names: ant_enabled_names,
         }),
       })
-      logForDiagnosticsNoPII('info', 'tengu_plugins_loaded', allMetrics)
+      logForDiagnosticsNoPII("info", "tengu_plugins_loaded", allMetrics)
     })
   }, [initialPluginLoad, enabled])
 
@@ -293,10 +282,10 @@ export function useManagePlugins({
   useEffect(() => {
     if (!enabled || !needsRefresh) return
     addNotification({
-      key: 'plugin-reload-pending',
-      text: 'Plugins changed. Run /reload-plugins to activate.',
-      color: 'suggestion',
-      priority: 'low',
+      key: "plugin-reload-pending",
+      text: "Plugins changed. Run /reload-plugins to activate.",
+      color: "suggestion",
+      priority: "low",
     })
     // Do NOT auto-refresh. Do NOT reset needsRefresh — /reload-plugins
     // consumes it via refreshActivePlugins().

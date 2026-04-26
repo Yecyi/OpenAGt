@@ -285,7 +285,8 @@ export const layer: Layer.Layer<
         sessionID: input.sessionID,
         model,
       })
-      const noToolSystem = "You are in a conversation summarization mode. Do not call any tools. Respond only with the requested summary text."
+      const noToolSystem =
+        "You are in a conversation summarization mode. Do not call any tools. Respond only with the requested summary text."
 
       const result = yield* processor.process({
         user: userMessage,

@@ -36,9 +36,9 @@ export function setCseShimGate(gate: () => boolean): void {
  * the compat gate, so archiveSession/fetchSessionTitle need this re-tag.
  */
 export function toCompatSessionId(id: string): string {
-  if (!id.startsWith('cse_')) return id
+  if (!id.startsWith("cse_")) return id
   if (_isCseShimEnabled && !_isCseShimEnabled()) return id
-  return 'session_' + id.slice('cse_'.length)
+  return "session_" + id.slice("cse_".length)
 }
 
 /**
@@ -52,6 +52,6 @@ export function toCompatSessionId(id: string): string {
  * not found" back. Same UUID, wrong tag. No-op for IDs that aren't `session_*`.
  */
 export function toInfraSessionId(id: string): string {
-  if (!id.startsWith('session_')) return id
-  return 'cse_' + id.slice('session_'.length)
+  if (!id.startsWith("session_")) return id
+  return "cse_" + id.slice("session_".length)
 }

@@ -14,7 +14,7 @@
  * also lacks bidi. We enable bidi reordering when running on Windows or
  * inside Windows Terminal (covers WSL).
  */
-import bidiFactory from 'bidi-js'
+import bidiFactory from "bidi-js"
 
 type ClusteredChar = {
   value: string
@@ -29,9 +29,9 @@ let needsSoftwareBidi: boolean | undefined
 function needsBidi(): boolean {
   if (needsSoftwareBidi === undefined) {
     needsSoftwareBidi =
-      process.platform === 'win32' ||
-      typeof process.env['WT_SESSION'] === 'string' || // WSL in Windows Terminal
-      process.env['TERM_PROGRAM'] === 'vscode' // VS Code integrated terminal (xterm.js)
+      process.platform === "win32" ||
+      typeof process.env["WT_SESSION"] === "string" || // WSL in Windows Terminal
+      process.env["TERM_PROGRAM"] === "vscode" // VS Code integrated terminal (xterm.js)
   }
   return needsSoftwareBidi
 }
@@ -56,7 +56,7 @@ export function reorderBidi(characters: ClusteredChar[]): ClusteredChar[] {
   }
 
   // Build a plain string from the clustered chars to run through bidi
-  const plainText = characters.map(c => c.value).join('')
+  const plainText = characters.map((c) => c.value).join("")
 
   // Check if there are any RTL characters — skip bidi if pure LTR
   if (!hasRTLCharacters(plainText)) {
@@ -64,7 +64,7 @@ export function reorderBidi(characters: ClusteredChar[]): ClusteredChar[] {
   }
 
   const bidi = getBidi()
-  const { levels } = bidi.getEmbeddingLevels(plainText, 'auto')
+  const { levels } = bidi.getEmbeddingLevels(plainText, "auto")
 
   // Map bidi levels back to ClusteredChar indices.
   // Each ClusteredChar may be multiple code units in the joined string.

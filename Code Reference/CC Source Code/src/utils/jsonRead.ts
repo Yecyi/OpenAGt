@@ -9,7 +9,7 @@
  * read. Without this, JSON.parse fails with "Unexpected token".
  */
 
-const UTF8_BOM = '\uFEFF'
+const UTF8_BOM = "\uFEFF"
 
 export function stripBOM(content: string): string {
   return content.startsWith(UTF8_BOM) ? content.slice(1) : content

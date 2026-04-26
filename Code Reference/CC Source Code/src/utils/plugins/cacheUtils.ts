@@ -1,26 +1,23 @@
-import { readdir, rm, stat, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { clearCommandsCache } from '../../commands.js'
-import { clearAllOutputStylesCache } from '../../constants/outputStyles.js'
-import { clearAgentDefinitionsCache } from '../../tools/AgentTool/loadAgentsDir.js'
-import { clearPromptCache } from '../../tools/SkillTool/prompt.js'
-import { resetSentSkillNames } from '../attachments.js'
-import { logForDebugging } from '../debug.js'
-import { getErrnoCode } from '../errors.js'
-import { logError } from '../log.js'
-import { loadInstalledPluginsFromDisk } from './installedPluginsManager.js'
-import { clearPluginAgentCache } from './loadPluginAgents.js'
-import { clearPluginCommandCache } from './loadPluginCommands.js'
-import {
-  clearPluginHookCache,
-  pruneRemovedPluginHooks,
-} from './loadPluginHooks.js'
-import { clearPluginOutputStyleCache } from './loadPluginOutputStyles.js'
-import { clearPluginCache, getPluginCachePath } from './pluginLoader.js'
-import { clearPluginOptionsCache } from './pluginOptionsStorage.js'
-import { isPluginZipCacheEnabled } from './zipCache.js'
+import { readdir, rm, stat, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { clearCommandsCache } from "../../commands.js"
+import { clearAllOutputStylesCache } from "../../constants/outputStyles.js"
+import { clearAgentDefinitionsCache } from "../../tools/AgentTool/loadAgentsDir.js"
+import { clearPromptCache } from "../../tools/SkillTool/prompt.js"
+import { resetSentSkillNames } from "../attachments.js"
+import { logForDebugging } from "../debug.js"
+import { getErrnoCode } from "../errors.js"
+import { logError } from "../log.js"
+import { loadInstalledPluginsFromDisk } from "./installedPluginsManager.js"
+import { clearPluginAgentCache } from "./loadPluginAgents.js"
+import { clearPluginCommandCache } from "./loadPluginCommands.js"
+import { clearPluginHookCache, pruneRemovedPluginHooks } from "./loadPluginHooks.js"
+import { clearPluginOutputStyleCache } from "./loadPluginOutputStyles.js"
+import { clearPluginCache, getPluginCachePath } from "./pluginLoader.js"
+import { clearPluginOptionsCache } from "./pluginOptionsStorage.js"
+import { isPluginZipCacheEnabled } from "./zipCache.js"
 
-const ORPHANED_AT_FILENAME = '.orphaned_at'
+const ORPHANED_AT_FILENAME = ".orphaned_at"
 const CLEANUP_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 export function clearAllPluginCaches(): void {
@@ -35,7 +32,7 @@ export function clearAllPluginCaches(): void {
   // stay valid until the prune completes (preserves gh-29767). No-op when
   // STATE.registeredHooks is empty (test/preload.ts beforeEach clears it via
   // resetStateForTests before reaching here).
-  pruneRemovedPluginHooks().catch(e => logError(e))
+  pruneRemovedPluginHooks().catch((e) => logError(e))
   clearPluginOptionsCache()
   clearPluginOutputStyleCache()
   clearAllOutputStylesCache()
@@ -53,11 +50,9 @@ export function clearAllCaches(): void {
  * Mark a plugin version as orphaned.
  * Called when a plugin is uninstalled or updated to a new version.
  */
-export async function markPluginVersionOrphaned(
-  versionPath: string,
-): Promise<void> {
+export async function markPluginVersionOrphaned(versionPath: string): Promise<void> {
   try {
-    await writeFile(getOrphanedAtPath(versionPath), `${Date.now()}`, 'utf-8')
+    await writeFile(getOrphanedAtPath(versionPath), `${Date.now()}`, "utf-8")
   } catch (error) {
     logForDebugging(`Failed to write .orphaned_at: ${versionPath}: ${error}`)
   }
@@ -88,9 +83,7 @@ export async function cleanupOrphanedPluginVersionsInBackground(): Promise<void>
 
     // Pass 1: Remove .orphaned_at from installed versions
     // This handles cases where a plugin was reinstalled after being orphaned
-    await Promise.all(
-      [...installedVersions].map(p => removeOrphanedAtMarker(p)),
-    )
+    await Promise.all([...installedVersions].map((p) => removeOrphanedAtMarker(p)))
 
     // Pass 2: Process orphaned versions
     for (const marketplace of await readSubdirs(cachePath)) {
@@ -125,7 +118,7 @@ async function removeOrphanedAtMarker(versionPath: string): Promise<void> {
     await unlink(orphanedAtPath)
   } catch (error) {
     const code = getErrnoCode(error)
-    if (code === 'ENOENT') return
+    if (code === "ENOENT") return
     logForDebugging(`Failed to remove .orphaned_at: ${versionPath}: ${error}`)
   }
 }
@@ -146,10 +139,7 @@ function getInstalledVersionPaths(): Set<string> | null {
   }
 }
 
-async function processOrphanedPluginVersion(
-  versionPath: string,
-  now: number,
-): Promise<void> {
+async function processOrphanedPluginVersion(versionPath: string, now: number): Promise<void> {
   const orphanedAtPath = getOrphanedAtPath(versionPath)
 
   let orphanedAt: number
@@ -157,7 +147,7 @@ async function processOrphanedPluginVersion(
     orphanedAt = (await stat(orphanedAtPath)).mtimeMs
   } catch (error) {
     const code = getErrnoCode(error)
-    if (code === 'ENOENT') {
+    if (code === "ENOENT") {
       await markPluginVersionOrphaned(versionPath)
       return
     }
@@ -169,9 +159,7 @@ async function processOrphanedPluginVersion(
     try {
       await rm(versionPath, { recursive: true, force: true })
     } catch (error) {
-      logForDebugging(
-        `Failed to delete orphaned version: ${versionPath}: ${error}`,
-      )
+      logForDebugging(`Failed to delete orphaned version: ${versionPath}: ${error}`)
     }
   }
 }
@@ -189,7 +177,7 @@ async function removeIfEmpty(dirPath: string): Promise<void> {
 async function readSubdirs(dirPath: string): Promise<string[]> {
   try {
     const entries = await readdir(dirPath, { withFileTypes: true })
-    return entries.filter(d => d.isDirectory()).map(d => d.name)
+    return entries.filter((d) => d.isDirectory()).map((d) => d.name)
   } catch {
     return []
   }

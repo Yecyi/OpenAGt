@@ -21,6 +21,8 @@ import type {
   ConfigUpdateResponses,
   CoordinatorApproveResponses,
   CoordinatorCancelResponses,
+  CoordinatorContinueErrors,
+  CoordinatorContinueResponses,
   CoordinatorDispatchResponses,
   CoordinatorGetResponses,
   CoordinatorIntentSettleErrors,
@@ -3894,6 +3896,51 @@ export class Coordinator extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+
+  public continue<ThrowOnError extends boolean = false>(
+    parameters: {
+      runID: string
+      directory?: string
+      workspace?: string
+      budget_delta?: {
+        max_rounds?: number
+        max_model_calls?: number
+        max_tool_calls?: number
+        max_subagents?: number
+        max_wallclock_ms?: number
+        max_estimated_tokens?: number
+      }
+      autoContinue?: "never" | "checkpoint" | "safe"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "runID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "budget_delta" },
+            { in: "body", key: "autoContinue" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<CoordinatorContinueResponses, CoordinatorContinueErrors, ThrowOnError>(
+      {
+        url: "/coordinator/run/{runID}/continue",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   public summarize<ThrowOnError extends boolean = false>(

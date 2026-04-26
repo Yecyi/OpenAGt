@@ -11001,6 +11001,542 @@ export type CoordinatorRetryResponses = {
 
 export type CoordinatorRetryResponse = CoordinatorRetryResponses[keyof CoordinatorRetryResponses]
 
+export type CoordinatorContinueData = {
+  body?: {
+    budget_delta?: {
+      max_rounds?: number
+      max_model_calls?: number
+      max_tool_calls?: number
+      max_subagents?: number
+      max_wallclock_ms?: number
+      max_estimated_tokens?: number
+    }
+    autoContinue?: "never" | "checkpoint" | "safe"
+  }
+  path: {
+    runID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/coordinator/run/{runID}/continue"
+}
+
+export type CoordinatorContinueErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CoordinatorContinueError = CoordinatorContinueErrors[keyof CoordinatorContinueErrors]
+
+export type CoordinatorContinueResponses = {
+  /**
+   * Continued coordinator run with approved budget
+   */
+  200: {
+    id: string
+    sessionID: string
+    goal: string
+    intent: {
+      goal: string
+      task_type:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      success_criteria: Array<string>
+      risk_level: "low" | "medium" | "high"
+      needs_user_clarification: boolean
+      clarification_questions: Array<string>
+      workflow:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      workflow_confidence?: "low" | "medium" | "high"
+      secondary_workflows?: Array<
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      >
+      expected_output: string
+      permission_expectations: Array<string>
+    }
+    mode: "manual" | "assisted" | "autonomous"
+    workflow:
+      | "coding"
+      | "review"
+      | "debugging"
+      | "research"
+      | "writing"
+      | "data-analysis"
+      | "planning"
+      | "personal-admin"
+      | "documentation"
+      | "environment-audit"
+      | "automation"
+      | "file-data-organization"
+      | "general-operations"
+    effort: "low" | "medium" | "high" | "deep"
+    effort_profile: {
+      planning_rounds: number
+      expert_count_min: number
+      expert_count_max: number
+      verifier_count_min: number
+      reducer_enabled: boolean
+      reviewer_enabled: boolean
+      debugger_enabled: boolean
+      revise_policy: "none" | "critical_only" | "all_artifacts"
+      max_revise_nodes: number
+      max_revision_per_artifact: number
+      reasoning_effort?: "low" | "medium" | "high"
+      timeout_multiplier: number
+    }
+    state:
+      | "settling_intent"
+      | "awaiting_approval"
+      | "planned"
+      | "active"
+      | "blocked"
+      | "completed"
+      | "failed"
+      | "cancelled"
+    plan: {
+      goal: string
+      nodes: Array<{
+        id: string
+        description: string
+        prompt: string
+        task_kind: "research" | "implement" | "verify" | "generic"
+        subagent_type: string
+        role?:
+          | "coordinator"
+          | "planner"
+          | "researcher"
+          | "reducer"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "reviser"
+          | "writer"
+          | "analyst"
+          | "style-editor"
+          | "factuality-checker"
+          | "citation-auditor"
+          | "contradiction-checker"
+          | "constraint-checker"
+          | "alternative-planner"
+          | "risk-reviewer"
+          | "inbox-classifier"
+          | "priority-sorter"
+          | "scheduler"
+          | "privacy-reviewer"
+          | "follow-up-planner"
+          | "trigger-designer"
+          | "dry-run-verifier"
+          | "rollback-planner"
+          | "doc-researcher"
+          | "structure-writer"
+          | "environment-auditor"
+          | "blocker-classifier"
+          | "remediation-planner"
+          | "inventory-agent"
+          | "organizer"
+          | "safety-verifier"
+          | "executor"
+          | "memory-curator"
+          | "automation-planner"
+        model?: {
+          providerID: string
+          modelID: string
+          variant?: string
+        }
+        risk?: "low" | "medium" | "high"
+        depends_on: Array<string>
+        write_scope: Array<string>
+        read_scope: Array<string>
+        parallel_group?: string
+        assigned_scope?: Array<string>
+        excluded_scope?: Array<string>
+        merge_status?: "none" | "waiting" | "merged" | "conflict"
+        conflicts?: Array<string>
+        acceptance_checks: Array<string>
+        output_schema?:
+          | "plan"
+          | "research"
+          | "implementation"
+          | "verification"
+          | "review"
+          | "revise"
+          | "debug"
+          | "document"
+          | "analysis"
+          | "outline"
+          | "draft"
+          | "environment-diagnosis"
+          | "automation-plan"
+          | "organization-plan"
+          | "memory"
+          | "research-synthesis"
+          | "summary"
+        requires_user_input?: boolean
+        priority: "high" | "normal" | "low"
+        origin: "user" | "coordinator" | "scheduler" | "gateway"
+        expert_id?: string
+        expert_role?: string
+        workflow?:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        artifact_type?: string
+        artifact_id?: string
+        revision_of?: string
+        quality_gate_id?: string
+        memory_namespace?: string
+        confidence?: "low" | "medium" | "high"
+        revise_policy?: "none" | "critical_only" | "all_artifacts"
+      }>
+      effort?: "low" | "medium" | "high" | "deep"
+      workflow?:
+        | "coding"
+        | "review"
+        | "debugging"
+        | "research"
+        | "writing"
+        | "data-analysis"
+        | "planning"
+        | "personal-admin"
+        | "documentation"
+        | "environment-audit"
+        | "automation"
+        | "file-data-organization"
+        | "general-operations"
+      effort_profile?: {
+        planning_rounds: number
+        expert_count_min: number
+        expert_count_max: number
+        verifier_count_min: number
+        reducer_enabled: boolean
+        reviewer_enabled: boolean
+        debugger_enabled: boolean
+        revise_policy: "none" | "critical_only" | "all_artifacts"
+        max_revise_nodes: number
+        max_revision_per_artifact: number
+        reasoning_effort?: "low" | "medium" | "high"
+        timeout_multiplier: number
+      }
+      parallel_policy?: {
+        mode?: "off" | "safe" | "aggressive"
+        max_parallel_agents?: number
+        max_parallel_tools?: number
+        read_only_parallel_allowed?: boolean
+        write_parallel_requires_disjoint_scope?: boolean
+        merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
+        conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
+      }
+      expert_lanes?: Array<{
+        id: string
+        workflow:
+          | "coding"
+          | "review"
+          | "debugging"
+          | "research"
+          | "writing"
+          | "data-analysis"
+          | "planning"
+          | "personal-admin"
+          | "documentation"
+          | "environment-audit"
+          | "automation"
+          | "file-data-organization"
+          | "general-operations"
+        role:
+          | "coordinator"
+          | "planner"
+          | "researcher"
+          | "reducer"
+          | "implementer"
+          | "verifier"
+          | "reviewer"
+          | "debugger"
+          | "reviser"
+          | "writer"
+          | "analyst"
+          | "style-editor"
+          | "factuality-checker"
+          | "citation-auditor"
+          | "contradiction-checker"
+          | "constraint-checker"
+          | "alternative-planner"
+          | "risk-reviewer"
+          | "inbox-classifier"
+          | "priority-sorter"
+          | "scheduler"
+          | "privacy-reviewer"
+          | "follow-up-planner"
+          | "trigger-designer"
+          | "dry-run-verifier"
+          | "rollback-planner"
+          | "doc-researcher"
+          | "structure-writer"
+          | "environment-auditor"
+          | "blocker-classifier"
+          | "remediation-planner"
+          | "inventory-agent"
+          | "organizer"
+          | "safety-verifier"
+          | "executor"
+          | "memory-curator"
+          | "automation-planner"
+        expert_id: string
+        node_ids: Array<string>
+        memory_namespace: string
+      }>
+      quality_gates?: Array<{
+        id: string
+        kind:
+          | "plan_revise"
+          | "input_revise"
+          | "output_revise"
+          | "handoff_revise"
+          | "reducer_revise"
+          | "verifier_revise"
+          | "debugger_revise"
+          | "final_revise"
+        node_id?: string
+        artifact_id?: string
+        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        required?: boolean
+        confidence?: "low" | "medium" | "high"
+        issues?: Array<string>
+      }>
+      revise_points?: Array<{
+        id: string
+        kind:
+          | "plan_revise"
+          | "input_revise"
+          | "output_revise"
+          | "handoff_revise"
+          | "reducer_revise"
+          | "verifier_revise"
+          | "debugger_revise"
+          | "final_revise"
+        target_node_id?: string
+        artifact_id?: string
+        required?: boolean
+        node_id?: string
+        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      }>
+      memory_context?: {
+        scopes?: Array<"profile" | "workspace" | "session">
+        workflow_tags?: Array<string>
+        expert_tags?: Array<string>
+        note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
+      }
+      budget_limited?: boolean
+      specialization_fallback?: boolean
+    }
+    task_ids: Array<string>
+    summary?: string
+    time: {
+      created: number
+      updated: number
+      finished?: number
+    }
+  }
+}
+
+export type CoordinatorContinueResponse = CoordinatorContinueResponses[keyof CoordinatorContinueResponses]
+
 export type CoordinatorSummarizeData = {
   body?: never
   path: {

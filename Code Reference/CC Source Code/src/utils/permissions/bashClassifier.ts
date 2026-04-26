@@ -1,19 +1,17 @@
 // Stub for external builds - classifier permissions feature is ANT-ONLY
 
-export const PROMPT_PREFIX = 'prompt:'
+export const PROMPT_PREFIX = "prompt:"
 
 export type ClassifierResult = {
   matches: boolean
   matchedDescription?: string
-  confidence: 'high' | 'medium' | 'low'
+  confidence: "high" | "medium" | "low"
   reason: string
 }
 
-export type ClassifierBehavior = 'deny' | 'ask' | 'allow'
+export type ClassifierBehavior = "deny" | "ask" | "allow"
 
-export function extractPromptDescription(
-  _ruleContent: string | undefined,
-): string | null {
+export function extractPromptDescription(_ruleContent: string | undefined): string | null {
   return null
 }
 
@@ -47,8 +45,8 @@ export async function classifyBashCommand(
 ): Promise<ClassifierResult> {
   return {
     matches: false,
-    confidence: 'high',
-    reason: 'This feature is disabled',
+    confidence: "high",
+    reason: "This feature is disabled",
   }
 }
 

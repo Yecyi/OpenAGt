@@ -1,9 +1,6 @@
-import {
-  DANGEROUS_SHELL_SETTINGS,
-  SAFE_ENV_VARS,
-} from '../../utils/managedEnvConstants.js'
-import type { SettingsJson } from '../../utils/settings/types.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
+import { DANGEROUS_SHELL_SETTINGS, SAFE_ENV_VARS } from "../../utils/managedEnvConstants.js"
+import type { SettingsJson } from "../../utils/settings/types.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
 
 type DangerousShellSetting = (typeof DANGEROUS_SHELL_SETTINGS)[number]
 
@@ -21,9 +18,7 @@ export type DangerousSettings = {
  * any env var NOT in SAFE_ENV_VARS is considered dangerous.
  * See managedEnv.ts for the authoritative list and threat categories.
  */
-export function extractDangerousSettings(
-  settings: SettingsJson | null | undefined,
-): DangerousSettings {
+export function extractDangerousSettings(settings: SettingsJson | null | undefined): DangerousSettings {
   if (!settings) {
     return {
       shellSettings: {},
@@ -36,16 +31,16 @@ export function extractDangerousSettings(
   const shellSettings: Partial<Record<DangerousShellSetting, string>> = {}
   for (const key of DANGEROUS_SHELL_SETTINGS) {
     const value = settings[key]
-    if (typeof value === 'string' && value.length > 0) {
+    if (typeof value === "string" && value.length > 0) {
       shellSettings[key] = value
     }
   }
 
   // Extract dangerous env vars - any var NOT in SAFE_ENV_VARS is dangerous
   const envVars: Record<string, string> = {}
-  if (settings.env && typeof settings.env === 'object') {
+  if (settings.env && typeof settings.env === "object") {
     for (const [key, value] of Object.entries(settings.env)) {
-      if (typeof value === 'string' && value.length > 0) {
+      if (typeof value === "string" && value.length > 0) {
         // Check if this env var is NOT in the safe list
         if (!SAFE_ENV_VARS.has(key.toUpperCase())) {
           envVars[key] = value
@@ -58,7 +53,7 @@ export function extractDangerousSettings(
   const hasHooks =
     settings.hooks !== undefined &&
     settings.hooks !== null &&
-    typeof settings.hooks === 'object' &&
+    typeof settings.hooks === "object" &&
     Object.keys(settings.hooks).length > 0
 
   return {
@@ -74,9 +69,7 @@ export function extractDangerousSettings(
  */
 export function hasDangerousSettings(dangerous: DangerousSettings): boolean {
   return (
-    Object.keys(dangerous.shellSettings).length > 0 ||
-    Object.keys(dangerous.envVars).length > 0 ||
-    dangerous.hasHooks
+    Object.keys(dangerous.shellSettings).length > 0 || Object.keys(dangerous.envVars).length > 0 || dangerous.hasHooks
   )
 }
 
@@ -120,9 +113,7 @@ export function hasDangerousSettingsChanged(
  * Format dangerous settings as a human-readable list for the UI
  * Only returns setting names, not values
  */
-export function formatDangerousSettingsList(
-  dangerous: DangerousSettings,
-): string[] {
+export function formatDangerousSettingsList(dangerous: DangerousSettings): string[] {
   const items: string[] = []
 
   // Shell settings (names only)
@@ -137,7 +128,7 @@ export function formatDangerousSettingsList(
 
   // Hooks
   if (dangerous.hasHooks) {
-    items.push('hooks')
+    items.push("hooks")
   }
 
   return items

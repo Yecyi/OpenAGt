@@ -73,13 +73,13 @@ Bias toward action — read files, make changes, commit without asking.
 
 ### Associated Tools
 
-| Tool | Feature Flag | Purpose |
-|------|-------------|---------|
-| SleepTool | KAIROS / PROACTIVE | Control pacing between autonomous actions |
-| SendUserFileTool | KAIROS | Proactively send files to users |
-| PushNotificationTool | KAIROS / KAIROS_PUSH_NOTIFICATION | Push notifications to user devices |
-| SubscribePRTool | KAIROS_GITHUB_WEBHOOKS | Subscribe to GitHub PR webhook events |
-| BriefTool | KAIROS_BRIEF | Proactive status updates |
+| Tool                 | Feature Flag                      | Purpose                                   |
+| -------------------- | --------------------------------- | ----------------------------------------- |
+| SleepTool            | KAIROS / PROACTIVE                | Control pacing between autonomous actions |
+| SendUserFileTool     | KAIROS                            | Proactively send files to users           |
+| PushNotificationTool | KAIROS / KAIROS_PUSH_NOTIFICATION | Push notifications to user devices        |
+| SubscribePRTool      | KAIROS_GITHUB_WEBHOOKS            | Subscribe to GitHub PR webhook events     |
+| BriefTool            | KAIROS_BRIEF                      | Proactive status updates                  |
 
 ### Behavior
 
@@ -108,19 +108,19 @@ Push-to-talk voice input is fully implemented but gated behind `VOICE_MODE` feat
 
 Tools found in source but not yet enabled for external users:
 
-| Tool | Feature Flag | Description |
-|------|-------------|-------------|
-| **WebBrowserTool** | `WEB_BROWSER_TOOL` | Built-in browser automation (codename: bagel) |
-| **TerminalCaptureTool** | `TERMINAL_PANEL` | Terminal panel capture and monitoring |
-| **WorkflowTool** | `WORKFLOW_SCRIPTS` | Execute predefined workflow scripts |
-| **MonitorTool** | `MONITOR_TOOL` | System/process monitoring |
-| **SnipTool** | `HISTORY_SNIP` | Conversation history snipping/truncation |
-| **ListPeersTool** | `UDS_INBOX` | Unix domain socket peer discovery |
-| **RemoteTriggerTool** | `AGENT_TRIGGERS_REMOTE` | Remote agent triggering |
-| **TungstenTool** | ant-only | Internal performance monitoring panel |
-| **VerifyPlanExecutionTool** | VERIFY_PLAN env | Plan execution verification |
-| **OverflowTestTool** | `OVERFLOW_TEST_TOOL` | Context overflow testing |
-| **SubscribePRTool** | `KAIROS_GITHUB_WEBHOOKS` | GitHub PR webhook subscriptions |
+| Tool                        | Feature Flag             | Description                                   |
+| --------------------------- | ------------------------ | --------------------------------------------- |
+| **WebBrowserTool**          | `WEB_BROWSER_TOOL`       | Built-in browser automation (codename: bagel) |
+| **TerminalCaptureTool**     | `TERMINAL_PANEL`         | Terminal panel capture and monitoring         |
+| **WorkflowTool**            | `WORKFLOW_SCRIPTS`       | Execute predefined workflow scripts           |
+| **MonitorTool**             | `MONITOR_TOOL`           | System/process monitoring                     |
+| **SnipTool**                | `HISTORY_SNIP`           | Conversation history snipping/truncation      |
+| **ListPeersTool**           | `UDS_INBOX`              | Unix domain socket peer discovery             |
+| **RemoteTriggerTool**       | `AGENT_TRIGGERS_REMOTE`  | Remote agent triggering                       |
+| **TungstenTool**            | ant-only                 | Internal performance monitoring panel         |
+| **VerifyPlanExecutionTool** | VERIFY_PLAN env          | Plan execution verification                   |
+| **OverflowTestTool**        | `OVERFLOW_TEST_TOOL`     | Context overflow testing                      |
+| **SubscribePRTool**         | `KAIROS_GITHUB_WEBHOOKS` | GitHub PR webhook subscriptions               |
 
 ## 5. Coordinator Mode
 

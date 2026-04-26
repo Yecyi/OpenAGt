@@ -8,16 +8,16 @@
  * Usage: Call initializeAnalyticsSink() during app startup to attach the sink.
  */
 
-import { trackDatadogEvent } from './datadog.js'
-import { logEventTo1P, shouldSampleEvent } from './firstPartyEventLogger.js'
-import { checkStatsigFeatureGate_CACHED_MAY_BE_STALE } from './growthbook.js'
-import { attachAnalyticsSink, stripProtoFields } from './index.js'
-import { isSinkKilled } from './sinkKillswitch.js'
+import { trackDatadogEvent } from "./datadog.js"
+import { logEventTo1P, shouldSampleEvent } from "./firstPartyEventLogger.js"
+import { checkStatsigFeatureGate_CACHED_MAY_BE_STALE } from "./growthbook.js"
+import { attachAnalyticsSink, stripProtoFields } from "./index.js"
+import { isSinkKilled } from "./sinkKillswitch.js"
 
 // Local type matching the logEvent metadata signature
 type LogEventMetadata = { [key: string]: boolean | number | undefined }
 
-const DATADOG_GATE_NAME = 'tengu_log_datadog_events'
+const DATADOG_GATE_NAME = "tengu_log_datadog_events"
 
 // Module-level gate state - starts undefined, initialized during startup
 let isDatadogGateEnabled: boolean | undefined = undefined
@@ -27,7 +27,7 @@ let isDatadogGateEnabled: boolean | undefined = undefined
  * Falls back to cached value from previous session if not yet initialized.
  */
 function shouldTrackDatadog(): boolean {
-  if (isSinkKilled('datadog')) {
+  if (isSinkKilled("datadog")) {
     return false
   }
   if (isDatadogGateEnabled !== undefined) {
@@ -55,10 +55,7 @@ function logEventImpl(eventName: string, metadata: LogEventMetadata): void {
   }
 
   // If sample result is a positive number, add it to metadata
-  const metadataWithSampleRate =
-    sampleResult !== null
-      ? { ...metadata, sample_rate: sampleResult }
-      : metadata
+  const metadataWithSampleRate = sampleResult !== null ? { ...metadata, sample_rate: sampleResult } : metadata
 
   if (shouldTrackDatadog()) {
     // Datadog is a general-access backend — strip _PROTO_* keys
@@ -77,10 +74,7 @@ function logEventImpl(eventName: string, metadata: LogEventMetadata): void {
  * With Segment removed the two remaining sinks are fire-and-forget, so this
  * just wraps the sync impl — kept to preserve the sink interface contract.
  */
-function logEventAsyncImpl(
-  eventName: string,
-  metadata: LogEventMetadata,
-): Promise<void> {
+function logEventAsyncImpl(eventName: string, metadata: LogEventMetadata): Promise<void> {
   logEventImpl(eventName, metadata)
   return Promise.resolve()
 }
@@ -94,8 +88,7 @@ function logEventAsyncImpl(
  * Called from main.tsx during setupBackend().
  */
 export function initializeAnalyticsGates(): void {
-  isDatadogGateEnabled =
-    checkStatsigFeatureGate_CACHED_MAY_BE_STALE(DATADOG_GATE_NAME)
+  isDatadogGateEnabled = checkStatsigFeatureGate_CACHED_MAY_BE_STALE(DATADOG_GATE_NAME)
 }
 
 /**

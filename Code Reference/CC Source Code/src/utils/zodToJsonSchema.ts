@@ -2,7 +2,7 @@
  * Converts Zod v4 schemas to JSON Schema using native toJSONSchema.
  */
 
-import { toJSONSchema, type ZodTypeAny } from 'zod/v4'
+import { toJSONSchema, type ZodTypeAny } from "zod/v4"
 
 export type JsonSchema7Type = Record<string, unknown>
 

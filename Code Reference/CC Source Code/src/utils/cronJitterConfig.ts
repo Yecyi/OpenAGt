@@ -8,13 +8,10 @@
 //   REPL (useScheduledTasks.ts): pass `getJitterConfig: getCronJitterConfig`
 //   Daemon/SDK: omit getJitterConfig → DEFAULT_CRON_JITTER_CONFIG applies.
 
-import { z } from 'zod/v4'
-import { getFeatureValue_CACHED_WITH_REFRESH } from '../services/analytics/growthbook.js'
-import {
-  type CronJitterConfig,
-  DEFAULT_CRON_JITTER_CONFIG,
-} from './cronTasks.js'
-import { lazySchema } from './lazySchema.js'
+import { z } from "zod/v4"
+import { getFeatureValue_CACHED_WITH_REFRESH } from "../services/analytics/growthbook.js"
+import { type CronJitterConfig, DEFAULT_CRON_JITTER_CONFIG } from "./cronTasks.js"
+import { lazySchema } from "./lazySchema.js"
 
 // How often to re-fetch tengu_kairos_cron_config from GrowthBook. Short because
 // this is an incident lever — when we push a config change to shed :00 load,
@@ -49,7 +46,7 @@ const cronJitterConfigSchema = lazySchema(() =>
         .max(THIRTY_DAYS_MS)
         .default(DEFAULT_CRON_JITTER_CONFIG.recurringMaxAgeMs),
     })
-    .refine(c => c.oneShotFloorMs <= c.oneShotMaxMs),
+    .refine((c) => c.oneShotFloorMs <= c.oneShotMaxMs),
 )
 
 /**
@@ -66,7 +63,7 @@ const cronJitterConfigSchema = lazySchema(() =>
  */
 export function getCronJitterConfig(): CronJitterConfig {
   const raw = getFeatureValue_CACHED_WITH_REFRESH<unknown>(
-    'tengu_kairos_cron_config',
+    "tengu_kairos_cron_config",
     DEFAULT_CRON_JITTER_CONFIG,
     JITTER_CONFIG_REFRESH_MS,
   )

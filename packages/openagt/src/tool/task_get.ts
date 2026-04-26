@@ -26,7 +26,10 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
     return {
       description: "Get structured status and summary for a previously created task.",
       parameters,
-      execute: (params: z.infer<typeof parameters>, ctx): Effect.Effect<Tool.ExecuteResult<TaskGetMetadata>, never, never> =>
+      execute: (
+        params: z.infer<typeof parameters>,
+        ctx,
+      ): Effect.Effect<Tool.ExecuteResult<TaskGetMetadata>, never, never> =>
         Effect.gen(function* () {
           const record = yield* tasks.get({ taskID: SessionID.make(params.task_id), parentSessionID: ctx.sessionID })
           if (Option.isNone(record)) {
@@ -41,7 +44,8 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
 
           return {
             title: "Task Status",
-            output: `${record.value.task_id} ${record.value.status}\n${record.value.result_summary ?? record.value.error_summary ?? ""}`.trim(),
+            output:
+              `${record.value.task_id} ${record.value.status}\n${record.value.result_summary ?? record.value.error_summary ?? ""}`.trim(),
             metadata: {
               found: true as const,
               task: Tool.toMetadata(record.value),

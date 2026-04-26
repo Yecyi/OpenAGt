@@ -82,19 +82,23 @@ export const EventRoutes = () =>
         let done = false
 
         q.push(
-          JSON.stringify(eventEnvelope({
-            type: "server.connected",
-            properties: {},
-          })),
+          JSON.stringify(
+            eventEnvelope({
+              type: "server.connected",
+              properties: {},
+            }),
+          ),
         )
 
         // Send heartbeat every 10s to prevent stalled proxy streams.
         const heartbeat = setInterval(() => {
           q.push(
-            JSON.stringify(eventEnvelope({
-              type: "server.heartbeat",
-              properties: {},
-            })),
+            JSON.stringify(
+              eventEnvelope({
+                type: "server.heartbeat",
+                properties: {},
+              }),
+            ),
           )
         }, 10_000)
 

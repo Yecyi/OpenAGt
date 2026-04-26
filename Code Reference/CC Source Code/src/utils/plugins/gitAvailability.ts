@@ -5,8 +5,8 @@
  * provides a memoized check to determine if git is available on the system.
  */
 
-import memoize from 'lodash-es/memoize.js'
-import { which } from '../which.js'
+import memoize from "lodash-es/memoize.js"
+import { which } from "../which.js"
 
 /**
  * Check if a command is available in PATH.
@@ -40,7 +40,7 @@ async function isCommandAvailable(command: string): Promise<boolean> {
  * @returns True if git is installed and executable
  */
 export const checkGitAvailable = memoize(async (): Promise<boolean> => {
-  return isCommandAvailable('git')
+  return isCommandAvailable("git")
 })
 
 /**

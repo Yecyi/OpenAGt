@@ -1,4 +1,4 @@
-import { sleep } from '../../utils/sleep.js'
+import { sleep } from "../../utils/sleep.js"
 
 /**
  * Coalescing uploader for PUT /worker (session state + metadata).
@@ -86,10 +86,7 @@ export class WorkerStateUploader {
   }
 
   private retryDelay(failures: number): number {
-    const exponential = Math.min(
-      this.config.baseDelayMs * 2 ** (failures - 1),
-      this.config.maxDelayMs,
-    )
+    const exponential = Math.min(this.config.baseDelayMs * 2 ** (failures - 1), this.config.maxDelayMs)
     const jitter = Math.random() * this.config.jitterMs
     return exponential + jitter
   }
@@ -103,18 +100,15 @@ export class WorkerStateUploader {
  * one level deep — overlay keys are added/overwritten, null values
  * preserved for server-side delete.
  */
-function coalescePatches(
-  base: Record<string, unknown>,
-  overlay: Record<string, unknown>,
-): Record<string, unknown> {
+function coalescePatches(base: Record<string, unknown>, overlay: Record<string, unknown>): Record<string, unknown> {
   const merged = { ...base }
 
   for (const [key, value] of Object.entries(overlay)) {
     if (
-      (key === 'external_metadata' || key === 'internal_metadata') &&
+      (key === "external_metadata" || key === "internal_metadata") &&
       merged[key] &&
-      typeof merged[key] === 'object' &&
-      typeof value === 'object' &&
+      typeof merged[key] === "object" &&
+      typeof value === "object" &&
       value !== null
     ) {
       // RFC 7396 merge — overlay keys win, nulls preserved for server

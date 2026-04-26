@@ -1,4 +1,4 @@
-import { createAbortController } from './abortController.js'
+import { createAbortController } from "./abortController.js"
 
 /**
  * Creates a combined AbortSignal that aborts when the input signal aborts,
@@ -34,13 +34,13 @@ export function createCombinedAbortSignal(
     timer = setTimeout(abortCombined, timeoutMs)
     timer.unref?.()
   }
-  signal?.addEventListener('abort', abortCombined)
-  signalB?.addEventListener('abort', abortCombined)
+  signal?.addEventListener("abort", abortCombined)
+  signalB?.addEventListener("abort", abortCombined)
 
   const cleanup = () => {
     if (timer !== undefined) clearTimeout(timer)
-    signal?.removeEventListener('abort', abortCombined)
-    signalB?.removeEventListener('abort', abortCombined)
+    signal?.removeEventListener("abort", abortCombined)
+    signalB?.removeEventListener("abort", abortCombined)
   }
 
   return { signal: combined.signal, cleanup }

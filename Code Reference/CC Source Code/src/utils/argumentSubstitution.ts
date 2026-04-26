@@ -10,7 +10,7 @@
  * Arguments are parsed using shell-quote for proper shell argument handling.
  */
 
-import { tryParseShellCommand } from './bash/shellQuote.js'
+import { tryParseShellCommand } from "./bash/shellQuote.js"
 
 /**
  * Parse an arguments string into an array of individual arguments.
@@ -27,16 +27,14 @@ export function parseArguments(args: string): string[] {
   }
 
   // Return $KEY to preserve variable syntax literally (don't expand variables)
-  const result = tryParseShellCommand(args, key => `$${key}`)
+  const result = tryParseShellCommand(args, (key) => `$${key}`)
   if (!result.success) {
     // Fall back to simple whitespace split if parsing fails
     return args.split(/\s+/).filter(Boolean)
   }
 
   // Filter to only string tokens (ignore shell operators, etc.)
-  return result.tokens.filter(
-    (token): token is string => typeof token === 'string',
-  )
+  return result.tokens.filter((token): token is string => typeof token === "string")
 }
 
 /**
@@ -47,21 +45,18 @@ export function parseArguments(args: string): string[] {
  * - "foo bar baz" => ["foo", "bar", "baz"]
  * - ["foo", "bar", "baz"] => ["foo", "bar", "baz"]
  */
-export function parseArgumentNames(
-  argumentNames: string | string[] | undefined,
-): string[] {
+export function parseArgumentNames(argumentNames: string | string[] | undefined): string[] {
   if (!argumentNames) {
     return []
   }
 
   // Filter out empty strings and numeric-only names (which conflict with $0, $1 shorthand)
-  const isValidName = (name: string): boolean =>
-    typeof name === 'string' && name.trim() !== '' && !/^\d+$/.test(name)
+  const isValidName = (name: string): boolean => typeof name === "string" && name.trim() !== "" && !/^\d+$/.test(name)
 
   if (Array.isArray(argumentNames)) {
     return argumentNames.filter(isValidName)
   }
-  if (typeof argumentNames === 'string') {
+  if (typeof argumentNames === "string") {
     return argumentNames.split(/\s+/).filter(isValidName)
   }
   return []
@@ -73,13 +68,10 @@ export function parseArgumentNames(
  * @param typedArgs - Arguments the user has typed so far
  * @returns Hint string like "[arg2] [arg3]" or undefined if all filled
  */
-export function generateProgressiveArgumentHint(
-  argNames: string[],
-  typedArgs: string[],
-): string | undefined {
+export function generateProgressiveArgumentHint(argNames: string[], typedArgs: string[]): string | undefined {
   const remaining = argNames.slice(typedArgs.length)
   if (remaining.length === 0) return undefined
-  return remaining.map(name => `[${name}]`).join(' ')
+  return remaining.map((name) => `[${name}]`).join(" ")
 }
 
 /**
@@ -114,26 +106,23 @@ export function substituteArguments(
 
     // Match $name but not $name[...] or $nameXxx (word chars)
     // Also ensure we match word boundaries to avoid partial matches
-    content = content.replace(
-      new RegExp(`\\$${name}(?![\\[\\w])`, 'g'),
-      parsedArgs[i] ?? '',
-    )
+    content = content.replace(new RegExp(`\\$${name}(?![\\[\\w])`, "g"), parsedArgs[i] ?? "")
   }
 
   // Replace indexed arguments ($ARGUMENTS[0], $ARGUMENTS[1], etc.)
   content = content.replace(/\$ARGUMENTS\[(\d+)\]/g, (_, indexStr: string) => {
     const index = parseInt(indexStr, 10)
-    return parsedArgs[index] ?? ''
+    return parsedArgs[index] ?? ""
   })
 
   // Replace shorthand indexed arguments ($0, $1, etc.)
   content = content.replace(/\$(\d+)(?!\w)/g, (_, indexStr: string) => {
     const index = parseInt(indexStr, 10)
-    return parsedArgs[index] ?? ''
+    return parsedArgs[index] ?? ""
   })
 
   // Replace $ARGUMENTS with the full arguments string
-  content = content.replaceAll('$ARGUMENTS', args)
+  content = content.replaceAll("$ARGUMENTS", args)
 
   // If no placeholders were found and appendIfNoPlaceholder is true, append
   // But only if args is non-empty (empty string means command invoked with no args)

@@ -21,23 +21,23 @@
  * function in this file reduces to a trivial return.
  */
 
-import { getRepoClassCached } from './commitAttribution.js'
-import { getGlobalConfig } from './config.js'
-import { isEnvTruthy } from './envUtils.js'
+import { getRepoClassCached } from "./commitAttribution.js"
+import { getGlobalConfig } from "./config.js"
+import { isEnvTruthy } from "./envUtils.js"
 
 export function isUndercover(): boolean {
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     if (isEnvTruthy(process.env.CLAUDE_CODE_UNDERCOVER)) return true
     // Auto: active unless we've positively confirmed we're in an allowlisted
     // internal repo. 'external', 'none', and null (check not yet run) all
     // resolve to ON. The check is primed in setup.ts; only 'internal' → OFF.
-    return getRepoClassCached() !== 'internal'
+    return getRepoClassCached() !== "internal"
   }
   return false
 }
 
 export function getUndercoverInstructions(): string {
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     return `## UNDERCOVER MODE — CRITICAL
 
 You are operating UNDERCOVER in a PUBLIC/OPEN-SOURCE repository. Your commit
@@ -68,7 +68,7 @@ BAD (never write these):
 - "Co-Authored-By: Claude Opus 4.6 <…>"
 `
   }
-  return ''
+  return ""
 }
 
 /**
@@ -78,7 +78,7 @@ BAD (never write these):
  * flag on mount.
  */
 export function shouldShowUndercoverAutoNotice(): boolean {
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     // If forced via env, user already knows; don't nag.
     if (isEnvTruthy(process.env.CLAUDE_CODE_UNDERCOVER)) return false
     if (!isUndercover()) return false

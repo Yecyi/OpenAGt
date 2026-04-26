@@ -4,9 +4,9 @@
  * Uses the termio tokenizer for escape sequence boundary detection,
  * then interprets sequences as keypresses.
  */
-import { Buffer } from 'buffer'
-import { PASTE_END, PASTE_START } from './termio/csi.js'
-import { createTokenizer, type Tokenizer } from './termio/tokenize.js'
+import { Buffer } from "buffer"
+import { PASTE_END, PASTE_START } from "./termio/csi.js"
+import { createTokenizer, type Tokenizer } from "./termio/tokenize.js"
 
 // eslint-disable-next-line no-control-regex
 const META_KEY_CODE_RE = /^(?:\x1b)([a-zA-Z0-9])$/
@@ -66,8 +66,8 @@ const SGR_MOUSE_RE = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/
 
 function createPasteKey(content: string): ParsedKey {
   return {
-    kind: 'key',
-    name: '',
+    kind: "key",
+    name: "",
     fn: false,
     ctrl: false,
     meta: false,
@@ -95,20 +95,20 @@ export const DECRPM_STATUS = {
  */
 export type TerminalResponse =
   /** DECRPM: answer to DECRQM (request DEC private mode status) */
-  | { type: 'decrpm'; mode: number; status: number }
+  | { type: "decrpm"; mode: number; status: number }
   /** DA1: primary device attributes (used as a universal sentinel) */
-  | { type: 'da1'; params: number[] }
+  | { type: "da1"; params: number[] }
   /** DA2: secondary device attributes (terminal version info) */
-  | { type: 'da2'; params: number[] }
+  | { type: "da2"; params: number[] }
   /** Kitty keyboard protocol: current flags (answer to CSI ? u) */
-  | { type: 'kittyKeyboard'; flags: number }
+  | { type: "kittyKeyboard"; flags: number }
   /** DSR: cursor position report (answer to CSI 6 n) */
-  | { type: 'cursorPosition'; row: number; col: number }
+  | { type: "cursorPosition"; row: number; col: number }
   /** OSC response: generic operating-system-command reply (e.g. OSC 11 bg color) */
-  | { type: 'osc'; code: number; data: string }
+  | { type: "osc"; code: number; data: string }
   /** XTVERSION: terminal name/version string (answer to CSI > 0 q).
    *  Example values: "xterm.js(5.5.0)", "ghostty 1.2.0", "iTerm2 3.6". */
-  | { type: 'xtversion'; name: string }
+  | { type: "xtversion"; name: string }
 
 /**
  * Try to recognize a sequence token as a terminal response.
@@ -121,32 +121,32 @@ export type TerminalResponse =
  */
 function parseTerminalResponse(s: string): TerminalResponse | null {
   // CSI-prefixed responses
-  if (s.startsWith('\x1b[')) {
+  if (s.startsWith("\x1b[")) {
     let m: RegExpExecArray | null
 
     if ((m = DECRPM_RE.exec(s))) {
       return {
-        type: 'decrpm',
+        type: "decrpm",
         mode: parseInt(m[1]!, 10),
         status: parseInt(m[2]!, 10),
       }
     }
 
     if ((m = DA1_RE.exec(s))) {
-      return { type: 'da1', params: splitNumericParams(m[1]!) }
+      return { type: "da1", params: splitNumericParams(m[1]!) }
     }
 
     if ((m = DA2_RE.exec(s))) {
-      return { type: 'da2', params: splitNumericParams(m[1]!) }
+      return { type: "da2", params: splitNumericParams(m[1]!) }
     }
 
     if ((m = KITTY_FLAGS_RE.exec(s))) {
-      return { type: 'kittyKeyboard', flags: parseInt(m[1]!, 10) }
+      return { type: "kittyKeyboard", flags: parseInt(m[1]!, 10) }
     }
 
     if ((m = CURSOR_POSITION_RE.exec(s))) {
       return {
-        type: 'cursorPosition',
+        type: "cursorPosition",
         row: parseInt(m[1]!, 10),
         col: parseInt(m[2]!, 10),
       }
@@ -156,18 +156,18 @@ function parseTerminalResponse(s: string): TerminalResponse | null {
   }
 
   // OSC responses (e.g. OSC 11 ; rgb:... for bg color query)
-  if (s.startsWith('\x1b]')) {
+  if (s.startsWith("\x1b]")) {
     const m = OSC_RESPONSE_RE.exec(s)
     if (m) {
-      return { type: 'osc', code: parseInt(m[1]!, 10), data: m[2]! }
+      return { type: "osc", code: parseInt(m[1]!, 10), data: m[2]! }
     }
   }
 
   // DCS responses (e.g. XTVERSION: DCS > | name ST)
-  if (s.startsWith('\x1bP')) {
+  if (s.startsWith("\x1bP")) {
     const m = XTVERSION_RE.exec(s)
     if (m) {
-      return { type: 'xtversion', name: m[1]! }
+      return { type: "xtversion", name: m[1]! }
     }
   }
 
@@ -176,11 +176,11 @@ function parseTerminalResponse(s: string): TerminalResponse | null {
 
 function splitNumericParams(params: string): number[] {
   if (!params) return []
-  return params.split(';').map(p => parseInt(p, 10))
+  return params.split(";").map((p) => parseInt(p, 10))
 }
 
 export type KeyParseState = {
-  mode: 'NORMAL' | 'IN_PASTE'
+  mode: "NORMAL" | "IN_PASTE"
   incomplete: string
   pasteBuffer: string
   // Internal tokenizer instance
@@ -188,23 +188,23 @@ export type KeyParseState = {
 }
 
 export const INITIAL_STATE: KeyParseState = {
-  mode: 'NORMAL',
-  incomplete: '',
-  pasteBuffer: '',
+  mode: "NORMAL",
+  incomplete: "",
+  pasteBuffer: "",
 }
 
 function inputToString(input: Buffer | string): string {
   if (Buffer.isBuffer(input)) {
     if (input[0]! > 127 && input[1] === undefined) {
       ;(input[0] as unknown as number) -= 128
-      return '\x1b' + String(input)
+      return "\x1b" + String(input)
     } else {
       return String(input)
     }
-  } else if (input !== undefined && typeof input !== 'string') {
+  } else if (input !== undefined && typeof input !== "string") {
     return String(input)
   } else if (!input) {
-    return ''
+    return ""
   } else {
     return input
   }
@@ -212,10 +212,10 @@ function inputToString(input: Buffer | string): string {
 
 export function parseMultipleKeypresses(
   prevState: KeyParseState,
-  input: Buffer | string | null = '',
+  input: Buffer | string | null = "",
 ): [ParsedInput[], KeyParseState] {
   const isFlush = input === null
-  const inputString = isFlush ? '' : inputToString(input)
+  const inputString = isFlush ? "" : inputToString(input)
 
   // Get or create tokenizer
   const tokenizer = prevState._tokenizer ?? createTokenizer({ x10Mouse: true })
@@ -225,28 +225,28 @@ export function parseMultipleKeypresses(
 
   // Convert tokens to parsed keys, handling paste mode
   const keys: ParsedInput[] = []
-  let inPaste = prevState.mode === 'IN_PASTE'
+  let inPaste = prevState.mode === "IN_PASTE"
   let pasteBuffer = prevState.pasteBuffer
 
   for (const token of tokens) {
-    if (token.type === 'sequence') {
+    if (token.type === "sequence") {
       if (token.value === PASTE_START) {
         inPaste = true
-        pasteBuffer = ''
+        pasteBuffer = ""
       } else if (token.value === PASTE_END) {
         // Always emit a paste key, even for empty pastes. This allows
         // downstream handlers to detect empty pastes (e.g., for clipboard
         // image handling on macOS). The paste content may be empty string.
         keys.push(createPasteKey(pasteBuffer))
         inPaste = false
-        pasteBuffer = ''
+        pasteBuffer = ""
       } else if (inPaste) {
         // Sequences inside paste are treated as literal text
         pasteBuffer += token.value
       } else {
         const response = parseTerminalResponse(token.value)
         if (response) {
-          keys.push({ kind: 'response', sequence: token.value, response })
+          keys.push({ kind: "response", sequence: token.value, response })
         } else {
           const mouse = parseMouseEvent(token.value)
           if (mouse) {
@@ -256,13 +256,10 @@ export function parseMultipleKeypresses(
           }
         }
       }
-    } else if (token.type === 'text') {
+    } else if (token.type === "text") {
       if (inPaste) {
         pasteBuffer += token.value
-      } else if (
-        /^\[<\d+;\d+;\d+[Mm]$/.test(token.value) ||
-        /^\[M[\x60-\x7f][\x20-\uffff]{2}$/.test(token.value)
-      ) {
+      } else if (/^\[<\d+;\d+;\d+[Mm]$/.test(token.value) || /^\[M[\x60-\x7f][\x20-\uffff]{2}$/.test(token.value)) {
         // Orphaned SGR/X10 mouse tail (fullscreen only — mouse tracking is off
         // otherwise). A heavy render blocked the event loop past App's 50ms
         // flush timer, so the buffered ESC was flushed as a lone Escape and
@@ -274,7 +271,7 @@ export function parseMultipleKeypresses(
         // range would match typed input like `[MAX]` batched into one read
         // and silently drop it as a phantom click. Click/drag orphans leak
         // as visible garbage instead; deletable garbage beats silent loss.
-        const resynthesized = '\x1b' + token.value
+        const resynthesized = "\x1b" + token.value
         const mouse = parseMouseEvent(resynthesized)
         keys.push(mouse ?? parseKeypress(resynthesized))
       } else {
@@ -287,12 +284,12 @@ export function parseMultipleKeypresses(
   if (isFlush && inPaste && pasteBuffer) {
     keys.push(createPasteKey(pasteBuffer))
     inPaste = false
-    pasteBuffer = ''
+    pasteBuffer = ""
   }
 
   // Build new state
   const newState: KeyParseState = {
-    mode: inPaste ? 'IN_PASTE' : 'NORMAL',
+    mode: inPaste ? "IN_PASTE" : "NORMAL",
     incomplete: tokenizer.buffer(),
     pasteBuffer,
     _tokenizer: tokenizer,
@@ -303,154 +300,129 @@ export function parseMultipleKeypresses(
 
 const keyName: Record<string, string> = {
   /* xterm/gnome ESC O letter */
-  OP: 'f1',
-  OQ: 'f2',
-  OR: 'f3',
-  OS: 'f4',
+  OP: "f1",
+  OQ: "f2",
+  OR: "f3",
+  OS: "f4",
   /* Application keypad mode (numpad digits 0-9) */
-  Op: '0',
-  Oq: '1',
-  Or: '2',
-  Os: '3',
-  Ot: '4',
-  Ou: '5',
-  Ov: '6',
-  Ow: '7',
-  Ox: '8',
-  Oy: '9',
+  Op: "0",
+  Oq: "1",
+  Or: "2",
+  Os: "3",
+  Ot: "4",
+  Ou: "5",
+  Ov: "6",
+  Ow: "7",
+  Ox: "8",
+  Oy: "9",
   /* Application keypad mode (numpad operators) */
-  Oj: '*',
-  Ok: '+',
-  Ol: ',',
-  Om: '-',
-  On: '.',
-  Oo: '/',
-  OM: 'return',
+  Oj: "*",
+  Ok: "+",
+  Ol: ",",
+  Om: "-",
+  On: ".",
+  Oo: "/",
+  OM: "return",
   /* xterm/rxvt ESC [ number ~ */
-  '[11~': 'f1',
-  '[12~': 'f2',
-  '[13~': 'f3',
-  '[14~': 'f4',
+  "[11~": "f1",
+  "[12~": "f2",
+  "[13~": "f3",
+  "[14~": "f4",
   /* from Cygwin and used in libuv */
-  '[[A': 'f1',
-  '[[B': 'f2',
-  '[[C': 'f3',
-  '[[D': 'f4',
-  '[[E': 'f5',
+  "[[A": "f1",
+  "[[B": "f2",
+  "[[C": "f3",
+  "[[D": "f4",
+  "[[E": "f5",
   /* common */
-  '[15~': 'f5',
-  '[17~': 'f6',
-  '[18~': 'f7',
-  '[19~': 'f8',
-  '[20~': 'f9',
-  '[21~': 'f10',
-  '[23~': 'f11',
-  '[24~': 'f12',
+  "[15~": "f5",
+  "[17~": "f6",
+  "[18~": "f7",
+  "[19~": "f8",
+  "[20~": "f9",
+  "[21~": "f10",
+  "[23~": "f11",
+  "[24~": "f12",
   /* xterm ESC [ letter */
-  '[A': 'up',
-  '[B': 'down',
-  '[C': 'right',
-  '[D': 'left',
-  '[E': 'clear',
-  '[F': 'end',
-  '[H': 'home',
+  "[A": "up",
+  "[B": "down",
+  "[C": "right",
+  "[D": "left",
+  "[E": "clear",
+  "[F": "end",
+  "[H": "home",
   /* xterm/gnome ESC O letter */
-  OA: 'up',
-  OB: 'down',
-  OC: 'right',
-  OD: 'left',
-  OE: 'clear',
-  OF: 'end',
-  OH: 'home',
+  OA: "up",
+  OB: "down",
+  OC: "right",
+  OD: "left",
+  OE: "clear",
+  OF: "end",
+  OH: "home",
   /* xterm/rxvt ESC [ number ~ */
-  '[1~': 'home',
-  '[2~': 'insert',
-  '[3~': 'delete',
-  '[4~': 'end',
-  '[5~': 'pageup',
-  '[6~': 'pagedown',
+  "[1~": "home",
+  "[2~": "insert",
+  "[3~": "delete",
+  "[4~": "end",
+  "[5~": "pageup",
+  "[6~": "pagedown",
   /* putty */
-  '[[5~': 'pageup',
-  '[[6~': 'pagedown',
+  "[[5~": "pageup",
+  "[[6~": "pagedown",
   /* rxvt */
-  '[7~': 'home',
-  '[8~': 'end',
+  "[7~": "home",
+  "[8~": "end",
   /* rxvt keys with modifiers */
-  '[a': 'up',
-  '[b': 'down',
-  '[c': 'right',
-  '[d': 'left',
-  '[e': 'clear',
+  "[a": "up",
+  "[b": "down",
+  "[c": "right",
+  "[d": "left",
+  "[e": "clear",
 
-  '[2$': 'insert',
-  '[3$': 'delete',
-  '[5$': 'pageup',
-  '[6$': 'pagedown',
-  '[7$': 'home',
-  '[8$': 'end',
+  "[2$": "insert",
+  "[3$": "delete",
+  "[5$": "pageup",
+  "[6$": "pagedown",
+  "[7$": "home",
+  "[8$": "end",
 
-  Oa: 'up',
-  Ob: 'down',
-  Oc: 'right',
-  Od: 'left',
-  Oe: 'clear',
+  Oa: "up",
+  Ob: "down",
+  Oc: "right",
+  Od: "left",
+  Oe: "clear",
 
-  '[2^': 'insert',
-  '[3^': 'delete',
-  '[5^': 'pageup',
-  '[6^': 'pagedown',
-  '[7^': 'home',
-  '[8^': 'end',
+  "[2^": "insert",
+  "[3^": "delete",
+  "[5^": "pageup",
+  "[6^": "pagedown",
+  "[7^": "home",
+  "[8^": "end",
   /* misc. */
-  '[Z': 'tab',
+  "[Z": "tab",
 }
 
 export const nonAlphanumericKeys = [
   // Filter out single-character values (digits, operators from numpad) since
   // those are printable characters that should produce input
-  ...Object.values(keyName).filter(v => v.length > 1),
+  ...Object.values(keyName).filter((v) => v.length > 1),
   // escape and backspace are assigned directly in parseKeypress (not via the
   // keyName map), so the spread above misses them. Without these, ctrl+escape
   // via Kitty/modifyOtherKeys leaks the literal word "escape" as input text
   // (input-event.ts:58 assigns keypress.name when ctrl is set).
-  'escape',
-  'backspace',
-  'wheelup',
-  'wheeldown',
-  'mouse',
+  "escape",
+  "backspace",
+  "wheelup",
+  "wheeldown",
+  "mouse",
 ]
 
 const isShiftKey = (code: string): boolean => {
-  return [
-    '[a',
-    '[b',
-    '[c',
-    '[d',
-    '[e',
-    '[2$',
-    '[3$',
-    '[5$',
-    '[6$',
-    '[7$',
-    '[8$',
-    '[Z',
-  ].includes(code)
+  return ["[a", "[b", "[c", "[d", "[e", "[2$", "[3$", "[5$", "[6$", "[7$", "[8$", "[Z"].includes(code)
 }
 
 const isCtrlKey = (code: string): boolean => {
-  return [
-    'Oa',
-    'Ob',
-    'Oc',
-    'Od',
-    'Oe',
-    '[2^',
-    '[3^',
-    '[5^',
-    '[6^',
-    '[7^',
-    '[8^',
-  ].includes(code)
+  return ["Oa", "Ob", "Oc", "Od", "Oe", "[2^", "[3^", "[5^", "[6^", "[7^", "[8^"].includes(code)
 }
 
 /**
@@ -487,50 +459,50 @@ function decodeModifier(modifier: number): {
 function keycodeToName(keycode: number): string | undefined {
   switch (keycode) {
     case 9:
-      return 'tab'
+      return "tab"
     case 13:
-      return 'return'
+      return "return"
     case 27:
-      return 'escape'
+      return "escape"
     case 32:
-      return 'space'
+      return "space"
     case 127:
-      return 'backspace'
+      return "backspace"
     // Kitty keyboard protocol numpad keys (KP_0 through KP_9)
     case 57399:
-      return '0'
+      return "0"
     case 57400:
-      return '1'
+      return "1"
     case 57401:
-      return '2'
+      return "2"
     case 57402:
-      return '3'
+      return "3"
     case 57403:
-      return '4'
+      return "4"
     case 57404:
-      return '5'
+      return "5"
     case 57405:
-      return '6'
+      return "6"
     case 57406:
-      return '7'
+      return "7"
     case 57407:
-      return '8'
+      return "8"
     case 57408:
-      return '9'
+      return "9"
     case 57409: // KP_DECIMAL
-      return '.'
+      return "."
     case 57410: // KP_DIVIDE
-      return '/'
+      return "/"
     case 57411: // KP_MULTIPLY
-      return '*'
+      return "*"
     case 57412: // KP_SUBTRACT
-      return '-'
+      return "-"
     case 57413: // KP_ADD
-      return '+'
+      return "+"
     case 57414: // KP_ENTER
-      return 'return'
+      return "return"
     case 57415: // KP_EQUAL
-      return '='
+      return "="
     default:
       // Printable ASCII characters
       if (keycode >= 32 && keycode <= 126) {
@@ -541,7 +513,7 @@ function keycodeToName(keycode: number): string | undefined {
 }
 
 export type ParsedKey = {
-  kind: 'key'
+  kind: "key"
   fn: boolean
   name: string | undefined
   ctrl: boolean
@@ -559,7 +531,7 @@ export type ParsedKey = {
  *  out of the input stream. Not user input — consumers should dispatch
  *  to a response handler. */
 export type ParsedResponse = {
-  kind: 'response'
+  kind: "response"
   /** Raw escape sequence bytes, for debugging/logging */
   sequence: string
   response: TerminalResponse
@@ -569,12 +541,12 @@ export type ParsedResponse = {
  *  releases (wheel events remain ParsedKey). col/row are 1-indexed
  *  from the terminal sequence (CSI < btn;col;row M/m). */
 export type ParsedMouse = {
-  kind: 'mouse'
+  kind: "mouse"
   /** Raw SGR button code. Low 2 bits = button (0=left,1=mid,2=right),
    *  bit 5 (0x20) = drag/motion, bit 6 (0x40) = wheel. */
   button: number
   /** 'press' for M terminator, 'release' for m terminator */
-  action: 'press' | 'release'
+  action: "press" | "release"
   /** 1-indexed column (from terminal) */
   col: number
   /** 1-indexed row (from terminal) */
@@ -599,21 +571,21 @@ function parseMouseEvent(s: string): ParsedMouse | null {
   // so the keybinding system can route them to scroll handlers.
   if ((button & 0x40) !== 0) return null
   return {
-    kind: 'mouse',
+    kind: "mouse",
     button,
-    action: match[4] === 'M' ? 'press' : 'release',
+    action: match[4] === "M" ? "press" : "release",
     col: parseInt(match[2]!, 10),
     row: parseInt(match[3]!, 10),
     sequence: s,
   }
 }
 
-function parseKeypress(s: string = ''): ParsedKey {
+function parseKeypress(s: string = ""): ParsedKey {
   let parts
 
   const key: ParsedKey = {
-    kind: 'key',
-    name: '',
+    kind: "key",
+    name: "",
     fn: false,
     ctrl: false,
     meta: false,
@@ -637,7 +609,7 @@ function parseKeypress(s: string = ''): ParsedKey {
     const mods = decodeModifier(modifier)
     const name = keycodeToName(codepoint)
     return {
-      kind: 'key',
+      kind: "key",
       name,
       fn: false,
       ctrl: mods.ctrl,
@@ -658,7 +630,7 @@ function parseKeypress(s: string = ''): ParsedKey {
     const mods = decodeModifier(parseInt(match[1]!, 10))
     const name = keycodeToName(parseInt(match[2]!, 10))
     return {
-      kind: 'key',
+      kind: "key",
       name,
       fn: false,
       ctrl: mods.ctrl,
@@ -680,10 +652,10 @@ function parseKeypress(s: string = ''): ParsedKey {
   // should still be recognized as wheelup/wheeldown.
   if ((match = SGR_MOUSE_RE.exec(s))) {
     const button = parseInt(match[1]!, 10)
-    if ((button & 0x43) === 0x40) return createNavKey(s, 'wheelup', false)
-    if ((button & 0x43) === 0x41) return createNavKey(s, 'wheeldown', false)
+    if ((button & 0x43) === 0x40) return createNavKey(s, "wheelup", false)
+    if ((button & 0x43) === 0x41) return createNavKey(s, "wheeldown", false)
     // Shouldn't reach here (parseMouseEvent catches non-wheel) but be safe
-    return createNavKey(s, 'mouse', false)
+    return createNavKey(s, "mouse", false)
   }
 
   // X10 mouse: CSI M + 3 raw bytes (Cb+32, Cx+32, Cy+32). Terminals that
@@ -691,43 +663,43 @@ function parseKeypress(s: string = ''): ParsedKey {
   // Button bits match SGR: 0x40 = wheel, low bit = direction. Non-wheel
   // X10 events (clicks/drags) are swallowed here — we only enable mouse
   // tracking in alt-screen and only need wheel for ScrollBox.
-  if (s.length === 6 && s.startsWith('\x1b[M')) {
+  if (s.length === 6 && s.startsWith("\x1b[M")) {
     const button = s.charCodeAt(3) - 32
-    if ((button & 0x43) === 0x40) return createNavKey(s, 'wheelup', false)
-    if ((button & 0x43) === 0x41) return createNavKey(s, 'wheeldown', false)
-    return createNavKey(s, 'mouse', false)
+    if ((button & 0x43) === 0x40) return createNavKey(s, "wheelup", false)
+    if ((button & 0x43) === 0x41) return createNavKey(s, "wheeldown", false)
+    return createNavKey(s, "mouse", false)
   }
 
-  if (s === '\r') {
+  if (s === "\r") {
     key.raw = undefined
-    key.name = 'return'
-  } else if (s === '\n') {
-    key.name = 'enter'
-  } else if (s === '\t') {
-    key.name = 'tab'
-  } else if (s === '\b' || s === '\x1b\b') {
-    key.name = 'backspace'
-    key.meta = s.charAt(0) === '\x1b'
-  } else if (s === '\x7f' || s === '\x1b\x7f') {
-    key.name = 'backspace'
-    key.meta = s.charAt(0) === '\x1b'
-  } else if (s === '\x1b' || s === '\x1b\x1b') {
-    key.name = 'escape'
+    key.name = "return"
+  } else if (s === "\n") {
+    key.name = "enter"
+  } else if (s === "\t") {
+    key.name = "tab"
+  } else if (s === "\b" || s === "\x1b\b") {
+    key.name = "backspace"
+    key.meta = s.charAt(0) === "\x1b"
+  } else if (s === "\x7f" || s === "\x1b\x7f") {
+    key.name = "backspace"
+    key.meta = s.charAt(0) === "\x1b"
+  } else if (s === "\x1b" || s === "\x1b\x1b") {
+    key.name = "escape"
     key.meta = s.length === 2
-  } else if (s === ' ' || s === '\x1b ') {
-    key.name = 'space'
+  } else if (s === " " || s === "\x1b ") {
+    key.name = "space"
     key.meta = s.length === 2
-  } else if (s === '\x1f') {
-    key.name = '_'
+  } else if (s === "\x1f") {
+    key.name = "_"
     key.ctrl = true
-  } else if (s <= '\x1a' && s.length === 1) {
-    key.name = String.fromCharCode(s.charCodeAt(0) + 'a'.charCodeAt(0) - 1)
+  } else if (s <= "\x1a" && s.length === 1) {
+    key.name = String.fromCharCode(s.charCodeAt(0) + "a".charCodeAt(0) - 1)
     key.ctrl = true
-  } else if (s.length === 1 && s >= '0' && s <= '9') {
-    key.name = 'number'
-  } else if (s.length === 1 && s >= 'a' && s <= 'z') {
+  } else if (s.length === 1 && s >= "0" && s <= "9") {
+    key.name = "number"
+  } else if (s.length === 1 && s >= "a" && s <= "z") {
     key.name = s
-  } else if (s.length === 1 && s >= 'A' && s <= 'Z') {
+  } else if (s.length === 1 && s >= "A" && s <= "Z") {
     key.name = s.toLowerCase()
     key.shift = true
   } else if ((parts = META_KEY_CODE_RE.exec(s))) {
@@ -736,13 +708,11 @@ function parseKeypress(s: string = ''): ParsedKey {
   } else if ((parts = FN_KEY_RE.exec(s))) {
     const segs = [...s]
 
-    if (segs[0] === '\u001b' && segs[1] === '\u001b') {
+    if (segs[0] === "\u001b" && segs[1] === "\u001b") {
       key.option = true
     }
 
-    const code = [parts[1], parts[2], parts[4], parts[6]]
-      .filter(Boolean)
-      .join('')
+    const code = [parts[1], parts[2], parts[4], parts[6]].filter(Boolean).join("")
 
     const modifier = ((parts[3] || parts[5] || 1) as number) - 1
 
@@ -758,27 +728,27 @@ function parseKeypress(s: string = ''): ParsedKey {
   }
 
   // iTerm in natural text editing mode
-  if (key.raw === '\x1Bb') {
+  if (key.raw === "\x1Bb") {
     key.meta = true
-    key.name = 'left'
-  } else if (key.raw === '\x1Bf') {
+    key.name = "left"
+  } else if (key.raw === "\x1Bf") {
     key.meta = true
-    key.name = 'right'
+    key.name = "right"
   }
 
   switch (s) {
-    case '\u001b[1~':
-      return createNavKey(s, 'home', false)
-    case '\u001b[4~':
-      return createNavKey(s, 'end', false)
-    case '\u001b[5~':
-      return createNavKey(s, 'pageup', false)
-    case '\u001b[6~':
-      return createNavKey(s, 'pagedown', false)
-    case '\u001b[1;5D':
-      return createNavKey(s, 'left', true)
-    case '\u001b[1;5C':
-      return createNavKey(s, 'right', true)
+    case "\u001b[1~":
+      return createNavKey(s, "home", false)
+    case "\u001b[4~":
+      return createNavKey(s, "end", false)
+    case "\u001b[5~":
+      return createNavKey(s, "pageup", false)
+    case "\u001b[6~":
+      return createNavKey(s, "pagedown", false)
+    case "\u001b[1;5D":
+      return createNavKey(s, "left", true)
+    case "\u001b[1;5C":
+      return createNavKey(s, "right", true)
   }
 
   return key
@@ -786,7 +756,7 @@ function parseKeypress(s: string = ''): ParsedKey {
 
 function createNavKey(s: string, name: string, ctrl: boolean): ParsedKey {
   return {
-    kind: 'key',
+    kind: "key",
     name,
     ctrl,
     meta: false,

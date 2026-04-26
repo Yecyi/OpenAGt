@@ -1,4 +1,4 @@
-import { logForDebugging } from './debug.js'
+import { logForDebugging } from "./debug.js"
 
 /** AWS short-term credentials format. */
 export type AwsCredentials = {
@@ -18,28 +18,28 @@ type AwsError = {
 }
 
 export function isAwsCredentialsProviderError(err: unknown) {
-  return (err as AwsError | undefined)?.name === 'CredentialsProviderError'
+  return (err as AwsError | undefined)?.name === "CredentialsProviderError"
 }
 
 /** Typeguard to validate AWS STS assume-role output */
 export function isValidAwsStsOutput(obj: unknown): obj is AwsStsOutput {
-  if (!obj || typeof obj !== 'object') {
+  if (!obj || typeof obj !== "object") {
     return false
   }
 
   const output = obj as Record<string, unknown>
 
   // Check if Credentials exists and has required fields
-  if (!output.Credentials || typeof output.Credentials !== 'object') {
+  if (!output.Credentials || typeof output.Credentials !== "object") {
     return false
   }
 
   const credentials = output.Credentials as Record<string, unknown>
 
   return (
-    typeof credentials.AccessKeyId === 'string' &&
-    typeof credentials.SecretAccessKey === 'string' &&
-    typeof credentials.SessionToken === 'string' &&
+    typeof credentials.AccessKeyId === "string" &&
+    typeof credentials.SecretAccessKey === "string" &&
+    typeof credentials.SessionToken === "string" &&
     credentials.AccessKeyId.length > 0 &&
     credentials.SecretAccessKey.length > 0 &&
     credentials.SessionToken.length > 0
@@ -48,9 +48,7 @@ export function isValidAwsStsOutput(obj: unknown): obj is AwsStsOutput {
 
 /** Throws if STS caller identity cannot be retrieved. */
 export async function checkStsCallerIdentity(): Promise<void> {
-  const { STSClient, GetCallerIdentityCommand } = await import(
-    '@aws-sdk/client-sts'
-  )
+  const { STSClient, GetCallerIdentityCommand } = await import("@aws-sdk/client-sts")
   await new STSClient().send(new GetCallerIdentityCommand({}))
 }
 
@@ -60,15 +58,13 @@ export async function checkStsCallerIdentity(): Promise<void> {
  */
 export async function clearAwsIniCache(): Promise<void> {
   try {
-    logForDebugging('Clearing AWS credential provider cache')
-    const { fromIni } = await import('@aws-sdk/credential-providers')
+    logForDebugging("Clearing AWS credential provider cache")
+    const { fromIni } = await import("@aws-sdk/credential-providers")
     const iniProvider = fromIni({ ignoreCache: true })
     await iniProvider() // This updates the global file cache
-    logForDebugging('AWS credential provider cache refreshed')
+    logForDebugging("AWS credential provider cache refreshed")
   } catch (_error) {
     // Ignore errors - we're just clearing the cache
-    logForDebugging(
-      'Failed to clear AWS credential cache (this is expected if no credentials are configured)',
-    )
+    logForDebugging("Failed to clear AWS credential cache (this is expected if no credentials are configured)")
   }
 }

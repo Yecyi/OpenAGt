@@ -1,25 +1,21 @@
-import { z } from 'zod/v4'
-import type { ValidationResult } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import {
-  getCronFilePath,
-  listAllCronTasks,
-  removeCronTasks,
-} from '../../utils/cronTasks.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { getTeammateContext } from '../../utils/teammateContext.js'
+import { z } from "zod/v4"
+import type { ValidationResult } from "../../Tool.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { getCronFilePath, listAllCronTasks, removeCronTasks } from "../../utils/cronTasks.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getTeammateContext } from "../../utils/teammateContext.js"
 import {
   buildCronDeletePrompt,
   CRON_DELETE_DESCRIPTION,
   CRON_DELETE_TOOL_NAME,
   isDurableCronEnabled,
   isKairosCronEnabled,
-} from './prompt.js'
-import { renderDeleteResultMessage, renderDeleteToolUseMessage } from './UI.js'
+} from "./prompt.js"
+import { renderDeleteResultMessage, renderDeleteToolUseMessage } from "./UI.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    id: z.string().describe('Job ID returned by CronCreate.'),
+    id: z.string().describe("Job ID returned by CronCreate."),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -34,7 +30,7 @@ export type DeleteOutput = z.infer<OutputSchema>
 
 export const CronDeleteTool = buildTool({
   name: CRON_DELETE_TOOL_NAME,
-  searchHint: 'cancel a scheduled cron job',
+  searchHint: "cancel a scheduled cron job",
   maxResultSizeChars: 100_000,
   shouldDefer: true,
   get inputSchema(): InputSchema {
@@ -60,7 +56,7 @@ export const CronDeleteTool = buildTool({
   },
   async validateInput(input): Promise<ValidationResult> {
     const tasks = await listAllCronTasks()
-    const task = tasks.find(t => t.id === input.id)
+    const task = tasks.find((t) => t.id === input.id)
     if (!task) {
       return {
         result: false,
@@ -86,7 +82,7 @@ export const CronDeleteTool = buildTool({
   mapToolResultToToolResultBlockParam(output, toolUseID) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content: `Cancelled job ${output.id}.`,
     }
   },

@@ -12,21 +12,18 @@
  * isImage}, so local-terminal and same-machine-desktop render unaffected.
  */
 
-import { feature } from 'bun:bundle'
-import axios from 'axios'
-import { randomUUID } from 'crypto'
-import { readFile } from 'fs/promises'
-import { basename, extname } from 'path'
-import { z } from 'zod/v4'
+import { feature } from "bun:bundle"
+import axios from "axios"
+import { randomUUID } from "crypto"
+import { readFile } from "fs/promises"
+import { basename, extname } from "path"
+import { z } from "zod/v4"
 
-import {
-  getBridgeAccessToken,
-  getBridgeBaseUrlOverride,
-} from '../../bridge/bridgeConfig.js'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
+import { getBridgeAccessToken, getBridgeBaseUrlOverride } from "../../bridge/bridgeConfig.js"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
 
 // Matches the private_api backend limit
 const MAX_UPLOAD_BYTES = 30 * 1024 * 1024
@@ -41,16 +38,16 @@ const UPLOAD_TIMEOUT_MS = 30_000
 // viewers use /preview for images and /contents for everything else,
 // so images go image/* and the rest go octet-stream.
 const MIME_BY_EXT: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
 }
 
 function guessMimeType(filename: string): string {
   const ext = extname(filename).toLowerCase()
-  return MIME_BY_EXT[ext] ?? 'application/octet-stream'
+  return MIME_BY_EXT[ext] ?? "application/octet-stream"
 }
 
 function debug(msg: string): void {
@@ -67,18 +64,12 @@ function debug(msg: string): void {
  * skip → web viewer sees inert cards with no file_uuid.
  */
 function getBridgeBaseUrl(): string {
-  return (
-    getBridgeBaseUrlOverride() ??
-    process.env.ANTHROPIC_BASE_URL ??
-    getOauthConfig().BASE_API_URL
-  )
+  return getBridgeBaseUrlOverride() ?? process.env.ANTHROPIC_BASE_URL ?? getOauthConfig().BASE_API_URL
 }
 
 // /api/oauth/file_upload returns one of ChatMessage{Image,Blob,Document}FileSchema.
 // All share file_uuid; that's the only field we need.
-const uploadResponseSchema = lazySchema(() =>
-  z.object({ file_uuid: z.string() }),
-)
+const uploadResponseSchema = lazySchema(() => z.object({ file_uuid: z.string() }))
 
 export type BriefUploadContext = {
   replBridgeEnabled: boolean
@@ -96,7 +87,7 @@ export async function uploadBriefAttachment(
 ): Promise<string | undefined> {
   // Positive pattern so bun:bundle eliminates the entire body from
   // non-BRIDGE_MODE builds (negative `if (!feature(...)) return` does not).
-  if (feature('BRIDGE_MODE')) {
+  if (feature("BRIDGE_MODE")) {
     if (!ctx.replBridgeEnabled) return undefined
 
     if (size > MAX_UPLOAD_BYTES) {
@@ -106,7 +97,7 @@ export async function uploadBriefAttachment(
 
     const token = getBridgeAccessToken()
     if (!token) {
-      debug('skip: no oauth token')
+      debug("skip: no oauth token")
       return undefined
     }
 
@@ -140,8 +131,8 @@ export async function uploadBriefAttachment(
       const response = await axios.post(url, body, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': body.length.toString(),
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": body.length.toString(),
         },
         timeout: UPLOAD_TIMEOUT_MS,
         signal: ctx.signal,
@@ -157,9 +148,7 @@ export async function uploadBriefAttachment(
 
       const parsed = uploadResponseSchema().safeParse(response.data)
       if (!parsed.success) {
-        debug(
-          `unexpected response shape for ${fullPath}: ${parsed.error.message}`,
-        )
+        debug(`unexpected response shape for ${fullPath}: ${parsed.error.message}`)
         return undefined
       }
 

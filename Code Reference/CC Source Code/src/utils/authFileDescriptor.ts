@@ -1,14 +1,9 @@
-import { mkdirSync, writeFileSync } from 'fs'
-import {
-  getApiKeyFromFd,
-  getOauthTokenFromFd,
-  setApiKeyFromFd,
-  setOauthTokenFromFd,
-} from '../bootstrap/state.js'
-import { logForDebugging } from './debug.js'
-import { isEnvTruthy } from './envUtils.js'
-import { errorMessage, isENOENT } from './errors.js'
-import { getFsImplementation } from './fsOperations.js'
+import { mkdirSync, writeFileSync } from "fs"
+import { getApiKeyFromFd, getOauthTokenFromFd, setApiKeyFromFd, setOauthTokenFromFd } from "../bootstrap/state.js"
+import { logForDebugging } from "./debug.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { errorMessage, isENOENT } from "./errors.js"
+import { getFsImplementation } from "./fsOperations.js"
 
 /**
  * Well-known token file locations in CCR. The Go environment-manager creates
@@ -17,7 +12,7 @@ import { getFsImplementation } from './fsOperations.js'
  * spawned inside the CCR container can find the token without inheriting
  * the FD — which they can't: pipe FDs don't cross tmux/shell boundaries.
  */
-const CCR_TOKEN_DIR = '/home/claude/.claude/remote'
+const CCR_TOKEN_DIR = "/home/claude/.claude/remote"
 export const CCR_OAUTH_TOKEN_PATH = `${CCR_TOKEN_DIR}/.oauth_token`
 export const CCR_API_KEY_PATH = `${CCR_TOKEN_DIR}/.api_key`
 export const CCR_SESSION_INGRESS_TOKEN_PATH = `${CCR_TOKEN_DIR}/.session_ingress_token`
@@ -27,11 +22,7 @@ export const CCR_SESSION_INGRESS_TOKEN_PATH = `${CCR_TOKEN_DIR}/.session_ingress
  * access. CCR-gated: outside CCR there's no /home/claude/ and no reason to
  * put a token on disk that the FD was meant to keep off disk.
  */
-export function maybePersistTokenForSubprocesses(
-  path: string,
-  token: string,
-  tokenName: string,
-): void {
+export function maybePersistTokenForSubprocesses(path: string, token: string, tokenName: string): void {
   if (!isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)) {
     return
   }
@@ -39,13 +30,10 @@ export function maybePersistTokenForSubprocesses(
     // eslint-disable-next-line custom-rules/no-sync-fs -- one-shot startup write in CCR, caller is sync
     mkdirSync(CCR_TOKEN_DIR, { recursive: true, mode: 0o700 })
     // eslint-disable-next-line custom-rules/no-sync-fs -- one-shot startup write in CCR, caller is sync
-    writeFileSync(path, token, { encoding: 'utf8', mode: 0o600 })
+    writeFileSync(path, token, { encoding: "utf8", mode: 0o600 })
     logForDebugging(`Persisted ${tokenName} to ${path} for subprocess access`)
   } catch (error) {
-    logForDebugging(
-      `Failed to persist ${tokenName} to disk (non-fatal): ${errorMessage(error)}`,
-      { level: 'error' },
-    )
+    logForDebugging(`Failed to persist ${tokenName} to disk (non-fatal): ${errorMessage(error)}`, { level: "error" })
   }
 }
 
@@ -54,14 +42,11 @@ export function maybePersistTokenForSubprocesses(
  * creates the directory), so file-not-found is the expected outcome everywhere
  * else — treated as "no fallback", not an error.
  */
-export function readTokenFromWellKnownFile(
-  path: string,
-  tokenName: string,
-): string | null {
+export function readTokenFromWellKnownFile(path: string, tokenName: string): string | null {
   try {
     const fsOps = getFsImplementation()
     // eslint-disable-next-line custom-rules/no-sync-fs -- fallback read for CCR subprocess path, one-shot at startup, caller is sync
-    const token = fsOps.readFileSync(path, { encoding: 'utf8' }).trim()
+    const token = fsOps.readFileSync(path, { encoding: "utf8" }).trim()
     if (!token) {
       return null
     }
@@ -72,10 +57,7 @@ export function readTokenFromWellKnownFile(
     // else (EACCES from perm misconfig, etc.) is worth surfacing in the
     // debug log so subprocess auth failures aren't mysterious.
     if (!isENOENT(error)) {
-      logForDebugging(
-        `Failed to read ${tokenName} from ${path}: ${errorMessage(error)}`,
-        { level: 'debug' },
-      )
+      logForDebugging(`Failed to read ${tokenName} from ${path}: ${errorMessage(error)}`, { level: "debug" })
     }
     return null
   }
@@ -123,10 +105,7 @@ function getCredentialFromFd({
 
   const fd = parseInt(fdEnv, 10)
   if (Number.isNaN(fd)) {
-    logForDebugging(
-      `${envVar} must be a valid file descriptor number, got: ${fdEnv}`,
-      { level: 'error' },
-    )
+    logForDebugging(`${envVar} must be a valid file descriptor number, got: ${fdEnv}`, { level: "error" })
     setCached(null)
     return null
   }
@@ -135,15 +114,13 @@ function getCredentialFromFd({
     // Use /dev/fd on macOS/BSD, /proc/self/fd on Linux
     const fsOps = getFsImplementation()
     const fdPath =
-      process.platform === 'darwin' || process.platform === 'freebsd'
-        ? `/dev/fd/${fd}`
-        : `/proc/self/fd/${fd}`
+      process.platform === "darwin" || process.platform === "freebsd" ? `/dev/fd/${fd}` : `/proc/self/fd/${fd}`
 
     // eslint-disable-next-line custom-rules/no-sync-fs -- legacy FD path, read once at startup, caller is sync
-    const token = fsOps.readFileSync(fdPath, { encoding: 'utf8' }).trim()
+    const token = fsOps.readFileSync(fdPath, { encoding: "utf8" }).trim()
     if (!token) {
       logForDebugging(`File descriptor contained empty ${label}`, {
-        level: 'error',
+        level: "error",
       })
       setCached(null)
       return null
@@ -153,10 +130,7 @@ function getCredentialFromFd({
     maybePersistTokenForSubprocesses(wellKnownPath, token, label)
     return token
   } catch (error) {
-    logForDebugging(
-      `Failed to read ${label} from file descriptor ${fd}: ${errorMessage(error)}`,
-      { level: 'error' },
-    )
+    logForDebugging(`Failed to read ${label} from file descriptor ${fd}: ${errorMessage(error)}`, { level: "error" })
     // FD env var was set but read failed — typically a subprocess that
     // inherited the env var but not the FD (ENXIO). Try the well-known file.
     const fromFile = readTokenFromWellKnownFile(wellKnownPath, label)
@@ -172,9 +146,9 @@ function getCredentialFromFd({
  */
 export function getOAuthTokenFromFileDescriptor(): string | null {
   return getCredentialFromFd({
-    envVar: 'CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR',
+    envVar: "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
     wellKnownPath: CCR_OAUTH_TOKEN_PATH,
-    label: 'OAuth token',
+    label: "OAuth token",
     getCached: getOauthTokenFromFd,
     setCached: setOauthTokenFromFd,
   })
@@ -187,9 +161,9 @@ export function getOAuthTokenFromFileDescriptor(): string | null {
  */
 export function getApiKeyFromFileDescriptor(): string | null {
   return getCredentialFromFd({
-    envVar: 'CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR',
+    envVar: "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR",
     wellKnownPath: CCR_API_KEY_PATH,
-    label: 'API key',
+    label: "API key",
     getCached: getApiKeyFromFd,
     setCached: setApiKeyFromFd,
   })

@@ -1,36 +1,26 @@
-import reject from 'lodash-es/reject.js'
-import { z } from 'zod/v4'
-import { performMCPOAuthFlow } from '../../services/mcp/auth.js'
-import {
-  clearMcpAuthCache,
-  reconnectMcpServerImpl,
-} from '../../services/mcp/client.js'
-import {
-  buildMcpToolName,
-  getMcpPrefix,
-} from '../../services/mcp/mcpStringUtils.js'
-import type {
-  McpHTTPServerConfig,
-  McpSSEServerConfig,
-  ScopedMcpServerConfig,
-} from '../../services/mcp/types.js'
-import type { Tool } from '../../Tool.js'
-import { errorMessage } from '../../utils/errors.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { logMCPDebug, logMCPError } from '../../utils/log.js'
-import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
+import reject from "lodash-es/reject.js"
+import { z } from "zod/v4"
+import { performMCPOAuthFlow } from "../../services/mcp/auth.js"
+import { clearMcpAuthCache, reconnectMcpServerImpl } from "../../services/mcp/client.js"
+import { buildMcpToolName, getMcpPrefix } from "../../services/mcp/mcpStringUtils.js"
+import type { McpHTTPServerConfig, McpSSEServerConfig, ScopedMcpServerConfig } from "../../services/mcp/types.js"
+import type { Tool } from "../../Tool.js"
+import { errorMessage } from "../../utils/errors.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { logMCPDebug, logMCPError } from "../../utils/log.js"
+import type { PermissionDecision } from "../../utils/permissions/PermissionResult.js"
 
 const inputSchema = lazySchema(() => z.object({}))
 type InputSchema = ReturnType<typeof inputSchema>
 
 export type McpAuthOutput = {
-  status: 'auth_url' | 'unsupported' | 'error'
+  status: "auth_url" | "unsupported" | "error"
   message: string
   authUrl?: string
 }
 
 function getConfigUrl(config: ScopedMcpServerConfig): string | undefined {
-  if ('url' in config) return config.url
+  if ("url" in config) return config.url
   return undefined
 }
 
@@ -46,12 +36,9 @@ function getConfigUrl(config: ScopedMcpServerConfig): string | undefined {
  * replacement (useManageMCPConnections.updateServer wipes anything matching
  * mcp__<server>__*, so this pseudo-tool is removed automatically).
  */
-export function createMcpAuthTool(
-  serverName: string,
-  config: ScopedMcpServerConfig,
-): Tool<InputSchema, McpAuthOutput> {
+export function createMcpAuthTool(serverName: string, config: ScopedMcpServerConfig): Tool<InputSchema, McpAuthOutput> {
   const url = getConfigUrl(config)
-  const transport = config.type ?? 'stdio'
+  const transport = config.type ?? "stdio"
   const location = url ? `${transport} at ${url}` : transport
 
   const description =
@@ -60,9 +47,9 @@ export function createMcpAuthTool(
     `Once the user completes authorization in their browser, the server's real tools will become available automatically.`
 
   return {
-    name: buildMcpToolName(serverName, 'authenticate'),
+    name: buildMcpToolName(serverName, "authenticate"),
     isMcp: true,
-    mcpInfo: { serverName, toolName: 'authenticate' },
+    mcpInfo: { serverName, toolName: "authenticate" },
     isEnabled: () => true,
     isConcurrencySafe: () => false,
     isReadOnly: () => false,
@@ -80,16 +67,16 @@ export function createMcpAuthTool(
       return inputSchema()
     },
     async checkPermissions(input): Promise<PermissionDecision> {
-      return { behavior: 'allow', updatedInput: input }
+      return { behavior: "allow", updatedInput: input }
     },
     async call(_input, context) {
       // claude.ai connectors use a separate auth flow (handleClaudeAIAuth in
       // MCPRemoteServerMenu) that we don't invoke programmatically here —
       // just point the user at /mcp.
-      if (config.type === 'claudeai-proxy') {
+      if (config.type === "claudeai-proxy") {
         return {
           data: {
-            status: 'unsupported' as const,
+            status: "unsupported" as const,
             message: `This is a claude.ai MCP connector. Ask the user to run /mcp and select "${serverName}" to authenticate.`,
           },
         }
@@ -98,25 +85,24 @@ export function createMcpAuthTool(
       // performMCPOAuthFlow only accepts sse/http. needs-auth state is only
       // set on HTTP 401 (UnauthorizedError) so other transports shouldn't
       // reach here, but be defensive.
-      if (config.type !== 'sse' && config.type !== 'http') {
+      if (config.type !== "sse" && config.type !== "http") {
         return {
           data: {
-            status: 'unsupported' as const,
+            status: "unsupported" as const,
             message: `Server "${serverName}" uses ${transport} transport which does not support OAuth from this tool. Ask the user to run /mcp and authenticate manually.`,
           },
         }
       }
 
-      const sseOrHttpConfig = config as (
-        | McpSSEServerConfig
-        | McpHTTPServerConfig
-      ) & { scope: ScopedMcpServerConfig['scope'] }
+      const sseOrHttpConfig = config as (McpSSEServerConfig | McpHTTPServerConfig) & {
+        scope: ScopedMcpServerConfig["scope"]
+      }
 
       // Mirror cli/print.ts mcp_authenticate: start the flow, capture the
       // URL via onAuthorizationUrl, return it immediately. The flow's
       // Promise resolves later when the browser callback fires.
       let resolveAuthUrl: ((url: string) => void) | undefined
-      const authUrlPromise = new Promise<string>(resolve => {
+      const authUrlPromise = new Promise<string>((resolve) => {
         resolveAuthUrl = resolve
       })
 
@@ -126,7 +112,7 @@ export function createMcpAuthTool(
       const oauthPromise = performMCPOAuthFlow(
         serverName,
         sseOrHttpConfig,
-        u => resolveAuthUrl?.(u),
+        (u) => resolveAuthUrl?.(u),
         controller.signal,
         { skipBrowserOpen: true },
       )
@@ -139,50 +125,33 @@ export function createMcpAuthTool(
           clearMcpAuthCache()
           const result = await reconnectMcpServerImpl(serverName, config)
           const prefix = getMcpPrefix(serverName)
-          setAppState(prev => ({
+          setAppState((prev) => ({
             ...prev,
             mcp: {
               ...prev.mcp,
-              clients: prev.mcp.clients.map(c =>
-                c.name === serverName ? result.client : c,
-              ),
-              tools: [
-                ...reject(prev.mcp.tools, t => t.name?.startsWith(prefix)),
-                ...result.tools,
-              ],
-              commands: [
-                ...reject(prev.mcp.commands, c => c.name?.startsWith(prefix)),
-                ...result.commands,
-              ],
+              clients: prev.mcp.clients.map((c) => (c.name === serverName ? result.client : c)),
+              tools: [...reject(prev.mcp.tools, (t) => t.name?.startsWith(prefix)), ...result.tools],
+              commands: [...reject(prev.mcp.commands, (c) => c.name?.startsWith(prefix)), ...result.commands],
               resources: result.resources
                 ? { ...prev.mcp.resources, [serverName]: result.resources }
                 : prev.mcp.resources,
             },
           }))
-          logMCPDebug(
-            serverName,
-            `OAuth complete, reconnected with ${result.tools.length} tool(s)`,
-          )
+          logMCPDebug(serverName, `OAuth complete, reconnected with ${result.tools.length} tool(s)`)
         })
-        .catch(err => {
-          logMCPError(
-            serverName,
-            `OAuth flow failed after tool-triggered start: ${errorMessage(err)}`,
-          )
+        .catch((err) => {
+          logMCPError(serverName, `OAuth flow failed after tool-triggered start: ${errorMessage(err)}`)
         })
 
       try {
         // Race: get the URL, or the flow completes without needing one
         // (e.g. XAA with cached IdP token — silent auth).
-        const authUrl = await Promise.race([
-          authUrlPromise,
-          oauthPromise.then(() => null as string | null),
-        ])
+        const authUrl = await Promise.race([authUrlPromise, oauthPromise.then(() => null as string | null)])
 
         if (authUrl) {
           return {
             data: {
-              status: 'auth_url' as const,
+              status: "auth_url" as const,
               authUrl,
               message: `Ask the user to open this URL in their browser to authorize the ${serverName} MCP server:\n\n${authUrl}\n\nOnce they complete the flow, the server's tools will become available automatically.`,
             },
@@ -191,14 +160,14 @@ export function createMcpAuthTool(
 
         return {
           data: {
-            status: 'auth_url' as const,
+            status: "auth_url" as const,
             message: `Authentication completed silently for ${serverName}. The server's tools should now be available.`,
           },
         }
       } catch (err) {
         return {
           data: {
-            status: 'error' as const,
+            status: "error" as const,
             message: `Failed to start OAuth flow for ${serverName}: ${errorMessage(err)}. Ask the user to run /mcp and authenticate manually.`,
           },
         }
@@ -207,7 +176,7 @@ export function createMcpAuthTool(
     mapToolResultToToolResultBlockParam(data, toolUseID) {
       return {
         tool_use_id: toolUseID,
-        type: 'tool_result',
+        type: "tool_result",
         content: data.message,
       }
     },

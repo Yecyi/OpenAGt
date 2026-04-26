@@ -5,7 +5,7 @@
   overflow-y: auto;
 }
 
-.dev-overlay>div {
+.dev-overlay > div {
   position: relative;
   display: flex;
   align-items: center;
@@ -75,7 +75,7 @@
 
 .dev-overlay-button:focus {
   outline: 2px solid transparent;
-  outline-offset: 2px
+  outline-offset: 2px;
 }
 
 .dev-overlay-button:focus-visible {
@@ -87,7 +87,7 @@
   color: rgb(31 41 55);
 }
 
-.dev-overlay-button>svg {
+.dev-overlay-button > svg {
   height: 1.5rem;
   width: 1.5rem;
 }
@@ -103,7 +103,6 @@
   flex-direction: row;
   gap: 0.5rem;
 }
-
 
 .dev-overlay-controls {
   display: flex;
@@ -130,12 +129,12 @@
   font-weight: 600;
 }
 
-.dev-overlay-version>div {
+.dev-overlay-version > div {
   height: 1.5rem;
   width: 1.5rem;
 }
 
-.dev-overlay-version>div>svg {
+.dev-overlay-version > div > svg {
   height: 1.5rem;
   width: 1.5rem;
 }
@@ -266,7 +265,7 @@
   min-height: 16rem;
 }
 
-.dev-overlay-code-view>.shiki {
+.dev-overlay-code-view > .shiki {
   float: left;
   min-width: 100%;
   overflow-x: auto;
@@ -277,16 +276,16 @@
   background-color: transparent !important;
 }
 
-.dev-overlay-code-view>.shiki .line::before {
+.dev-overlay-code-view > .shiki .line::before {
   content: counter(step);
   counter-increment: step;
   width: 1rem;
   margin-right: 1.5rem;
   display: inline-block;
   text-align: right;
-  color: rgba(115, 138, 148, .4)
+  color: rgba(115, 138, 148, 0.4);
 }
 
 .dev-overlay-error-line {
-  background-color: rgba(239, 68, 68, .4);
+  background-color: rgba(239, 68, 68, 0.4);
 }

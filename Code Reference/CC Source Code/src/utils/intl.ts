@@ -13,7 +13,7 @@ let wordSegmenter: Intl.Segmenter | null = null
 export function getGraphemeSegmenter(): Intl.Segmenter {
   if (!graphemeSegmenter) {
     graphemeSegmenter = new Intl.Segmenter(undefined, {
-      granularity: 'grapheme',
+      granularity: "grapheme",
     })
   }
   return graphemeSegmenter
@@ -24,10 +24,10 @@ export function getGraphemeSegmenter(): Intl.Segmenter {
  * Returns '' for empty strings.
  */
 export function firstGrapheme(text: string): string {
-  if (!text) return ''
+  if (!text) return ""
   const segments = getGraphemeSegmenter().segment(text)
   const first = segments[Symbol.iterator]().next().value
-  return first?.segment ?? ''
+  return first?.segment ?? ""
 }
 
 /**
@@ -35,8 +35,8 @@ export function firstGrapheme(text: string): string {
  * Returns '' for empty strings.
  */
 export function lastGrapheme(text: string): string {
-  if (!text) return ''
-  let last = ''
+  if (!text) return ""
+  let last = ""
   for (const { segment } of getGraphemeSegmenter().segment(text)) {
     last = segment
   }
@@ -45,7 +45,7 @@ export function lastGrapheme(text: string): string {
 
 export function getWordSegmenter(): Intl.Segmenter {
   if (!wordSegmenter) {
-    wordSegmenter = new Intl.Segmenter(undefined, { granularity: 'word' })
+    wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" })
   }
   return wordSegmenter
 }
@@ -54,13 +54,13 @@ export function getWordSegmenter(): Intl.Segmenter {
 const rtfCache = new Map<string, Intl.RelativeTimeFormat>()
 
 export function getRelativeTimeFormat(
-  style: 'long' | 'short' | 'narrow',
-  numeric: 'always' | 'auto',
+  style: "long" | "short" | "narrow",
+  numeric: "always" | "auto",
 ): Intl.RelativeTimeFormat {
   const key = `${style}:${numeric}`
   let rtf = rtfCache.get(key)
   if (!rtf) {
-    rtf = new Intl.RelativeTimeFormat('en', { style, numeric })
+    rtf = new Intl.RelativeTimeFormat("en", { style, numeric })
     rtfCache.set(key, rtf)
   }
   return rtf

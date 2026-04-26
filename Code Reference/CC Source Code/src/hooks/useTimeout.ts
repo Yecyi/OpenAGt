@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react"
 
 export function useTimeout(delay: number, resetTrigger?: number): boolean {
   const [isElapsed, setIsElapsed] = useState(false)

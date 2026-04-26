@@ -1,24 +1,20 @@
-import { z } from 'zod/v4'
-import { getSessionId, setOriginalCwd } from '../../bootstrap/state.js'
-import { clearSystemPromptSections } from '../../constants/systemPromptSections.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { Tool } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { clearMemoryFileCaches } from '../../utils/claudemd.js'
-import { getCwd } from '../../utils/cwd.js'
-import { findCanonicalGitRoot } from '../../utils/git.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import { getPlanSlug, getPlansDirectory } from '../../utils/plans.js'
-import { setCwd } from '../../utils/Shell.js'
-import { saveWorktreeState } from '../../utils/sessionStorage.js'
-import {
-  createWorktreeForSession,
-  getCurrentWorktreeSession,
-  validateWorktreeSlug,
-} from '../../utils/worktree.js'
-import { ENTER_WORKTREE_TOOL_NAME } from './constants.js'
-import { getEnterWorktreeToolPrompt } from './prompt.js'
-import { renderToolResultMessage, renderToolUseMessage } from './UI.js'
+import { z } from "zod/v4"
+import { getSessionId, setOriginalCwd } from "../../bootstrap/state.js"
+import { clearSystemPromptSections } from "../../constants/systemPromptSections.js"
+import { logEvent } from "../../services/analytics/index.js"
+import type { Tool } from "../../Tool.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { clearMemoryFileCaches } from "../../utils/claudemd.js"
+import { getCwd } from "../../utils/cwd.js"
+import { findCanonicalGitRoot } from "../../utils/git.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getPlanSlug, getPlansDirectory } from "../../utils/plans.js"
+import { setCwd } from "../../utils/Shell.js"
+import { saveWorktreeState } from "../../utils/sessionStorage.js"
+import { createWorktreeForSession, getCurrentWorktreeSession, validateWorktreeSlug } from "../../utils/worktree.js"
+import { ENTER_WORKTREE_TOOL_NAME } from "./constants.js"
+import { getEnterWorktreeToolPrompt } from "./prompt.js"
+import { renderToolResultMessage, renderToolUseMessage } from "./UI.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -28,7 +24,7 @@ const inputSchema = lazySchema(() =>
         try {
           validateWorktreeSlug(s)
         } catch (e) {
-          ctx.addIssue({ code: 'custom', message: (e as Error).message })
+          ctx.addIssue({ code: "custom", message: (e as Error).message })
         }
       })
       .optional()
@@ -51,10 +47,10 @@ export type Output = z.infer<OutputSchema>
 
 export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
   name: ENTER_WORKTREE_TOOL_NAME,
-  searchHint: 'create an isolated git worktree and switch into it',
+  searchHint: "create an isolated git worktree and switch into it",
   maxResultSizeChars: 100_000,
   async description() {
-    return 'Creates an isolated worktree (via git or configured hooks) and switches the session into it'
+    return "Creates an isolated worktree (via git or configured hooks) and switches the session into it"
   },
   async prompt() {
     return getEnterWorktreeToolPrompt()
@@ -66,18 +62,18 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
     return outputSchema()
   },
   userFacingName() {
-    return 'Creating worktree'
+    return "Creating worktree"
   },
   shouldDefer: true,
   toAutoClassifierInput(input) {
-    return input.name ?? ''
+    return input.name ?? ""
   },
   renderToolUseMessage,
   renderToolResultMessage,
   async call(input) {
     // Validate not already in a worktree created by this session
     if (getCurrentWorktreeSession()) {
-      throw new Error('Already in a worktree session')
+      throw new Error("Already in a worktree session")
     }
 
     // Resolve to main repo root so worktree creation works from within a worktree
@@ -101,13 +97,11 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
     clearMemoryFileCaches()
     getPlansDirectory.cache.clear?.()
 
-    logEvent('tengu_worktree_created', {
+    logEvent("tengu_worktree_created", {
       mid_session: true,
     })
 
-    const branchInfo = worktreeSession.worktreeBranch
-      ? ` on branch ${worktreeSession.worktreeBranch}`
-      : ''
+    const branchInfo = worktreeSession.worktreeBranch ? ` on branch ${worktreeSession.worktreeBranch}` : ""
 
     return {
       data: {
@@ -119,7 +113,7 @@ export const EnterWorktreeTool: Tool<InputSchema, Output> = buildTool({
   },
   mapToolResultToToolResultBlockParam({ message }, toolUseID) {
     return {
-      type: 'tool_result',
+      type: "tool_result",
       content: message,
       tool_use_id: toolUseID,
     }

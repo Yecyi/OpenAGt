@@ -1,40 +1,32 @@
-import { useContext, useEffect, useRef } from 'react'
-import {
-  CLEAR_TAB_STATUS,
-  supportsTabStatus,
-  tabStatus,
-  wrapForMultiplexer,
-} from '../termio/osc.js'
-import type { Color } from '../termio/types.js'
-import { TerminalWriteContext } from '../useTerminalNotification.js'
+import { useContext, useEffect, useRef } from "react"
+import { CLEAR_TAB_STATUS, supportsTabStatus, tabStatus, wrapForMultiplexer } from "../termio/osc.js"
+import type { Color } from "../termio/types.js"
+import { TerminalWriteContext } from "../useTerminalNotification.js"
 
-export type TabStatusKind = 'idle' | 'busy' | 'waiting'
+export type TabStatusKind = "idle" | "busy" | "waiting"
 
 const rgb = (r: number, g: number, b: number): Color => ({
-  type: 'rgb',
+  type: "rgb",
   r,
   g,
   b,
 })
 
 // Per the OSC 21337 usage guide's suggested mapping.
-const TAB_STATUS_PRESETS: Record<
-  TabStatusKind,
-  { indicator: Color; status: string; statusColor: Color }
-> = {
+const TAB_STATUS_PRESETS: Record<TabStatusKind, { indicator: Color; status: string; statusColor: Color }> = {
   idle: {
     indicator: rgb(0, 215, 95),
-    status: 'Idle',
+    status: "Idle",
     statusColor: rgb(136, 136, 136),
   },
   busy: {
     indicator: rgb(255, 149, 0),
-    status: 'Working…',
+    status: "Working…",
     statusColor: rgb(255, 149, 0),
   },
   waiting: {
     indicator: rgb(95, 135, 255),
-    status: 'Waiting',
+    status: "Waiting",
     statusColor: rgb(95, 135, 255),
   },
 }

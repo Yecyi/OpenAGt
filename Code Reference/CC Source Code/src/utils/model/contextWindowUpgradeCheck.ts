@@ -1,5 +1,5 @@
-import { checkOpus1mAccess, checkSonnet1mAccess } from './check1mAccess.js'
-import { getUserSpecifiedModelSetting } from './model.js'
+import { checkOpus1mAccess, checkSonnet1mAccess } from "./check1mAccess.js"
+import { getUserSpecifiedModelSetting } from "./model.js"
 
 // @[MODEL LAUNCH]: Add a branch for the new model if it supports a 1M context upgrade path.
 /**
@@ -12,16 +12,16 @@ function getAvailableUpgrade(): {
   multiplier: number
 } | null {
   const currentModelSetting = getUserSpecifiedModelSetting()
-  if (currentModelSetting === 'opus' && checkOpus1mAccess()) {
+  if (currentModelSetting === "opus" && checkOpus1mAccess()) {
     return {
-      alias: 'opus[1m]',
-      name: 'Opus 1M',
+      alias: "opus[1m]",
+      name: "Opus 1M",
       multiplier: 5,
     }
-  } else if (currentModelSetting === 'sonnet' && checkSonnet1mAccess()) {
+  } else if (currentModelSetting === "sonnet" && checkSonnet1mAccess()) {
     return {
-      alias: 'sonnet[1m]',
-      name: 'Sonnet 1M',
+      alias: "sonnet[1m]",
+      name: "Sonnet 1M",
       multiplier: 5,
     }
   }
@@ -32,14 +32,14 @@ function getAvailableUpgrade(): {
 /**
  * Get upgrade message for different contexts
  */
-export function getUpgradeMessage(context: 'warning' | 'tip'): string | null {
+export function getUpgradeMessage(context: "warning" | "tip"): string | null {
   const upgrade = getAvailableUpgrade()
   if (!upgrade) return null
 
   switch (context) {
-    case 'warning':
+    case "warning":
       return `/model ${upgrade.alias}`
-    case 'tip':
+    case "tip":
       return `Tip: You have access to ${upgrade.name} with ${upgrade.multiplier}x more context`
     default:
       return null

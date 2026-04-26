@@ -1,6 +1,6 @@
-import { logForDebugging } from '../debug.js'
-import { withResolvers } from '../withResolvers.js'
-import { requireComputerUseSwift } from './swiftLoader.js'
+import { logForDebugging } from "../debug.js"
+import { withResolvers } from "../withResolvers.js"
+import { requireComputerUseSwift } from "./swiftLoader.js"
 
 /**
  * Shared CFRunLoop pump. Swift's four `@MainActor` async methods
@@ -25,7 +25,7 @@ function retain(): void {
   pending++
   if (pump === undefined) {
     pump = setInterval(drainTick, 1, requireComputerUseSwift())
-    logForDebugging('[drainRunLoop] pump started', { level: 'verbose' })
+    logForDebugging("[drainRunLoop] pump started", { level: "verbose" })
   }
 }
 
@@ -34,7 +34,7 @@ function release(): void {
   if (pending <= 0 && pump !== undefined) {
     clearInterval(pump)
     pump = undefined
-    logForDebugging('[drainRunLoop] pump stopped', { level: 'verbose' })
+    logForDebugging("[drainRunLoop] pump stopped", { level: "verbose" })
     pending = 0
   }
 }

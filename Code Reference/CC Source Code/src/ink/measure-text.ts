@@ -1,4 +1,4 @@
-import { lineWidth } from './line-width-cache.js'
+import { lineWidth } from "./line-width-cache.js"
 
 type Output = {
   width: number
@@ -25,7 +25,7 @@ function measureText(text: string, maxWidth: number): Output {
   let start = 0
 
   while (start <= text.length) {
-    const end = text.indexOf('\n', start)
+    const end = text.indexOf("\n", start)
     const line = end === -1 ? text.substring(start) : text.substring(start, end)
 
     const w = lineWidth(line)

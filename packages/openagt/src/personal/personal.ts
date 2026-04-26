@@ -169,13 +169,16 @@ function privacySafeContent(content: string) {
   ].some((pattern) => pattern.test(content))
 }
 
-function tagScore(tags: string[], input: {
-  workflow?: string
-  expertID?: string
-  role?: string
-  artifactType?: string
-  includeFailurePatterns?: boolean
-}) {
+function tagScore(
+  tags: string[],
+  input: {
+    workflow?: string
+    expertID?: string
+    role?: string
+    artifactType?: string
+    includeFailurePatterns?: boolean
+  },
+) {
   return (
     (input.expertID && tags.includes(`expert:${input.expertID}`) ? 40 : 0) +
     (input.workflow && tags.includes(`workflow:${input.workflow}`) ? 30 : 0) +
@@ -257,8 +260,14 @@ export interface Interface {
     scheduledFor?: number
     payload?: Record<string, unknown>
   }) => Effect.Effect<InboxItemType, Error>
-  readonly listInboxItems: (input: { projectID: ProjectID; state?: InboxStateType }) => Effect.Effect<InboxItemType[], Error>
-  readonly updateInboxState: (input: { id: z.infer<typeof InboxItemID.zod>; state: InboxStateType }) => Effect.Effect<InboxItemType, Error>
+  readonly listInboxItems: (input: {
+    projectID: ProjectID
+    state?: InboxStateType
+  }) => Effect.Effect<InboxItemType[], Error>
+  readonly updateInboxState: (input: {
+    id: z.infer<typeof InboxItemID.zod>
+    state: InboxStateType
+  }) => Effect.Effect<InboxItemType, Error>
   readonly scheduleWakeup: (input: {
     projectID: ProjectID
     sessionID?: SessionID
@@ -268,7 +277,10 @@ export interface Interface {
     scheduledFor: number
     payload?: Record<string, unknown>
   }) => Effect.Effect<ScheduledWakeupType, Error>
-  readonly listDueWakeups: (input: { projectID: ProjectID; now?: number }) => Effect.Effect<ScheduledWakeupType[], Error>
+  readonly listDueWakeups: (input: {
+    projectID: ProjectID
+    now?: number
+  }) => Effect.Effect<ScheduledWakeupType[], Error>
   readonly dispatchDueWakeups: (input: { projectID: ProjectID; now?: number }) => Effect.Effect<InboxItemType[], Error>
   readonly completeWakeup: (id: z.infer<typeof ScheduledWakeupID.zod>) => Effect.Effect<ScheduledWakeupType, Error>
   readonly ingestSession: (input: {
@@ -286,20 +298,23 @@ export interface Interface {
     priority?: WorkPriorityType
     payload?: Record<string, unknown>
   }) => Effect.Effect<InboxItemType, Error>
-  readonly overview: (input: { projectID: ProjectID; now?: number }) => Effect.Effect<{
-    inbox: Record<InboxStateType, number>
-    wakeups: {
-      due: number
-      pending: number
-      fired: number
-    }
-    memory: {
-      profile: number
-      workspace: number
-      session: number
-      recent: MemoryNoteType[]
-    }
-  }, Error>
+  readonly overview: (input: { projectID: ProjectID; now?: number }) => Effect.Effect<
+    {
+      inbox: Record<InboxStateType, number>
+      wakeups: {
+        due: number
+        pending: number
+        fired: number
+      }
+      memory: {
+        profile: number
+        workspace: number
+        session: number
+        recent: MemoryNoteType[]
+      }
+    },
+    Error
+  >
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openagt/PersonalAgent") {}
@@ -311,12 +326,14 @@ export const layer = Layer.effect(
     const sessions = yield* Session.Service
 
     const remember: Interface["remember"] = Effect.fn("PersonalAgent.remember")(function* (input) {
-      if (!privacySafeContent(input.content)) return yield* Effect.fail(new Error("Memory content failed privacy filter"))
+      if (!privacySafeContent(input.content))
+        return yield* Effect.fail(new Error("Memory content failed privacy filter"))
       const id = MemoryNoteID.ascending()
       const timestamp = now()
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.insert(PersonalMemoryNoteTable)
+          db
+            .insert(PersonalMemoryNoteTable)
             .values({
               id,
               scope: input.scope,
@@ -361,10 +378,7 @@ export const layer = Layer.effect(
       return rows.map(memoryFromRow)
     })
 
-    const sessionSearch = (input: {
-      query: string
-      sessionID?: SessionID
-    }) =>
+    const sessionSearch = (input: { query: string; sessionID?: SessionID }) =>
       Effect.gen(function* () {
         if (!input.sessionID) return [] as MemorySearchResultType[]
         const sessionID = input.sessionID
@@ -394,21 +408,24 @@ export const layer = Layer.effect(
       })
 
     const searchMemory: Interface["searchMemory"] = Effect.fn("PersonalAgent.searchMemory")(function* (input) {
-      const scopes = input.scopes && input.scopes.length > 0 ? input.scopes : (["profile", "workspace"] as MemoryScopeType[])
+      const scopes =
+        input.scopes && input.scopes.length > 0 ? input.scopes : (["profile", "workspace"] as MemoryScopeType[])
       const ftsQuery = escapeFts(input.query)
       const matches = yield* Effect.sync(() =>
         !ftsQuery
           ? new Map<string, number>()
           : new Map(
               DatabaseClient()
-                .all<{ id: string; score: number }>(sql`
+                .all<{ id: string; score: number }>(
+                  sql`
                   SELECT note.id AS id, bm25(personal_memory_fts) AS score
                   FROM personal_memory_fts
                   JOIN personal_memory_note AS note ON note.rowid = personal_memory_fts.rowid
                   WHERE personal_memory_fts MATCH ${ftsQuery}
                   ORDER BY score
                   LIMIT 50
-                `)
+                `,
+                )
                 .map((item) => [item.id, Math.max(0, item.score * -1)]),
             ),
       )
@@ -456,7 +473,8 @@ export const layer = Layer.effect(
     })
 
     const synthesize: Interface["synthesize"] = Effect.fn("PersonalAgent.synthesize")(function* (input) {
-      const scope: MemoryScopeType = input.kind === "manual_preference" ? "profile" : input.projectID ? "workspace" : "profile"
+      const scope: MemoryScopeType =
+        input.kind === "manual_preference" ? "profile" : input.projectID ? "workspace" : "profile"
       const source =
         input.kind === "manual_preference"
           ? "manual"
@@ -486,7 +504,13 @@ export const layer = Layer.effect(
 
     const hasMemoryTag = Effect.fn("PersonalAgent.hasMemoryTag")(function* (tag: string) {
       return yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(PersonalMemoryNoteTable).all().some((row) => row.tags.includes(tag))),
+        Database.use((db) =>
+          db
+            .select()
+            .from(PersonalMemoryNoteTable)
+            .all()
+            .some((row) => row.tags.includes(tag)),
+        ),
       )
     })
 
@@ -519,7 +543,8 @@ export const layer = Layer.effect(
       const timestamp = now()
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.insert(InboxItemTable)
+          db
+            .insert(InboxItemTable)
             .values({
               id,
               project_id: input.projectID,
@@ -560,33 +585,37 @@ export const layer = Layer.effect(
       return rows.map(inboxFromRow)
     })
 
-    const updateInboxState: Interface["updateInboxState"] = Effect.fn("PersonalAgent.updateInboxState")(function* (input) {
-      const timestamp = now()
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db.update(InboxItemTable)
-            .set({
-              state: input.state,
-              time_updated: timestamp,
-              time_completed: input.state === "done" ? timestamp : null,
-            })
-            .where(eq(InboxItemTable.id, input.id))
-            .run(),
-        ),
-      )
-      const item = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(InboxItemTable).where(eq(InboxItemTable.id, input.id)).get()),
-      ).pipe(Effect.map((row) => inboxFromRow(row!)))
-      yield* bus.publish(Event.InboxUpdated, item)
-      return item
-    })
+    const updateInboxState: Interface["updateInboxState"] = Effect.fn("PersonalAgent.updateInboxState")(
+      function* (input) {
+        const timestamp = now()
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(InboxItemTable)
+              .set({
+                state: input.state,
+                time_updated: timestamp,
+                time_completed: input.state === "done" ? timestamp : null,
+              })
+              .where(eq(InboxItemTable.id, input.id))
+              .run(),
+          ),
+        )
+        const item = yield* Effect.sync(() =>
+          Database.use((db) => db.select().from(InboxItemTable).where(eq(InboxItemTable.id, input.id)).get()),
+        ).pipe(Effect.map((row) => inboxFromRow(row!)))
+        yield* bus.publish(Event.InboxUpdated, item)
+        return item
+      },
+    )
 
     const scheduleWakeup: Interface["scheduleWakeup"] = Effect.fn("PersonalAgent.scheduleWakeup")(function* (input) {
       const id = ScheduledWakeupID.ascending()
       const timestamp = now()
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.insert(ScheduledWakeupTable)
+          db
+            .insert(ScheduledWakeupTable)
             .values({
               id,
               project_id: input.projectID,
@@ -625,50 +654,56 @@ export const layer = Layer.effect(
       return rows.map(wakeupFromRow)
     })
 
-    const dispatchDueWakeups: Interface["dispatchDueWakeups"] = Effect.fn("PersonalAgent.dispatchDueWakeups")(function* (input) {
-      const due = yield* listDueWakeups(input)
-      return yield* Effect.all(
-        due.map((wakeup) =>
-          Effect.gen(function* () {
-            const inbox = yield* createInboxItem({
-              projectID: wakeup.projectID as ProjectID,
-              sessionID: wakeup.sessionID ? SessionID.make(wakeup.sessionID) : undefined,
-              source: "scheduled",
-              scope: "workspace",
-              goal: wakeup.goal,
-              contextRefs: wakeup.context_refs,
-              priority: wakeup.priority,
-              scheduledFor: wakeup.scheduled_for,
-              payload: wakeup.payload,
-            })
-            yield* Effect.sync(() =>
-              Database.use((db) =>
-                db.update(ScheduledWakeupTable)
-                  .set({
-                    state: "fired",
-                    inbox_item_id: inbox.id,
-                    time_fired: now(),
-                    time_updated: now(),
-                  })
-                  .where(eq(ScheduledWakeupTable.id, wakeup.id))
-                  .run(),
-              ),
-            )
-            const fired = yield* Effect.sync(() =>
-              Database.use((db) => db.select().from(ScheduledWakeupTable).where(eq(ScheduledWakeupTable.id, wakeup.id)).get()),
-            ).pipe(Effect.map((row) => wakeupFromRow(row!)))
-            yield* bus.publish(Event.SchedulerFired, { ...fired, inbox_item: inbox })
-            return inbox
-          }),
-        ),
-        { concurrency: "unbounded" },
-      )
-    })
+    const dispatchDueWakeups: Interface["dispatchDueWakeups"] = Effect.fn("PersonalAgent.dispatchDueWakeups")(
+      function* (input) {
+        const due = yield* listDueWakeups(input)
+        return yield* Effect.all(
+          due.map((wakeup) =>
+            Effect.gen(function* () {
+              const inbox = yield* createInboxItem({
+                projectID: wakeup.projectID as ProjectID,
+                sessionID: wakeup.sessionID ? SessionID.make(wakeup.sessionID) : undefined,
+                source: "scheduled",
+                scope: "workspace",
+                goal: wakeup.goal,
+                contextRefs: wakeup.context_refs,
+                priority: wakeup.priority,
+                scheduledFor: wakeup.scheduled_for,
+                payload: wakeup.payload,
+              })
+              yield* Effect.sync(() =>
+                Database.use((db) =>
+                  db
+                    .update(ScheduledWakeupTable)
+                    .set({
+                      state: "fired",
+                      inbox_item_id: inbox.id,
+                      time_fired: now(),
+                      time_updated: now(),
+                    })
+                    .where(eq(ScheduledWakeupTable.id, wakeup.id))
+                    .run(),
+                ),
+              )
+              const fired = yield* Effect.sync(() =>
+                Database.use((db) =>
+                  db.select().from(ScheduledWakeupTable).where(eq(ScheduledWakeupTable.id, wakeup.id)).get(),
+                ),
+              ).pipe(Effect.map((row) => wakeupFromRow(row!)))
+              yield* bus.publish(Event.SchedulerFired, { ...fired, inbox_item: inbox })
+              return inbox
+            }),
+          ),
+          { concurrency: "unbounded" },
+        )
+      },
+    )
 
     const completeWakeup: Interface["completeWakeup"] = Effect.fn("PersonalAgent.completeWakeup")(function* (id) {
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.update(ScheduledWakeupTable)
+          db
+            .update(ScheduledWakeupTable)
             .set({
               state: "completed",
               time_completed: now(),
@@ -741,12 +776,11 @@ export const layer = Layer.effect(
     })
 
     const subscriptionStops = new Map<string, () => void>()
-    yield* Effect.addFinalizer(
-      () =>
-        Effect.sync(() => {
-          for (const stop of subscriptionStops.values()) stop()
-          subscriptionStops.clear()
-        }),
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        for (const stop of subscriptionStops.values()) stop()
+        subscriptionStops.clear()
+      }),
     )
 
     const ensureSubscribed = Effect.fn("PersonalAgent.ensureSubscribed")(function* () {
@@ -785,11 +819,12 @@ export const layer = Layer.effect(
               const metadata = event.properties.result.metadata ?? {}
               const workflow = typeof metadata.workflow === "string" ? metadata.workflow : undefined
               const expertID = typeof metadata.expert_id === "string" ? metadata.expert_id : undefined
-              const role = typeof metadata.expert_role === "string"
-                ? metadata.expert_role
-                : typeof metadata.role === "string"
-                  ? metadata.role
-                  : undefined
+              const role =
+                typeof metadata.expert_role === "string"
+                  ? metadata.expert_role
+                  : typeof metadata.role === "string"
+                    ? metadata.role
+                    : undefined
               const artifactType = typeof metadata.artifact_type === "string" ? metadata.artifact_type : undefined
               const tags = memoryTags({
                 workflow,
@@ -813,13 +848,14 @@ export const layer = Layer.effect(
                 })
               }
               if (!expertID) return
-              const kind = role === "reviser"
-                ? "reviser_pattern"
-                : role === "reducer"
-                  ? "reducer_summary"
-                  : role === "verifier" || event.properties.result.task_kind === "verify"
-                    ? "verifier_rule"
-                    : "expert_output"
+              const kind =
+                role === "reviser"
+                  ? "reviser_pattern"
+                  : role === "reducer"
+                    ? "reducer_summary"
+                    : role === "verifier" || event.properties.result.task_kind === "verify"
+                      ? "verifier_rule"
+                      : "expert_output"
               yield* synthesizeOnce({
                 tag: `expert_task:${event.properties.result.task_id}`,
                 kind,
@@ -868,62 +904,76 @@ export const layer = Layer.effect(
     })
 
     return Service.of({
-      remember: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* remember(input)
-      }),
-      listMemory: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* listMemory(input)
-      }),
-      searchMemory: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* searchMemory(input)
-      }),
-      synthesize: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* synthesize(input)
-      }),
-      createInboxItem: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* createInboxItem(input)
-      }),
-      listInboxItems: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* listInboxItems(input)
-      }),
-      updateInboxState: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* updateInboxState(input)
-      }),
-      scheduleWakeup: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* scheduleWakeup(input)
-      }),
-      listDueWakeups: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* listDueWakeups(input)
-      }),
-      dispatchDueWakeups: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* dispatchDueWakeups(input)
-      }),
-      completeWakeup: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* completeWakeup(input)
-      }),
-      ingestSession: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* ingestSession(input)
-      }),
-      ingestWebhook: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* ingestWebhook(input)
-      }),
-      overview: (input) => Effect.gen(function* () {
-        yield* ensureSubscribed()
-        return yield* overview(input)
-      }),
+      remember: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* remember(input)
+        }),
+      listMemory: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* listMemory(input)
+        }),
+      searchMemory: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* searchMemory(input)
+        }),
+      synthesize: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* synthesize(input)
+        }),
+      createInboxItem: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* createInboxItem(input)
+        }),
+      listInboxItems: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* listInboxItems(input)
+        }),
+      updateInboxState: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* updateInboxState(input)
+        }),
+      scheduleWakeup: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* scheduleWakeup(input)
+        }),
+      listDueWakeups: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* listDueWakeups(input)
+        }),
+      dispatchDueWakeups: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* dispatchDueWakeups(input)
+        }),
+      completeWakeup: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* completeWakeup(input)
+        }),
+      ingestSession: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* ingestSession(input)
+        }),
+      ingestWebhook: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* ingestWebhook(input)
+        }),
+      overview: (input) =>
+        Effect.gen(function* () {
+          yield* ensureSubscribed()
+          return yield* overview(input)
+        }),
     })
   }),
 )

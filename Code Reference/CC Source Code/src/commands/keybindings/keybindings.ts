@@ -1,19 +1,15 @@
-import { mkdir, writeFile } from 'fs/promises'
-import { dirname } from 'path'
-import {
-  getKeybindingsPath,
-  isKeybindingCustomizationEnabled,
-} from '../../keybindings/loadUserBindings.js'
-import { generateKeybindingsTemplate } from '../../keybindings/template.js'
-import { getErrnoCode } from '../../utils/errors.js'
-import { editFileInEditor } from '../../utils/promptEditor.js'
+import { mkdir, writeFile } from "fs/promises"
+import { dirname } from "path"
+import { getKeybindingsPath, isKeybindingCustomizationEnabled } from "../../keybindings/loadUserBindings.js"
+import { generateKeybindingsTemplate } from "../../keybindings/template.js"
+import { getErrnoCode } from "../../utils/errors.js"
+import { editFileInEditor } from "../../utils/promptEditor.js"
 
-export async function call(): Promise<{ type: 'text'; value: string }> {
+export async function call(): Promise<{ type: "text"; value: string }> {
   if (!isKeybindingCustomizationEnabled()) {
     return {
-      type: 'text',
-      value:
-        'Keybinding customization is not enabled. This feature is currently in preview.',
+      type: "text",
+      value: "Keybinding customization is not enabled. This feature is currently in preview.",
     }
   }
 
@@ -25,11 +21,11 @@ export async function call(): Promise<{ type: 'text'; value: string }> {
   await mkdir(dirname(keybindingsPath), { recursive: true })
   try {
     await writeFile(keybindingsPath, generateKeybindingsTemplate(), {
-      encoding: 'utf-8',
-      flag: 'wx',
+      encoding: "utf-8",
+      flag: "wx",
     })
   } catch (e: unknown) {
-    if (getErrnoCode(e) === 'EEXIST') {
+    if (getErrnoCode(e) === "EEXIST") {
       fileExists = true
     } else {
       throw e
@@ -40,12 +36,12 @@ export async function call(): Promise<{ type: 'text'; value: string }> {
   const result = await editFileInEditor(keybindingsPath)
   if (result.error) {
     return {
-      type: 'text',
-      value: `${fileExists ? 'Opened' : 'Created'} ${keybindingsPath}. Could not open in editor: ${result.error}`,
+      type: "text",
+      value: `${fileExists ? "Opened" : "Created"} ${keybindingsPath}. Could not open in editor: ${result.error}`,
     }
   }
   return {
-    type: 'text',
+    type: "text",
     value: fileExists
       ? `Opened ${keybindingsPath} in your editor.`
       : `Created ${keybindingsPath} with template. Opened in your editor.`,

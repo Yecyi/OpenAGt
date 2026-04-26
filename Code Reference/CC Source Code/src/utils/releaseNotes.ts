@@ -1,14 +1,14 @@
-import axios from 'axios'
-import { mkdir, readFile, writeFile } from 'fs/promises'
-import { dirname, join } from 'path'
-import { coerce } from 'semver'
-import { getIsNonInteractiveSession } from '../bootstrap/state.js'
-import { getGlobalConfig, saveGlobalConfig } from './config.js'
-import { getClaudeConfigHomeDir } from './envUtils.js'
-import { toError } from './errors.js'
-import { logError } from './log.js'
-import { isEssentialTrafficOnly } from './privacyLevel.js'
-import { gt } from './semver.js'
+import axios from "axios"
+import { mkdir, readFile, writeFile } from "fs/promises"
+import { dirname, join } from "path"
+import { coerce } from "semver"
+import { getIsNonInteractiveSession } from "../bootstrap/state.js"
+import { getGlobalConfig, saveGlobalConfig } from "./config.js"
+import { getClaudeConfigHomeDir } from "./envUtils.js"
+import { toError } from "./errors.js"
+import { logError } from "./log.js"
+import { isEssentialTrafficOnly } from "./privacyLevel.js"
+import { gt } from "./semver.js"
 
 const MAX_RELEASE_NOTES_SHOWN = 5
 
@@ -25,17 +25,15 @@ const MAX_RELEASE_NOTES_SHOWN = 5
  * 2. We fetch the changelog in the background and store it in config
  * 3. Next time the user starts Claude, the cached changelog is available immediately
  */
-export const CHANGELOG_URL =
-  'https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md'
-const RAW_CHANGELOG_URL =
-  'https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md'
+export const CHANGELOG_URL = "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md"
+const RAW_CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/CHANGELOG.md"
 
 /**
  * Get the path for the cached changelog file.
  * The changelog is stored at ~/.claude/cache/changelog.md
  */
 function getChangelogCachePath(): string {
-  return join(getClaudeConfigHomeDir(), 'cache', 'changelog.md')
+  return join(getClaudeConfigHomeDir(), "cache", "changelog.md")
 }
 
 // In-memory cache populated by async reads. Sync callers (React render, sync
@@ -64,8 +62,8 @@ export async function migrateChangelogFromConfig(): Promise<void> {
   try {
     await mkdir(dirname(cachePath), { recursive: true })
     await writeFile(cachePath, config.cachedChangelog, {
-      encoding: 'utf-8',
-      flag: 'wx', // Write only if file doesn't exist
+      encoding: "utf-8",
+      flag: "wx", // Write only if file doesn't exist
     })
   } catch {
     // File already exists, which is fine - skip silently
@@ -106,12 +104,12 @@ export async function fetchAndStoreChangelog(): Promise<void> {
     await mkdir(dirname(cachePath), { recursive: true })
 
     // Write changelog to cache file
-    await writeFile(cachePath, changelogContent, { encoding: 'utf-8' })
+    await writeFile(cachePath, changelogContent, { encoding: "utf-8" })
     changelogMemoryCache = changelogContent
 
     // Update timestamp in config
     const changelogLastFetched = Date.now()
-    saveGlobalConfig(current => ({
+    saveGlobalConfig((current) => ({
       ...current,
       changelogLastFetched,
     }))
@@ -129,12 +127,12 @@ export async function getStoredChangelog(): Promise<string> {
   }
   const cachePath = getChangelogCachePath()
   try {
-    const content = await readFile(cachePath, 'utf-8')
+    const content = await readFile(cachePath, "utf-8")
     changelogMemoryCache = content
     return content
   } catch {
-    changelogMemoryCache = ''
-    return ''
+    changelogMemoryCache = ""
+    return ""
   }
 }
 
@@ -145,7 +143,7 @@ export async function getStoredChangelog(): Promise<string> {
  * the cache is populated before first render via `await checkForReleaseNotes()`.
  */
 export function getStoredChangelogFromMemory(): string {
-  return changelogMemoryCache ?? ''
+  return changelogMemoryCache ?? ""
 }
 
 /**
@@ -164,7 +162,7 @@ export function parseChangelog(content: string): Record<string, string[]> {
     const sections = content.split(/^## /gm).slice(1) // Skip the first section which is the header
 
     for (const section of sections) {
-      const lines = section.trim().split('\n')
+      const lines = section.trim().split("\n")
       if (lines.length === 0) continue
 
       // Extract version from the first line
@@ -173,14 +171,14 @@ export function parseChangelog(content: string): Record<string, string[]> {
       if (!versionLine) continue
 
       // First part before any dash is the version
-      const version = versionLine.split(' - ')[0]?.trim() || ''
+      const version = versionLine.split(" - ")[0]?.trim() || ""
       if (!version) continue
 
       // Extract bullet points
       const notes = lines
         .slice(1)
-        .filter(line => line.trim().startsWith('- '))
-        .map(line => line.trim().substring(2).trim())
+        .filter((line) => line.trim().startsWith("- "))
+        .map((line) => line.trim().substring(2).trim())
         .filter(Boolean)
 
       if (notes.length > 0) {
@@ -216,17 +214,10 @@ export function getRecentReleaseNotes(
     const baseCurrentVersion = coerce(currentVersion)
     const basePreviousVersion = previousVersion ? coerce(previousVersion) : null
 
-    if (
-      !basePreviousVersion ||
-      (baseCurrentVersion &&
-        gt(baseCurrentVersion.version, basePreviousVersion.version))
-    ) {
+    if (!basePreviousVersion || (baseCurrentVersion && gt(baseCurrentVersion.version, basePreviousVersion.version))) {
       // Get all versions that are newer than the last seen version
       return Object.entries(releaseNotes)
-        .filter(
-          ([version]) =>
-            !basePreviousVersion || gt(version, basePreviousVersion.version),
-        )
+        .filter(([version]) => !basePreviousVersion || gt(version, basePreviousVersion.version))
         .sort(([versionA], [versionB]) => (gt(versionA, versionB) ? -1 : 1)) // Sort newest first
         .flatMap(([_, notes]) => notes)
         .filter(Boolean)
@@ -253,13 +244,11 @@ export function getAllReleaseNotes(
     const releaseNotes = parseChangelog(changelogContent)
 
     // Sort versions with oldest first
-    const sortedVersions = Object.keys(releaseNotes).sort((a, b) =>
-      gt(a, b) ? 1 : -1,
-    )
+    const sortedVersions = Object.keys(releaseNotes).sort((a, b) => (gt(a, b) ? 1 : -1))
 
     // Return array of [version, notes] arrays
     return sortedVersions
-      .map(version => {
+      .map((version) => {
         const versionNotes = releaseNotes[version]
         if (!versionNotes || versionNotes.length === 0) return null
 
@@ -289,10 +278,10 @@ export async function checkForReleaseNotes(
   currentVersion: string = MACRO.VERSION,
 ): Promise<{ hasReleaseNotes: boolean; releaseNotes: string[] }> {
   // For Ant builds, use VERSION_CHANGELOG bundled at build time
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     const changelog = MACRO.VERSION_CHANGELOG
     if (changelog) {
-      const commits = changelog.trim().split('\n').filter(Boolean)
+      const commits = changelog.trim().split("\n").filter(Boolean)
       return {
         hasReleaseNotes: commits.length > 0,
         releaseNotes: commits,
@@ -310,14 +299,10 @@ export async function checkForReleaseNotes(
   // If the version has changed or we don't have a cached changelog, fetch a new one
   // This happens in the background and doesn't block the UI
   if (lastSeenVersion !== currentVersion || !cachedChangelog) {
-    fetchAndStoreChangelog().catch(error => logError(toError(error)))
+    fetchAndStoreChangelog().catch((error) => logError(toError(error)))
   }
 
-  const releaseNotes = getRecentReleaseNotes(
-    currentVersion,
-    lastSeenVersion,
-    cachedChangelog,
-  )
+  const releaseNotes = getRecentReleaseNotes(currentVersion, lastSeenVersion, cachedChangelog)
   const hasReleaseNotes = releaseNotes.length > 0
 
   return {
@@ -337,10 +322,10 @@ export function checkForReleaseNotesSync(
   currentVersion: string = MACRO.VERSION,
 ): { hasReleaseNotes: boolean; releaseNotes: string[] } {
   // For Ant builds, use VERSION_CHANGELOG bundled at build time
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     const changelog = MACRO.VERSION_CHANGELOG
     if (changelog) {
-      const commits = changelog.trim().split('\n').filter(Boolean)
+      const commits = changelog.trim().split("\n").filter(Boolean)
       return {
         hasReleaseNotes: commits.length > 0,
         releaseNotes: commits,

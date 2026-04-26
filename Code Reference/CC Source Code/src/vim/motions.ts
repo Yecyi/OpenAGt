@@ -4,17 +4,13 @@
  * Pure functions for resolving vim motions to cursor positions.
  */
 
-import type { Cursor } from '../utils/Cursor.js'
+import type { Cursor } from "../utils/Cursor.js"
 
 /**
  * Resolve a motion to a target cursor position.
  * Does not modify anything - pure calculation.
  */
-export function resolveMotion(
-  key: string,
-  cursor: Cursor,
-  count: number,
-): Cursor {
+export function resolveMotion(key: string, cursor: Cursor, count: number): Cursor {
   let result = cursor
   for (let i = 0; i < count; i++) {
     const next = applySingleMotion(key, result)
@@ -29,37 +25,37 @@ export function resolveMotion(
  */
 function applySingleMotion(key: string, cursor: Cursor): Cursor {
   switch (key) {
-    case 'h':
+    case "h":
       return cursor.left()
-    case 'l':
+    case "l":
       return cursor.right()
-    case 'j':
+    case "j":
       return cursor.downLogicalLine()
-    case 'k':
+    case "k":
       return cursor.upLogicalLine()
-    case 'gj':
+    case "gj":
       return cursor.down()
-    case 'gk':
+    case "gk":
       return cursor.up()
-    case 'w':
+    case "w":
       return cursor.nextVimWord()
-    case 'b':
+    case "b":
       return cursor.prevVimWord()
-    case 'e':
+    case "e":
       return cursor.endOfVimWord()
-    case 'W':
+    case "W":
       return cursor.nextWORD()
-    case 'B':
+    case "B":
       return cursor.prevWORD()
-    case 'E':
+    case "E":
       return cursor.endOfWORD()
-    case '0':
+    case "0":
       return cursor.startOfLogicalLine()
-    case '^':
+    case "^":
       return cursor.firstNonBlankInLogicalLine()
-    case '$':
+    case "$":
       return cursor.endOfLogicalLine()
-    case 'G':
+    case "G":
       return cursor.startOfLastLine()
     default:
       return cursor
@@ -70,7 +66,7 @@ function applySingleMotion(key: string, cursor: Cursor): Cursor {
  * Check if a motion is inclusive (includes character at destination).
  */
 export function isInclusiveMotion(key: string): boolean {
-  return 'eE$'.includes(key)
+  return "eE$".includes(key)
 }
 
 /**
@@ -78,5 +74,5 @@ export function isInclusiveMotion(key: string): boolean {
  * Note: gj/gk are characterwise exclusive per `:help gj`, not linewise.
  */
 export function isLinewiseMotion(key: string): boolean {
-  return 'jkG'.includes(key) || key === 'gg'
+  return "jkG".includes(key) || key === "gg"
 }

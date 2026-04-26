@@ -122,12 +122,7 @@ const pendingOAuthTransports = new Map<string, TransportWithAuth>()
 type ClosableTransport = { close: () => void | Promise<void> }
 
 function isClosableTransport(transport: unknown): transport is ClosableTransport {
-  return (
-    !!transport &&
-    typeof transport === "object" &&
-    "close" in transport &&
-    typeof transport.close === "function"
-  )
+  return !!transport && typeof transport === "object" && "close" in transport && typeof transport.close === "function"
 }
 
 function closeTransportIfSupported(transport: unknown) {
@@ -179,7 +174,7 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number
   const inputSchema = mcpTool.inputSchema as JSONSchema7 | undefined
   const schema: JSONSchema7 =
     inputSchema && typeof inputSchema === "object"
-      ? structuredClone(inputSchema) as JSONSchema7
+      ? (structuredClone(inputSchema) as JSONSchema7)
       : {
           type: "object",
           properties: {},

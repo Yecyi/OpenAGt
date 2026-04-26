@@ -27,10 +27,10 @@
 
 This repository contains two related but independent codebases:
 
-| Area | Path | Purpose | Current State |
-|---|---|---|---|
-| Claude Code research source | root (`src/`, `docs/`, `scripts/`) | Decompiled/unbundled analysis of `@anthropic-ai/claude-code@2.1.88` plus best-effort build helpers | Primary analysis target in this repo |
-| Agent Studio prototype | `agent_studio/` | Local-first coding assistant stack (`agentd` + Flutter desktop app) with its own workspace packages | Actively runnable prototype with TypeScript runtime + Flutter UI |
+| Area                        | Path                               | Purpose                                                                                             | Current State                                                    |
+| --------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Claude Code research source | root (`src/`, `docs/`, `scripts/`) | Decompiled/unbundled analysis of `@anthropic-ai/claude-code@2.1.88` plus best-effort build helpers  | Primary analysis target in this repo                             |
+| Agent Studio prototype      | `agent_studio/`                    | Local-first coding assistant stack (`agentd` + Flutter desktop app) with its own workspace packages | Actively runnable prototype with TypeScript runtime + Flutter UI |
 
 ```
 Claude_Code_leak/
@@ -68,13 +68,13 @@ docs/
 
 > Click any filename above to jump to the full report.
 
-| # | Topic | Key Findings |
-|---|-------|-------------|
-| 01 | **Telemetry & Privacy** | Two analytics sinks (1P → Anthropic, Datadog). Environment fingerprint, process metrics, repo hash on every event. **No UI-exposed opt-out** for 1st-party logging. `OTEL_LOG_TOOL_DETAILS=1` enables full tool input capture. |
-| 02 | **Hidden Features & Codenames** | Animal codenames (Capybara v8, Tengu, Fennec→Opus 4.6, **Numbat** next). Feature flags use random word pairs (`tengu_frond_boric`) to obscure purpose. Internal users get better prompts, verification agents, and effort anchors. Hidden commands: `/btw`, `/stickers`. |
-| 03 | **Undercover Mode** | Anthropic employees auto-enter undercover mode in public repos. Model instructed: *"Do not blow your cover"* — strip all AI attribution, write commits "as a human developer would." **No force-OFF exists.** Raises transparency questions for open-source communities. |
-| 04 | **Remote Control** | Hourly polling of `/api/claude_code/settings`. Dangerous changes show blocking dialog — **reject = app exits**. 6+ killswitches (bypass permissions, fast mode, voice mode, analytics sink). GrowthBook flags can change any user's behavior without consent. |
-| 05 | **Future Roadmap** | **Numbat** codename confirmed. Opus 4.7 / Sonnet 4.8 in development. **KAIROS** = fully autonomous agent mode with `<tick>` heartbeats, push notifications, PR subscriptions. Voice mode (push-to-talk) ready but gated. 17 unreleased tools found. |
+| #   | Topic                           | Key Findings                                                                                                                                                                                                                                                             |
+| --- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 01  | **Telemetry & Privacy**         | Two analytics sinks (1P → Anthropic, Datadog). Environment fingerprint, process metrics, repo hash on every event. **No UI-exposed opt-out** for 1st-party logging. `OTEL_LOG_TOOL_DETAILS=1` enables full tool input capture.                                           |
+| 02  | **Hidden Features & Codenames** | Animal codenames (Capybara v8, Tengu, Fennec→Opus 4.6, **Numbat** next). Feature flags use random word pairs (`tengu_frond_boric`) to obscure purpose. Internal users get better prompts, verification agents, and effort anchors. Hidden commands: `/btw`, `/stickers`. |
+| 03  | **Undercover Mode**             | Anthropic employees auto-enter undercover mode in public repos. Model instructed: _"Do not blow your cover"_ — strip all AI attribution, write commits "as a human developer would." **No force-OFF exists.** Raises transparency questions for open-source communities. |
+| 04  | **Remote Control**              | Hourly polling of `/api/claude_code/settings`. Dangerous changes show blocking dialog — **reject = app exits**. 6+ killswitches (bypass permissions, fast mode, voice mode, analytics sink). GrowthBook flags can change any user's behavior without consent.            |
+| 05  | **Future Roadmap**              | **Numbat** codename confirmed. Opus 4.7 / Sonnet 4.8 in development. **KAIROS** = fully autonomous agent mode with `<tick>` heartbeats, push notifications, PR subscriptions. Voice mode (push-to-talk) ready but gated. 17 unreleased tools found.                      |
 
 ---
 
@@ -91,51 +91,51 @@ These modules have no source files anywhere in the npm package. They are interna
 <details>
 <summary>Click to expand full list</summary>
 
-| Module | Purpose | Feature Gate |
-|--------|---------|-------------|
-| `daemon/main.js` | Background daemon supervisor | `DAEMON` |
-| `daemon/workerRegistry.js` | Daemon worker registry | `DAEMON` |
-| `proactive/index.js` | Proactive notification system | `PROACTIVE` |
-| `contextCollapse/index.js` | Context collapse service (experimental) | `CONTEXT_COLLAPSE` |
-| `contextCollapse/operations.js` | Collapse operations | `CONTEXT_COLLAPSE` |
-| `contextCollapse/persist.js` | Collapse persistence | `CONTEXT_COLLAPSE` |
-| `skillSearch/featureCheck.js` | Remote skill feature check | `EXPERIMENTAL_SKILL_SEARCH` |
-| `skillSearch/remoteSkillLoader.js` | Remote skill loader | `EXPERIMENTAL_SKILL_SEARCH` |
-| `skillSearch/remoteSkillState.js` | Remote skill state | `EXPERIMENTAL_SKILL_SEARCH` |
-| `skillSearch/telemetry.js` | Skill search telemetry | `EXPERIMENTAL_SKILL_SEARCH` |
-| `skillSearch/localSearch.js` | Local skill search | `EXPERIMENTAL_SKILL_SEARCH` |
-| `skillSearch/prefetch.js` | Skill prefetch | `EXPERIMENTAL_SKILL_SEARCH` |
-| `coordinator/workerAgent.js` | Multi-agent coordinator worker | `COORDINATOR_MODE` |
-| `bridge/peerSessions.js` | Bridge peer session management | `BRIDGE_MODE` |
-| `assistant/index.js` | Kairos assistant mode | `KAIROS` |
-| `assistant/AssistantSessionChooser.js` | Assistant session picker | `KAIROS` |
-| `compact/reactiveCompact.js` | Reactive context compaction | `CACHED_MICROCOMPACT` |
-| `compact/snipCompact.js` | Snip-based compaction | `HISTORY_SNIP` |
-| `compact/snipProjection.js` | Snip projection | `HISTORY_SNIP` |
-| `compact/cachedMCConfig.js` | Cached micro-compact config | `CACHED_MICROCOMPACT` |
-| `sessionTranscript/sessionTranscript.js` | Session transcript service | `TRANSCRIPT_CLASSIFIER` |
-| `commands/agents-platform/index.js` | Internal agents platform | `ant` (internal) |
-| `commands/assistant/index.js` | Assistant command | `KAIROS` |
-| `commands/buddy/index.js` | Buddy system notifications | `BUDDY` |
-| `commands/fork/index.js` | Fork subagent command | `FORK_SUBAGENT` |
-| `commands/peers/index.js` | Multi-peer commands | `BRIDGE_MODE` |
-| `commands/proactive.js` | Proactive command | `PROACTIVE` |
-| `commands/remoteControlServer/index.js` | Remote control server | `DAEMON` + `BRIDGE_MODE` |
-| `commands/subscribe-pr.js` | GitHub PR subscription | `KAIROS_GITHUB_WEBHOOKS` |
-| `commands/torch.js` | Internal debug tool | `TORCH` |
-| `commands/workflows/index.js` | Workflow commands | `WORKFLOW_SCRIPTS` |
-| `jobs/classifier.js` | Internal job classifier | `TEMPLATES` |
-| `memdir/memoryShapeTelemetry.js` | Memory shape telemetry | `MEMORY_SHAPE_TELEMETRY` |
-| `services/sessionTranscript/sessionTranscript.js` | Session transcript | `TRANSCRIPT_CLASSIFIER` |
-| `tasks/LocalWorkflowTask/LocalWorkflowTask.js` | Local workflow task | `WORKFLOW_SCRIPTS` |
-| `protectedNamespace.js` | Internal namespace guard | `ant` (internal) |
-| `protectedNamespace.js` (envUtils) | Protected namespace runtime | `ant` (internal) |
-| `coreTypes.generated.js` | Generated core types | `ant` (internal) |
-| `devtools.js` | Internal dev tools | `ant` (internal) |
-| `attributionHooks.js` | Internal attribution hooks | `COMMIT_ATTRIBUTION` |
-| `systemThemeWatcher.js` | System theme watcher | `AUTO_THEME` |
-| `udsClient.js` / `udsMessaging.js` | UDS messaging client | `UDS_INBOX` |
-| `systemThemeWatcher.js` | Theme watcher | `AUTO_THEME` |
+| Module                                            | Purpose                                 | Feature Gate                |
+| ------------------------------------------------- | --------------------------------------- | --------------------------- |
+| `daemon/main.js`                                  | Background daemon supervisor            | `DAEMON`                    |
+| `daemon/workerRegistry.js`                        | Daemon worker registry                  | `DAEMON`                    |
+| `proactive/index.js`                              | Proactive notification system           | `PROACTIVE`                 |
+| `contextCollapse/index.js`                        | Context collapse service (experimental) | `CONTEXT_COLLAPSE`          |
+| `contextCollapse/operations.js`                   | Collapse operations                     | `CONTEXT_COLLAPSE`          |
+| `contextCollapse/persist.js`                      | Collapse persistence                    | `CONTEXT_COLLAPSE`          |
+| `skillSearch/featureCheck.js`                     | Remote skill feature check              | `EXPERIMENTAL_SKILL_SEARCH` |
+| `skillSearch/remoteSkillLoader.js`                | Remote skill loader                     | `EXPERIMENTAL_SKILL_SEARCH` |
+| `skillSearch/remoteSkillState.js`                 | Remote skill state                      | `EXPERIMENTAL_SKILL_SEARCH` |
+| `skillSearch/telemetry.js`                        | Skill search telemetry                  | `EXPERIMENTAL_SKILL_SEARCH` |
+| `skillSearch/localSearch.js`                      | Local skill search                      | `EXPERIMENTAL_SKILL_SEARCH` |
+| `skillSearch/prefetch.js`                         | Skill prefetch                          | `EXPERIMENTAL_SKILL_SEARCH` |
+| `coordinator/workerAgent.js`                      | Multi-agent coordinator worker          | `COORDINATOR_MODE`          |
+| `bridge/peerSessions.js`                          | Bridge peer session management          | `BRIDGE_MODE`               |
+| `assistant/index.js`                              | Kairos assistant mode                   | `KAIROS`                    |
+| `assistant/AssistantSessionChooser.js`            | Assistant session picker                | `KAIROS`                    |
+| `compact/reactiveCompact.js`                      | Reactive context compaction             | `CACHED_MICROCOMPACT`       |
+| `compact/snipCompact.js`                          | Snip-based compaction                   | `HISTORY_SNIP`              |
+| `compact/snipProjection.js`                       | Snip projection                         | `HISTORY_SNIP`              |
+| `compact/cachedMCConfig.js`                       | Cached micro-compact config             | `CACHED_MICROCOMPACT`       |
+| `sessionTranscript/sessionTranscript.js`          | Session transcript service              | `TRANSCRIPT_CLASSIFIER`     |
+| `commands/agents-platform/index.js`               | Internal agents platform                | `ant` (internal)            |
+| `commands/assistant/index.js`                     | Assistant command                       | `KAIROS`                    |
+| `commands/buddy/index.js`                         | Buddy system notifications              | `BUDDY`                     |
+| `commands/fork/index.js`                          | Fork subagent command                   | `FORK_SUBAGENT`             |
+| `commands/peers/index.js`                         | Multi-peer commands                     | `BRIDGE_MODE`               |
+| `commands/proactive.js`                           | Proactive command                       | `PROACTIVE`                 |
+| `commands/remoteControlServer/index.js`           | Remote control server                   | `DAEMON` + `BRIDGE_MODE`    |
+| `commands/subscribe-pr.js`                        | GitHub PR subscription                  | `KAIROS_GITHUB_WEBHOOKS`    |
+| `commands/torch.js`                               | Internal debug tool                     | `TORCH`                     |
+| `commands/workflows/index.js`                     | Workflow commands                       | `WORKFLOW_SCRIPTS`          |
+| `jobs/classifier.js`                              | Internal job classifier                 | `TEMPLATES`                 |
+| `memdir/memoryShapeTelemetry.js`                  | Memory shape telemetry                  | `MEMORY_SHAPE_TELEMETRY`    |
+| `services/sessionTranscript/sessionTranscript.js` | Session transcript                      | `TRANSCRIPT_CLASSIFIER`     |
+| `tasks/LocalWorkflowTask/LocalWorkflowTask.js`    | Local workflow task                     | `WORKFLOW_SCRIPTS`          |
+| `protectedNamespace.js`                           | Internal namespace guard                | `ant` (internal)            |
+| `protectedNamespace.js` (envUtils)                | Protected namespace runtime             | `ant` (internal)            |
+| `coreTypes.generated.js`                          | Generated core types                    | `ant` (internal)            |
+| `devtools.js`                                     | Internal dev tools                      | `ant` (internal)            |
+| `attributionHooks.js`                             | Internal attribution hooks              | `COMMIT_ATTRIBUTION`        |
+| `systemThemeWatcher.js`                           | System theme watcher                    | `AUTO_THEME`                |
+| `udsClient.js` / `udsMessaging.js`                | UDS messaging client                    | `UDS_INBOX`                 |
+| `systemThemeWatcher.js`                           | Theme watcher                           | `AUTO_THEME`                |
 
 </details>
 
@@ -146,25 +146,25 @@ These tools have type signatures in `sdk-tools.d.ts` but their implementations w
 <details>
 <summary>Click to expand full list</summary>
 
-| Tool | Purpose | Feature Gate |
-|------|---------|-------------|
-| `REPLTool` | Interactive REPL (VM sandbox) | `ant` (internal) |
-| `SnipTool` | Context snipping | `HISTORY_SNIP` |
-| `SleepTool` | Sleep/delay in agent loop | `PROACTIVE` / `KAIROS` |
-| `MonitorTool` | MCP monitoring | `MONITOR_TOOL` |
-| `OverflowTestTool` | Overflow testing | `OVERFLOW_TEST_TOOL` |
-| `WorkflowTool` | Workflow execution | `WORKFLOW_SCRIPTS` |
-| `WebBrowserTool` | Browser automation | `WEB_BROWSER_TOOL` |
-| `TerminalCaptureTool` | Terminal capture | `TERMINAL_PANEL` |
-| `TungstenTool` | Internal perf monitoring | `ant` (internal) |
-| `VerifyPlanExecutionTool` | Plan verification | `CLAUDE_CODE_VERIFY_PLAN` |
-| `SendUserFileTool` | Send files to users | `KAIROS` |
-| `SubscribePRTool` | GitHub PR subscription | `KAIROS_GITHUB_WEBHOOKS` |
-| `SuggestBackgroundPRTool` | Suggest background PRs | `KAIROS` |
-| `PushNotificationTool` | Push notifications | `KAIROS` |
-| `CtxInspectTool` | Context inspection | `CONTEXT_COLLAPSE` |
-| `ListPeersTool` | List active peers | `UDS_INBOX` |
-| `DiscoverSkillsTool` | Skill discovery | `EXPERIMENTAL_SKILL_SEARCH` |
+| Tool                      | Purpose                       | Feature Gate                |
+| ------------------------- | ----------------------------- | --------------------------- |
+| `REPLTool`                | Interactive REPL (VM sandbox) | `ant` (internal)            |
+| `SnipTool`                | Context snipping              | `HISTORY_SNIP`              |
+| `SleepTool`               | Sleep/delay in agent loop     | `PROACTIVE` / `KAIROS`      |
+| `MonitorTool`             | MCP monitoring                | `MONITOR_TOOL`              |
+| `OverflowTestTool`        | Overflow testing              | `OVERFLOW_TEST_TOOL`        |
+| `WorkflowTool`            | Workflow execution            | `WORKFLOW_SCRIPTS`          |
+| `WebBrowserTool`          | Browser automation            | `WEB_BROWSER_TOOL`          |
+| `TerminalCaptureTool`     | Terminal capture              | `TERMINAL_PANEL`            |
+| `TungstenTool`            | Internal perf monitoring      | `ant` (internal)            |
+| `VerifyPlanExecutionTool` | Plan verification             | `CLAUDE_CODE_VERIFY_PLAN`   |
+| `SendUserFileTool`        | Send files to users           | `KAIROS`                    |
+| `SubscribePRTool`         | GitHub PR subscription        | `KAIROS_GITHUB_WEBHOOKS`    |
+| `SuggestBackgroundPRTool` | Suggest background PRs        | `KAIROS`                    |
+| `PushNotificationTool`    | Push notifications            | `KAIROS`                    |
+| `CtxInspectTool`          | Context inspection            | `CONTEXT_COLLAPSE`          |
+| `ListPeersTool`           | List active peers             | `UDS_INBOX`                 |
+| `DiscoverSkillsTool`      | Skill discovery               | `EXPERIMENTAL_SKILL_SEARCH` |
 
 </details>
 
@@ -175,14 +175,14 @@ These are internal prompt templates and documentation, never published.
 <details>
 <summary>Click to expand</summary>
 
-| File | Purpose |
-|------|---------|
+| File                                                  | Purpose                                |
+| ----------------------------------------------------- | -------------------------------------- |
 | `yolo-classifier-prompts/auto_mode_system_prompt.txt` | Auto-mode system prompt for classifier |
-| `yolo-classifier-prompts/permissions_anthropic.txt` | Anthropic-internal permission prompt |
-| `yolo-classifier-prompts/permissions_external.txt` | External user permission prompt |
-| `verify/SKILL.md` | Verification skill documentation |
-| `verify/examples/cli.md` | CLI verification examples |
-| `verify/examples/server.md` | Server verification examples |
+| `yolo-classifier-prompts/permissions_anthropic.txt`   | Anthropic-internal permission prompt   |
+| `yolo-classifier-prompts/permissions_external.txt`    | External user permission prompt        |
+| `verify/SKILL.md`                                     | Verification skill documentation       |
+| `verify/examples/cli.md`                              | CLI verification examples              |
+| `verify/examples/server.md`                           | Server verification examples           |
 
 </details>
 
@@ -196,12 +196,13 @@ These are internal prompt templates and documentation, never published.
   daemon/main.js  ← INCLUDED    ──bundle─→  daemon/main.js  ← DELETED (DCE)
   tools/REPLTool  ← INCLUDED    ──bundle─→  tools/REPLTool  ← DELETED (DCE)
   proactive/      ← INCLUDED    ──bundle─→  (referenced but absent from src/)
-  ```
+```
 
-  Bun's `feature()` is a **compile-time intrinsic**:
-  - Returns `true` in Anthropic's internal build → code is kept in the bundle
-  - Returns `false` in the published build → code is dead-code-eliminated
-  - The 108 modules simply do not exist anywhere in the published artifact
+Bun's `feature()` is a **compile-time intrinsic**:
+
+- Returns `true` in Anthropic's internal build → code is kept in the bundle
+- Returns `false` in the published build → code is dead-code-eliminated
+- The 108 modules simply do not exist anywhere in the published artifact
 
 ---
 
@@ -222,17 +223,17 @@ please contact the repository owner for immediate removal.
 
 ## Stats
 
-| Item | Count |
-|------|-------|
-| Source files (.ts/.tsx) | ~1,884 |
-| Lines of code | ~512,664 |
-| Largest single file | `query.ts` (~785KB) |
-| Built-in tools | ~40+ |
-| Slash commands | ~80+ |
-| Dependencies (node_modules) | ~192 packages |
-| Runtime | Bun (compiled to Node.js >= 18 bundle) |
+| Item                                 | Count                                            |
+| ------------------------------------ | ------------------------------------------------ |
+| Source files (.ts/.tsx)              | ~1,884                                           |
+| Lines of code                        | ~512,664                                         |
+| Largest single file                  | `query.ts` (~785KB)                              |
+| Built-in tools                       | ~40+                                             |
+| Slash commands                       | ~80+                                             |
+| Dependencies (node_modules)          | ~192 packages                                    |
+| Runtime                              | Bun (compiled to Node.js >= 18 bundle)           |
 | Agent Studio runtime source (TS/TSX) | 25 files / ~8.4K LOC (excluding build artifacts) |
-| Agent Studio desktop source (Dart) | 7 files / ~3.0K LOC (excluding build artifacts) |
+| Agent Studio desktop source (Dart)   | 7 files / ~3.0K LOC (excluding build artifacts)  |
 
 ---
 
@@ -242,17 +243,17 @@ please contact the repository owner for immediate removal.
 
 ### Package topology
 
-| Path | Responsibility |
-|---|---|
-| `apps/agentd` | RPC server over WebSocket (`ws://127.0.0.1:4317` by default) |
-| `packages/protocol` | Zod schemas for requests, events, tool contracts, and runtime state |
-| `packages/storage` | SQLite persistence (`~/.agent-studio/agent-studio.db`) + transcript/task/tool-result sidecars |
-| `packages/control-plane` | Workspace trust model, rule matching, path safety checks, approval policy |
-| `packages/model-adapters` | OpenAI-compatible chat adapter (streaming + tool call parsing) |
-| `packages/tool-runtime` | Tool registry/orchestrator + built-in read/write/shell tools |
-| `packages/agent-system` | Task manager and agent profile primitives |
-| `packages/core-runtime` | Main run loop (sessions, status events, tool turns, approvals, cancellation) |
-| `apps/flutter_app` | Desktop control plane UI (provider config, sessions, approvals, transcript view) |
+| Path                      | Responsibility                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| `apps/agentd`             | RPC server over WebSocket (`ws://127.0.0.1:4317` by default)                                  |
+| `packages/protocol`       | Zod schemas for requests, events, tool contracts, and runtime state                           |
+| `packages/storage`        | SQLite persistence (`~/.agent-studio/agent-studio.db`) + transcript/task/tool-result sidecars |
+| `packages/control-plane`  | Workspace trust model, rule matching, path safety checks, approval policy                     |
+| `packages/model-adapters` | OpenAI-compatible chat adapter (streaming + tool call parsing)                                |
+| `packages/tool-runtime`   | Tool registry/orchestrator + built-in read/write/shell tools                                  |
+| `packages/agent-system`   | Task manager and agent profile primitives                                                     |
+| `packages/core-runtime`   | Main run loop (sessions, status events, tool turns, approvals, cancellation)                  |
+| `apps/flutter_app`        | Desktop control plane UI (provider config, sessions, approvals, transcript view)              |
 
 ### Implemented RPC methods
 
@@ -263,6 +264,7 @@ please contact the repository owner for immediate removal.
 `read_file`, `list_dir`, `glob`, `grep`, `git_status`, `git_diff`, `write_file`, `edit_file`, `run_shell`, `run_powershell`.
 
 Runtime behavior visible in code:
+
 - Read-only tools execute concurrently (`maxConcurrentReadTools`), mutating/execution tools execute serially.
 - `run_shell` / `run_powershell` require explicit approval by default.
 - Untrusted workspaces block mutating/execution tools.
@@ -290,11 +292,13 @@ flutter run -d windows
 ```
 
 Optional runtime env vars for `agentd`:
+
 - `AGENT_STUDIO_WS_PORT` (default `4317`)
 - `AGENT_STUDIO_LOG_LEVEL` (`fatal|error|warn|info|debug|trace`)
 - `AGENT_STUDIO_HOME` (default data root `~/.agent-studio`)
 
 Notes:
+
 - Flutter auto-start logic prefers `agent_studio/apps/agentd/dist/index.js`, but the current package exports still point to TypeScript sources. Manual `npm run dev:agentd` is safer during development.
 - If port `4317` is already occupied, set `AGENT_STUDIO_WS_PORT` and connect Flutter to the same endpoint.
 
@@ -984,19 +988,19 @@ This source code demonstrates 12 layered mechanisms that a production AI agent h
 
 ## Key Design Patterns
 
-| Pattern | Where | Purpose |
-|---------|-------|---------|
-| **AsyncGenerator streaming** | `QueryEngine`, `query()` | Full-chain streaming from API to consumer |
-| **Builder + Factory** | `buildTool()` | Safe defaults for tool definitions |
-| **Branded Types** | `SystemPrompt`, `asSystemPrompt()` | Prevent string/array confusion |
-| **Feature Flags + DCE** | `feature()` from `bun:bundle` | Compile-time dead code elimination |
-| **Discriminated Unions** | `Message` types | Type-safe message handling |
-| **Observer + State Machine** | `StreamingToolExecutor` | Tool execution lifecycle tracking |
-| **Snapshot State** | `FileHistoryState` | Undo/redo for file operations |
-| **Ring Buffer** | Error log | Bounded memory for long sessions |
-| **Fire-and-Forget Write** | `recordTranscript()` | Non-blocking persistence with ordering |
-| **Lazy Schema** | `lazySchema()` | Defer Zod schema evaluation for performance |
-| **Context Isolation** | `AsyncLocalStorage` | Per-agent context in shared process |
+| Pattern                      | Where                              | Purpose                                     |
+| ---------------------------- | ---------------------------------- | ------------------------------------------- |
+| **AsyncGenerator streaming** | `QueryEngine`, `query()`           | Full-chain streaming from API to consumer   |
+| **Builder + Factory**        | `buildTool()`                      | Safe defaults for tool definitions          |
+| **Branded Types**            | `SystemPrompt`, `asSystemPrompt()` | Prevent string/array confusion              |
+| **Feature Flags + DCE**      | `feature()` from `bun:bundle`      | Compile-time dead code elimination          |
+| **Discriminated Unions**     | `Message` types                    | Type-safe message handling                  |
+| **Observer + State Machine** | `StreamingToolExecutor`            | Tool execution lifecycle tracking           |
+| **Snapshot State**           | `FileHistoryState`                 | Undo/redo for file operations               |
+| **Ring Buffer**              | Error log                          | Bounded memory for long sessions            |
+| **Fire-and-Forget Write**    | `recordTranscript()`               | Non-blocking persistence with ordering      |
+| **Lazy Schema**              | `lazySchema()`                     | Defer Zod schema evaluation for performance |
+| **Context Isolation**        | `AsyncLocalStorage`                | Per-agent context in shared process         |
 
 ---
 
@@ -1018,6 +1022,6 @@ This source is **not directly compilable** from this repo alone:
 ## License
 
 All source code in this repository is copyright **Anthropic and Claude**. This repository is for technical research and education only. See the original npm package for full license terms.
-"# claude_code_annotated" 
-"# claude_code_annotated" 
-"# claude_code_annotated" 
+"# claude_code_annotated"
+"# claude_code_annotated"
+"# claude_code_annotated"

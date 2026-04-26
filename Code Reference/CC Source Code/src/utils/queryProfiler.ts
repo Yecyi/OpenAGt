@@ -27,9 +27,9 @@
  * - query_end: End of query
  */
 
-import { logForDebugging } from './debug.js'
-import { isEnvTruthy } from './envUtils.js'
-import { formatMs, formatTimelineLine, getPerformance } from './profilerBase.js'
+import { logForDebugging } from "./debug.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { formatMs, formatTimelineLine, getPerformance } from "./profilerBase.js"
 
 // Module-level state - initialized once when the module loads
 // eslint-disable-next-line custom-rules/no-process-env-top-level
@@ -60,7 +60,7 @@ export function startQueryProfile(): void {
   queryCount++
 
   // Record the start checkpoint
-  queryCheckpoint('query_user_input_received')
+  queryCheckpoint("query_user_input_received")
 }
 
 /**
@@ -74,8 +74,8 @@ export function queryCheckpoint(name: string): void {
   memorySnapshots.set(name, process.memoryUsage())
 
   // Track first token specially
-  if (name === 'query_first_chunk_received' && firstTokenTime === null) {
-    const marks = perf.getEntriesByType('mark')
+  if (name === "query_first_chunk_received" && firstTokenTime === null) {
+    const marks = perf.getEntriesByType("mark")
     if (marks.length > 0) {
       const lastMark = marks[marks.length - 1]
       firstTokenTime = lastMark?.startTime ?? 0
@@ -89,7 +89,7 @@ export function queryCheckpoint(name: string): void {
 export function endQueryProfile(): void {
   if (!ENABLED) return
 
-  queryCheckpoint('query_profile_end')
+  queryCheckpoint("query_profile_end")
 }
 
 /**
@@ -98,8 +98,8 @@ export function endQueryProfile(): void {
 function getSlowWarning(deltaMs: number, name: string): string {
   // Don't flag the first checkpoint as slow - it measures time from process start,
   // not actual processing overhead
-  if (name === 'query_user_input_received') {
-    return ''
+  if (name === "query_user_input_received") {
+    return ""
   }
 
   if (deltaMs > 1000) {
@@ -110,17 +110,17 @@ function getSlowWarning(deltaMs: number, name: string): string {
   }
 
   // Specific warnings for known bottlenecks
-  if (name.includes('git_status') && deltaMs > 50) {
-    return ' ⚠️  git status'
+  if (name.includes("git_status") && deltaMs > 50) {
+    return " ⚠️  git status"
   }
-  if (name.includes('tool_schema') && deltaMs > 50) {
-    return ' ⚠️  tool schemas'
+  if (name.includes("tool_schema") && deltaMs > 50) {
+    return " ⚠️  tool schemas"
   }
-  if (name.includes('client_creation') && deltaMs > 50) {
-    return ' ⚠️  client creation'
+  if (name.includes("client_creation") && deltaMs > 50) {
+    return " ⚠️  client creation"
   }
 
-  return ''
+  return ""
 }
 
 /**
@@ -128,20 +128,20 @@ function getSlowWarning(deltaMs: number, name: string): string {
  */
 function getQueryProfileReport(): string {
   if (!ENABLED) {
-    return 'Query profiling not enabled (set CLAUDE_CODE_PROFILE_QUERY=1)'
+    return "Query profiling not enabled (set CLAUDE_CODE_PROFILE_QUERY=1)"
   }
 
   const perf = getPerformance()
-  const marks = perf.getEntriesByType('mark')
+  const marks = perf.getEntriesByType("mark")
   if (marks.length === 0) {
-    return 'No query profiling checkpoints recorded'
+    return "No query profiling checkpoints recorded"
   }
 
   const lines: string[] = []
-  lines.push('='.repeat(80))
+  lines.push("=".repeat(80))
   lines.push(`QUERY PROFILING REPORT - Query #${queryCount}`)
-  lines.push('='.repeat(80))
-  lines.push('')
+  lines.push("=".repeat(80))
+  lines.push("")
 
   // Use first mark as baseline (query start time) to show relative times
   const baselineTime = marks[0]?.startTime ?? 0
@@ -165,10 +165,10 @@ function getQueryProfileReport(): string {
     )
 
     // Track key milestones for summary (use relative times)
-    if (mark.name === 'query_api_request_sent') {
+    if (mark.name === "query_api_request_sent") {
       apiRequestSentTime = relativeTime
     }
-    if (mark.name === 'query_first_chunk_received') {
+    if (mark.name === "query_first_chunk_received") {
       firstChunkTime = relativeTime
     }
 
@@ -179,25 +179,18 @@ function getQueryProfileReport(): string {
   const lastMark = marks[marks.length - 1]
   const totalTime = lastMark ? lastMark.startTime - baselineTime : 0
 
-  lines.push('')
-  lines.push('-'.repeat(80))
+  lines.push("")
+  lines.push("-".repeat(80))
 
   if (firstChunkTime > 0) {
     const preRequestOverhead = apiRequestSentTime
     const networkLatency = firstChunkTime - apiRequestSentTime
-    const preRequestPercent = (
-      (preRequestOverhead / firstChunkTime) *
-      100
-    ).toFixed(1)
+    const preRequestPercent = ((preRequestOverhead / firstChunkTime) * 100).toFixed(1)
     const networkPercent = ((networkLatency / firstChunkTime) * 100).toFixed(1)
 
     lines.push(`Total TTFT: ${formatMs(firstChunkTime)}ms`)
-    lines.push(
-      `  - Pre-request overhead: ${formatMs(preRequestOverhead)}ms (${preRequestPercent}%)`,
-    )
-    lines.push(
-      `  - Network latency: ${formatMs(networkLatency)}ms (${networkPercent}%)`,
-    )
+    lines.push(`  - Pre-request overhead: ${formatMs(preRequestOverhead)}ms (${preRequestPercent}%)`)
+    lines.push(`  - Network latency: ${formatMs(networkLatency)}ms (${networkPercent}%)`)
   } else {
     lines.push(`Total time: ${formatMs(totalTime)}ms`)
   }
@@ -205,67 +198,64 @@ function getQueryProfileReport(): string {
   // Add phase summary
   lines.push(getPhaseSummary(marks, baselineTime))
 
-  lines.push('='.repeat(80))
+  lines.push("=".repeat(80))
 
-  return lines.join('\n')
+  return lines.join("\n")
 }
 
 /**
  * Get phase-based summary showing time spent in each major phase
  */
-function getPhaseSummary(
-  marks: Array<{ name: string; startTime: number }>,
-  baselineTime: number,
-): string {
+function getPhaseSummary(marks: Array<{ name: string; startTime: number }>, baselineTime: number): string {
   const phases: Array<{ name: string; start: string; end: string }> = [
     {
-      name: 'Context loading',
-      start: 'query_context_loading_start',
-      end: 'query_context_loading_end',
+      name: "Context loading",
+      start: "query_context_loading_start",
+      end: "query_context_loading_end",
     },
     {
-      name: 'Microcompact',
-      start: 'query_microcompact_start',
-      end: 'query_microcompact_end',
+      name: "Microcompact",
+      start: "query_microcompact_start",
+      end: "query_microcompact_end",
     },
     {
-      name: 'Autocompact',
-      start: 'query_autocompact_start',
-      end: 'query_autocompact_end',
+      name: "Autocompact",
+      start: "query_autocompact_start",
+      end: "query_autocompact_end",
     },
-    { name: 'Query setup', start: 'query_setup_start', end: 'query_setup_end' },
+    { name: "Query setup", start: "query_setup_start", end: "query_setup_end" },
     {
-      name: 'Tool schemas',
-      start: 'query_tool_schema_build_start',
-      end: 'query_tool_schema_build_end',
-    },
-    {
-      name: 'Message normalization',
-      start: 'query_message_normalization_start',
-      end: 'query_message_normalization_end',
+      name: "Tool schemas",
+      start: "query_tool_schema_build_start",
+      end: "query_tool_schema_build_end",
     },
     {
-      name: 'Client creation',
-      start: 'query_client_creation_start',
-      end: 'query_client_creation_end',
+      name: "Message normalization",
+      start: "query_message_normalization_start",
+      end: "query_message_normalization_end",
     },
     {
-      name: 'Network TTFB',
-      start: 'query_api_request_sent',
-      end: 'query_first_chunk_received',
+      name: "Client creation",
+      start: "query_client_creation_start",
+      end: "query_client_creation_end",
     },
     {
-      name: 'Tool execution',
-      start: 'query_tool_execution_start',
-      end: 'query_tool_execution_end',
+      name: "Network TTFB",
+      start: "query_api_request_sent",
+      end: "query_first_chunk_received",
+    },
+    {
+      name: "Tool execution",
+      start: "query_tool_execution_start",
+      end: "query_tool_execution_end",
     },
   ]
 
-  const markMap = new Map(marks.map(m => [m.name, m.startTime - baselineTime]))
+  const markMap = new Map(marks.map((m) => [m.name, m.startTime - baselineTime]))
 
   const lines: string[] = []
-  lines.push('')
-  lines.push('PHASE BREAKDOWN:')
+  lines.push("")
+  lines.push("PHASE BREAKDOWN:")
 
   for (const phase of phases) {
     const startTime = markMap.get(phase.start)
@@ -273,23 +263,19 @@ function getPhaseSummary(
 
     if (startTime !== undefined && endTime !== undefined) {
       const duration = endTime - startTime
-      const bar = '█'.repeat(Math.min(Math.ceil(duration / 10), 50)) // 1 block per 10ms, max 50
-      lines.push(
-        `  ${phase.name.padEnd(22)} ${formatMs(duration).padStart(10)}ms ${bar}`,
-      )
+      const bar = "█".repeat(Math.min(Math.ceil(duration / 10), 50)) // 1 block per 10ms, max 50
+      lines.push(`  ${phase.name.padEnd(22)} ${formatMs(duration).padStart(10)}ms ${bar}`)
     }
   }
 
   // Calculate pre-API overhead (everything before api_request_sent)
-  const apiRequestSent = markMap.get('query_api_request_sent')
+  const apiRequestSent = markMap.get("query_api_request_sent")
   if (apiRequestSent !== undefined) {
-    lines.push('')
-    lines.push(
-      `  ${'Total pre-API overhead'.padEnd(22)} ${formatMs(apiRequestSent).padStart(10)}ms`,
-    )
+    lines.push("")
+    lines.push(`  ${"Total pre-API overhead".padEnd(22)} ${formatMs(apiRequestSent).padStart(10)}ms`)
   }
 
-  return lines.join('\n')
+  return lines.join("\n")
 }
 
 /**

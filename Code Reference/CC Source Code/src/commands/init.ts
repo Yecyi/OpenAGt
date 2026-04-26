@@ -1,7 +1,7 @@
-import { feature } from 'bun:bundle'
-import type { Command } from '../commands.js'
-import { maybeMarkProjectOnboardingComplete } from '../projectOnboardingState.js'
-import { isEnvTruthy } from '../utils/envUtils.js'
+import { feature } from "bun:bundle"
+import type { Command } from "../commands.js"
+import { maybeMarkProjectOnboardingComplete } from "../projectOnboardingState.js"
+import { isEnvTruthy } from "../utils/envUtils.js"
 
 const OLD_INIT_PROMPT = `Please analyze this codebase and create a CLAUDE.md file, which will be given to future instances of Claude Code to operate in this repository.
 
@@ -224,28 +224,24 @@ When building the list, work through these checks and include only what applies:
 - Browse official plugins with \`/plugin\` — these bundle skills, agents, hooks, and MCP servers that you may find helpful. You can also create your own custom plugins to share them with others. (Always include this one.)`
 
 const command = {
-  type: 'prompt',
-  name: 'init',
+  type: "prompt",
+  name: "init",
   get description() {
-    return feature('NEW_INIT') &&
-      (process.env.USER_TYPE === 'ant' ||
-        isEnvTruthy(process.env.CLAUDE_CODE_NEW_INIT))
-      ? 'Initialize new CLAUDE.md file(s) and optional skills/hooks with codebase documentation'
-      : 'Initialize a new CLAUDE.md file with codebase documentation'
+    return feature("NEW_INIT") && (process.env.USER_TYPE === "ant" || isEnvTruthy(process.env.CLAUDE_CODE_NEW_INIT))
+      ? "Initialize new CLAUDE.md file(s) and optional skills/hooks with codebase documentation"
+      : "Initialize a new CLAUDE.md file with codebase documentation"
   },
   contentLength: 0, // Dynamic content
-  progressMessage: 'analyzing your codebase',
-  source: 'builtin',
+  progressMessage: "analyzing your codebase",
+  source: "builtin",
   async getPromptForCommand() {
     maybeMarkProjectOnboardingComplete()
 
     return [
       {
-        type: 'text',
+        type: "text",
         text:
-          feature('NEW_INIT') &&
-          (process.env.USER_TYPE === 'ant' ||
-            isEnvTruthy(process.env.CLAUDE_CODE_NEW_INIT))
+          feature("NEW_INIT") && (process.env.USER_TYPE === "ant" || isEnvTruthy(process.env.CLAUDE_CODE_NEW_INIT))
             ? NEW_INIT_PROMPT
             : OLD_INIT_PROMPT,
       },

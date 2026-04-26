@@ -1,8 +1,8 @@
-import type { StructuredPatchHunk } from 'diff'
-import { useMemo, useRef } from 'react'
-import type { FileEditOutput } from '../tools/FileEditTool/types.js'
-import type { Output as FileWriteOutput } from '../tools/FileWriteTool/FileWriteTool.js'
-import type { Message } from '../types/message.js'
+import type { StructuredPatchHunk } from "diff"
+import { useMemo, useRef } from "react"
+import type { FileEditOutput } from "../tools/FileEditTool/types.js"
+import type { Output as FileWriteOutput } from "../tools/FileWriteTool/FileWriteTool.js"
+import type { Message } from "../types/message.js"
 
 export type TurnFileDiff = {
   filePath: string
@@ -34,22 +34,19 @@ type TurnDiffCache = {
 }
 
 function isFileEditResult(result: unknown): result is FileEditResult {
-  if (!result || typeof result !== 'object') return false
+  if (!result || typeof result !== "object") return false
   const r = result as Record<string, unknown>
   // FileEditTool: has structuredPatch with content
   // FileWriteTool (update): has structuredPatch with content
   // FileWriteTool (create): has type='create' and content (structuredPatch is empty)
-  const hasFilePath = typeof r.filePath === 'string'
-  const hasStructuredPatch =
-    Array.isArray(r.structuredPatch) && r.structuredPatch.length > 0
-  const isNewFile = r.type === 'create' && typeof r.content === 'string'
+  const hasFilePath = typeof r.filePath === "string"
+  const hasStructuredPatch = Array.isArray(r.structuredPatch) && r.structuredPatch.length > 0
+  const isNewFile = r.type === "create" && typeof r.content === "string"
   return hasFilePath && (hasStructuredPatch || isNewFile)
 }
 
 function isFileWriteOutput(result: FileEditResult): result is FileWriteOutput {
-  return (
-    'type' in result && (result.type === 'create' || result.type === 'update')
-  )
+  return "type" in result && (result.type === "create" || result.type === "update")
 }
 
 function countHunkLines(hunks: StructuredPatchHunk[]): {
@@ -60,20 +57,20 @@ function countHunkLines(hunks: StructuredPatchHunk[]): {
   let removed = 0
   for (const hunk of hunks) {
     for (const line of hunk.lines) {
-      if (line.startsWith('+')) added++
-      else if (line.startsWith('-')) removed++
+      if (line.startsWith("+")) added++
+      else if (line.startsWith("-")) removed++
     }
   }
   return { added, removed }
 }
 
 function getUserPromptPreview(message: Message): string {
-  if (message.type !== 'user') return ''
+  if (message.type !== "user") return ""
   const content = message.message.content
-  const text = typeof content === 'string' ? content : ''
+  const text = typeof content === "string" ? content : ""
   // Truncate to ~30 chars
   if (text.length <= 30) return text
-  return text.slice(0, 29) + '…'
+  return text.slice(0, 29) + "…"
 }
 
 function computeTurnStats(turn: TurnDiff): void {
@@ -119,13 +116,12 @@ export function useTurnDiffs(messages: Message[]): TurnDiff[] {
     // Process only new messages
     for (let i = c.lastProcessedIndex; i < messages.length; i++) {
       const message = messages[i]
-      if (!message || message.type !== 'user') continue
+      if (!message || message.type !== "user") continue
 
       // Check if this is a user prompt (not a tool result)
       const isToolResult =
         message.toolUseResult ||
-        (Array.isArray(message.message.content) &&
-          message.message.content[0]?.type === 'tool_result')
+        (Array.isArray(message.message.content) && message.message.content[0]?.type === "tool_result")
 
       if (!isToolResult && !message.isMeta) {
         // Start a new turn on user prompt
@@ -147,7 +143,7 @@ export function useTurnDiffs(messages: Message[]): TurnDiff[] {
         const result = message.toolUseResult
         if (isFileEditResult(result)) {
           const { filePath, structuredPatch } = result
-          const isNewFile = 'type' in result && result.type === 'create'
+          const isNewFile = "type" in result && result.type === "create"
 
           // Get or create file entry
           let fileEntry = c.currentTurn.files.get(filePath)
@@ -163,19 +159,15 @@ export function useTurnDiffs(messages: Message[]): TurnDiff[] {
           }
 
           // For new files, generate synthetic hunk from content
-          if (
-            isNewFile &&
-            structuredPatch.length === 0 &&
-            isFileWriteOutput(result)
-          ) {
+          if (isNewFile && structuredPatch.length === 0 && isFileWriteOutput(result)) {
             const content = result.content
-            const lines = content.split('\n')
+            const lines = content.split("\n")
             const syntheticHunk: StructuredPatchHunk = {
               oldStart: 0,
               oldLines: 0,
               newStart: 1,
               newLines: lines.length,
-              lines: lines.map(l => '+' + l),
+              lines: lines.map((l) => "+" + l),
             }
             fileEntry.hunks.push(syntheticHunk)
             fileEntry.linesAdded += lines.length

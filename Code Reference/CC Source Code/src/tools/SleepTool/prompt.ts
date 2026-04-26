@@ -1,8 +1,8 @@
-import { TICK_TAG } from '../../constants/xml.js'
+import { TICK_TAG } from "../../constants/xml.js"
 
-export const SLEEP_TOOL_NAME = 'Sleep'
+export const SLEEP_TOOL_NAME = "Sleep"
 
-export const DESCRIPTION = 'Wait for a specified duration'
+export const DESCRIPTION = "Wait for a specified duration"
 
 export const SLEEP_TOOL_PROMPT = `Wait for a specified duration. The user can interrupt the sleep at any time.
 

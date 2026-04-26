@@ -1,13 +1,10 @@
-import axios, { type AxiosError } from 'axios'
-import type { StdoutMessage } from 'src/entrypoints/sdk/controlTypes.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { logForDiagnosticsNoPII } from '../../utils/diagLogs.js'
-import { getSessionIngressAuthToken } from '../../utils/sessionIngressAuth.js'
-import { SerialBatchEventUploader } from './SerialBatchEventUploader.js'
-import {
-  WebSocketTransport,
-  type WebSocketTransportOptions,
-} from './WebSocketTransport.js'
+import axios, { type AxiosError } from "axios"
+import type { StdoutMessage } from "src/entrypoints/sdk/controlTypes.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { logForDiagnosticsNoPII } from "../../utils/diagLogs.js"
+import { getSessionIngressAuthToken } from "../../utils/sessionIngressAuth.js"
+import { SerialBatchEventUploader } from "./SerialBatchEventUploader.js"
+import { WebSocketTransport, type WebSocketTransportOptions } from "./WebSocketTransport.js"
 
 const BATCH_FLUSH_INTERVAL_MS = 100
 // Per-attempt POST timeout. Bounds how long a single stuck POST can block
@@ -91,20 +88,16 @@ export class HybridTransport extends WebSocketTransport {
       // replBridge sets this; the 1P transportUtils path does not.
       maxConsecutiveFailures,
       onBatchDropped: (batchSize, failures) => {
-        logForDiagnosticsNoPII(
-          'error',
-          'cli_hybrid_batch_dropped_max_failures',
-          {
-            batchSize,
-            failures,
-          },
-        )
+        logForDiagnosticsNoPII("error", "cli_hybrid_batch_dropped_max_failures", {
+          batchSize,
+          failures,
+        })
         onBatchDropped?.(batchSize, failures)
       },
-      send: batch => this.postOnce(batch),
+      send: (batch) => this.postOnce(batch),
     })
     logForDebugging(`HybridTransport: POST URL = ${this.postUrl}`)
-    logForDiagnosticsNoPII('info', 'cli_hybrid_transport_initialized')
+    logForDiagnosticsNoPII("info", "cli_hybrid_transport_initialized")
   }
 
   /**
@@ -115,15 +108,12 @@ export class HybridTransport extends WebSocketTransport {
    * so the later resolution doesn't add latency.
    */
   override async write(message: StdoutMessage): Promise<void> {
-    if (message.type === 'stream_event') {
+    if (message.type === "stream_event") {
       // Delay: accumulate stream_events briefly before enqueueing.
       // Promise resolves immediately — callers don't await stream_events.
       this.streamEventBuffer.push(message)
       if (!this.streamEventTimer) {
-        this.streamEventTimer = setTimeout(
-          () => this.flushStreamEvents(),
-          BATCH_FLUSH_INTERVAL_MS,
-        )
+        this.streamEventTimer = setTimeout(() => this.flushStreamEvents(), BATCH_FLUSH_INTERVAL_MS)
       }
       return
     }
@@ -183,7 +173,7 @@ export class HybridTransport extends WebSocketTransport {
     let graceTimer: ReturnType<typeof setTimeout> | undefined
     void Promise.race([
       uploader.flush(),
-      new Promise<void>(r => {
+      new Promise<void>((r) => {
         // eslint-disable-next-line no-restricted-syntax -- need timer ref for clearTimeout
         graceTimer = setTimeout(r, CLOSE_GRACE_MS)
       }),
@@ -202,14 +192,14 @@ export class HybridTransport extends WebSocketTransport {
   private async postOnce(events: StdoutMessage[]): Promise<void> {
     const sessionToken = getSessionIngressAuthToken()
     if (!sessionToken) {
-      logForDebugging('HybridTransport: No session token available for POST')
-      logForDiagnosticsNoPII('warn', 'cli_hybrid_post_no_token')
+      logForDebugging("HybridTransport: No session token available for POST")
+      logForDiagnosticsNoPII("warn", "cli_hybrid_post_no_token")
       return
     }
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${sessionToken}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     }
 
     let response
@@ -226,7 +216,7 @@ export class HybridTransport extends WebSocketTransport {
     } catch (error) {
       const axiosError = error as AxiosError
       logForDebugging(`HybridTransport: POST error: ${axiosError.message}`)
-      logForDiagnosticsNoPII('warn', 'cli_hybrid_post_network_error')
+      logForDiagnosticsNoPII("warn", "cli_hybrid_post_network_error")
       throw error
     }
 
@@ -236,25 +226,17 @@ export class HybridTransport extends WebSocketTransport {
     }
 
     // 4xx (except 429) are permanent — drop, don't retry.
-    if (
-      response.status >= 400 &&
-      response.status < 500 &&
-      response.status !== 429
-    ) {
-      logForDebugging(
-        `HybridTransport: POST returned ${response.status} (permanent), dropping`,
-      )
-      logForDiagnosticsNoPII('warn', 'cli_hybrid_post_client_error', {
+    if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+      logForDebugging(`HybridTransport: POST returned ${response.status} (permanent), dropping`)
+      logForDiagnosticsNoPII("warn", "cli_hybrid_post_client_error", {
         status: response.status,
       })
       return
     }
 
     // 429 / 5xx — retryable. Throw so uploader re-queues and backs off.
-    logForDebugging(
-      `HybridTransport: POST returned ${response.status} (retryable)`,
-    )
-    logForDiagnosticsNoPII('warn', 'cli_hybrid_post_retryable_error', {
+    logForDebugging(`HybridTransport: POST returned ${response.status} (retryable)`)
+    logForDiagnosticsNoPII("warn", "cli_hybrid_post_retryable_error", {
       status: response.status,
     })
     throw new Error(`POST failed with ${response.status}`)
@@ -267,15 +249,13 @@ export class HybridTransport extends WebSocketTransport {
  * To: https://api.example.com/v2/session_ingress/session/<session_id>/events
  */
 function convertWsUrlToPostUrl(wsUrl: URL): string {
-  const protocol = wsUrl.protocol === 'wss:' ? 'https:' : 'http:'
+  const protocol = wsUrl.protocol === "wss:" ? "https:" : "http:"
 
   // Replace /ws/ with /session/ and append /events
   let pathname = wsUrl.pathname
-  pathname = pathname.replace('/ws/', '/session/')
-  if (!pathname.endsWith('/events')) {
-    pathname = pathname.endsWith('/')
-      ? pathname + 'events'
-      : pathname + '/events'
+  pathname = pathname.replace("/ws/", "/session/")
+  if (!pathname.endsWith("/events")) {
+    pathname = pathname.endsWith("/") ? pathname + "events" : pathname + "/events"
   }
 
   return `${protocol}//${wsUrl.host}${pathname}${wsUrl.search}`

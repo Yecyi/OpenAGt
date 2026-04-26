@@ -5,8 +5,8 @@
  * Based on the backend API contract from anthropic/anthropic#218817.
  */
 
-import { z } from 'zod/v4'
-import { lazySchema } from '../../utils/lazySchema.js'
+import { z } from "zod/v4"
+import { lazySchema } from "../../utils/lazySchema.js"
 
 /**
  * Content portion of user sync data - flat key-value storage.
@@ -59,9 +59,8 @@ export type SettingsSyncUploadResult = {
  * Keys used for sync entries
  */
 export const SYNC_KEYS = {
-  USER_SETTINGS: '~/.claude/settings.json',
-  USER_MEMORY: '~/.claude/CLAUDE.md',
-  projectSettings: (projectId: string) =>
-    `projects/${projectId}/.claude/settings.local.json`,
+  USER_SETTINGS: "~/.claude/settings.json",
+  USER_MEMORY: "~/.claude/CLAUDE.md",
+  projectSettings: (projectId: string) => `projects/${projectId}/.claude/settings.local.json`,
   projectMemory: (projectId: string) => `projects/${projectId}/CLAUDE.local.md`,
 } as const

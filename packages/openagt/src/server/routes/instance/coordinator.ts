@@ -25,6 +25,7 @@ import {
   ContinuationRequest,
   LongTaskProfile,
   ProgressSnapshot,
+  ResourceLimit,
   TodoTimeline,
 } from "@/coordinator/schema"
 import { TaskRuntime } from "@/session/task-runtime"
@@ -59,6 +60,13 @@ const retryPayload = z
   })
   .optional()
 
+const continuePayload = z
+  .object({
+    budget_delta: ResourceLimit.partial().optional(),
+    autoContinue: AutoContinuePolicy.optional(),
+  })
+  .optional()
+
 const projection = z.object({
   run: CoordinatorRun,
   tasks: z.array(TaskRuntime.TaskRecord),
@@ -66,6 +74,7 @@ const projection = z.object({
     pending: z.number().int(),
     running: z.number().int(),
     completed: z.number().int(),
+    partial: z.number().int(),
     failed: z.number().int(),
     cancelled: z.number().int(),
   }),
@@ -74,7 +83,7 @@ const projection = z.object({
       id: z.string(),
       node_ids: z.array(z.string()),
       task_ids: z.array(z.string()),
-      status: z.enum(["pending", "running", "completed", "failed", "cancelled"]),
+      status: z.enum(["pending", "running", "completed", "partial", "failed", "cancelled"]),
       merge_status: z.enum(["none", "waiting", "merged", "conflict"]),
       blocked_by: z.array(z.string()),
       conflicts: z.array(z.string()),
@@ -324,6 +333,35 @@ export const CoordinatorRoutes = () =>
             id: c.req.valid("param").runID,
             taskID: body?.task_id,
             nodeID: body?.node_id,
+          })
+        }),
+    )
+    .post(
+      "/run/:runID/continue",
+      describeRoute({
+        operationId: "coordinator.continue",
+        responses: {
+          200: {
+            description: "Continued coordinator run with approved budget",
+            content: {
+              "application/json": {
+                schema: resolver(CoordinatorRun),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("param", z.object({ runID: CoordinatorRunID.zod })),
+      validator("json", continuePayload),
+      async (c) =>
+        jsonRequest("CoordinatorRoutes.continue", c, function* () {
+          const svc = yield* Coordinator.Service
+          const body = c.req.valid("json")
+          return yield* svc.continueRun({
+            id: c.req.valid("param").runID,
+            budgetDelta: body?.budget_delta,
+            autoContinue: body?.autoContinue,
           })
         }),
     )

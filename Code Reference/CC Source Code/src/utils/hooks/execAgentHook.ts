@@ -1,34 +1,34 @@
-import { randomUUID } from 'crypto'
-import type { HookEvent } from 'src/entrypoints/agentSdkTypes.js'
-import { query } from '../../query.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/metadata.js'
-import type { ToolUseContext } from '../../Tool.js'
-import { type Tool, toolMatchesName } from '../../Tool.js'
-import { SYNTHETIC_OUTPUT_TOOL_NAME } from '../../tools/SyntheticOutputTool/SyntheticOutputTool.js'
-import { ALL_AGENT_DISALLOWED_TOOLS } from '../../tools.js'
-import { asAgentId } from '../../types/ids.js'
-import type { Message } from '../../types/message.js'
-import { createAbortController } from '../abortController.js'
-import { createAttachmentMessage } from '../attachments.js'
-import { createCombinedAbortSignal } from '../combinedAbortSignal.js'
-import { logForDebugging } from '../debug.js'
-import { errorMessage } from '../errors.js'
-import type { HookResult } from '../hooks.js'
-import { createUserMessage, handleMessageFromStream } from '../messages.js'
-import { getSmallFastModel } from '../model/model.js'
-import { hasPermissionsToUseTool } from '../permissions/permissions.js'
-import { getAgentTranscriptPath, getTranscriptPath } from '../sessionStorage.js'
-import type { AgentHook } from '../settings/types.js'
-import { jsonStringify } from '../slowOperations.js'
-import { asSystemPrompt } from '../systemPromptType.js'
+import { randomUUID } from "crypto"
+import type { HookEvent } from "src/entrypoints/agentSdkTypes.js"
+import { query } from "../../query.js"
+import { logEvent } from "../../services/analytics/index.js"
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from "../../services/analytics/metadata.js"
+import type { ToolUseContext } from "../../Tool.js"
+import { type Tool, toolMatchesName } from "../../Tool.js"
+import { SYNTHETIC_OUTPUT_TOOL_NAME } from "../../tools/SyntheticOutputTool/SyntheticOutputTool.js"
+import { ALL_AGENT_DISALLOWED_TOOLS } from "../../tools.js"
+import { asAgentId } from "../../types/ids.js"
+import type { Message } from "../../types/message.js"
+import { createAbortController } from "../abortController.js"
+import { createAttachmentMessage } from "../attachments.js"
+import { createCombinedAbortSignal } from "../combinedAbortSignal.js"
+import { logForDebugging } from "../debug.js"
+import { errorMessage } from "../errors.js"
+import type { HookResult } from "../hooks.js"
+import { createUserMessage, handleMessageFromStream } from "../messages.js"
+import { getSmallFastModel } from "../model/model.js"
+import { hasPermissionsToUseTool } from "../permissions/permissions.js"
+import { getAgentTranscriptPath, getTranscriptPath } from "../sessionStorage.js"
+import type { AgentHook } from "../settings/types.js"
+import { jsonStringify } from "../slowOperations.js"
+import { asSystemPrompt } from "../systemPromptType.js"
 import {
   addArgumentsToPrompt,
   createStructuredOutputTool,
   hookResponseSchema,
   registerStructuredOutputEnforcement,
-} from './hookHelpers.js'
-import { clearSessionHooks } from './sessionHooks.js'
+} from "./hookHelpers.js"
+import { clearSessionHooks } from "./sessionHooks.js"
 
 /**
  * Execute an agent-based hook using a multi-turn LLM query
@@ -51,35 +51,30 @@ export async function execAgentHook(
   const effectiveToolUseID = toolUseID || `hook-${randomUUID()}`
 
   // Get transcript path from context
-  const transcriptPath = toolUseContext.agentId
-    ? getAgentTranscriptPath(toolUseContext.agentId)
-    : getTranscriptPath()
+  const transcriptPath = toolUseContext.agentId ? getAgentTranscriptPath(toolUseContext.agentId) : getTranscriptPath()
   const hookStartTime = Date.now()
   try {
     // Replace $ARGUMENTS with the JSON input
     const processedPrompt = addArgumentsToPrompt(hook.prompt, jsonInput)
-    logForDebugging(
-      `Hooks: Processing agent hook with prompt: ${processedPrompt}`,
-    )
+    logForDebugging(`Hooks: Processing agent hook with prompt: ${processedPrompt}`)
 
     // Create user message directly - no need for processUserInput which would
     // trigger UserPromptSubmit hooks and cause infinite recursion
     const userMessage = createUserMessage({ content: processedPrompt })
     const agentMessages = [userMessage]
 
-    logForDebugging(
-      `Hooks: Starting agent query with ${agentMessages.length} messages`,
-    )
+    logForDebugging(`Hooks: Starting agent query with ${agentMessages.length} messages`)
 
     // Setup timeout and combine with parent signal
     const hookTimeoutMs = hook.timeout ? hook.timeout * 1000 : 60000
     const hookAbortController = createAbortController()
 
     // Combine parent signal with timeout, and have it abort our controller
-    const { signal: parentTimeoutSignal, cleanup: cleanupCombinedSignal } =
-      createCombinedAbortSignal(signal, { timeoutMs: hookTimeoutMs })
+    const { signal: parentTimeoutSignal, cleanup: cleanupCombinedSignal } = createCombinedAbortSignal(signal, {
+      timeoutMs: hookTimeoutMs,
+    })
     const onParentTimeout = () => hookAbortController.abort()
-    parentTimeoutSignal.addEventListener('abort', onParentTimeout)
+    parentTimeoutSignal.addEventListener("abort", onParentTimeout)
 
     // Combined signal is just our controller's signal now
     const combinedSignal = hookAbortController.signal
@@ -91,16 +86,14 @@ export async function execAgentHook(
       // Filter out any existing StructuredOutput tool to avoid duplicates with different schemas
       // (e.g., when parent context has a StructuredOutput tool from --json-schema flag)
       const filteredTools = toolUseContext.options.tools.filter(
-        tool => !toolMatchesName(tool, SYNTHETIC_OUTPUT_TOOL_NAME),
+        (tool) => !toolMatchesName(tool, SYNTHETIC_OUTPUT_TOOL_NAME),
       )
 
       // Use all available tools plus our structured output tool
       // Filter out disallowed agent tools to prevent stop hook agents from spawning subagents
       // or entering plan mode, and filter out duplicate StructuredOutput tools
       const tools: Tool[] = [
-        ...filteredTools.filter(
-          tool => !ALL_AGENT_DISALLOWED_TOOLS.has(tool.name),
-        ),
+        ...filteredTools.filter((tool) => !ALL_AGENT_DISALLOWED_TOOLS.has(tool.name)),
         structuredOutputTool,
       ]
 
@@ -131,19 +124,18 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
           tools,
           mainLoopModel: model,
           isNonInteractiveSession: true,
-          thinkingConfig: { type: 'disabled' as const },
+          thinkingConfig: { type: "disabled" as const },
         },
         setInProgressToolUseIDs: () => {},
         getAppState() {
           const appState = toolUseContext.getAppState()
           // Add session rule to allow reading transcript file
-          const existingSessionRules =
-            appState.toolPermissionContext.alwaysAllowRules.session ?? []
+          const existingSessionRules = appState.toolPermissionContext.alwaysAllowRules.session ?? []
           return {
             ...appState,
             toolPermissionContext: {
               ...appState.toolPermissionContext,
-              mode: 'dontAsk' as const,
+              mode: "dontAsk" as const,
               alwaysAllowRules: {
                 ...appState.toolPermissionContext.alwaysAllowRules,
                 session: [...existingSessionRules, `Read(/${transcriptPath})`],
@@ -154,10 +146,7 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
       }
 
       // Register a session-level stop hook to enforce structured output
-      registerStructuredOutputEnforcement(
-        toolUseContext.setAppState,
-        hookAgentId,
-      )
+      registerStructuredOutputEnforcement(toolUseContext.setAppState, hookAgentId)
 
       let structuredOutputResult: { ok: boolean; reason?: string } | null = null
       let turnCount = 0
@@ -171,54 +160,41 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
         systemContext: {},
         canUseTool: hasPermissionsToUseTool,
         toolUseContext: agentToolUseContext,
-        querySource: 'hook_agent',
+        querySource: "hook_agent",
       })) {
         // Process stream events to update response length in the spinner
         handleMessageFromStream(
           message,
           () => {}, // onMessage - we handle messages below
-          newContent =>
-            toolUseContext.setResponseLength(
-              length => length + newContent.length,
-            ),
+          (newContent) => toolUseContext.setResponseLength((length) => length + newContent.length),
           toolUseContext.setStreamMode ?? (() => {}),
           () => {}, // onStreamingToolUses - not needed for hooks
         )
 
         // Skip streaming events for further processing
-        if (
-          message.type === 'stream_event' ||
-          message.type === 'stream_request_start'
-        ) {
+        if (message.type === "stream_event" || message.type === "stream_request_start") {
           continue
         }
 
         // Count assistant turns
-        if (message.type === 'assistant') {
+        if (message.type === "assistant") {
           turnCount++
 
           // Check if we've hit the turn limit
           if (turnCount >= MAX_AGENT_TURNS) {
             hitMaxTurns = true
-            logForDebugging(
-              `Hooks: Agent turn ${turnCount} hit max turns, aborting`,
-            )
+            logForDebugging(`Hooks: Agent turn ${turnCount} hit max turns, aborting`)
             hookAbortController.abort()
             break
           }
         }
 
         // Check for structured output in attachments
-        if (
-          message.type === 'attachment' &&
-          message.attachment.type === 'structured_output'
-        ) {
+        if (message.type === "attachment" && message.attachment.type === "structured_output") {
           const parsed = hookResponseSchema().safeParse(message.attachment.data)
           if (parsed.success) {
             structuredOutputResult = parsed.data
-            logForDebugging(
-              `Hooks: Got structured output: ${jsonStringify(structuredOutputResult)}`,
-            )
+            logForDebugging(`Hooks: Got structured output: ${jsonStringify(structuredOutputResult)}`)
             // Got structured output, abort and exit
             hookAbortController.abort()
             break
@@ -226,7 +202,7 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
         }
       }
 
-      parentTimeoutSignal.removeEventListener('abort', onParentTimeout)
+      parentTimeoutSignal.removeEventListener("abort", onParentTimeout)
       cleanupCombinedSignal()
 
       // Clean up the session hook we registered for this agent
@@ -236,45 +212,39 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
       if (!structuredOutputResult) {
         // If we hit max turns, just log and return cancelled (no UI message)
         if (hitMaxTurns) {
-          logForDebugging(
-            `Hooks: Agent hook did not complete within ${MAX_AGENT_TURNS} turns`,
-          )
-          logEvent('tengu_agent_stop_hook_max_turns', {
+          logForDebugging(`Hooks: Agent hook did not complete within ${MAX_AGENT_TURNS} turns`)
+          logEvent("tengu_agent_stop_hook_max_turns", {
             durationMs: Date.now() - hookStartTime,
             turnCount,
-            agentName:
-              agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            agentName: agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
           return {
             hook,
-            outcome: 'cancelled',
+            outcome: "cancelled",
           }
         }
 
         // For other cases (e.g., agent finished without calling structured output tool),
         // just log and return cancelled (don't show error to user)
         logForDebugging(`Hooks: Agent hook did not return structured output`)
-        logEvent('tengu_agent_stop_hook_error', {
+        logEvent("tengu_agent_stop_hook_error", {
           durationMs: Date.now() - hookStartTime,
           turnCount,
           errorType: 1, // 1 = no structured output
-          agentName:
-            agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          agentName: agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
         return {
           hook,
-          outcome: 'cancelled',
+          outcome: "cancelled",
         }
       }
 
       // Return result based on structured output
       if (!structuredOutputResult.ok) {
-        logForDebugging(
-          `Hooks: Agent hook condition was not met: ${structuredOutputResult.reason}`,
-        )
+        logForDebugging(`Hooks: Agent hook condition was not met: ${structuredOutputResult.reason}`)
         return {
           hook,
-          outcome: 'blocking',
+          outcome: "blocking",
           blockingError: {
             blockingError: `Agent hook condition was not met: ${structuredOutputResult.reason}`,
             command: hook.prompt,
@@ -284,31 +254,30 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
 
       // Condition was met
       logForDebugging(`Hooks: Agent hook condition was met`)
-      logEvent('tengu_agent_stop_hook_success', {
+      logEvent("tengu_agent_stop_hook_success", {
         durationMs: Date.now() - hookStartTime,
         turnCount,
-        agentName:
-          agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        agentName: agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
       return {
         hook,
-        outcome: 'success',
+        outcome: "success",
         message: createAttachmentMessage({
-          type: 'hook_success',
+          type: "hook_success",
           hookName,
           toolUseID: effectiveToolUseID,
           hookEvent,
-          content: '',
+          content: "",
         }),
       }
     } catch (error) {
-      parentTimeoutSignal.removeEventListener('abort', onParentTimeout)
+      parentTimeoutSignal.removeEventListener("abort", onParentTimeout)
       cleanupCombinedSignal()
 
       if (combinedSignal.aborted) {
         return {
           hook,
-          outcome: 'cancelled',
+          outcome: "cancelled",
         }
       }
       throw error
@@ -316,22 +285,21 @@ When done, return your result using the ${SYNTHETIC_OUTPUT_TOOL_NAME} tool with:
   } catch (error) {
     const errorMsg = errorMessage(error)
     logForDebugging(`Hooks: Agent hook error: ${errorMsg}`)
-    logEvent('tengu_agent_stop_hook_error', {
+    logEvent("tengu_agent_stop_hook_error", {
       durationMs: Date.now() - hookStartTime,
       errorType: 2, // 2 = general error
-      agentName:
-        agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      agentName: agentName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
     return {
       hook,
-      outcome: 'non_blocking_error',
+      outcome: "non_blocking_error",
       message: createAttachmentMessage({
-        type: 'hook_non_blocking_error',
+        type: "hook_non_blocking_error",
         hookName,
         toolUseID: effectiveToolUseID,
         hookEvent,
         stderr: `Error executing agent hook: ${errorMsg}`,
-        stdout: '',
+        stdout: "",
         exitCode: 1,
       }),
     }

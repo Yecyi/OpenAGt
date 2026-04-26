@@ -1,7 +1,7 @@
-import { logForDebugging } from '../../utils/debug.js'
-import { truncate } from '../../utils/format.js'
-import { getFsImplementation } from '../../utils/fsOperations.js'
-import { expandPath } from '../../utils/path.js'
+import { logForDebugging } from "../../utils/debug.js"
+import { truncate } from "../../utils/format.js"
+import { getFsImplementation } from "../../utils/fsOperations.js"
+import { expandPath } from "../../utils/path.js"
 
 const MAX_READ_BYTES = 64 * 1024
 
@@ -18,11 +18,7 @@ const MAX_READ_BYTES = 64 * 1024
  * wrapped in try/catch so ENOENT and other errors fall back gracefully.
  * @returns The symbol at that position, or null if extraction fails
  */
-export function getSymbolAtPosition(
-  filePath: string,
-  line: number,
-  character: number,
-): string | null {
+export function getSymbolAtPosition(filePath: string, line: number, character: number): string | null {
   try {
     const fs = getFsImplementation()
     const absolutePath = expandPath(filePath)
@@ -35,8 +31,8 @@ export function getSymbolAtPosition(
     const { buffer, bytesRead } = fs.readSync(absolutePath, {
       length: MAX_READ_BYTES,
     })
-    const content = buffer.toString('utf-8', 0, bytesRead)
-    const lines = content.split('\n')
+    const content = buffer.toString("utf-8", 0, bytesRead)
+    const lines = content.split("\n")
 
     if (line < 0 || line >= lines.length) {
       return null
@@ -79,10 +75,9 @@ export function getSymbolAtPosition(
     // Log unexpected errors for debugging (permission issues, encoding problems, etc.)
     // Use logForDebugging since this is a display enhancement, not a critical error
     if (error instanceof Error) {
-      logForDebugging(
-        `Symbol extraction failed for ${filePath}:${line}:${character}: ${error.message}`,
-        { level: 'warn' },
-      )
+      logForDebugging(`Symbol extraction failed for ${filePath}:${line}:${character}: ${error.message}`, {
+        level: "warn",
+      })
     }
     // Still return null for graceful fallback to position display
     return null

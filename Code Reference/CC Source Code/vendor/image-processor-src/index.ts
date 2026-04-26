@@ -32,7 +32,7 @@ export function getNativeModule(): NativeModule | null {
   loadAttempted = true
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cachedModule = require('../../image-processor.node')
+    cachedModule = require("../../image-processor.node")
   } catch {
     cachedModule = null
   }
@@ -41,34 +41,18 @@ export function getNativeModule(): NativeModule | null {
 
 interface ImageProcessor {
   metadata(): { width: number; height: number; format: string }
-  resize(
-    width: number,
-    height: number,
-    options?: { fit?: string; withoutEnlargement?: boolean },
-  ): ImageProcessor
+  resize(width: number, height: number, options?: { fit?: string; withoutEnlargement?: boolean }): ImageProcessor
   jpeg(quality?: number): ImageProcessor
-  png(options?: {
-    compressionLevel?: number
-    palette?: boolean
-    colors?: number
-  }): ImageProcessor
+  png(options?: { compressionLevel?: number; palette?: boolean; colors?: number }): ImageProcessor
   webp(quality?: number): ImageProcessor
   toBuffer(): Promise<Buffer>
 }
 
 interface SharpInstance {
   metadata(): Promise<{ width: number; height: number; format: string }>
-  resize(
-    width: number,
-    height: number,
-    options?: { fit?: string; withoutEnlargement?: boolean },
-  ): SharpInstance
+  resize(width: number, height: number, options?: { fit?: string; withoutEnlargement?: boolean }): SharpInstance
   jpeg(options?: { quality?: number }): SharpInstance
-  png(options?: {
-    compressionLevel?: number
-    palette?: boolean
-    colors?: number
-  }): SharpInstance
+  png(options?: { compressionLevel?: number; palette?: boolean; colors?: number }): SharpInstance
   webp(options?: { quality?: number }): SharpInstance
   toBuffer(): Promise<Buffer>
 }
@@ -89,7 +73,7 @@ export function sharp(input: Buffer): SharpInstance {
       processorPromise = (async () => {
         const mod = getNativeModule()
         if (!mod) {
-          throw new Error('Native image processor module not available')
+          throw new Error("Native image processor module not available")
         }
         return mod.processImage(input)
       })()
@@ -114,37 +98,29 @@ export function sharp(input: Buffer): SharpInstance {
       return proc.metadata()
     },
 
-    resize(
-      width: number,
-      height: number,
-      options?: { fit?: string; withoutEnlargement?: boolean },
-    ) {
-      operations.push(proc => {
+    resize(width: number, height: number, options?: { fit?: string; withoutEnlargement?: boolean }) {
+      operations.push((proc) => {
         proc.resize(width, height, options)
       })
       return instance
     },
 
     jpeg(options?: { quality?: number }) {
-      operations.push(proc => {
+      operations.push((proc) => {
         proc.jpeg(options?.quality)
       })
       return instance
     },
 
-    png(options?: {
-      compressionLevel?: number
-      palette?: boolean
-      colors?: number
-    }) {
-      operations.push(proc => {
+    png(options?: { compressionLevel?: number; palette?: boolean; colors?: number }) {
+      operations.push((proc) => {
         proc.png(options)
       })
       return instance
     },
 
     webp(options?: { quality?: number }) {
-      operations.push(proc => {
+      operations.push((proc) => {
         proc.webp(options?.quality)
       })
       return instance

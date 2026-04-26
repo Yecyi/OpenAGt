@@ -8,11 +8,11 @@
  * external binaries with the same argv syntax).
  */
 
-import { getCommitCounter, getPrCounter } from '../../bootstrap/state.js'
+import { getCommitCounter, getPrCounter } from "../../bootstrap/state.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../../services/analytics/index.js'
+} from "../../services/analytics/index.js"
 
 /**
  * Build a regex that matches `git <subcmd>` while tolerating git's global
@@ -20,44 +20,34 @@ import {
  * `--git-dir=path`). Common when the model retries with
  * `git -c commit.gpgsign=false commit` after a signing failure.
  */
-function gitCmdRe(subcmd: string, suffix = ''): RegExp {
-  return new RegExp(
-    `\\bgit(?:\\s+-[cC]\\s+\\S+|\\s+--\\S+=\\S+)*\\s+${subcmd}\\b${suffix}`,
-  )
+function gitCmdRe(subcmd: string, suffix = ""): RegExp {
+  return new RegExp(`\\bgit(?:\\s+-[cC]\\s+\\S+|\\s+--\\S+=\\S+)*\\s+${subcmd}\\b${suffix}`)
 }
 
-const GIT_COMMIT_RE = gitCmdRe('commit')
-const GIT_PUSH_RE = gitCmdRe('push')
-const GIT_CHERRY_PICK_RE = gitCmdRe('cherry-pick')
-const GIT_MERGE_RE = gitCmdRe('merge', '(?!-)')
-const GIT_REBASE_RE = gitCmdRe('rebase')
+const GIT_COMMIT_RE = gitCmdRe("commit")
+const GIT_PUSH_RE = gitCmdRe("push")
+const GIT_CHERRY_PICK_RE = gitCmdRe("cherry-pick")
+const GIT_MERGE_RE = gitCmdRe("merge", "(?!-)")
+const GIT_REBASE_RE = gitCmdRe("rebase")
 
-export type CommitKind = 'committed' | 'amended' | 'cherry-picked'
-export type BranchAction = 'merged' | 'rebased'
-export type PrAction =
-  | 'created'
-  | 'edited'
-  | 'merged'
-  | 'commented'
-  | 'closed'
-  | 'ready'
+export type CommitKind = "committed" | "amended" | "cherry-picked"
+export type BranchAction = "merged" | "rebased"
+export type PrAction = "created" | "edited" | "merged" | "commented" | "closed" | "ready"
 
 const GH_PR_ACTIONS: readonly { re: RegExp; action: PrAction; op: string }[] = [
-  { re: /\bgh\s+pr\s+create\b/, action: 'created', op: 'pr_create' },
-  { re: /\bgh\s+pr\s+edit\b/, action: 'edited', op: 'pr_edit' },
-  { re: /\bgh\s+pr\s+merge\b/, action: 'merged', op: 'pr_merge' },
-  { re: /\bgh\s+pr\s+comment\b/, action: 'commented', op: 'pr_comment' },
-  { re: /\bgh\s+pr\s+close\b/, action: 'closed', op: 'pr_close' },
-  { re: /\bgh\s+pr\s+ready\b/, action: 'ready', op: 'pr_ready' },
+  { re: /\bgh\s+pr\s+create\b/, action: "created", op: "pr_create" },
+  { re: /\bgh\s+pr\s+edit\b/, action: "edited", op: "pr_edit" },
+  { re: /\bgh\s+pr\s+merge\b/, action: "merged", op: "pr_merge" },
+  { re: /\bgh\s+pr\s+comment\b/, action: "commented", op: "pr_comment" },
+  { re: /\bgh\s+pr\s+close\b/, action: "closed", op: "pr_close" },
+  { re: /\bgh\s+pr\s+ready\b/, action: "ready", op: "pr_ready" },
 ]
 
 /**
  * Parse PR info from a GitHub PR URL.
  * Returns { prNumber, prUrl, prRepository } or null if not a valid PR URL.
  */
-function parsePrUrl(
-  url: string,
-): { prNumber: number; prUrl: string; prRepository: string } | null {
+function parsePrUrl(url: string): { prNumber: number; prUrl: string; prRepository: string } | null {
   const match = url.match(/https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/)
   if (match?.[1] && match?.[2]) {
     return {
@@ -91,9 +81,7 @@ export function parseGitCommitId(stdout: string): string | undefined {
  * with a status flag (space, +, -, *, !, =); the char class tolerates any.
  */
 function parseGitPushBranch(output: string): string | undefined {
-  const match = output.match(
-    /^\s*[+\-*!= ]?\s*(?:\[new branch\]|\S+\.\.+\S+)\s+\S+\s*->\s*(\S+)/m,
-  )
+  const match = output.match(/^\s*[+\-*!= ]?\s*(?:\[new branch\]|\S+\.\.+\S+)\s+\S+\s*->\s*(\S+)/m)
   return match?.[1]
 }
 
@@ -110,15 +98,12 @@ function parsePrNumberFromText(stdout: string): number | undefined {
  * Extract target ref from `git merge <ref>` / `git rebase <ref>` command.
  * Skips flags and keywords — first non-flag argument is the ref.
  */
-function parseRefFromCommand(
-  command: string,
-  verb: string,
-): string | undefined {
+function parseRefFromCommand(command: string, verb: string): string | undefined {
   const after = command.split(gitCmdRe(verb))[1]
   if (!after) return undefined
   for (const t of after.trim().split(/\s+/)) {
     if (/^[&|;><]/.test(t)) break
-    if (t.startsWith('-')) continue
+    if (t.startsWith("-")) continue
     return t
   }
   return undefined
@@ -149,11 +134,7 @@ export function detectGitOperation(
     if (sha) {
       result.commit = {
         sha: sha.slice(0, 6),
-        kind: isCherryPick
-          ? 'cherry-picked'
-          : /--amend\b/.test(command)
-            ? 'amended'
-            : 'committed',
+        kind: isCherryPick ? "cherry-picked" : /--amend\b/.test(command) ? "amended" : "committed",
       }
     }
   }
@@ -161,18 +142,15 @@ export function detectGitOperation(
     const branch = parseGitPushBranch(output)
     if (branch) result.push = { branch }
   }
-  if (
-    GIT_MERGE_RE.test(command) &&
-    /(Fast-forward|Merge made by)/.test(output)
-  ) {
-    const ref = parseRefFromCommand(command, 'merge')
-    if (ref) result.branch = { ref, action: 'merged' }
+  if (GIT_MERGE_RE.test(command) && /(Fast-forward|Merge made by)/.test(output)) {
+    const ref = parseRefFromCommand(command, "merge")
+    if (ref) result.branch = { ref, action: "merged" }
   }
   if (GIT_REBASE_RE.test(command) && /Successfully rebased/.test(output)) {
-    const ref = parseRefFromCommand(command, 'rebase')
-    if (ref) result.branch = { ref, action: 'rebased' }
+    const ref = parseRefFromCommand(command, "rebase")
+    if (ref) result.branch = { ref, action: "rebased" }
   }
-  const prAction = GH_PR_ACTIONS.find(a => a.re.test(command))?.action
+  const prAction = GH_PR_ACTIONS.find((a) => a.re.test(command))?.action
   if (prAction) {
     const pr = findPrInStdout(output)
     if (pr) {
@@ -186,71 +164,60 @@ export function detectGitOperation(
 }
 
 // Exported for testing purposes
-export function trackGitOperations(
-  command: string,
-  exitCode: number,
-  stdout?: string,
-): void {
+export function trackGitOperations(command: string, exitCode: number, stdout?: string): void {
   const success = exitCode === 0
   if (!success) {
     return
   }
 
   if (GIT_COMMIT_RE.test(command)) {
-    logEvent('tengu_git_operation', {
-      operation:
-        'commit' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_git_operation", {
+      operation: "commit" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
     if (command.match(/--amend\b/)) {
-      logEvent('tengu_git_operation', {
-        operation:
-          'commit_amend' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      logEvent("tengu_git_operation", {
+        operation: "commit_amend" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
     }
     getCommitCounter()?.add(1)
   }
   if (GIT_PUSH_RE.test(command)) {
-    logEvent('tengu_git_operation', {
-      operation:
-        'push' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_git_operation", {
+      operation: "push" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
-  const prHit = GH_PR_ACTIONS.find(a => a.re.test(command))
+  const prHit = GH_PR_ACTIONS.find((a) => a.re.test(command))
   if (prHit) {
-    logEvent('tengu_git_operation', {
-      operation:
-        prHit.op as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_git_operation", {
+      operation: prHit.op as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
-  if (prHit?.action === 'created') {
+  if (prHit?.action === "created") {
     getPrCounter()?.add(1)
     // Auto-link session to PR if we can extract PR URL from stdout
     if (stdout) {
       const prInfo = findPrInStdout(stdout)
       if (prInfo) {
         // Import is done dynamically to avoid circular dependency
-        void import('../../utils/sessionStorage.js').then(
-          ({ linkSessionToPR }) => {
-            void import('../../bootstrap/state.js').then(({ getSessionId }) => {
-              const sessionId = getSessionId()
-              if (sessionId) {
-                void linkSessionToPR(
-                  sessionId as `${string}-${string}-${string}-${string}-${string}`,
-                  prInfo.prNumber,
-                  prInfo.prUrl,
-                  prInfo.prRepository,
-                )
-              }
-            })
-          },
-        )
+        void import("../../utils/sessionStorage.js").then(({ linkSessionToPR }) => {
+          void import("../../bootstrap/state.js").then(({ getSessionId }) => {
+            const sessionId = getSessionId()
+            if (sessionId) {
+              void linkSessionToPR(
+                sessionId as `${string}-${string}-${string}-${string}-${string}`,
+                prInfo.prNumber,
+                prInfo.prUrl,
+                prInfo.prRepository,
+              )
+            }
+          })
+        })
       }
     }
   }
   if (command.match(/\bglab\s+mr\s+create\b/)) {
-    logEvent('tengu_git_operation', {
-      operation:
-        'pr_create' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_git_operation", {
+      operation: "pr_create" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
     getPrCounter()?.add(1)
   }
@@ -259,18 +226,13 @@ export function trackGitOperations(
   // Also detect implicit POST when -d is used (curl defaults to POST with data)
   const isCurlPost =
     command.match(/\bcurl\b/) &&
-    (command.match(/-X\s*POST\b/i) ||
-      command.match(/--request\s*=?\s*POST\b/i) ||
-      command.match(/\s-d\s/))
+    (command.match(/-X\s*POST\b/i) || command.match(/--request\s*=?\s*POST\b/i) || command.match(/\s-d\s/))
   // Match PR endpoints in URLs, but not sub-resources like /pulls/123/comments
   // Require https?:// prefix to avoid matching text in POST body or other params
-  const isPrEndpoint = command.match(
-    /https?:\/\/[^\s'"]*\/(pulls|pull-requests|merge[-_]requests)(?!\/\d)/i,
-  )
+  const isPrEndpoint = command.match(/https?:\/\/[^\s'"]*\/(pulls|pull-requests|merge[-_]requests)(?!\/\d)/i)
   if (isCurlPost && isPrEndpoint) {
-    logEvent('tengu_git_operation', {
-      operation:
-        'pr_create' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_git_operation", {
+      operation: "pr_create" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
     getPrCounter()?.add(1)
   }

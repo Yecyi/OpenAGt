@@ -1,6 +1,6 @@
-import type { ChildProcess } from 'child_process'
-import { z } from 'zod/v4'
-import { lazySchema } from '../utils/lazySchema.js'
+import type { ChildProcess } from "child_process"
+import { z } from "zod/v4"
+import { lazySchema } from "../utils/lazySchema.js"
 
 export const connectResponseSchema = lazySchema(() =>
   z.object({
@@ -23,12 +23,7 @@ export type ServerConfig = {
   workspace?: string
 }
 
-export type SessionState =
-  | 'starting'
-  | 'running'
-  | 'detached'
-  | 'stopping'
-  | 'stopped'
+export type SessionState = "starting" | "running" | "detached" | "stopping" | "stopped"
 
 export type SessionInfo = {
   id: string

@@ -228,14 +228,18 @@ export function Prompt(props: PromptProps) {
 
     // 获取 model context limit
     const msg = sync.data.message[props.sessionID] ?? []
-    const lastAssistant = msg.findLast((item): item is AssistantMessage => item.role === "assistant" && item.tokens.output > 0)
+    const lastAssistant = msg.findLast(
+      (item): item is AssistantMessage => item.role === "assistant" && item.tokens.output > 0,
+    )
 
     // 如果没有历史消息，使用默认的 context limit
     let modelContextLimit = 200000 // 默认 200K
     let historyTokens = 0
 
     if (lastAssistant) {
-      const model = sync.data.provider.find((item) => item.id === lastAssistant.providerID)?.models[lastAssistant.modelID]
+      const model = sync.data.provider.find((item) => item.id === lastAssistant.providerID)?.models[
+        lastAssistant.modelID
+      ]
       if (model?.limit.context) {
         modelContextLimit = model.limit.context
       }
@@ -1263,7 +1267,14 @@ export function Prompt(props: PromptProps) {
               cursorColor={theme.text}
               syntaxStyle={syntax()}
             />
-            <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between" alignItems="flex-end">
+            <box
+              flexDirection="row"
+              flexShrink={0}
+              paddingTop={1}
+              gap={1}
+              justifyContent="space-between"
+              alignItems="flex-end"
+            >
               <box flexDirection="column" minWidth={0}>
                 <Show when={local.agent.current()} fallback={<box height={1} />}>
                   {(agent) => (
@@ -1273,7 +1284,10 @@ export function Prompt(props: PromptProps) {
                           {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
                         </text>
                         <Show when={store.mode === "normal"}>
-                          <text fg={fadeColor(keybind.leader ? theme.textMuted : theme.text, modelMetaAlpha())} wrapMode="none">
+                          <text
+                            fg={fadeColor(keybind.leader ? theme.textMuted : theme.text, modelMetaAlpha())}
+                            wrapMode="none"
+                          >
                             {local.model.parsed().model}
                           </text>
                         </Show>

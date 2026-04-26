@@ -7,25 +7,21 @@
  * - reconcileMarketplaces(): bundled diff + install (I/O, idempotent, additive)
  */
 
-import isEqual from 'lodash-es/isEqual.js'
-import { isAbsolute, resolve } from 'path'
-import { getOriginalCwd } from '../../bootstrap/state.js'
-import { logForDebugging } from '../debug.js'
-import { errorMessage } from '../errors.js'
-import { pathExists } from '../file.js'
-import { findCanonicalGitRoot } from '../git.js'
-import { logError } from '../log.js'
+import isEqual from "lodash-es/isEqual.js"
+import { isAbsolute, resolve } from "path"
+import { getOriginalCwd } from "../../bootstrap/state.js"
+import { logForDebugging } from "../debug.js"
+import { errorMessage } from "../errors.js"
+import { pathExists } from "../file.js"
+import { findCanonicalGitRoot } from "../git.js"
+import { logError } from "../log.js"
 import {
   addMarketplaceSource,
   type DeclaredMarketplace,
   getDeclaredMarketplaces,
   loadKnownMarketplacesConfig,
-} from './marketplaceManager.js'
-import {
-  isLocalMarketplaceSource,
-  type KnownMarketplacesFile,
-  type MarketplaceSource,
-} from './schemas.js'
+} from "./marketplaceManager.js"
+import { isLocalMarketplaceSource, type KnownMarketplacesFile, type MarketplaceSource } from "./schemas.js"
 
 export type MarketplaceDiff = {
   /** Declared in settings, absent from known_marketplaces.json */
@@ -53,7 +49,7 @@ export function diffMarketplaces(
   opts?: { projectRoot?: string },
 ): MarketplaceDiff {
   const missing: string[] = []
-  const sourceChanged: MarketplaceDiff['sourceChanged'] = []
+  const sourceChanged: MarketplaceDiff["sourceChanged"] = []
   const upToDate: string[] = []
 
   for (const [name, intent] of Object.entries(declared)) {
@@ -90,14 +86,14 @@ export type ReconcileOptions = {
 
 export type ReconcileProgressEvent =
   | {
-      type: 'installing'
+      type: "installing"
       name: string
-      action: 'install' | 'update'
+      action: "install" | "update"
       index: number
       total: number
     }
-  | { type: 'installed'; name: string; alreadyMaterialized: boolean }
-  | { type: 'failed'; name: string; error: string }
+  | { type: "installed"; name: string; alreadyMaterialized: boolean }
+  | { type: "failed"; name: string; error: string }
 
 export type ReconcileResult = {
   installed: string[]
@@ -111,9 +107,7 @@ export type ReconcileResult = {
  * Make known_marketplaces.json consistent with declared intent.
  * Idempotent. Additive only (never deletes). Does not touch AppState.
  */
-export async function reconcileMarketplaces(
-  opts?: ReconcileOptions,
-): Promise<ReconcileResult> {
+export async function reconcileMarketplaces(opts?: ReconcileOptions): Promise<ReconcileResult> {
   const declared = getDeclaredMarketplaces()
   if (Object.keys(declared).length === 0) {
     return { installed: [], updated: [], failed: [], upToDate: [], skipped: [] }
@@ -134,21 +128,21 @@ export async function reconcileMarketplaces(
   type WorkItem = {
     name: string
     source: MarketplaceSource
-    action: 'install' | 'update'
+    action: "install" | "update"
   }
   const work: WorkItem[] = [
     ...diff.missing.map(
       (name): WorkItem => ({
         name,
         source: normalizeSource(declared[name]!.source),
-        action: 'install',
+        action: "install",
       }),
     ),
     ...diff.sourceChanged.map(
       ({ name, declaredSource }): WorkItem => ({
         name,
         source: declaredSource,
-        action: 'update',
+        action: "update",
       }),
     ),
   ]
@@ -166,14 +160,8 @@ export async function reconcileMarketplaces(
     // be valid; addMarketplaceSource would fail anyway, so skipping avoids a
     // noisy "failed" event and preserves the working entry. Missing entries
     // are NOT skipped (nothing to preserve; the user should see the error).
-    if (
-      item.action === 'update' &&
-      isLocalMarketplaceSource(item.source) &&
-      !(await pathExists(item.source.path))
-    ) {
-      logForDebugging(
-        `[reconcile] '${item.name}' declared path does not exist; keeping materialized entry`,
-      )
+    if (item.action === "update" && isLocalMarketplaceSource(item.source) && !(await pathExists(item.source.path))) {
+      logForDebugging(`[reconcile] '${item.name}' declared path does not exist; keeping materialized entry`)
       skipped.push(item.name)
       continue
     }
@@ -191,17 +179,17 @@ export async function reconcileMarketplaces(
   }
 
   logForDebugging(
-    `[reconcile] ${toProcess.length} marketplace(s): ${toProcess.map(w => `${w.name}(${w.action})`).join(', ')}`,
+    `[reconcile] ${toProcess.length} marketplace(s): ${toProcess.map((w) => `${w.name}(${w.action})`).join(", ")}`,
   )
 
   const installed: string[] = []
   const updated: string[] = []
-  const failed: ReconcileResult['failed'] = []
+  const failed: ReconcileResult["failed"] = []
 
   for (let i = 0; i < toProcess.length; i++) {
     const { name, source, action } = toProcess[i]!
     opts?.onProgress?.({
-      type: 'installing',
+      type: "installing",
       name,
       action,
       index: i + 1,
@@ -215,17 +203,17 @@ export async function reconcileMarketplaces(
       // and overwrites the old JSON entry.
       const result = await addMarketplaceSource(source)
 
-      if (action === 'install') installed.push(name)
+      if (action === "install") installed.push(name)
       else updated.push(name)
       opts?.onProgress?.({
-        type: 'installed',
+        type: "installed",
         name,
         alreadyMaterialized: result.alreadyMaterialized,
       })
     } catch (e) {
       const error = errorMessage(e)
       failed.push({ name, error })
-      opts?.onProgress?.({ type: 'failed', name, error })
+      opts?.onProgress?.({ type: "failed", name, error })
       logError(e)
     }
   }
@@ -246,14 +234,8 @@ export async function reconcileMarketplaces(
  * its own absolute path, and deleting the worktree leaves a dead
  * installLocation. The canonical root is stable across all worktrees.
  */
-function normalizeSource(
-  source: MarketplaceSource,
-  projectRoot?: string,
-): MarketplaceSource {
-  if (
-    (source.source === 'directory' || source.source === 'file') &&
-    !isAbsolute(source.path)
-  ) {
+function normalizeSource(source: MarketplaceSource, projectRoot?: string): MarketplaceSource {
+  if ((source.source === "directory" || source.source === "file") && !isAbsolute(source.path)) {
     const base = projectRoot ?? getOriginalCwd()
     const canonicalRoot = findCanonicalGitRoot(base)
     return {

@@ -15,7 +15,8 @@ function isCoordinatorGroup(value: unknown): value is CoordinatorProjectionGroup
   if (typeof value.id !== "string") return false
   if (!isStringArray(value.node_ids)) return false
   if (!isStringArray(value.task_ids)) return false
-  if (!["pending", "running", "completed", "failed", "cancelled"].includes(String(value.status))) return false
+  if (!["pending", "running", "completed", "partial", "failed", "cancelled"].includes(String(value.status)))
+    return false
   if (!["none", "waiting", "merged", "conflict"].includes(String(value.merge_status))) return false
   return true
 }
@@ -174,7 +175,7 @@ export type CoordinatorProjectionGroup = Record<string, unknown> & {
   id: string
   node_ids: string[]
   task_ids: string[]
-  status: "pending" | "running" | "completed" | "failed" | "cancelled"
+  status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
   merge_status: "none" | "waiting" | "merged" | "conflict"
 }
 
@@ -337,7 +338,8 @@ export function getCoordinatorProjection(value: unknown) {
   if (!Array.isArray(candidate.tasks) || candidate.tasks.some((item) => !isRecord(item))) return
   if (!isRecord(candidate.counts)) return
   if (Object.values(candidate.counts).some((item) => typeof item !== "number")) return
-  if (!Array.isArray(candidate.groups) || candidate.groups.some((item) => !isCoordinatorGroup(item))) return
+  const groups = candidate.groups === undefined ? [] : candidate.groups
+  if (!Array.isArray(groups) || groups.some((item) => !isCoordinatorGroup(item))) return
   if (
     candidate.expert_lanes !== undefined &&
     (!Array.isArray(candidate.expert_lanes) || candidate.expert_lanes.some((item) => !isExpertLane(item)))
@@ -362,7 +364,7 @@ export function getCoordinatorProjection(value: unknown) {
   if (candidate.progress_snapshot !== undefined && !isProgressSnapshot(candidate.progress_snapshot)) return
   if (candidate.checkpoint_memory !== undefined && !isCheckpointMemorySummary(candidate.checkpoint_memory)) return
   if (candidate.continuation_request !== undefined && !isContinuationRequest(candidate.continuation_request)) return
-  return candidate as CoordinatorProjection
+  return { ...candidate, groups } as CoordinatorProjection
 }
 
 export function getEffortProfile(value: unknown) {

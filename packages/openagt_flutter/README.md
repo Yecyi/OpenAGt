@@ -45,32 +45,32 @@ A native iOS/Android mobile client for OpenCode AI coding agent. Connects to the
 
 ### Working (MVP Complete)
 
-| Feature | File | Status |
-|---------|------|--------|
-| App entry + server connection | `main.dart`, `ConnectionScreen` | ✅ |
-| Session list (list/create/delete) | `session_list_screen.dart` | ✅ |
-| Chat interface (send/receive) | `chat_screen.dart` | ✅ |
-| Real-time SSE streaming | `sse_client.dart` | ✅ |
-| REST API client (Dio) | `opencode_api_client.dart` | ✅ |
-| Light + dark theme | `openag_theme.dart` | ✅ |
-| Material Design 3 styling | `openag_theme.dart` | ✅ |
-| Local storage (Hive, SharedPreferences) | `pubspec.yaml` deps | ✅ |
+| Feature                                 | File                            | Status |
+| --------------------------------------- | ------------------------------- | ------ |
+| App entry + server connection           | `main.dart`, `ConnectionScreen` | ✅     |
+| Session list (list/create/delete)       | `session_list_screen.dart`      | ✅     |
+| Chat interface (send/receive)           | `chat_screen.dart`              | ✅     |
+| Real-time SSE streaming                 | `sse_client.dart`               | ✅     |
+| REST API client (Dio)                   | `opencode_api_client.dart`      | ✅     |
+| Light + dark theme                      | `openag_theme.dart`             | ✅     |
+| Material Design 3 styling               | `openag_theme.dart`             | ✅     |
+| Local storage (Hive, SharedPreferences) | `pubspec.yaml` deps             | ✅     |
 
 ### Planned / Incomplete
 
-| Feature | Priority |
-|---------|----------|
-| Tool call visualization | P2 |
-| Markdown/code rendering | P2 |
-| Diff visualization | P2 |
-| File browser | P2 |
-| Provider/model switching | P2 |
-| Settings page | P2 |
-| Push notifications | P3 |
-| Offline mode | P3 |
-| Multi-device sync | P3 |
-| Deep linking | P3 |
-| Biometric auth | P3 |
+| Feature                  | Priority |
+| ------------------------ | -------- |
+| Tool call visualization  | P2       |
+| Markdown/code rendering  | P2       |
+| Diff visualization       | P2       |
+| File browser             | P2       |
+| Provider/model switching | P2       |
+| Settings page            | P2       |
+| Push notifications       | P3       |
+| Offline mode             | P3       |
+| Multi-device sync        | P3       |
+| Deep linking             | P3       |
+| Biometric auth           | P3       |
 
 ---
 
@@ -111,15 +111,15 @@ question.asked        # Question asked
 
 ## Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| Framework | Flutter 3.x |
-| State Management | flutter_riverpod |
-| HTTP Client | Dio |
-| Real-time | web_socket_channel (SSE) |
-| Local Storage | Hive + shared_preferences |
-| Markdown | flutter_markdown |
-| Utilities | uuid, intl, equatable, freezed |
+| Component        | Technology                     |
+| ---------------- | ------------------------------ |
+| Framework        | Flutter 3.x                    |
+| State Management | flutter_riverpod               |
+| HTTP Client      | Dio                            |
+| Real-time        | web_socket_channel (SSE)       |
+| Local Storage    | Hive + shared_preferences      |
+| Markdown         | flutter_markdown               |
+| Utilities        | uuid, intl, equatable, freezed |
 
 ---
 

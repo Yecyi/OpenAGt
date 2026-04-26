@@ -15,7 +15,7 @@ describe("Format", () => {
     "-e",
     [
       'const fs = require("node:fs")',
-      'const file = process.argv[1]',
+      "const file = process.argv[1]",
       'const value = fs.readFileSync(file, "utf8")',
       `fs.writeFileSync(file, value + ${JSON.stringify(suffix)})`,
     ].join(";"),

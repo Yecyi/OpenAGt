@@ -882,9 +882,7 @@ export function options(input: {
   if (input.model.api.npm === "@ai-sdk/azure") {
     result["store"] = true
     // B-P2-1: Salt the prompt cache key with static blocks hash
-    result["promptCacheKey"] = input.staticBlocksHash
-      ? `${input.sessionID}:${input.staticBlocksHash}`
-      : input.sessionID
+    result["promptCacheKey"] = input.staticBlocksHash ? `${input.sessionID}:${input.staticBlocksHash}` : input.sessionID
   }
 
   if (input.model.api.npm === "@openrouter/ai-sdk-provider" || input.model.api.npm === "@llmgateway/ai-sdk-provider") {
@@ -990,9 +988,7 @@ export function options(input: {
   }
 
   if (input.model.providerID === "venice") {
-    result["promptCacheKey"] = input.staticBlocksHash
-      ? `${input.sessionID}:${input.staticBlocksHash}`
-      : input.sessionID
+    result["promptCacheKey"] = input.staticBlocksHash ? `${input.sessionID}:${input.staticBlocksHash}` : input.sessionID
   }
 
   if (input.model.providerID === "openrouter") {

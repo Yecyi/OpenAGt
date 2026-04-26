@@ -7,14 +7,14 @@
  * A session ID uniquely identifies a Claude Code session.
  * Returned by getSessionId().
  */
-export type SessionId = string & { readonly __brand: 'SessionId' }
+export type SessionId = string & { readonly __brand: "SessionId" }
 
 /**
  * An agent ID uniquely identifies a subagent within a session.
  * Returned by createAgentId().
  * When present, indicates the context is a subagent (not the main session).
  */
-export type AgentId = string & { readonly __brand: 'AgentId' }
+export type AgentId = string & { readonly __brand: "AgentId" }
 
 /**
  * Cast a raw string to SessionId.

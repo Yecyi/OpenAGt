@@ -34,9 +34,7 @@ export interface RetryPolicy {
   circuitBreakerResetMs: number
 }
 
-function getRetryPolicy(fallback?: {
-  retryPolicy?: Partial<RetryPolicy>
-}): RetryPolicy {
+function getRetryPolicy(fallback?: { retryPolicy?: Partial<RetryPolicy> }): RetryPolicy {
   return {
     baseDelayMs: fallback?.retryPolicy?.baseDelayMs ?? 1000,
     maxDelayMs: fallback?.retryPolicy?.maxDelayMs ?? 30000,
@@ -288,8 +286,7 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       const m = runtimeState.metrics
       return {
         ...m,
-        fallbackRate:
-          m.totalAttempts === 0 ? 0 : Math.round((m.totalFallbacks / m.totalAttempts) * 10000) / 100,
+        fallbackRate: m.totalAttempts === 0 ? 0 : Math.round((m.totalFallbacks / m.totalAttempts) * 10000) / 100,
         fallbackByReason: { ...m.fallbackByReason },
         fallbackByProvider: { ...m.fallbackByProvider },
         hopLatencies: [...m.hopLatencies],

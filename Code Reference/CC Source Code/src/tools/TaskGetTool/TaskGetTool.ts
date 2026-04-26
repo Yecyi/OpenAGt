@@ -1,18 +1,13 @@
-import { z } from 'zod/v4'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import {
-  getTask,
-  getTaskListId,
-  isTodoV2Enabled,
-  TaskStatusSchema,
-} from '../../utils/tasks.js'
-import { TASK_GET_TOOL_NAME } from './constants.js'
-import { DESCRIPTION, PROMPT } from './prompt.js'
+import { z } from "zod/v4"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getTask, getTaskListId, isTodoV2Enabled, TaskStatusSchema } from "../../utils/tasks.js"
+import { TASK_GET_TOOL_NAME } from "./constants.js"
+import { DESCRIPTION, PROMPT } from "./prompt.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    taskId: z.string().describe('The ID of the task to retrieve'),
+    taskId: z.string().describe("The ID of the task to retrieve"),
   }),
 )
 type InputSchema = ReturnType<typeof inputSchema>
@@ -37,7 +32,7 @@ export type Output = z.infer<OutputSchema>
 
 export const TaskGetTool = buildTool({
   name: TASK_GET_TOOL_NAME,
-  searchHint: 'retrieve a task by ID',
+  searchHint: "retrieve a task by ID",
   maxResultSizeChars: 100_000,
   async description() {
     return DESCRIPTION
@@ -52,7 +47,7 @@ export const TaskGetTool = buildTool({
     return outputSchema()
   },
   userFacingName() {
-    return 'TaskGet'
+    return "TaskGet"
   },
   shouldDefer: true,
   isEnabled() {
@@ -101,28 +96,24 @@ export const TaskGetTool = buildTool({
     if (!task) {
       return {
         tool_use_id: toolUseID,
-        type: 'tool_result',
-        content: 'Task not found',
+        type: "tool_result",
+        content: "Task not found",
       }
     }
 
-    const lines = [
-      `Task #${task.id}: ${task.subject}`,
-      `Status: ${task.status}`,
-      `Description: ${task.description}`,
-    ]
+    const lines = [`Task #${task.id}: ${task.subject}`, `Status: ${task.status}`, `Description: ${task.description}`]
 
     if (task.blockedBy.length > 0) {
-      lines.push(`Blocked by: ${task.blockedBy.map(id => `#${id}`).join(', ')}`)
+      lines.push(`Blocked by: ${task.blockedBy.map((id) => `#${id}`).join(", ")}`)
     }
     if (task.blocks.length > 0) {
-      lines.push(`Blocks: ${task.blocks.map(id => `#${id}`).join(', ')}`)
+      lines.push(`Blocks: ${task.blocks.map((id) => `#${id}`).join(", ")}`)
     }
 
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
-      content: lines.join('\n'),
+      type: "tool_result",
+      content: lines.join("\n"),
     }
   },
 } satisfies ToolDef<InputSchema, Output>)

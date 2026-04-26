@@ -1,6 +1,6 @@
-import Anthropic, { type ClientOptions } from '@anthropic-ai/sdk'
-import { randomUUID } from 'crypto'
-import type { GoogleAuth } from 'google-auth-library'
+import Anthropic, { type ClientOptions } from "@anthropic-ai/sdk"
+import { randomUUID } from "crypto"
+import type { GoogleAuth } from "google-auth-library"
 import {
   checkAndRefreshOAuthTokenIfNeeded,
   getAnthropicApiKey,
@@ -9,25 +9,15 @@ import {
   isClaudeAISubscriber,
   refreshAndGetAwsCredentials,
   refreshGcpCredentialsIfNeeded,
-} from 'src/utils/auth.js'
-import { getUserAgent } from 'src/utils/http.js'
-import { getSmallFastModel } from 'src/utils/model/model.js'
-import {
-  getAPIProvider,
-  isFirstPartyAnthropicBaseUrl,
-} from 'src/utils/model/providers.js'
-import { getProxyFetchOptions } from 'src/utils/proxy.js'
-import {
-  getIsNonInteractiveSession,
-  getSessionId,
-} from '../../bootstrap/state.js'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { isDebugToStdErr, logForDebugging } from '../../utils/debug.js'
-import {
-  getAWSRegion,
-  getVertexRegionForModel,
-  isEnvTruthy,
-} from '../../utils/envUtils.js'
+} from "src/utils/auth.js"
+import { getUserAgent } from "src/utils/http.js"
+import { getSmallFastModel } from "src/utils/model/model.js"
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from "src/utils/model/providers.js"
+import { getProxyFetchOptions } from "src/utils/proxy.js"
+import { getIsNonInteractiveSession, getSessionId } from "../../bootstrap/state.js"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { isDebugToStdErr, logForDebugging } from "../../utils/debug.js"
+import { getAWSRegion, getVertexRegionForModel, isEnvTruthy } from "../../utils/envUtils.js"
 
 /**
  * Environment variables for different client types:
@@ -70,18 +60,18 @@ import {
  * 4. Fallback region (us-east5)
  */
 
-function createStderrLogger(): ClientOptions['logger'] {
+function createStderrLogger(): ClientOptions["logger"] {
   return {
     error: (msg, ...args) =>
       // biome-ignore lint/suspicious/noConsole:: intentional console output -- SDK logger must use console
-      console.error('[Anthropic SDK ERROR]', msg, ...args),
+      console.error("[Anthropic SDK ERROR]", msg, ...args),
     // biome-ignore lint/suspicious/noConsole:: intentional console output -- SDK logger must use console
-    warn: (msg, ...args) => console.error('[Anthropic SDK WARN]', msg, ...args),
+    warn: (msg, ...args) => console.error("[Anthropic SDK WARN]", msg, ...args),
     // biome-ignore lint/suspicious/noConsole:: intentional console output -- SDK logger must use console
-    info: (msg, ...args) => console.error('[Anthropic SDK INFO]', msg, ...args),
+    info: (msg, ...args) => console.error("[Anthropic SDK INFO]", msg, ...args),
     debug: (msg, ...args) =>
       // biome-ignore lint/suspicious/noConsole:: intentional console output -- SDK logger must use console
-      console.error('[Anthropic SDK DEBUG]', msg, ...args),
+      console.error("[Anthropic SDK DEBUG]", msg, ...args),
   }
 }
 
@@ -95,7 +85,7 @@ export async function getAnthropicClient({
   apiKey?: string
   maxRetries: number
   model?: string
-  fetchOverride?: ClientOptions['fetch']
+  fetchOverride?: ClientOptions["fetch"]
   source?: string
 }): Promise<Anthropic> {
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
@@ -103,34 +93,30 @@ export async function getAnthropicClient({
   const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP
   const customHeaders = getCustomHeaders()
   const defaultHeaders: { [key: string]: string } = {
-    'x-app': 'cli',
-    'User-Agent': getUserAgent(),
-    'X-Claude-Code-Session-Id': getSessionId(),
+    "x-app": "cli",
+    "User-Agent": getUserAgent(),
+    "X-Claude-Code-Session-Id": getSessionId(),
     ...customHeaders,
-    ...(containerId ? { 'x-claude-remote-container-id': containerId } : {}),
-    ...(remoteSessionId
-      ? { 'x-claude-remote-session-id': remoteSessionId }
-      : {}),
+    ...(containerId ? { "x-claude-remote-container-id": containerId } : {}),
+    ...(remoteSessionId ? { "x-claude-remote-session-id": remoteSessionId } : {}),
     // SDK consumers can identify their app/library for backend analytics
-    ...(clientApp ? { 'x-client-app': clientApp } : {}),
+    ...(clientApp ? { "x-client-app": clientApp } : {}),
   }
 
   // Log API client configuration for HFI debugging
   logForDebugging(
-    `[API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: ${!!process.env.ANTHROPIC_CUSTOM_HEADERS}, has Authorization header: ${!!customHeaders['Authorization']}`,
+    `[API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: ${!!process.env.ANTHROPIC_CUSTOM_HEADERS}, has Authorization header: ${!!customHeaders["Authorization"]}`,
   )
 
   // Add additional protection header if enabled via env var
-  const additionalProtectionEnabled = isEnvTruthy(
-    process.env.CLAUDE_CODE_ADDITIONAL_PROTECTION,
-  )
+  const additionalProtectionEnabled = isEnvTruthy(process.env.CLAUDE_CODE_ADDITIONAL_PROTECTION)
   if (additionalProtectionEnabled) {
-    defaultHeaders['x-anthropic-additional-protection'] = 'true'
+    defaultHeaders["x-anthropic-additional-protection"] = "true"
   }
 
-  logForDebugging('[API:auth] OAuth token check starting')
+  logForDebugging("[API:auth] OAuth token check starting")
   await checkAndRefreshOAuthTokenIfNeeded()
-  logForDebugging('[API:auth] OAuth token check complete')
+  logForDebugging("[API:auth] OAuth token check complete")
 
   if (!isClaudeAISubscriber()) {
     await configureApiKeyHeaders(defaultHeaders, getIsNonInteractiveSession())
@@ -145,17 +131,16 @@ export async function getAnthropicClient({
     dangerouslyAllowBrowser: true,
     fetchOptions: getProxyFetchOptions({
       forAnthropicAPI: true,
-    }) as ClientOptions['fetchOptions'],
+    }) as ClientOptions["fetchOptions"],
     ...(resolvedFetch && {
       fetch: resolvedFetch,
     }),
   }
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK)) {
-    const { AnthropicBedrock } = await import('@anthropic-ai/bedrock-sdk')
+    const { AnthropicBedrock } = await import("@anthropic-ai/bedrock-sdk")
     // Use region override for small fast model if specified
     const awsRegion =
-      model === getSmallFastModel() &&
-      process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION
+      model === getSmallFastModel() && process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION
         ? process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION
         : getAWSRegion()
 
@@ -189,23 +174,20 @@ export async function getAnthropicClient({
     return new AnthropicBedrock(bedrockArgs) as unknown as Anthropic
   }
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)) {
-    const { AnthropicFoundry } = await import('@anthropic-ai/foundry-sdk')
+    const { AnthropicFoundry } = await import("@anthropic-ai/foundry-sdk")
     // Determine Azure AD token provider based on configuration
     // SDK reads ANTHROPIC_FOUNDRY_API_KEY by default
     let azureADTokenProvider: (() => Promise<string>) | undefined
     if (!process.env.ANTHROPIC_FOUNDRY_API_KEY) {
       if (isEnvTruthy(process.env.CLAUDE_CODE_SKIP_FOUNDRY_AUTH)) {
         // Mock token provider for testing/proxy scenarios (similar to Vertex mock GoogleAuth)
-        azureADTokenProvider = () => Promise.resolve('')
+        azureADTokenProvider = () => Promise.resolve("")
       } else {
         // Use real Azure AD authentication with DefaultAzureCredential
-        const {
-          DefaultAzureCredential: AzureCredential,
-          getBearerTokenProvider,
-        } = await import('@azure/identity')
+        const { DefaultAzureCredential: AzureCredential, getBearerTokenProvider } = await import("@azure/identity")
         azureADTokenProvider = getBearerTokenProvider(
           new AzureCredential(),
-          'https://cognitiveservices.azure.com/.default',
+          "https://cognitiveservices.azure.com/.default",
         )
       }
     }
@@ -226,8 +208,8 @@ export async function getAnthropicClient({
     }
 
     const [{ AnthropicVertex }, { GoogleAuth }] = await Promise.all([
-      import('@anthropic-ai/vertex-sdk'),
-      import('google-auth-library'),
+      import("@anthropic-ai/vertex-sdk"),
+      import("google-auth-library"),
     ])
     // TODO: Cache either GoogleAuth instance or AuthClient to improve performance
     // Currently we create a new GoogleAuth instance for every getAnthropicClient() call
@@ -251,17 +233,15 @@ export async function getAnthropicClient({
     // Check project environment variables in same order as google-auth-library
     // See: https://github.com/googleapis/google-auth-library-nodejs/blob/main/src/auth/googleauth.ts
     const hasProjectEnvVar =
-      process.env['GCLOUD_PROJECT'] ||
-      process.env['GOOGLE_CLOUD_PROJECT'] ||
-      process.env['gcloud_project'] ||
-      process.env['google_cloud_project']
+      process.env["GCLOUD_PROJECT"] ||
+      process.env["GOOGLE_CLOUD_PROJECT"] ||
+      process.env["gcloud_project"] ||
+      process.env["google_cloud_project"]
 
     // Check for credential file paths (service account or ADC)
     // Note: We're checking both standard and lowercase variants to be safe,
     // though we should verify what google-auth-library actually checks
-    const hasKeyFile =
-      process.env['GOOGLE_APPLICATION_CREDENTIALS'] ||
-      process.env['google_application_credentials']
+    const hasKeyFile = process.env["GOOGLE_APPLICATION_CREDENTIALS"] || process.env["google_application_credentials"]
 
     const googleAuth = isEnvTruthy(process.env.CLAUDE_CODE_SKIP_VERTEX_AUTH)
       ? ({
@@ -271,7 +251,7 @@ export async function getAnthropicClient({
           }),
         } as unknown as GoogleAuth)
       : new GoogleAuth({
-          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+          scopes: ["https://www.googleapis.com/auth/cloud-platform"],
           // Only use ANTHROPIC_VERTEX_PROJECT_ID as last resort fallback
           // This prevents the 12-second metadata server timeout when:
           // - No project env vars are set AND
@@ -300,12 +280,9 @@ export async function getAnthropicClient({
   // Determine authentication method based on available tokens
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
     apiKey: isClaudeAISubscriber() ? null : apiKey || getAnthropicApiKey(),
-    authToken: isClaudeAISubscriber()
-      ? getClaudeAIOAuthTokens()?.accessToken
-      : undefined,
+    authToken: isClaudeAISubscriber() ? getClaudeAIOAuthTokens()?.accessToken : undefined,
     // Set baseURL from OAuth config when using staging OAuth
-    ...(process.env.USER_TYPE === 'ant' &&
-    isEnvTruthy(process.env.USE_STAGING_OAUTH)
+    ...(process.env.USER_TYPE === "ant" && isEnvTruthy(process.env.USE_STAGING_OAUTH)
       ? { baseURL: getOauthConfig().BASE_API_URL }
       : {}),
     ...ARGS,
@@ -319,11 +296,9 @@ async function configureApiKeyHeaders(
   headers: Record<string, string>,
   isNonInteractiveSession: boolean,
 ): Promise<void> {
-  const token =
-    process.env.ANTHROPIC_AUTH_TOKEN ||
-    (await getApiKeyFromApiKeyHelper(isNonInteractiveSession))
+  const token = process.env.ANTHROPIC_AUTH_TOKEN || (await getApiKeyFromApiKeyHelper(isNonInteractiveSession))
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+    headers["Authorization"] = `Bearer ${token}`
   }
 }
 
@@ -341,7 +316,7 @@ function getCustomHeaders(): Record<string, string> {
 
     // Parse header in format "Name: Value" (curl style). Split on first `:`
     // then trim — avoids regex backtracking on malformed long header lines.
-    const colonIdx = headerString.indexOf(':')
+    const colonIdx = headerString.indexOf(":")
     if (colonIdx === -1) continue
     const name = headerString.slice(0, colonIdx).trim()
     const value = headerString.slice(colonIdx + 1).trim()
@@ -353,18 +328,14 @@ function getCustomHeaders(): Record<string, string> {
   return customHeaders
 }
 
-export const CLIENT_REQUEST_ID_HEADER = 'x-client-request-id'
+export const CLIENT_REQUEST_ID_HEADER = "x-client-request-id"
 
-function buildFetch(
-  fetchOverride: ClientOptions['fetch'],
-  source: string | undefined,
-): ClientOptions['fetch'] {
+function buildFetch(fetchOverride: ClientOptions["fetch"], source: string | undefined): ClientOptions["fetch"] {
   // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
   const inner = fetchOverride ?? globalThis.fetch
   // Only send to the first-party API — Bedrock/Vertex/Foundry don't log it
   // and unknown headers risk rejection by strict proxies (inc-4029 class).
-  const injectClientRequestId =
-    getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
+  const injectClientRequestId = getAPIProvider() === "firstParty" && isFirstPartyAnthropicBaseUrl()
   return (input, init) => {
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
     const headers = new Headers(init?.headers)
@@ -379,7 +350,7 @@ function buildFetch(
       const url = input instanceof Request ? input.url : String(input)
       const id = headers.get(CLIENT_REQUEST_ID_HEADER)
       logForDebugging(
-        `[API REQUEST] ${new URL(url).pathname}${id ? ` ${CLIENT_REQUEST_ID_HEADER}=${id}` : ''} source=${source ?? 'unknown'}`,
+        `[API REQUEST] ${new URL(url).pathname}${id ? ` ${CLIENT_REQUEST_ID_HEADER}=${id}` : ""} source=${source ?? "unknown"}`,
       )
     } catch {
       // never let logging crash the fetch

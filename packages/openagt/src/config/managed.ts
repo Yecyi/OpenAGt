@@ -33,7 +33,11 @@ function systemManagedConfigDir(): string {
 }
 
 export function managedConfigDir() {
-  return process.env.OPENAGT_TEST_MANAGED_CONFIG_DIR || process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR || systemManagedConfigDir()
+  return (
+    process.env.OPENAGT_TEST_MANAGED_CONFIG_DIR ||
+    process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR ||
+    systemManagedConfigDir()
+  )
 }
 
 export function parseManagedPlist(json: string): string {

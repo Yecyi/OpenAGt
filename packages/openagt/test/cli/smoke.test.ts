@@ -23,7 +23,10 @@ interface SmokeTestContext {
   exitCode: number
 }
 
-async function runCLI(args: string[], options?: { cwd?: string; env?: Record<string, string> }): Promise<SmokeTestContext> {
+async function runCLI(
+  args: string[],
+  options?: { cwd?: string; env?: Record<string, string> },
+): Promise<SmokeTestContext> {
   const cwd = options?.cwd ?? process.cwd()
   const env = { ...process.env, ...options?.env }
 
@@ -40,16 +43,14 @@ async function runCLI(args: string[], options?: { cwd?: string; env?: Record<str
 describe("CLI Smoke Tests", () => {
   describe("help", () => {
     test("--help shows usage information", async () => {
-      const result = await $`bun run ${CLI_ENTRY} --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("openagt")
     })
 
     test("-h shows usage information", async () => {
-      const result = await $`bun run ${CLI_ENTRY} -h`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} -h`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("openagt")
@@ -58,16 +59,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("version", () => {
     test("--version shows version", async () => {
-      const result = await $`bun run ${CLI_ENTRY} --version`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} --version`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toMatch(/\d+\.\d+\.\d+/)
     })
 
     test("-v shows version", async () => {
-      const result = await $`bun run ${CLI_ENTRY} -v`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} -v`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toMatch(/\d+\.\d+\.\d+/)
@@ -78,17 +77,14 @@ describe("CLI Smoke Tests", () => {
     test("creates project in new directory", async () => {
       await using tmp = await tmpdir()
 
-      const result = await $`bun run ${CLI_ENTRY} init`
-        .cwd(tmp.path)
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} init`.cwd(tmp.path).quiet()
 
       // init may fail without git credentials, but should not crash
       expect([0, 1]).toContain(result.exitCode)
     })
 
     test("init --help works", async () => {
-      const result = await $`bun run ${CLI_ENTRY} init --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} init --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("init")
@@ -97,8 +93,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("session", () => {
     test("session --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} session --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} session --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("session")
@@ -107,9 +102,7 @@ describe("CLI Smoke Tests", () => {
     test("session list works without session", async () => {
       await using tmp = await tmpdir({ git: true })
 
-      const result = await $`bun run ${CLI_ENTRY} session list`
-        .cwd(tmp.path)
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} session list`.cwd(tmp.path).quiet()
 
       // May fail if server not running, but should not crash
       expect([0, 1]).toContain(result.exitCode)
@@ -118,16 +111,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("providers", () => {
     test("providers --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} providers --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} providers --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("providers")
     })
 
     test("providers list shows available providers", async () => {
-      const result = await $`bun run ${CLI_ENTRY} providers list`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} providers list`.quiet()
 
       expect(result.exitCode).toBe(0)
     })
@@ -135,16 +126,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("models", () => {
     test("models --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} models --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} models --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("models")
     })
 
     test("models list works", async () => {
-      const result = await $`bun run ${CLI_ENTRY} models list`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} models list`.quiet()
 
       expect(result.exitCode).toBe(0)
     }, 120_000)
@@ -152,8 +141,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("agent", () => {
     test("agent --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} agent --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} agent --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("agent")
@@ -162,16 +150,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("serve", () => {
     test("serve --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} serve --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} serve --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("serve")
     })
 
     test("serve --version shows server version", async () => {
-      const result = await $`bun run ${CLI_ENTRY} serve --version`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} serve --version`.quiet()
 
       expect(result.exitCode).toBe(0)
     })
@@ -179,32 +165,28 @@ describe("CLI Smoke Tests", () => {
 
   describe("debug", () => {
     test("debug --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} debug --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("debug")
     })
 
     test("debug agent --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} debug agent --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug agent --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("agent")
     })
 
     test("debug config --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} debug config --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug config --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("config")
     })
 
     test("debug doctor --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} debug doctor --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug doctor --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("doctor")
@@ -213,9 +195,7 @@ describe("CLI Smoke Tests", () => {
     test("debug doctor --json emits a stable diagnostic envelope", async () => {
       await using tmp = await tmpdir({ git: true })
 
-      const result = await $`bun run ${CLI_ENTRY} debug doctor --json`
-        .cwd(tmp.path)
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug doctor --json`.cwd(tmp.path).quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain('"schema_version": 1')
@@ -225,8 +205,7 @@ describe("CLI Smoke Tests", () => {
     })
 
     test("debug bundle --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} debug bundle --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} debug bundle --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("bundle")
@@ -235,16 +214,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("mcp", () => {
     test("mcp --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} mcp --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} mcp --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("mcp")
     })
 
     test("mcp start --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} mcp start --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} mcp start --help`.quiet()
 
       expect(result.exitCode).toBe(0)
     })
@@ -252,8 +229,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("acp", () => {
     test("acp --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} acp --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} acp --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("acp")
@@ -262,8 +238,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("error handling", () => {
     test("unknown command does not crash", async () => {
-      const result = await $`bun run ${CLI_ENTRY} unknown-command-12345`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} unknown-command-12345`.quiet()
 
       // Should fail gracefully, not crash
       expect(result.exitCode).not.toBe(139) // SIGSEGV
@@ -271,9 +246,7 @@ describe("CLI Smoke Tests", () => {
     })
 
     test("malformed arguments do not crash", async () => {
-      const result = await $`bun run ${CLI_ENTRY} --invalid-option`
-        .nothrow()
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} --invalid-option`.nothrow().quiet()
 
       // Should show error, not crash
       expect(result.exitCode).toBeGreaterThan(0)
@@ -283,8 +256,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("stats", () => {
     test("stats --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} stats --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} stats --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("stats")
@@ -293,8 +265,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("export", () => {
     test("export --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} export --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} export --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("export")
@@ -303,8 +274,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("import", () => {
     test("import --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} import --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} import --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("import")
@@ -313,8 +283,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("github", () => {
     test("github --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} github --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} github --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("github")
@@ -323,8 +292,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("pr", () => {
     test("pr --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} pr --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} pr --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("pull request")
@@ -333,8 +301,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("account", () => {
     test("account --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} account --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} account --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("account")
@@ -343,16 +310,14 @@ describe("CLI Smoke Tests", () => {
 
   describe("plug", () => {
     test("plug --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} plug --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} plug --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("plugin")
     })
 
     test("plug list shows plugins", async () => {
-      const result = await $`bun run ${CLI_ENTRY} plug list`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} plug list`.quiet()
 
       // May fail without plugins, but should not crash
       expect([0, 1]).toContain(result.exitCode)
@@ -361,8 +326,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("upgrade", () => {
     test("upgrade --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} upgrade --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} upgrade --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("upgrade")
@@ -371,8 +335,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("db", () => {
     test("db --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} db --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} db --help`.quiet()
 
       expect(result.exitCode).toBe(0)
       expect(result.stdout.toString()).toContain("database")
@@ -381,8 +344,7 @@ describe("CLI Smoke Tests", () => {
 
   describe("web", () => {
     test("web --help shows usage", async () => {
-      const result = await $`bun run ${CLI_ENTRY} web --help`
-        .quiet()
+      const result = await $`bun run ${CLI_ENTRY} web --help`.quiet()
 
       expect(result.exitCode).toBe(0)
     })

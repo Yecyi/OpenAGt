@@ -6,8 +6,8 @@
  * - yoloClassifier.ts (YOLO mode security classification)
  */
 
-import type { BetaContentBlock } from '@anthropic-ai/sdk/resources/beta/messages.js'
-import type { z } from 'zod/v4'
+import type { BetaContentBlock } from "@anthropic-ai/sdk/resources/beta/messages.js"
+import type { z } from "zod/v4"
 
 /**
  * Extract tool use block from message content by tool name.
@@ -15,9 +15,9 @@ import type { z } from 'zod/v4'
 export function extractToolUseBlock(
   content: BetaContentBlock[],
   toolName: string,
-): Extract<BetaContentBlock, { type: 'tool_use' }> | null {
-  const block = content.find(b => b.type === 'tool_use' && b.name === toolName)
-  if (!block || block.type !== 'tool_use') {
+): Extract<BetaContentBlock, { type: "tool_use" }> | null {
+  const block = content.find((b) => b.type === "tool_use" && b.name === toolName)
+  if (!block || block.type !== "tool_use") {
     return null
   }
   return block
@@ -28,7 +28,7 @@ export function extractToolUseBlock(
  * Returns null if parsing fails.
  */
 export function parseClassifierResponse<T extends z.ZodTypeAny>(
-  toolUseBlock: Extract<BetaContentBlock, { type: 'tool_use' }>,
+  toolUseBlock: Extract<BetaContentBlock, { type: "tool_use" }>,
   schema: T,
 ): z.infer<T> | null {
   const parseResult = schema.safeParse(toolUseBlock.input)

@@ -1,27 +1,23 @@
-import { Ajv } from 'ajv'
-import { z } from 'zod/v4'
-import type { Tool, ToolInputJSONSchema } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../utils/errors.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import type { PermissionResult } from '../../utils/permissions/PermissionResult.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
+import { Ajv } from "ajv"
+import { z } from "zod/v4"
+import type { Tool, ToolInputJSONSchema } from "../../Tool.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from "../../utils/errors.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import type { PermissionResult } from "../../utils/permissions/PermissionResult.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
 
 // Allow any input object since the schema is provided dynamically
 const inputSchema = lazySchema(() => z.object({}).passthrough())
 type InputSchema = ReturnType<typeof inputSchema>
 
-const outputSchema = lazySchema(() =>
-  z.string().describe('Structured output tool result'),
-)
+const outputSchema = lazySchema(() => z.string().describe("Structured output tool result"))
 type OutputSchema = ReturnType<typeof outputSchema>
 export type Output = z.infer<OutputSchema>
 
-export const SYNTHETIC_OUTPUT_TOOL_NAME = 'StructuredOutput'
+export const SYNTHETIC_OUTPUT_TOOL_NAME = "StructuredOutput"
 
-export function isSyntheticOutputToolEnabled(opts: {
-  isNonInteractiveSession: boolean
-}): boolean {
+export function isSyntheticOutputToolEnabled(opts: { isNonInteractiveSession: boolean }): boolean {
   return opts.isNonInteractiveSession
 }
 
@@ -42,10 +38,10 @@ export const SyntheticOutputTool = buildTool({
     return false
   },
   name: SYNTHETIC_OUTPUT_TOOL_NAME,
-  searchHint: 'return the final response as structured JSON',
+  searchHint: "return the final response as structured JSON",
   maxResultSizeChars: 100_000,
   async description(): Promise<string> {
-    return 'Return structured output in the requested format'
+    return "Return structured output in the requested format"
   },
   async prompt(): Promise<string> {
     return `Use this tool to return your final response in the requested structured format. You MUST call this tool exactly once at the end of your response to provide the structured output.`
@@ -59,14 +55,14 @@ export const SyntheticOutputTool = buildTool({
   async call(input) {
     // The tool just validates and returns the input as the structured output
     return {
-      data: 'Structured output provided successfully',
+      data: "Structured output provided successfully",
       structured_output: input,
     }
   },
   async checkPermissions(input): Promise<PermissionResult> {
     // Always allow this tool - it's just returning data
     return {
-      behavior: 'allow',
+      behavior: "allow",
       updatedInput: input,
     }
   },
@@ -75,15 +71,15 @@ export const SyntheticOutputTool = buildTool({
     const keys = Object.keys(input)
     if (keys.length === 0) return null
     if (keys.length <= 3) {
-      return keys.map(k => `${k}: ${jsonStringify(input[k])}`).join(', ')
+      return keys.map((k) => `${k}: ${jsonStringify(input[k])}`).join(", ")
     }
-    return `${keys.length} fields: ${keys.slice(0, 3).join(', ')}…`
+    return `${keys.length} fields: ${keys.slice(0, 3).join(", ")}…`
   },
   renderToolUseRejectedMessage() {
-    return 'Structured output rejected'
+    return "Structured output rejected"
   },
   renderToolUseErrorMessage() {
-    return 'Structured output error'
+    return "Structured output error"
   },
   renderToolUseProgressMessage() {
     return null
@@ -94,7 +90,7 @@ export const SyntheticOutputTool = buildTool({
   mapToolResultToToolResultBlockParam(content: string, toolUseID: string) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result' as const,
+      type: "tool_result" as const,
       content,
     }
   },
@@ -113,9 +109,7 @@ const toolCache = new WeakMap<object, CreateResult>()
  * Returns {tool} on success or {error} with Ajv's diagnostic message
  * (e.g. "data/properties/bugs should be object") on invalid schema.
  */
-export function createSyntheticOutputTool(
-  jsonSchema: Record<string, unknown>,
-): CreateResult {
+export function createSyntheticOutputTool(jsonSchema: Record<string, unknown>): CreateResult {
   const cached = toolCache.get(jsonSchema)
   if (cached) return cached
 
@@ -124,9 +118,7 @@ export function createSyntheticOutputTool(
   return result
 }
 
-function buildSyntheticOutputTool(
-  jsonSchema: Record<string, unknown>,
-): CreateResult {
+function buildSyntheticOutputTool(jsonSchema: Record<string, unknown>): CreateResult {
   try {
     const ajv = new Ajv({ allErrors: true })
     const isValidSchema = ajv.validateSchema(jsonSchema)
@@ -142,16 +134,14 @@ function buildSyntheticOutputTool(
         async call(input) {
           const isValid = validateSchema(input)
           if (!isValid) {
-            const errors = validateSchema.errors
-              ?.map(e => `${e.instancePath || 'root'}: ${e.message}`)
-              .join(', ')
+            const errors = validateSchema.errors?.map((e) => `${e.instancePath || "root"}: ${e.message}`).join(", ")
             throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
               `Output does not match required schema: ${errors}`,
-              `StructuredOutput schema mismatch: ${(errors ?? '').slice(0, 150)}`,
+              `StructuredOutput schema mismatch: ${(errors ?? "").slice(0, 150)}`,
             )
           }
           return {
-            data: 'Structured output provided successfully',
+            data: "Structured output provided successfully",
             structured_output: input,
           }
         },

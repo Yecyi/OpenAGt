@@ -124,12 +124,11 @@ interface TokenValuedEntry {
   value: string | undefined
 }
 
-function evictIfOverTokenLimit(
-  memo: LRUCache<string, unknown>,
-  tokenLimit: number,
-): void {
+function evictIfOverTokenLimit(memo: LRUCache<string, unknown>, tokenLimit: number): void {
   let totalTokens = 0
-  const entries = Array.from((memo as LRUCache<string, TokenValuedEntry>).entries()) as Array<[string, TokenValuedEntry]>
+  const entries = Array.from((memo as LRUCache<string, TokenValuedEntry>).entries()) as Array<
+    [string, TokenValuedEntry]
+  >
   for (const [, entry] of entries) {
     totalTokens += computeTokenEstimate(entry.value ?? "")
     while (totalTokens > tokenLimit && memo.size > 0) {

@@ -5,18 +5,12 @@
  * so it can be safely imported by src/types/hooks.ts without creating
  * circular dependencies.
  */
-import z from 'zod/v4'
+import z from "zod/v4"
 // Types extracted to src/types/permissions.ts to break import cycles
-import type {
-  PermissionUpdate,
-  PermissionUpdateDestination,
-} from '../../types/permissions.js'
-import { lazySchema } from '../lazySchema.js'
-import { externalPermissionModeSchema } from './PermissionMode.js'
-import {
-  permissionBehaviorSchema,
-  permissionRuleValueSchema,
-} from './PermissionRule.js'
+import type { PermissionUpdate, PermissionUpdateDestination } from "../../types/permissions.js"
+import { lazySchema } from "../lazySchema.js"
+import { externalPermissionModeSchema } from "./PermissionMode.js"
+import { permissionBehaviorSchema, permissionRuleValueSchema } from "./PermissionRule.js"
 
 // Re-export for backwards compatibility
 export type { PermissionUpdate, PermissionUpdateDestination }
@@ -27,50 +21,50 @@ export type { PermissionUpdate, PermissionUpdateDestination }
 export const permissionUpdateDestinationSchema = lazySchema(() =>
   z.enum([
     // User settings (global)
-    'userSettings',
+    "userSettings",
     // Project settings (shared per-directory)
-    'projectSettings',
+    "projectSettings",
     // Local settings (gitignored)
-    'localSettings',
+    "localSettings",
     // In-memory for the current session only
-    'session',
+    "session",
     // From the command line arguments
-    'cliArg',
+    "cliArg",
   ]),
 )
 
 export const permissionUpdateSchema = lazySchema(() =>
-  z.discriminatedUnion('type', [
+  z.discriminatedUnion("type", [
     z.object({
-      type: z.literal('addRules'),
+      type: z.literal("addRules"),
       rules: z.array(permissionRuleValueSchema()),
       behavior: permissionBehaviorSchema(),
       destination: permissionUpdateDestinationSchema(),
     }),
     z.object({
-      type: z.literal('replaceRules'),
+      type: z.literal("replaceRules"),
       rules: z.array(permissionRuleValueSchema()),
       behavior: permissionBehaviorSchema(),
       destination: permissionUpdateDestinationSchema(),
     }),
     z.object({
-      type: z.literal('removeRules'),
+      type: z.literal("removeRules"),
       rules: z.array(permissionRuleValueSchema()),
       behavior: permissionBehaviorSchema(),
       destination: permissionUpdateDestinationSchema(),
     }),
     z.object({
-      type: z.literal('setMode'),
+      type: z.literal("setMode"),
       mode: externalPermissionModeSchema(),
       destination: permissionUpdateDestinationSchema(),
     }),
     z.object({
-      type: z.literal('addDirectories'),
+      type: z.literal("addDirectories"),
       directories: z.array(z.string()),
       destination: permissionUpdateDestinationSchema(),
     }),
     z.object({
-      type: z.literal('removeDirectories'),
+      type: z.literal("removeDirectories"),
       directories: z.array(z.string()),
       destination: permissionUpdateDestinationSchema(),
     }),

@@ -17,6 +17,7 @@ import { ShellRunner } from "@/shell/runner"
 import { SandboxBroker } from "@/sandbox/broker"
 import { SandboxPolicy } from "@/sandbox/policy"
 import type { ResolvedPolicy } from "@/sandbox/policy"
+import { autoBackendName } from "@/sandbox/backends"
 
 import { BashArity } from "@/permission/arity"
 import * as Truncate from "./truncate"
@@ -282,8 +283,7 @@ function chooseShell(command: string) {
   const acceptable = Shell.acceptable()
   if (process.platform !== "win32") return acceptable
   const text = command.trim().toLowerCase()
-  const hasPowerShellSyntax =
-    PS_TOKENS.some((item) => text.includes(item)) || /(^|[\s;(])&\s+["'a-z_$({]/i.test(text)
+  const hasPowerShellSyntax = PS_TOKENS.some((item) => text.includes(item)) || /(^|[\s;(])&\s+["'a-z_$({]/i.test(text)
   if (hasPowerShellSyntax) {
     const preferred = Shell.preferred()
     const name = Shell.name(preferred)
@@ -302,11 +302,7 @@ const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolea
   return tree.rootNode
 })
 
-const ask = Effect.fn("BashTool.ask")(function* (
-  ctx: Tool.Context,
-  scan: Scan,
-  metadata: Record<string, unknown>,
-) {
+const ask = Effect.fn("BashTool.ask")(function* (ctx: Tool.Context, scan: Scan, metadata: Record<string, unknown>) {
   if (scan.dirs.size > 0) {
     const globs = Array.from(scan.dirs).map((dir) => {
       if (process.platform === "win32") return AppFileSystem.normalizePathPattern(path.join(dir, "*"))
@@ -329,9 +325,7 @@ const ask = Effect.fn("BashTool.ask")(function* (
   })
 })
 
-const askShellExecute = Effect.fn(
-  "BashTool.askShellExecute",
-)(function* (
+const askShellExecute = Effect.fn("BashTool.askShellExecute")(function* (
   ctx: Tool.Context,
   input: {
     patterns: string[]
@@ -346,9 +340,7 @@ const askShellExecute = Effect.fn(
   })
 })
 
-const askShellNetwork = Effect.fn(
-  "BashTool.askShellNetwork",
-)(function* (
+const askShellNetwork = Effect.fn("BashTool.askShellNetwork")(function* (
   ctx: Tool.Context,
   input: {
     patterns: string[]
@@ -375,24 +367,16 @@ function stricterDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): 
 
 function preferredBackendName(preference: SandboxBackendPreference): SandboxBackendName | undefined {
   if (preference !== "auto") return preference
-  if (process.platform === "darwin") return "seatbelt"
-  if (process.platform === "win32") return "process"
-  return "landlock"
+  return autoBackendName()
 }
 
-function preferredBackendStatus(
-  preference: SandboxBackendPreference,
-  capabilities: SandboxBackendStatus[],
-) {
+function preferredBackendStatus(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
   const name = preferredBackendName(preference)
   if (!name) return
   return capabilities.find((item) => item.name === name)
 }
 
-function backendAvailability(
-  preference: SandboxBackendPreference,
-  capabilities: SandboxBackendStatus[],
-) {
+function backendAvailability(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
   const backend = preferredBackendStatus(preference, capabilities)
   if (!backend) return preference === "auto" ? "auto:unknown" : `${preference}:unknown`
   if (backend.available) return `${backend.name}:available`
@@ -418,7 +402,11 @@ function sandboxEscalationReason(input: {
     return "Sandbox enforcement is in report-only mode; confirmation required before running without enforcement."
   }
   const backend = preferredBackendStatus(input.policy.backend_preference, input.capabilities)
-  if (!backend?.available && input.policy.backend_preference !== "auto" && input.policy.sandbox.failure_policy !== "closed") {
+  if (
+    !backend?.available &&
+    input.policy.backend_preference !== "auto" &&
+    input.policy.sandbox.failure_policy !== "closed"
+  ) {
     return `Sandbox backend ${backend?.name ?? input.policy.backend_preference} is unavailable; confirmation required before downgrade.`
   }
 }
@@ -610,13 +598,18 @@ export const BashTool = Tool.define(
         .replaceAll("${maxLines}", String(Truncate.MAX_LINES))
         .replaceAll("${maxBytes}", String(Truncate.MAX_BYTES)),
       parameters: Parameters,
-      execute: (params: z.infer<typeof Parameters>, ctx: Tool.Context<BashMetadata>): Effect.Effect<Tool.ExecuteResult<BashMetadata>, never, never> =>
+      execute: (
+        params: z.infer<typeof Parameters>,
+        ctx: Tool.Context<BashMetadata>,
+      ): Effect.Effect<Tool.ExecuteResult<BashMetadata>, never, never> =>
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const shell = chooseShell(params.command)
           const name = Shell.name(shell)
           log.info("bash tool using shell", { shell })
-          const cwd = params.workdir ? yield* resolvePath(params.workdir, instance.directory, shell) : instance.directory
+          const cwd = params.workdir
+            ? yield* resolvePath(params.workdir, instance.directory, shell)
+            : instance.directory
           if (params.timeout !== undefined && params.timeout < 0) {
             throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
           }
@@ -712,16 +705,19 @@ export const BashTool = Tool.define(
             policy: preliminaryPolicy,
             capabilities,
           })
-          const finalDecision = escalationReason ? stricterDecision(preliminaryDecision, "confirm") : preliminaryDecision
+          const finalDecision = escalationReason
+            ? stricterDecision(preliminaryDecision, "confirm")
+            : preliminaryDecision
           const finalReason = escalationReason && preliminaryDecision === "allow" ? escalationReason : preliminaryReason
-          const policy = finalDecision === preliminaryDecision
-            ? preliminaryPolicy
-            : yield* sandboxPolicy.resolve({
-                result: security,
-                decision: finalDecision,
-                cwd,
-                externalPaths,
-              })
+          const policy =
+            finalDecision === preliminaryDecision
+              ? preliminaryPolicy
+              : yield* sandboxPolicy.resolve({
+                  result: security,
+                  decision: finalDecision,
+                  cwd,
+                  externalPaths,
+                })
           const backendAvailabilitySummary = backendAvailability(policy.backend_preference, capabilities)
           const approvalKind = classifyApprovalKind({
             decision: finalDecision,
@@ -737,13 +733,14 @@ export const BashTool = Tool.define(
             reason: finalReason,
             approvalKind,
             approvalRequired: finalDecision !== "allow" || policy.needs_network_permission,
-            policySource: policyDecision.matchedRules.length > 0
-              ? "exec_policy"
-              : escalationReason
-                ? "sandbox_policy"
-              : policy.needs_network_permission
-                ? "sandbox_policy"
-                : "shell_security",
+            policySource:
+              policyDecision.matchedRules.length > 0
+                ? "exec_policy"
+                : escalationReason
+                  ? "sandbox_policy"
+                  : policy.needs_network_permission
+                    ? "sandbox_policy"
+                    : "shell_security",
             backendPreference: policy.backend_preference,
             enforcement: policy.enforcement,
             filesystemPolicy: policy.filesystem_policy,
@@ -839,46 +836,48 @@ export const BashTool = Tool.define(
           }
 
           const env = yield* shellEnv(ctx, cwd)
-          return yield* shellRunner.run(
-            {
-              shell,
-              shellFamily: security.shell_family,
-              command: params.command,
-              cwd,
-              env,
-              timeout,
-              description: params.description ?? "Shell command",
-              enforcement: policy.enforcement,
-              backendPreference: policy.backend_preference,
-              filesystemPolicy: policy.filesystem_policy,
-              allowedPaths: policy.allowed_paths,
-              writablePaths: policy.writable_paths,
-              networkPolicy: policy.network_policy,
-              reportOnly: policy.sandbox.report_only,
-              failurePolicy: policy.sandbox.failure_policy,
-              riskLevel: security.risk_level,
-            },
-            ctx,
-          ).pipe(
-            Effect.map((result) => ({
-              ...result,
-              metadata: {
-                ...result.metadata,
-                findings: security.findings,
+          return yield* shellRunner
+            .run(
+              {
+                shell,
+                shellFamily: security.shell_family,
+                command: params.command,
+                cwd,
+                env,
+                timeout,
+                description: params.description ?? "Shell command",
+                enforcement: policy.enforcement,
+                backendPreference: policy.backend_preference,
+                filesystemPolicy: policy.filesystem_policy,
+                allowedPaths: policy.allowed_paths,
+                writablePaths: policy.writable_paths,
+                networkPolicy: policy.network_policy,
+                reportOnly: policy.sandbox.report_only,
+                failurePolicy: policy.sandbox.failure_policy,
                 riskLevel: security.risk_level,
-                decision: finalDecision,
-                reviewApiVersion: security.review_api_version,
-                reviewMode: security.review_mode,
-                reviewStatus: security.review_status,
-                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                shell_safety: shellSafety,
-                safetySummary: shellSafety.summary,
-                safetyDetails: shellSafety.details,
               },
-            })),
-          )
+              ctx,
+            )
+            .pipe(
+              Effect.map((result) => ({
+                ...result,
+                metadata: {
+                  ...result.metadata,
+                  findings: security.findings,
+                  riskLevel: security.risk_level,
+                  decision: finalDecision,
+                  reviewApiVersion: security.review_api_version,
+                  reviewMode: security.review_mode,
+                  reviewStatus: security.review_status,
+                  ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
+                  ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
+                  ...(matchedRules.length > 0 ? { matchedRules } : {}),
+                  shell_safety: shellSafety,
+                  safetySummary: shellSafety.summary,
+                  safetyDetails: shellSafety.details,
+                },
+              })),
+            )
         }),
     }
   }),

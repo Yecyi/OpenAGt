@@ -1,21 +1,16 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import { isUltrathinkEnabled } from './thinking.js'
-import { getInitialSettings } from './settings/settings.js'
-import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { getAPIProvider } from './model/providers.js'
-import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { isEnvTruthy } from './envUtils.js'
-import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
+import { isUltrathinkEnabled } from "./thinking.js"
+import { getInitialSettings } from "./settings/settings.js"
+import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from "./auth.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "src/services/analytics/growthbook.js"
+import { getAPIProvider } from "./model/providers.js"
+import { get3PModelCapabilityOverride } from "./model/modelSupportOverrides.js"
+import { isEnvTruthy } from "./envUtils.js"
+import type { EffortLevel } from "src/entrypoints/sdk/runtimeTypes.js"
 
 export type { EffortLevel }
 
-export const EFFORT_LEVELS = [
-  'low',
-  'medium',
-  'high',
-  'max',
-] as const satisfies readonly EffortLevel[]
+export const EFFORT_LEVELS = ["low", "medium", "high", "max"] as const satisfies readonly EffortLevel[]
 
 export type EffortValue = EffortLevel | number
 
@@ -25,16 +20,16 @@ export function modelSupportsEffort(model: string): boolean {
   if (isEnvTruthy(process.env.CLAUDE_CODE_ALWAYS_ENABLE_EFFORT)) {
     return true
   }
-  const supported3P = get3PModelCapabilityOverride(model, 'effort')
+  const supported3P = get3PModelCapabilityOverride(model, "effort")
   if (supported3P !== undefined) {
     return supported3P
   }
   // Supported by a subset of Claude 4 models
-  if (m.includes('opus-4-6') || m.includes('sonnet-4-6')) {
+  if (m.includes("opus-4-6") || m.includes("sonnet-4-6")) {
     return true
   }
   // Exclude any other known legacy models (haiku, older opus/sonnet variants)
-  if (m.includes('haiku') || m.includes('sonnet') || m.includes('opus')) {
+  if (m.includes("haiku") || m.includes("sonnet") || m.includes("opus")) {
     return false
   }
 
@@ -45,20 +40,20 @@ export function modelSupportsEffort(model: string): boolean {
   // Default to true for unknown model strings on 1P.
   // Do not default to true for 3P as they have different formats for their
   // model strings (ex. anthropics/claude-code#30795)
-  return getAPIProvider() === 'firstParty'
+  return getAPIProvider() === "firstParty"
 }
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
 // Per API docs, 'max' is Opus 4.6 only for public models — other models return an error.
 export function modelSupportsMaxEffort(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'max_effort')
+  const supported3P = get3PModelCapabilityOverride(model, "max_effort")
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (model.toLowerCase().includes('opus-4-6')) {
+  if (model.toLowerCase().includes("opus-4-6")) {
     return true
   }
-  if (process.env.USER_TYPE === 'ant' && resolveAntModel(model)) {
+  if (process.env.USER_TYPE === "ant" && resolveAntModel(model)) {
     return true
   }
   return false
@@ -69,10 +64,10 @@ export function isEffortLevel(value: string): value is EffortLevel {
 }
 
 export function parseEffortValue(value: unknown): EffortValue | undefined {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null || value === "") {
     return undefined
   }
-  if (typeof value === 'number' && isValidNumericEffort(value)) {
+  if (typeof value === "number" && isValidNumericEffort(value)) {
     return value
   }
   const str = String(value).toLowerCase()
@@ -92,13 +87,11 @@ export function parseEffortValue(value: unknown): EffortValue | undefined {
  * Write sites call this before saving to settings so the Zod schema
  * (which only accepts string levels) never rejects a write.
  */
-export function toPersistableEffort(
-  value: EffortValue | undefined,
-): EffortLevel | undefined {
-  if (value === 'low' || value === 'medium' || value === 'high') {
+export function toPersistableEffort(value: EffortValue | undefined): EffortLevel | undefined {
+  if (value === "low" || value === "medium" || value === "high") {
     return value
   }
-  if (value === 'max' && process.env.USER_TYPE === 'ant') {
+  if (value === "max" && process.env.USER_TYPE === "ant") {
     return value
   }
   return undefined
@@ -135,8 +128,7 @@ export function resolvePickerEffortPersistence(
 
 export function getEffortEnvOverride(): EffortValue | null | undefined {
   const envOverride = process.env.CLAUDE_CODE_EFFORT_LEVEL
-  return envOverride?.toLowerCase() === 'unset' ||
-    envOverride?.toLowerCase() === 'auto'
+  return envOverride?.toLowerCase() === "unset" || envOverride?.toLowerCase() === "auto"
     ? null
     : parseEffortValue(envOverride)
 }
@@ -157,11 +149,10 @@ export function resolveAppliedEffort(
   if (envOverride === null) {
     return undefined
   }
-  const resolved =
-    envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
+  const resolved = envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
   // API rejects 'max' on non-Opus-4.6 models — downgrade to 'high'.
-  if (resolved === 'max' && !modelSupportsMaxEffort(model)) {
-    return 'high'
+  if (resolved === "max" && !modelSupportsMaxEffort(model)) {
+    return "high"
   }
   return resolved
 }
@@ -171,11 +162,8 @@ export function resolveAppliedEffort(
  * with the 'high' fallback (what the API uses when no effort param is sent).
  * Single source of truth for the status bar and /effort output (CC-1088).
  */
-export function getDisplayedEffortLevel(
-  model: string,
-  appStateEffort: EffortValue | undefined,
-): EffortLevel {
-  const resolved = resolveAppliedEffort(model, appStateEffort) ?? 'high'
+export function getDisplayedEffortLevel(model: string, appStateEffort: EffortValue | undefined): EffortLevel {
+  const resolved = resolveAppliedEffort(model, appStateEffort) ?? "high"
   return convertEffortValueToLevel(resolved)
 }
 
@@ -185,13 +173,10 @@ export function getDisplayedEffortLevel(
  * Delegates to resolveAppliedEffort() so the displayed level matches what
  * the API actually receives (including max→high clamp for non-Opus models).
  */
-export function getEffortSuffix(
-  model: string,
-  effortValue: EffortValue | undefined,
-): string {
-  if (effortValue === undefined) return ''
+export function getEffortSuffix(model: string, effortValue: EffortValue | undefined): string {
+  if (effortValue === undefined) return ""
   const resolved = resolveAppliedEffort(model, effortValue)
-  if (resolved === undefined) return ''
+  if (resolved === undefined) return ""
   return ` with ${convertEffortValueToLevel(resolved)} effort`
 }
 
@@ -200,19 +185,19 @@ export function isValidNumericEffort(value: number): boolean {
 }
 
 export function convertEffortValueToLevel(value: EffortValue): EffortLevel {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     // Runtime guard: value may come from remote config (GrowthBook) where
     // TypeScript types can't help us. Coerce unknown strings to 'high'
     // rather than passing them through unchecked.
-    return isEffortLevel(value) ? value : 'high'
+    return isEffortLevel(value) ? value : "high"
   }
-  if (process.env.USER_TYPE === 'ant' && typeof value === 'number') {
-    if (value <= 50) return 'low'
-    if (value <= 85) return 'medium'
-    if (value <= 100) return 'high'
-    return 'max'
+  if (process.env.USER_TYPE === "ant" && typeof value === "number") {
+    if (value <= 50) return "low"
+    if (value <= 85) return "medium"
+    if (value <= 100) return "high"
+    return "max"
   }
-  return 'high'
+  return "high"
 }
 
 /**
@@ -223,14 +208,14 @@ export function convertEffortValueToLevel(value: EffortValue): EffortLevel {
  */
 export function getEffortLevelDescription(level: EffortLevel): string {
   switch (level) {
-    case 'low':
-      return 'Quick, straightforward implementation with minimal overhead'
-    case 'medium':
-      return 'Balanced approach with standard implementation and testing'
-    case 'high':
-      return 'Comprehensive implementation with extensive testing and documentation'
-    case 'max':
-      return 'Maximum capability with deepest reasoning (Opus 4.6 only)'
+    case "low":
+      return "Quick, straightforward implementation with minimal overhead"
+    case "medium":
+      return "Balanced approach with standard implementation and testing"
+    case "high":
+      return "Comprehensive implementation with extensive testing and documentation"
+    case "max":
+      return "Maximum capability with deepest reasoning (Opus 4.6 only)"
   }
 }
 
@@ -241,14 +226,14 @@ export function getEffortLevelDescription(level: EffortLevel): string {
  * @returns Human-readable description
  */
 export function getEffortValueDescription(value: EffortValue): string {
-  if (process.env.USER_TYPE === 'ant' && typeof value === 'number') {
+  if (process.env.USER_TYPE === "ant" && typeof value === "number") {
     return `[ANT-ONLY] Numeric effort value of ${value}`
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return getEffortLevelDescription(value)
   }
-  return 'Balanced approach with standard implementation and testing'
+  return "Balanced approach with standard implementation and testing"
 }
 
 export type OpusDefaultEffortConfig = {
@@ -259,16 +244,13 @@ export type OpusDefaultEffortConfig = {
 
 const OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT: OpusDefaultEffortConfig = {
   enabled: true,
-  dialogTitle: 'We recommend medium effort for Opus',
+  dialogTitle: "We recommend medium effort for Opus",
   dialogDescription:
-    'Effort determines how long Claude thinks for when completing your task. We recommend medium effort for most tasks to balance speed and intelligence and maximize rate limits. Use ultrathink to trigger high effort when needed.',
+    "Effort determines how long Claude thinks for when completing your task. We recommend medium effort for most tasks to balance speed and intelligence and maximize rate limits. Use ultrathink to trigger high effort when needed.",
 }
 
 export function getOpusDefaultEffortConfig(): OpusDefaultEffortConfig {
-  const config = getFeatureValue_CACHED_MAY_BE_STALE(
-    'tengu_grey_step2',
-    OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT,
-  )
+  const config = getFeatureValue_CACHED_MAY_BE_STALE("tengu_grey_step2", OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT)
   return {
     ...OPUS_DEFAULT_EFFORT_CONFIG_DEFAULT,
     ...config,
@@ -276,14 +258,11 @@ export function getOpusDefaultEffortConfig(): OpusDefaultEffortConfig {
 }
 
 // @[MODEL LAUNCH]: Update the default effort levels for new models
-export function getDefaultEffortForModel(
-  model: string,
-): EffortValue | undefined {
-  if (process.env.USER_TYPE === 'ant') {
+export function getDefaultEffortForModel(model: string): EffortValue | undefined {
+  if (process.env.USER_TYPE === "ant") {
     const config = getAntModelOverrideConfig()
     const isDefaultModel =
-      config?.defaultModel !== undefined &&
-      model.toLowerCase() === config.defaultModel.toLowerCase()
+      config?.defaultModel !== undefined && model.toLowerCase() === config.defaultModel.toLowerCase()
     if (isDefaultModel && config?.defaultModelEffortLevel) {
       return config.defaultModelEffortLevel
     }
@@ -306,21 +285,18 @@ export function getDefaultEffortForModel(
 
   // Default effort on Opus 4.6 to medium for Pro.
   // Max/Team also get medium when the tengu_grey_step2 config is enabled.
-  if (model.toLowerCase().includes('opus-4-6')) {
+  if (model.toLowerCase().includes("opus-4-6")) {
     if (isProSubscriber()) {
-      return 'medium'
+      return "medium"
     }
-    if (
-      getOpusDefaultEffortConfig().enabled &&
-      (isMaxSubscriber() || isTeamSubscriber())
-    ) {
-      return 'medium'
+    if (getOpusDefaultEffortConfig().enabled && (isMaxSubscriber() || isTeamSubscriber())) {
+      return "medium"
     }
   }
 
   // When ultrathink feature is on, default effort to medium (ultrathink bumps to high)
   if (isUltrathinkEnabled() && modelSupportsEffort(model)) {
-    return 'medium'
+    return "medium"
   }
 
   // Fallback to undefined, which means we don't set an effort level. This

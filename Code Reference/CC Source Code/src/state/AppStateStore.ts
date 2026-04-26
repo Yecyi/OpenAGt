@@ -1,49 +1,39 @@
-import type { Notification } from 'src/context/notifications.js'
-import type { TodoList } from 'src/utils/todo/types.js'
-import type { BridgePermissionCallbacks } from '../bridge/bridgePermissionCallbacks.js'
-import type { Command } from '../commands.js'
-import type { ChannelPermissionCallbacks } from '../services/mcp/channelPermissions.js'
-import type { ElicitationRequestEvent } from '../services/mcp/elicitationHandler.js'
-import type {
-  MCPServerConnection,
-  ServerResource,
-} from '../services/mcp/types.js'
-import { shouldEnablePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
-import {
-  getEmptyToolPermissionContext,
-  type Tool,
-  type ToolPermissionContext,
-} from '../Tool.js'
-import type { TaskState } from '../tasks/types.js'
-import type { AgentColorName } from '../tools/AgentTool/agentColorManager.js'
-import type { AgentDefinitionsResult } from '../tools/AgentTool/loadAgentsDir.js'
-import type { AllowedPrompt } from '../tools/ExitPlanModeTool/ExitPlanModeV2Tool.js'
-import type { AgentId } from '../types/ids.js'
-import type { Message, UserMessage } from '../types/message.js'
-import type { LoadedPlugin, PluginError } from '../types/plugin.js'
-import type { DeepImmutable } from '../types/utils.js'
-import {
-  type AttributionState,
-  createEmptyAttributionState,
-} from '../utils/commitAttribution.js'
-import type { EffortValue } from '../utils/effort.js'
-import type { FileHistoryState } from '../utils/fileHistory.js'
-import type { REPLHookContext } from '../utils/hooks/postSamplingHooks.js'
-import type { SessionHooksState } from '../utils/hooks/sessionHooks.js'
-import type { ModelSetting } from '../utils/model/model.js'
-import type { DenialTrackingState } from '../utils/permissions/denialTracking.js'
-import type { PermissionMode } from '../utils/permissions/PermissionMode.js'
-import { getInitialSettings } from '../utils/settings/settings.js'
-import type { SettingsJson } from '../utils/settings/types.js'
-import { shouldEnableThinkingByDefault } from '../utils/thinking.js'
-import type { Store } from './store.js'
+import type { Notification } from "src/context/notifications.js"
+import type { TodoList } from "src/utils/todo/types.js"
+import type { BridgePermissionCallbacks } from "../bridge/bridgePermissionCallbacks.js"
+import type { Command } from "../commands.js"
+import type { ChannelPermissionCallbacks } from "../services/mcp/channelPermissions.js"
+import type { ElicitationRequestEvent } from "../services/mcp/elicitationHandler.js"
+import type { MCPServerConnection, ServerResource } from "../services/mcp/types.js"
+import { shouldEnablePromptSuggestion } from "../services/PromptSuggestion/promptSuggestion.js"
+import { getEmptyToolPermissionContext, type Tool, type ToolPermissionContext } from "../Tool.js"
+import type { TaskState } from "../tasks/types.js"
+import type { AgentColorName } from "../tools/AgentTool/agentColorManager.js"
+import type { AgentDefinitionsResult } from "../tools/AgentTool/loadAgentsDir.js"
+import type { AllowedPrompt } from "../tools/ExitPlanModeTool/ExitPlanModeV2Tool.js"
+import type { AgentId } from "../types/ids.js"
+import type { Message, UserMessage } from "../types/message.js"
+import type { LoadedPlugin, PluginError } from "../types/plugin.js"
+import type { DeepImmutable } from "../types/utils.js"
+import { type AttributionState, createEmptyAttributionState } from "../utils/commitAttribution.js"
+import type { EffortValue } from "../utils/effort.js"
+import type { FileHistoryState } from "../utils/fileHistory.js"
+import type { REPLHookContext } from "../utils/hooks/postSamplingHooks.js"
+import type { SessionHooksState } from "../utils/hooks/sessionHooks.js"
+import type { ModelSetting } from "../utils/model/model.js"
+import type { DenialTrackingState } from "../utils/permissions/denialTracking.js"
+import type { PermissionMode } from "../utils/permissions/PermissionMode.js"
+import { getInitialSettings } from "../utils/settings/settings.js"
+import type { SettingsJson } from "../utils/settings/types.js"
+import { shouldEnableThinkingByDefault } from "../utils/thinking.js"
+import type { Store } from "./store.js"
 
 export type CompletionBoundary =
-  | { type: 'complete'; completedAt: number; outputTokens: number }
-  | { type: 'bash'; command: string; completedAt: number }
-  | { type: 'edit'; toolName: string; filePath: string; completedAt: number }
+  | { type: "complete"; completedAt: number; outputTokens: number }
+  | { type: "bash"; command: string; completedAt: number }
+  | { type: "edit"; toolName: string; filePath: string; completedAt: number }
   | {
-      type: 'denied_tool'
+      type: "denied_tool"
       toolName: string
       detail: string
       completedAt: number
@@ -56,9 +46,9 @@ export type SpeculationResult = {
 }
 
 export type SpeculationState =
-  | { status: 'idle' }
+  | { status: "idle" }
   | {
-      status: 'active'
+      status: "active"
       id: string
       abort: () => void
       startTime: number
@@ -71,20 +61,14 @@ export type SpeculationState =
       contextRef: { current: REPLHookContext }
       pipelinedSuggestion?: {
         text: string
-        promptId: 'user_intent' | 'stated_intent'
+        promptId: "user_intent" | "stated_intent"
         generationRequestId: string | null
       } | null
     }
 
-export const IDLE_SPECULATION_STATE: SpeculationState = { status: 'idle' }
+export const IDLE_SPECULATION_STATE: SpeculationState = { status: "idle" }
 
-export type FooterItem =
-  | 'tasks'
-  | 'tmux'
-  | 'bagel'
-  | 'teams'
-  | 'bridge'
-  | 'companion'
+export type FooterItem = "tasks" | "tmux" | "bagel" | "teams" | "bridge" | "companion"
 
 export type AppState = DeepImmutable<{
   settings: SettingsJson
@@ -92,7 +76,7 @@ export type AppState = DeepImmutable<{
   mainLoopModel: ModelSetting
   mainLoopModelForSession: ModelSetting
   statusLineText: string | undefined
-  expandedView: 'none' | 'tasks' | 'teammates'
+  expandedView: "none" | "tasks" | "teammates"
   isBriefOnly: boolean
   // Optional - only present when ENABLE_AGENT_SWARMS is true (for dead code elimination)
   showTeammateMessagePreview?: boolean
@@ -101,7 +85,7 @@ export type AppState = DeepImmutable<{
   // AppState (not local) so the panel can read it directly without prop-drilling
   // through PromptInput → PromptInputFooter.
   coordinatorTaskIndex: number
-  viewSelectionMode: 'none' | 'selecting-agent' | 'viewing-agent'
+  viewSelectionMode: "none" | "selecting-agent" | "viewing-agent"
   // Which footer pill is focused (arrow-key navigation below the prompt).
   // Lives in AppState so pill components rendered outside PromptInput
   // (CompanionSprite in REPL.tsx) can read their own focused state.
@@ -119,11 +103,7 @@ export type AppState = DeepImmutable<{
   // Remote session WS state (`claude assistant` viewer). 'connected' means the
   // live event stream is open; 'reconnecting' = transient WS drop, backoff
   // in progress; 'disconnected' = permanent close or reconnects exhausted.
-  remoteConnectionStatus:
-    | 'connecting'
-    | 'connected'
-    | 'reconnecting'
-    | 'disconnected'
+  remoteConnectionStatus: "connecting" | "connected" | "reconnecting" | "disconnected"
   // `claude assistant`: count of background tasks (Agent calls, teammates,
   // workflows) running inside the REMOTE daemon child. Event-sourced from
   // system/task_started and system/task_notification on the WS. The local
@@ -196,13 +176,13 @@ export type AppState = DeepImmutable<{
     installationStatus: {
       marketplaces: Array<{
         name: string
-        status: 'pending' | 'installing' | 'installed' | 'failed'
+        status: "pending" | "installing" | "installed" | "failed"
         error?: string
       }>
       plugins: Array<{
         id: string
         name: string
-        status: 'pending' | 'installing' | 'installed' | 'failed'
+        status: "pending" | "installing" | "installed" | "failed"
         error?: string
       }>
     }
@@ -299,7 +279,7 @@ export type AppState = DeepImmutable<{
   }
   // REPL tool VM context - persists across REPL calls for state sharing
   replContext?: {
-    vmContext: import('vm').Context
+    vmContext: import("vm").Context
     registeredTools: Map<
       string,
       {
@@ -354,7 +334,7 @@ export type AppState = DeepImmutable<{
       from: string
       text: string
       timestamp: string
-      status: 'pending' | 'processing' | 'processed'
+      status: "pending" | "processing" | "processed"
       color?: string
       summary?: string
     }>
@@ -384,7 +364,7 @@ export type AppState = DeepImmutable<{
   } | null
   promptSuggestion: {
     text: string | null
-    promptId: 'user_intent' | 'stated_intent' | null
+    promptId: "user_intent" | "stated_intent" | null
     shownAt: number
     acceptedAt: number
     generationRequestId: string | null
@@ -457,13 +437,10 @@ export function getDefaultAppState(): AppState {
   // Determine initial permission mode for teammates spawned with plan_mode_required
   // Use lazy require to avoid circular dependency with teammate.ts
   /* eslint-disable @typescript-eslint/no-require-imports */
-  const teammateUtils =
-    require('../utils/teammate.js') as typeof import('../utils/teammate.js')
+  const teammateUtils = require("../utils/teammate.js") as typeof import("../utils/teammate.js")
   /* eslint-enable @typescript-eslint/no-require-imports */
   const initialMode: PermissionMode =
-    teammateUtils.isTeammate() && teammateUtils.isPlanModeRequired()
-      ? 'plan'
-      : 'default'
+    teammateUtils.isTeammate() && teammateUtils.isPlanModeRequired() ? "plan" : "default"
 
   return {
     settings: getInitialSettings(),
@@ -473,16 +450,16 @@ export function getDefaultAppState(): AppState {
     mainLoopModel: null, // alias, full name (as with --model or env var), or null (default)
     mainLoopModelForSession: null,
     statusLineText: undefined,
-    expandedView: 'none',
+    expandedView: "none",
     isBriefOnly: false,
     showTeammateMessagePreview: false,
     selectedIPAgentIndex: -1,
     coordinatorTaskIndex: -1,
-    viewSelectionMode: 'none',
+    viewSelectionMode: "none",
     footerSelection: null,
     kairosEnabled: false,
     remoteSessionUrl: undefined,
-    remoteConnectionStatus: 'connecting',
+    remoteConnectionStatus: "connecting",
     remoteBackgroundTaskCount: 0,
     replBridgeEnabled: false,
     replBridgeExplicit: false,

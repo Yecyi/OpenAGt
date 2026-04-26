@@ -9,19 +9,15 @@
  * by checking if the process is still alive.
  */
 
-import { basename, join } from 'path'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
-import { logForDebugging } from '../debug.js'
-import { isEnvDefinedFalsy, isEnvTruthy } from '../envUtils.js'
-import { isENOENT, toError } from '../errors.js'
-import { getFsImplementation } from '../fsOperations.js'
-import { getProcessCommand } from '../genericProcessUtils.js'
-import { logError } from '../log.js'
-import {
-  jsonParse,
-  jsonStringify,
-  writeFileSync_DEPRECATED,
-} from '../slowOperations.js'
+import { basename, join } from "path"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../../services/analytics/growthbook.js"
+import { logForDebugging } from "../debug.js"
+import { isEnvDefinedFalsy, isEnvTruthy } from "../envUtils.js"
+import { isENOENT, toError } from "../errors.js"
+import { getFsImplementation } from "../fsOperations.js"
+import { getProcessCommand } from "../genericProcessUtils.js"
+import { logError } from "../log.js"
+import { jsonParse, jsonStringify, writeFileSync_DEPRECATED } from "../slowOperations.js"
 
 /**
  * Check if PID-based version locking is enabled.
@@ -42,10 +38,7 @@ export function isPidBasedLockingEnabled(): boolean {
     return false
   }
   // GrowthBook controls gradual rollout (returns false for external users)
-  return getFeatureValue_CACHED_MAY_BE_STALE(
-    'tengu_pid_based_version_locking',
-    false,
-  )
+  return getFeatureValue_CACHED_MAY_BE_STALE("tengu_pid_based_version_locking", false)
 }
 
 /**
@@ -121,10 +114,7 @@ function isClaudeProcess(pid: number, expectedExecPath: string): boolean {
     const normalizedCommand = command.toLowerCase()
     const normalizedExecPath = expectedExecPath.toLowerCase()
 
-    return (
-      normalizedCommand.includes('claude') ||
-      normalizedCommand.includes(normalizedExecPath)
-    )
+    return normalizedCommand.includes("claude") || normalizedCommand.includes(normalizedExecPath)
   } catch {
     // If command check fails, trust the PID check
     return true
@@ -134,21 +124,19 @@ function isClaudeProcess(pid: number, expectedExecPath: string): boolean {
 /**
  * Read and parse a lock file's content
  */
-export function readLockContent(
-  lockFilePath: string,
-): VersionLockContent | null {
+export function readLockContent(lockFilePath: string): VersionLockContent | null {
   const fs = getFsImplementation()
 
   try {
-    const content = fs.readFileSync(lockFilePath, { encoding: 'utf8' })
-    if (!content || content.trim() === '') {
+    const content = fs.readFileSync(lockFilePath, { encoding: "utf8" })
+    if (!content || content.trim() === "") {
       return null
     }
 
     const parsed = jsonParse(content) as VersionLockContent
 
     // Validate required fields
-    if (typeof parsed.pid !== 'number' || !parsed.version || !parsed.execPath) {
+    if (typeof parsed.pid !== "number" || !parsed.version || !parsed.execPath) {
       return null
     }
 
@@ -178,9 +166,7 @@ export function isLockActive(lockFilePath: string): boolean {
   // Secondary validation: is it actually a Claude process?
   // This helps with PID reuse scenarios
   if (!isClaudeProcess(pid, execPath)) {
-    logForDebugging(
-      `Lock PID ${pid} is running but does not appear to be Claude - treating as stale`,
-    )
+    logForDebugging(`Lock PID ${pid} is running but does not appear to be Claude - treating as stale`)
     return false
   }
 
@@ -207,16 +193,13 @@ export function isLockActive(lockFilePath: string): boolean {
 /**
  * Write lock content to a file atomically
  */
-function writeLockFile(
-  lockFilePath: string,
-  content: VersionLockContent,
-): void {
+function writeLockFile(lockFilePath: string, content: VersionLockContent): void {
   const fs = getFsImplementation()
   const tempPath = `${lockFilePath}.tmp.${process.pid}.${Date.now()}`
 
   try {
     writeFileSync_DEPRECATED(tempPath, jsonStringify(content, null, 2), {
-      encoding: 'utf8',
+      encoding: "utf8",
       flush: true,
     })
     fs.renameSync(tempPath, lockFilePath)
@@ -235,10 +218,7 @@ function writeLockFile(
  * Try to acquire a lock on a version file
  * Returns a release function if successful, null if the lock is already held
  */
-export async function tryAcquireLock(
-  versionPath: string,
-  lockFilePath: string,
-): Promise<(() => void) | null> {
+export async function tryAcquireLock(versionPath: string, lockFilePath: string): Promise<(() => void) | null> {
   const fs = getFsImplementation()
   const versionName = basename(versionPath)
 
@@ -247,9 +227,7 @@ export async function tryAcquireLock(
   // validates it's actually a Claude process (to handle PID reuse scenarios)
   if (isLockActive(lockFilePath)) {
     const existingContent = readLockContent(lockFilePath)
-    logForDebugging(
-      `Cannot acquire lock for ${versionName} - held by PID ${existingContent?.pid}`,
-    )
+    logForDebugging(`Cannot acquire lock for ${versionName} - held by PID ${existingContent?.pid}`)
     return null
   }
 
@@ -296,10 +274,7 @@ export async function tryAcquireLock(
  * Acquire a lock and hold it for the lifetime of the process
  * This is used for locking the currently running version
  */
-export async function acquireProcessLifetimeLock(
-  versionPath: string,
-  lockFilePath: string,
-): Promise<boolean> {
+export async function acquireProcessLifetimeLock(versionPath: string, lockFilePath: string): Promise<boolean> {
   const release = await tryAcquireLock(versionPath, lockFilePath)
 
   if (!release) {
@@ -315,9 +290,9 @@ export async function acquireProcessLifetimeLock(
     }
   }
 
-  process.on('exit', cleanup)
-  process.on('SIGINT', cleanup)
-  process.on('SIGTERM', cleanup)
+  process.on("exit", cleanup)
+  process.on("SIGINT", cleanup)
+  process.on("SIGTERM", cleanup)
 
   // Don't call release() - we want to hold the lock until process exits
   return true
@@ -354,9 +329,7 @@ export function getAllLockInfo(locksDir: string): LockInfo[] {
   const lockInfos: LockInfo[] = []
 
   try {
-    const lockFiles = fs
-      .readdirStringSync(locksDir)
-      .filter((f: string) => f.endsWith('.lock'))
+    const lockFiles = fs.readdirStringSync(locksDir).filter((f: string) => f.endsWith(".lock"))
 
     for (const lockFile of lockFiles) {
       const lockFilePath = join(locksDir, lockFile)
@@ -396,9 +369,7 @@ export function cleanupStaleLocks(locksDir: string): number {
   let cleanedCount = 0
 
   try {
-    const lockEntries = fs
-      .readdirStringSync(locksDir)
-      .filter((f: string) => f.endsWith('.lock'))
+    const lockEntries = fs.readdirStringSync(locksDir).filter((f: string) => f.endsWith(".lock"))
 
     for (const lockEntry of lockEntries) {
       const lockFilePath = join(locksDir, lockEntry)

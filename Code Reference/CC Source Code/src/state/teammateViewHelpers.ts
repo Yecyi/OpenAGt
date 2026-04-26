@@ -1,23 +1,18 @@
-import { logEvent } from '../services/analytics/index.js'
-import { isTerminalTaskStatus } from '../Task.js'
-import type { LocalAgentTaskState } from '../tasks/LocalAgentTask/LocalAgentTask.js'
+import { logEvent } from "../services/analytics/index.js"
+import { isTerminalTaskStatus } from "../Task.js"
+import type { LocalAgentTaskState } from "../tasks/LocalAgentTask/LocalAgentTask.js"
 
 // Inlined from framework.ts — importing creates a cycle through
 // BackgroundTasksDialog. Keep in sync with PANEL_GRACE_MS there.
 const PANEL_GRACE_MS = 30_000
 
-import type { AppState } from './AppState.js'
+import type { AppState } from "./AppState.js"
 
 // Inline type check instead of importing isLocalAgentTask — breaks the
 // teammateViewHelpers → LocalAgentTask runtime edge that creates a cycle
 // through BackgroundTasksDialog.
 function isLocalAgent(task: unknown): task is LocalAgentTaskState {
-  return (
-    typeof task === 'object' &&
-    task !== null &&
-    'type' in task &&
-    task.type === 'local_agent'
-  )
+  return typeof task === "object" && task !== null && "type" in task && task.type === "local_agent"
 }
 
 /**
@@ -31,9 +26,7 @@ function release(task: LocalAgentTaskState): LocalAgentTaskState {
     retain: false,
     messages: undefined,
     diskLoaded: false,
-    evictAfter: isTerminalTaskStatus(task.status)
-      ? Date.now() + PANEL_GRACE_MS
-      : undefined,
+    evictAfter: isTerminalTaskStatus(task.status) ? Date.now() + PANEL_GRACE_MS : undefined,
   }
 }
 
@@ -43,25 +36,15 @@ function release(task: LocalAgentTaskState): LocalAgentTaskState {
  * enables stream-append, triggers disk bootstrap) and clears evictAfter.
  * If switching from another agent, releases the previous one back to stub.
  */
-export function enterTeammateView(
-  taskId: string,
-  setAppState: (updater: (prev: AppState) => AppState) => void,
-): void {
-  logEvent('tengu_transcript_view_enter', {})
-  setAppState(prev => {
+export function enterTeammateView(taskId: string, setAppState: (updater: (prev: AppState) => AppState) => void): void {
+  logEvent("tengu_transcript_view_enter", {})
+  setAppState((prev) => {
     const task = prev.tasks[taskId]
     const prevId = prev.viewingAgentTaskId
     const prevTask = prevId !== undefined ? prev.tasks[prevId] : undefined
-    const switching =
-      prevId !== undefined &&
-      prevId !== taskId &&
-      isLocalAgent(prevTask) &&
-      prevTask.retain
-    const needsRetain =
-      isLocalAgent(task) && (!task.retain || task.evictAfter !== undefined)
-    const needsView =
-      prev.viewingAgentTaskId !== taskId ||
-      prev.viewSelectionMode !== 'viewing-agent'
+    const switching = prevId !== undefined && prevId !== taskId && isLocalAgent(prevTask) && prevTask.retain
+    const needsRetain = isLocalAgent(task) && (!task.retain || task.evictAfter !== undefined)
+    const needsView = prev.viewingAgentTaskId !== taskId || prev.viewSelectionMode !== "viewing-agent"
     if (!needsRetain && !needsView && !switching) return prev
     let tasks = prev.tasks
     if (switching || needsRetain) {
@@ -74,7 +57,7 @@ export function enterTeammateView(
     return {
       ...prev,
       viewingAgentTaskId: taskId,
-      viewSelectionMode: 'viewing-agent',
+      viewSelectionMode: "viewing-agent",
       tasks,
     }
   })
@@ -85,19 +68,17 @@ export function enterTeammateView(
  * Drops retain and clears messages back to stub form; if terminal,
  * schedules eviction via evictAfter so the row lingers briefly.
  */
-export function exitTeammateView(
-  setAppState: (updater: (prev: AppState) => AppState) => void,
-): void {
-  logEvent('tengu_transcript_view_exit', {})
-  setAppState(prev => {
+export function exitTeammateView(setAppState: (updater: (prev: AppState) => AppState) => void): void {
+  logEvent("tengu_transcript_view_exit", {})
+  setAppState((prev) => {
     const id = prev.viewingAgentTaskId
     const cleared = {
       ...prev,
       viewingAgentTaskId: undefined,
-      viewSelectionMode: 'none' as const,
+      viewSelectionMode: "none" as const,
     }
     if (id === undefined) {
-      return prev.viewSelectionMode === 'none' ? prev : cleared
+      return prev.viewSelectionMode === "none" ? prev : cleared
     }
     const task = prev.tasks[id]
     if (!isLocalAgent(task) || !task.retain) return cleared
@@ -113,14 +94,11 @@ export function exitTeammateView(
  * Dismiss sets evictAfter=0 so the filter hides immediately.
  * If viewing the dismissed agent, also exits to leader.
  */
-export function stopOrDismissAgent(
-  taskId: string,
-  setAppState: (updater: (prev: AppState) => AppState) => void,
-): void {
-  setAppState(prev => {
+export function stopOrDismissAgent(taskId: string, setAppState: (updater: (prev: AppState) => AppState) => void): void {
+  setAppState((prev) => {
     const task = prev.tasks[taskId]
     if (!isLocalAgent(task)) return prev
-    if (task.status === 'running') {
+    if (task.status === "running") {
       task.abortController?.abort()
       return prev
     }
@@ -134,7 +112,7 @@ export function stopOrDismissAgent(
       },
       ...(viewingThis && {
         viewingAgentTaskId: undefined,
-        viewSelectionMode: 'none',
+        viewSelectionMode: "none",
       }),
     }
   })

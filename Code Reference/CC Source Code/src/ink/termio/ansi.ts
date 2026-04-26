@@ -44,9 +44,9 @@ export const C0 = {
 } as const
 
 // String constants for output generation
-export const ESC = '\x1b'
-export const BEL = '\x07'
-export const SEP = ';'
+export const ESC = "\x1b"
+export const BEL = "\x07"
+export const SEP = ";"
 
 /**
  * Escape sequence type introducers (byte after ESC)

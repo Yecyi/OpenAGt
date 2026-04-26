@@ -332,7 +332,10 @@ export function fromConfig(permission: ConfigPermission.Info) {
 function validatePattern(pattern: string, strictMode: "strict" | "warn"): { valid: boolean; message?: string } {
   // Bare "*" is dangerous
   if (pattern === "*") {
-    return { valid: false, message: "Bare '*' pattern is too permissive. Use specific patterns like 'npm *' or 'git *'." }
+    return {
+      valid: false,
+      message: "Bare '*' pattern is too permissive. Use specific patterns like 'npm *' or 'git *'.",
+    }
   }
 
   // Pattern with ** but no anchors is dangerous

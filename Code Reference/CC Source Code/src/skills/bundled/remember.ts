@@ -1,8 +1,8 @@
-import { isAutoMemoryEnabled } from '../../memdir/paths.js'
-import { registerBundledSkill } from '../bundledSkills.js'
+import { isAutoMemoryEnabled } from "../../memdir/paths.js"
+import { registerBundledSkill } from "../bundledSkills.js"
 
 export function registerRememberSkill(): void {
-  if (process.env.USER_TYPE !== 'ant') {
+  if (process.env.USER_TYPE !== "ant") {
     return
   }
 
@@ -62,11 +62,11 @@ If auto-memory is empty, say so and offer to review CLAUDE.md for cleanup.
 `
 
   registerBundledSkill({
-    name: 'remember',
+    name: "remember",
     description:
-      'Review auto-memory entries and propose promotions to CLAUDE.md, CLAUDE.local.md, or shared memory. Also detects outdated, conflicting, and duplicate entries across memory layers.',
+      "Review auto-memory entries and propose promotions to CLAUDE.md, CLAUDE.local.md, or shared memory. Also detects outdated, conflicting, and duplicate entries across memory layers.",
     whenToUse:
-      'Use when the user wants to review, organize, or promote their auto-memory entries. Also useful for cleaning up outdated or conflicting entries across CLAUDE.md, CLAUDE.local.md, and auto-memory.',
+      "Use when the user wants to review, organize, or promote their auto-memory entries. Also useful for cleaning up outdated or conflicting entries across CLAUDE.md, CLAUDE.local.md, and auto-memory.",
     userInvocable: true,
     isEnabled: () => isAutoMemoryEnabled(),
     async getPromptForCommand(args) {
@@ -76,7 +76,7 @@ If auto-memory is empty, say so and offer to review CLAUDE.md for cleanup.
         prompt += `\n## Additional context from user\n\n${args}`
       }
 
-      return [{ type: 'text', text: prompt }]
+      return [{ type: "text", text: prompt }]
     },
   })
 }

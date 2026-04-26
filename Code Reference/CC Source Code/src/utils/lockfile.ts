@@ -9,24 +9,21 @@
  * package is only loaded the first time a lock function is actually called.
  */
 
-import type { CheckOptions, LockOptions, UnlockOptions } from 'proper-lockfile'
+import type { CheckOptions, LockOptions, UnlockOptions } from "proper-lockfile"
 
-type Lockfile = typeof import('proper-lockfile')
+type Lockfile = typeof import("proper-lockfile")
 
 let _lockfile: Lockfile | undefined
 
 function getLockfile(): Lockfile {
   if (!_lockfile) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _lockfile = require('proper-lockfile') as Lockfile
+    _lockfile = require("proper-lockfile") as Lockfile
   }
   return _lockfile
 }
 
-export function lock(
-  file: string,
-  options?: LockOptions,
-): Promise<() => Promise<void>> {
+export function lock(file: string, options?: LockOptions): Promise<() => Promise<void>> {
   return getLockfile().lock(file, options)
 }
 

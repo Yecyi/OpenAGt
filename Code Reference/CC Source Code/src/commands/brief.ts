@@ -1,20 +1,16 @@
-import { feature } from 'bun:bundle'
-import { z } from 'zod/v4'
-import { getKairosActive, setUserMsgOptIn } from '../bootstrap/state.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
+import { feature } from "bun:bundle"
+import { z } from "zod/v4"
+import { getKairosActive, setUserMsgOptIn } from "../bootstrap/state.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "../services/analytics/growthbook.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import type { ToolUseContext } from '../Tool.js'
-import { isBriefEntitled } from '../tools/BriefTool/BriefTool.js'
-import { BRIEF_TOOL_NAME } from '../tools/BriefTool/prompt.js'
-import type {
-  Command,
-  LocalJSXCommandContext,
-  LocalJSXCommandOnDone,
-} from '../types/command.js'
-import { lazySchema } from '../utils/lazySchema.js'
+} from "../services/analytics/index.js"
+import type { ToolUseContext } from "../Tool.js"
+import { isBriefEntitled } from "../tools/BriefTool/BriefTool.js"
+import { BRIEF_TOOL_NAME } from "../tools/BriefTool/prompt.js"
+import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from "../types/command.js"
+import { lazySchema } from "../utils/lazySchema.js"
 
 // Zod guards against fat-fingered GB pushes (same pattern as pollConfig.ts /
 // cronScheduler.ts). A malformed config falls back to DEFAULT_BRIEF_CONFIG
@@ -36,20 +32,17 @@ const DEFAULT_BRIEF_CONFIG: BriefConfig = {
 // The tool-availability gate (tengu_kairos_brief in isBriefEnabled) keeps its
 // 5-min TTL because that one IS a kill switch.
 function getBriefConfig(): BriefConfig {
-  const raw = getFeatureValue_CACHED_MAY_BE_STALE<unknown>(
-    'tengu_kairos_brief_config',
-    DEFAULT_BRIEF_CONFIG,
-  )
+  const raw = getFeatureValue_CACHED_MAY_BE_STALE<unknown>("tengu_kairos_brief_config", DEFAULT_BRIEF_CONFIG)
   const parsed = briefConfigSchema().safeParse(raw)
   return parsed.success ? parsed.data : DEFAULT_BRIEF_CONFIG
 }
 
 const brief = {
-  type: 'local-jsx',
-  name: 'brief',
-  description: 'Toggle brief-only mode',
+  type: "local-jsx",
+  name: "brief",
+  description: "Toggle brief-only mode",
   isEnabled: () => {
-    if (feature('KAIROS') || feature('KAIROS_BRIEF')) {
+    if (feature("KAIROS") || feature("KAIROS_BRIEF")) {
       return getBriefConfig().enable_slash_command
     }
     return false
@@ -67,14 +60,13 @@ const brief = {
         // Entitlement check only gates the on-transition — off is always
         // allowed so a user whose GB gate flipped mid-session isn't stuck.
         if (newState && !isBriefEntitled()) {
-          logEvent('tengu_brief_mode_toggled', {
+          logEvent("tengu_brief_mode_toggled", {
             enabled: false,
             gated: true,
-            source:
-              'slash_command' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            source: "slash_command" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
-          onDone('Brief tool is not enabled for your account', {
-            display: 'system',
+          onDone("Brief tool is not enabled for your account", {
+            display: "system",
           })
           return null
         }
@@ -86,16 +78,15 @@ const brief = {
         // without the tool, emitting plain text the filter hides.
         setUserMsgOptIn(newState)
 
-        context.setAppState(prev => {
+        context.setAppState((prev) => {
           if (prev.isBriefOnly === newState) return prev
           return { ...prev, isBriefOnly: newState }
         })
 
-        logEvent('tengu_brief_mode_toggled', {
+        logEvent("tengu_brief_mode_toggled", {
           enabled: newState,
           gated: false,
-          source:
-            'slash_command' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          source: "slash_command" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
 
         // The tool list change alone isn't a strong enough signal mid-session
@@ -118,10 +109,7 @@ const brief = {
               }\n</system-reminder>`,
             ]
 
-        onDone(
-          newState ? 'Brief-only mode enabled' : 'Brief-only mode disabled',
-          { display: 'system', metaMessages },
-        )
+        onDone(newState ? "Brief-only mode enabled" : "Brief-only mode disabled", { display: "system", metaMessages })
         return null
       },
     }),

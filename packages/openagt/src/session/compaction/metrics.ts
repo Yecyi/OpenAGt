@@ -118,8 +118,7 @@ export class CompressionTracker {
     stats.compressed++
     stats.totalOriginalTokens += originalTokens
     stats.totalCompressedTokens += compressedTokens
-    stats.avgTokensSaved =
-      (stats.avgTokensSaved * (stats.compressed - 1) + tokensSaved) / stats.compressed
+    stats.avgTokensSaved = (stats.avgTokensSaved * (stats.compressed - 1) + tokensSaved) / stats.compressed
     stats.maxTokensSaved = Math.max(stats.maxTokensSaved, tokensSaved)
 
     // Add to recent records
@@ -265,9 +264,10 @@ export class CompressionTracker {
     return Object.entries(this.metrics.byToolType)
       .map(([tool, stats]) => ({
         tool,
-        efficiency: stats.totalOriginalTokens > 0
-          ? (stats.totalOriginalTokens - stats.totalCompressedTokens) / stats.totalOriginalTokens
-          : 0,
+        efficiency:
+          stats.totalOriginalTokens > 0
+            ? (stats.totalOriginalTokens - stats.totalCompressedTokens) / stats.totalOriginalTokens
+            : 0,
         avgTokensSaved: Math.round(stats.avgTokensSaved),
       }))
       .sort((a, b) => b.efficiency - a.efficiency)
@@ -277,9 +277,7 @@ export class CompressionTracker {
    * Get recent records with quality feedback
    */
   private getRecentWithFeedback(): CompressionRecord[] {
-    return this.metrics.recentRecords
-      .slice(-this.qualityFeedbackWindow)
-      .filter((r) => r.qualityFeedback !== undefined)
+    return this.metrics.recentRecords.slice(-this.qualityFeedbackWindow).filter((r) => r.qualityFeedback !== undefined)
   }
 
   /**
@@ -309,9 +307,7 @@ export class CompressionTracker {
       }
     }
 
-    this.metrics.qualityScore = scores.length > 0
-      ? scores.reduce((a, b) => a + b, 0) / scores.length
-      : 0.8
+    this.metrics.qualityScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0.8
   }
 
   /**
@@ -360,13 +356,21 @@ export class PromptCacheMetricsTracker {
   recordCacheHit(): void {
     this.cacheHits++
     // C-1: Emit cache hit ratio metric
-    log.info("prompt.cache_hit_ratio", { ratio: this.getCacheHitRatio(), hits: this.cacheHits, misses: this.cacheMisses })
+    log.info("prompt.cache_hit_ratio", {
+      ratio: this.getCacheHitRatio(),
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+    })
   }
 
   recordCacheMiss(): void {
     this.cacheMisses++
     // C-1: Emit cache hit ratio metric
-    log.info("prompt.cache_hit_ratio", { ratio: this.getCacheHitRatio(), hits: this.cacheHits, misses: this.cacheMisses })
+    log.info("prompt.cache_hit_ratio", {
+      ratio: this.getCacheHitRatio(),
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+    })
   }
 
   recordDynamicBytes(bytes: number): void {
@@ -465,7 +469,12 @@ export class SecurityAuditTracker {
     this.recordEvent({ type: "permission_grant", sessionID, pattern })
   }
 
-  recordCompoundClassification(sessionID: string, pattern: string, riskLevel: "safe" | "low" | "medium" | "high", findings: string[]): void {
+  recordCompoundClassification(
+    sessionID: string,
+    pattern: string,
+    riskLevel: "safe" | "low" | "medium" | "high",
+    findings: string[],
+  ): void {
     this.recordEvent({
       type: "compound_classification",
       sessionID,

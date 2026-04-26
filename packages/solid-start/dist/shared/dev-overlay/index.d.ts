@@ -1,5 +1,5 @@
-import { type JSX } from "solid-js";
+import { type JSX } from "solid-js"
 export interface DevOverlayProps {
-    children?: JSX.Element;
+  children?: JSX.Element
 }
-export declare function DevOverlay(props: DevOverlayProps): JSX.Element;
+export declare function DevOverlay(props: DevOverlayProps): JSX.Element

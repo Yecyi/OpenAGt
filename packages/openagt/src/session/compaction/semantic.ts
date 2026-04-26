@@ -277,7 +277,7 @@ export function generateCompressionSummary(
   compressedLength: number,
   reason?: string,
 ): string {
-  const ratio = originalLength > 0 ? ((originalLength - compressedLength) / originalLength * 100).toFixed(0) : 0
+  const ratio = originalLength > 0 ? (((originalLength - compressedLength) / originalLength) * 100).toFixed(0) : 0
   const summary = `[Compressed ${toolName} output: ${originalLength} -> ${compressedLength} chars (${ratio}% reduction)]`
 
   if (reason) {

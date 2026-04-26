@@ -11,6 +11,7 @@ import type {
   SandboxFilesystemPolicy,
   SandboxNetworkPolicy,
 } from "@/sandbox/types"
+import { autoBackendName } from "@/sandbox/backends"
 import { Log } from "@/util"
 
 const log = Log.create({ service: "shell.runner" })
@@ -114,13 +115,7 @@ export const layer = Layer.effect(
       const capabilities = yield* broker.capabilities()
       const preferred =
         input.backendPreference === "auto"
-          ? capabilities.find((item) =>
-              process.platform === "darwin"
-                ? item.name === "seatbelt"
-                : process.platform === "win32"
-                  ? item.name === "process"
-                  : item.name === "landlock",
-            )
+          ? capabilities.find((item) => item.name === autoBackendName())
           : capabilities.find((item) => item.name === input.backendPreference)
 
       // B-P0-4: Advisory refusal on medium+ risk when broker absent

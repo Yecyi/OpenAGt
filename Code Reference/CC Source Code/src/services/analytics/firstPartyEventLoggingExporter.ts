@@ -1,53 +1,43 @@
-import type { HrTime } from '@opentelemetry/api'
-import { type ExportResult, ExportResultCode } from '@opentelemetry/core'
-import type {
-  LogRecordExporter,
-  ReadableLogRecord,
-} from '@opentelemetry/sdk-logs'
-import axios from 'axios'
-import { randomUUID } from 'crypto'
-import { appendFile, mkdir, readdir, unlink, writeFile } from 'fs/promises'
-import * as path from 'path'
-import type { CoreUserData } from 'src/utils/user.js'
-import {
-  getIsNonInteractiveSession,
-  getSessionId,
-} from '../../bootstrap/state.js'
-import { ClaudeCodeInternalEvent } from '../../types/generated/events_mono/claude_code/v1/claude_code_internal_event.js'
-import { GrowthbookExperimentEvent } from '../../types/generated/events_mono/growthbook/v1/growthbook_experiment_event.js'
-import {
-  getClaudeAIOAuthTokens,
-  hasProfileScope,
-  isClaudeAISubscriber,
-} from '../../utils/auth.js'
-import { checkHasTrustDialogAccepted } from '../../utils/config.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { errorMessage, isFsInaccessible, toError } from '../../utils/errors.js'
-import { getAuthHeaders } from '../../utils/http.js'
-import { readJSONLFile } from '../../utils/json.js'
-import { logError } from '../../utils/log.js'
-import { sleep } from '../../utils/sleep.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
-import { isOAuthTokenExpired } from '../oauth/client.js'
-import { stripProtoFields } from './index.js'
-import { type EventMetadata, to1PEventFormat } from './metadata.js'
+import type { HrTime } from "@opentelemetry/api"
+import { type ExportResult, ExportResultCode } from "@opentelemetry/core"
+import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs"
+import axios from "axios"
+import { randomUUID } from "crypto"
+import { appendFile, mkdir, readdir, unlink, writeFile } from "fs/promises"
+import * as path from "path"
+import type { CoreUserData } from "src/utils/user.js"
+import { getIsNonInteractiveSession, getSessionId } from "../../bootstrap/state.js"
+import { ClaudeCodeInternalEvent } from "../../types/generated/events_mono/claude_code/v1/claude_code_internal_event.js"
+import { GrowthbookExperimentEvent } from "../../types/generated/events_mono/growthbook/v1/growthbook_experiment_event.js"
+import { getClaudeAIOAuthTokens, hasProfileScope, isClaudeAISubscriber } from "../../utils/auth.js"
+import { checkHasTrustDialogAccepted } from "../../utils/config.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { getClaudeConfigHomeDir } from "../../utils/envUtils.js"
+import { errorMessage, isFsInaccessible, toError } from "../../utils/errors.js"
+import { getAuthHeaders } from "../../utils/http.js"
+import { readJSONLFile } from "../../utils/json.js"
+import { logError } from "../../utils/log.js"
+import { sleep } from "../../utils/sleep.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { getClaudeCodeUserAgent } from "../../utils/userAgent.js"
+import { isOAuthTokenExpired } from "../oauth/client.js"
+import { stripProtoFields } from "./index.js"
+import { type EventMetadata, to1PEventFormat } from "./metadata.js"
 
 // Unique ID for this process run - used to isolate failed event files between runs
 const BATCH_UUID = randomUUID()
 
 // File prefix for failed event storage
-const FILE_PREFIX = '1p_failed_events.'
+const FILE_PREFIX = "1p_failed_events."
 
 // Storage directory for failed events - evaluated at runtime to respect CLAUDE_CONFIG_DIR in tests
 function getStorageDir(): string {
-  return path.join(getClaudeConfigHomeDir(), 'telemetry')
+  return path.join(getClaudeConfigHomeDir(), "telemetry")
 }
 
 // API envelope - event_data is the JSON output from proto toJSON()
 type FirstPartyEventLoggingEvent = {
-  event_type: 'ClaudeCodeInternalEvent' | 'GrowthbookExperimentEvent'
+  event_type: "ClaudeCodeInternalEvent" | "GrowthbookExperimentEvent"
   event_data: unknown
 }
 
@@ -82,10 +72,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
   private readonly isKilled: () => boolean
   private pendingExports: Promise<void>[] = []
   private isShutdown = false
-  private readonly schedule: (
-    fn: () => Promise<void>,
-    delayMs: number,
-  ) => () => void
+  private readonly schedule: (fn: () => Promise<void>, delayMs: number) => () => void
   private cancelBackoff: (() => void) | null = null
   private attempts = 0
   private isRetrying = false
@@ -113,11 +100,11 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     // Overridable via tengu_1p_event_batch_config.baseUrl.
     const baseUrl =
       options.baseUrl ||
-      (process.env.ANTHROPIC_BASE_URL === 'https://api-staging.anthropic.com'
-        ? 'https://api-staging.anthropic.com'
-        : 'https://api.anthropic.com')
+      (process.env.ANTHROPIC_BASE_URL === "https://api-staging.anthropic.com"
+        ? "https://api-staging.anthropic.com"
+        : "https://api.anthropic.com")
 
-    this.endpoint = `${baseUrl}${options.path || '/api/event_logging/batch'}`
+    this.endpoint = `${baseUrl}${options.path || "/api/event_logging/batch"}`
 
     this.timeout = options.timeout || 10000
     this.maxBatchSize = options.maxBatchSize || 200
@@ -146,15 +133,10 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
   // --- Storage helpers ---
 
   private getCurrentBatchFilePath(): string {
-    return path.join(
-      getStorageDir(),
-      `${FILE_PREFIX}${getSessionId()}.${BATCH_UUID}.json`,
-    )
+    return path.join(getStorageDir(), `${FILE_PREFIX}${getSessionId()}.${BATCH_UUID}.json`)
   }
 
-  private async loadEventsFromFile(
-    filePath: string,
-  ): Promise<FirstPartyEventLoggingEvent[]> {
+  private async loadEventsFromFile(filePath: string): Promise<FirstPartyEventLoggingEvent[]> {
     try {
       return await readJSONLFile<FirstPartyEventLoggingEvent>(filePath)
     } catch {
@@ -162,16 +144,11 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     }
   }
 
-  private async loadEventsFromCurrentBatch(): Promise<
-    FirstPartyEventLoggingEvent[]
-  > {
+  private async loadEventsFromCurrentBatch(): Promise<FirstPartyEventLoggingEvent[]> {
     return this.loadEventsFromFile(this.getCurrentBatchFilePath())
   }
 
-  private async saveEventsToFile(
-    filePath: string,
-    events: FirstPartyEventLoggingEvent[],
-  ): Promise<void> {
+  private async saveEventsToFile(filePath: string, events: FirstPartyEventLoggingEvent[]): Promise<void> {
     try {
       if (events.length === 0) {
         try {
@@ -183,25 +160,22 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
         // Ensure storage directory exists
         await mkdir(getStorageDir(), { recursive: true })
         // Write as JSON lines (one event per line)
-        const content = events.map(e => jsonStringify(e)).join('\n') + '\n'
-        await writeFile(filePath, content, 'utf8')
+        const content = events.map((e) => jsonStringify(e)).join("\n") + "\n"
+        await writeFile(filePath, content, "utf8")
       }
     } catch (error) {
       logError(error)
     }
   }
 
-  private async appendEventsToFile(
-    filePath: string,
-    events: FirstPartyEventLoggingEvent[],
-  ): Promise<void> {
+  private async appendEventsToFile(filePath: string, events: FirstPartyEventLoggingEvent[]): Promise<void> {
     if (events.length === 0) return
     try {
       // Ensure storage directory exists
       await mkdir(getStorageDir(), { recursive: true })
       // Append as JSON lines (one event per line) - atomic on most filesystems
-      const content = events.map(e => jsonStringify(e)).join('\n') + '\n'
-      await appendFile(filePath, content, 'utf8')
+      const content = events.map((e) => jsonStringify(e)).join("\n") + "\n"
+      await appendFile(filePath, content, "utf8")
     } catch (error) {
       logError(error)
     }
@@ -223,7 +197,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       let files: string[]
       try {
         files = (await readdir(getStorageDir()))
-          .filter((f: string) => f.startsWith(prefix) && f.endsWith('.json'))
+          .filter((f: string) => f.startsWith(prefix) && f.endsWith(".json"))
           .filter((f: string) => !f.includes(BATCH_UUID)) // Exclude current batch
       } catch (e) {
         if (isFsInaccessible(e)) return
@@ -251,42 +225,33 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       return
     }
 
-    if (process.env.USER_TYPE === 'ant') {
-      logForDebugging(
-        `1P event logging: retrying ${events.length} events from previous batch`,
-      )
+    if (process.env.USER_TYPE === "ant") {
+      logForDebugging(`1P event logging: retrying ${events.length} events from previous batch`)
     }
 
     const failedEvents = await this.sendEventsInBatches(events)
     if (failedEvents.length === 0) {
       await this.deleteFile(filePath)
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging('1P event logging: previous batch retry succeeded')
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging("1P event logging: previous batch retry succeeded")
       }
     } else {
       // Save only the failed events back (not all original events)
       await this.saveEventsToFile(filePath, failedEvents)
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging(
-          `1P event logging: previous batch retry failed, ${failedEvents.length} events remain`,
-        )
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging(`1P event logging: previous batch retry failed, ${failedEvents.length} events remain`)
       }
     }
   }
 
-  async export(
-    logs: ReadableLogRecord[],
-    resultCallback: (result: ExportResult) => void,
-  ): Promise<void> {
+  async export(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): Promise<void> {
     if (this.isShutdown) {
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging(
-          '1P event logging export failed: Exporter has been shutdown',
-        )
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging("1P event logging export failed: Exporter has been shutdown")
       }
       resultCallback({
         code: ExportResultCode.FAILED,
-        error: new Error('Exporter has been shutdown'),
+        error: new Error("Exporter has been shutdown"),
       })
       return
     }
@@ -303,16 +268,10 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     })
   }
 
-  private async doExport(
-    logs: ReadableLogRecord[],
-    resultCallback: (result: ExportResult) => void,
-  ): Promise<void> {
+  private async doExport(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): Promise<void> {
     try {
       // Filter for event logs only (by scope name)
-      const eventLogs = logs.filter(
-        log =>
-          log.instrumentationScope?.name === 'com.anthropic.claude_code.events',
-      )
+      const eventLogs = logs.filter((log) => log.instrumentationScope?.name === "com.anthropic.claude_code.events")
 
       if (eventLogs.length === 0) {
         resultCallback({ code: ExportResultCode.SUCCESS })
@@ -330,9 +289,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       if (this.attempts >= this.maxAttempts) {
         resultCallback({
           code: ExportResultCode.FAILED,
-          error: new Error(
-            `Dropped ${events.length} events: max attempts (${this.maxAttempts}) reached`,
-          ),
+          error: new Error(`Dropped ${events.length} events: max attempts (${this.maxAttempts}) reached`),
         })
         return
       }
@@ -344,14 +301,10 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       if (failedEvents.length > 0) {
         await this.queueFailedEvents(failedEvents)
         this.scheduleBackoffRetry()
-        const context = this.lastExportErrorContext
-          ? ` (${this.lastExportErrorContext})`
-          : ''
+        const context = this.lastExportErrorContext ? ` (${this.lastExportErrorContext})` : ""
         resultCallback({
           code: ExportResultCode.FAILED,
-          error: new Error(
-            `Failed to export ${failedEvents.length} events${context}`,
-          ),
+          error: new Error(`Failed to export ${failedEvents.length} events${context}`),
         })
         return
       }
@@ -363,10 +316,8 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       }
       resultCallback({ code: ExportResultCode.SUCCESS })
     } catch (error) {
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging(
-          `1P event logging export failed: ${errorMessage(error)}`,
-        )
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging(`1P event logging export failed: ${errorMessage(error)}`)
       }
       logError(error)
       resultCallback({
@@ -376,19 +327,15 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     }
   }
 
-  private async sendEventsInBatches(
-    events: FirstPartyEventLoggingEvent[],
-  ): Promise<FirstPartyEventLoggingEvent[]> {
+  private async sendEventsInBatches(events: FirstPartyEventLoggingEvent[]): Promise<FirstPartyEventLoggingEvent[]> {
     // Chunk events into batches
     const batches: FirstPartyEventLoggingEvent[][] = []
     for (let i = 0; i < events.length; i += this.maxBatchSize) {
       batches.push(events.slice(i, i + this.maxBatchSize))
     }
 
-    if (process.env.USER_TYPE === 'ant') {
-      logForDebugging(
-        `1P event logging: exporting ${events.length} events in ${batches.length} batch(es)`,
-      )
+    if (process.env.USER_TYPE === "ant") {
+      logForDebugging(`1P event logging: exporting ${events.length} events in ${batches.length} batch(es)`)
     }
 
     // Send each batch with delay between them. On first failure, assume the
@@ -406,7 +353,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
         for (let j = i; j < batches.length; j++) {
           failedBatchEvents.push(...batches[j]!)
         }
-        if (process.env.USER_TYPE === 'ant') {
+        if (process.env.USER_TYPE === "ant") {
           const skipped = batches.length - 1 - i
           logForDebugging(
             `1P event logging: batch ${i + 1}/${batches.length} failed (${lastErrorContext}); short-circuiting ${skipped} remaining batch(es)`,
@@ -427,17 +374,13 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     return failedBatchEvents
   }
 
-  private async queueFailedEvents(
-    events: FirstPartyEventLoggingEvent[],
-  ): Promise<void> {
+  private async queueFailedEvents(events: FirstPartyEventLoggingEvent[]): Promise<void> {
     const filePath = this.getCurrentBatchFilePath()
 
     // Append-only: just add new events to file (atomic on most filesystems)
     await this.appendEventsToFile(filePath, events)
 
-    const context = this.lastExportErrorContext
-      ? ` (${this.lastExportErrorContext})`
-      : ''
+    const context = this.lastExportErrorContext ? ` (${this.lastExportErrorContext})` : ""
     const message = `1P event logging: ${events.length} events failed to export${context}`
     logError(new Error(message))
   }
@@ -449,15 +392,10 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     }
 
     // Quadratic backoff (matching Statsig SDK): base * attempts²
-    const delay = Math.min(
-      this.baseBackoffDelayMs * this.attempts * this.attempts,
-      this.maxBackoffDelayMs,
-    )
+    const delay = Math.min(this.baseBackoffDelayMs * this.attempts * this.attempts, this.maxBackoffDelayMs)
 
-    if (process.env.USER_TYPE === 'ant') {
-      logForDebugging(
-        `1P event logging: scheduling backoff retry in ${delay}ms (attempt ${this.attempts})`,
-      )
+    if (process.env.USER_TYPE === "ant") {
+      logForDebugging(`1P event logging: scheduling backoff retry in ${delay}ms (attempt ${this.attempts})`)
     }
 
     this.cancelBackoff = this.schedule(async () => {
@@ -475,7 +413,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       if (events.length === 0) break
 
       if (this.attempts >= this.maxAttempts) {
-        if (process.env.USER_TYPE === 'ant') {
+        if (process.env.USER_TYPE === "ant") {
           logForDebugging(
             `1P event logging: max attempts (${this.maxAttempts}) reached, dropping ${events.length} events`,
           )
@@ -490,10 +428,8 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       // Clear file before retry (we have events in memory now)
       await this.deleteFile(filePath)
 
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging(
-          `1P event logging: retrying ${events.length} failed events (attempt ${this.attempts + 1})`,
-        )
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging(`1P event logging: retrying ${events.length} failed events (attempt ${this.attempts + 1})`)
       }
 
       const failedEvents = await this.sendEventsInBatches(events)
@@ -510,8 +446,8 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
 
       // Success - reset backoff and continue loop to drain any newly queued events
       this.resetBackoff()
-      if (process.env.USER_TYPE === 'ant') {
-        logForDebugging('1P event logging: backoff retry succeeded')
+      if (process.env.USER_TYPE === "ant") {
+        logForDebugging("1P event logging: backoff retry succeeded")
       }
     }
   }
@@ -524,30 +460,27 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     }
   }
 
-  private async sendBatchWithRetry(
-    payload: FirstPartyEventLoggingPayload,
-  ): Promise<void> {
+  private async sendBatchWithRetry(payload: FirstPartyEventLoggingPayload): Promise<void> {
     if (this.isKilled()) {
       // Throw so the caller short-circuits remaining batches and queues
       // everything to disk. Zero network traffic while killed; the backoff
       // timer keeps ticking and will resume POSTs as soon as the GrowthBook
       // cache picks up the cleared flag.
-      throw new Error('firstParty sink killswitch active')
+      throw new Error("firstParty sink killswitch active")
     }
 
     const baseHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': getClaudeCodeUserAgent(),
-      'x-service-name': 'claude-code',
+      "Content-Type": "application/json",
+      "User-Agent": getClaudeCodeUserAgent(),
+      "x-service-name": "claude-code",
     }
 
     // Skip auth if trust hasn't been established yet
     // This prevents executing apiKeyHelper commands before the trust dialog
     // Non-interactive sessions implicitly have workspace trust
-    const hasTrust =
-      checkHasTrustDialogAccepted() || getIsNonInteractiveSession()
-    if (process.env.USER_TYPE === 'ant' && !hasTrust) {
-      logForDebugging('1P event logging: Trust not accepted')
+    const hasTrust = checkHasTrustDialogAccepted() || getIsNonInteractiveSession()
+    if (process.env.USER_TYPE === "ant" && !hasTrust) {
+      logForDebugging("1P event logging: Trust not accepted")
     }
 
     // Skip auth when the OAuth token is expired or lacks user:profile
@@ -559,29 +492,23 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
         shouldSkipAuth = true
       } else if (tokens && isOAuthTokenExpired(tokens.expiresAt)) {
         shouldSkipAuth = true
-        if (process.env.USER_TYPE === 'ant') {
-          logForDebugging(
-            '1P event logging: OAuth token expired, skipping auth to avoid 401',
-          )
+        if (process.env.USER_TYPE === "ant") {
+          logForDebugging("1P event logging: OAuth token expired, skipping auth to avoid 401")
         }
       }
     }
 
     // Try with auth headers first (unless trust not established or token is known to be expired)
     const authResult = shouldSkipAuth
-      ? { headers: {}, error: 'trust not established or Oauth token expired' }
+      ? { headers: {}, error: "trust not established or Oauth token expired" }
       : getAuthHeaders()
     const useAuth = !authResult.error
 
-    if (!useAuth && process.env.USER_TYPE === 'ant') {
-      logForDebugging(
-        `1P event logging: auth not available, sending without auth`,
-      )
+    if (!useAuth && process.env.USER_TYPE === "ant") {
+      logForDebugging(`1P event logging: auth not available, sending without auth`)
     }
 
-    const headers = useAuth
-      ? { ...baseHeaders, ...authResult.headers }
-      : baseHeaders
+    const headers = useAuth ? { ...baseHeaders, ...authResult.headers } : baseHeaders
 
     try {
       const response = await axios.post(this.endpoint, payload, {
@@ -592,15 +519,9 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       return
     } catch (error) {
       // Handle 401 by retrying without auth
-      if (
-        useAuth &&
-        axios.isAxiosError(error) &&
-        error.response?.status === 401
-      ) {
-        if (process.env.USER_TYPE === 'ant') {
-          logForDebugging(
-            '1P event logging: 401 auth error, retrying without auth',
-          )
+      if (useAuth && axios.isAxiosError(error) && error.response?.status === 401) {
+        if (process.env.USER_TYPE === "ant") {
+          logForDebugging("1P event logging: 401 auth error, retrying without auth")
         }
         const response = await axios.post(this.endpoint, payload, {
           timeout: this.timeout,
@@ -614,14 +535,10 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     }
   }
 
-  private logSuccess(
-    eventCount: number,
-    withAuth: boolean,
-    responseData: unknown,
-  ): void {
-    if (process.env.USER_TYPE === 'ant') {
+  private logSuccess(eventCount: number, withAuth: boolean, responseData: unknown): void {
+    if (process.env.USER_TYPE === "ant") {
       logForDebugging(
-        `1P event logging: ${eventCount} events exported successfully${withAuth ? ' (with auth)' : ' (without auth)'}`,
+        `1P event logging: ${eventCount} events exported successfully${withAuth ? " (with auth)" : " (without auth)"}`,
       )
       logForDebugging(`API Response: ${jsonStringify(responseData, null, 2)}`)
     }
@@ -632,23 +549,19 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     return new Date(seconds * 1000 + nanoseconds / 1000000)
   }
 
-  private transformLogsToEvents(
-    logs: ReadableLogRecord[],
-  ): FirstPartyEventLoggingPayload {
+  private transformLogsToEvents(logs: ReadableLogRecord[]): FirstPartyEventLoggingPayload {
     const events: FirstPartyEventLoggingEvent[] = []
 
     for (const log of logs) {
       const attributes = log.attributes || {}
 
       // Check if this is a GrowthBook experiment event
-      if (attributes.event_type === 'GrowthbookExperimentEvent') {
+      if (attributes.event_type === "GrowthbookExperimentEvent") {
         const timestamp = this.hrTimeToDate(log.hrTime)
         const account_uuid = attributes.account_uuid as string | undefined
-        const organization_uuid = attributes.organization_uuid as
-          | string
-          | undefined
+        const organization_uuid = attributes.organization_uuid as string | undefined
         events.push({
-          event_type: 'GrowthbookExperimentEvent',
+          event_type: "GrowthbookExperimentEvent",
           event_data: GrowthbookExperimentEvent.toJSON({
             event_id: attributes.event_id as string,
             timestamp,
@@ -659,36 +572,27 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
             experiment_metadata: attributes.experiment_metadata as string,
             device_id: attributes.device_id as string,
             session_id: attributes.session_id as string,
-            auth:
-              account_uuid || organization_uuid
-                ? { account_uuid, organization_uuid }
-                : undefined,
+            auth: account_uuid || organization_uuid ? { account_uuid, organization_uuid } : undefined,
           }),
         })
         continue
       }
 
       // Extract event name
-      const eventName =
-        (attributes.event_name as string) || (log.body as string) || 'unknown'
+      const eventName = (attributes.event_name as string) || (log.body as string) || "unknown"
 
       // Extract metadata objects directly (no JSON parsing needed)
       const coreMetadata = attributes.core_metadata as EventMetadata | undefined
       const userMetadata = attributes.user_metadata as CoreUserData
-      const eventMetadata = (attributes.event_metadata || {}) as Record<
-        string,
-        unknown
-      >
+      const eventMetadata = (attributes.event_metadata || {}) as Record<string, unknown>
 
       if (!coreMetadata) {
         // Emit partial event if core metadata is missing
-        if (process.env.USER_TYPE === 'ant') {
-          logForDebugging(
-            `1P event logging: core_metadata missing for event ${eventName}`,
-          )
+        if (process.env.USER_TYPE === "ant") {
+          logForDebugging(`1P event logging: core_metadata missing for event ${eventName}`)
         }
         events.push({
-          event_type: 'ClaudeCodeInternalEvent',
+          event_type: "ClaudeCodeInternalEvent",
           event_data: ClaudeCodeInternalEvent.toJSON({
             event_id: attributes.event_id as string | undefined,
             event_name: eventName,
@@ -696,36 +600,27 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
             session_id: getSessionId(),
             additional_metadata: Buffer.from(
               jsonStringify({
-                transform_error: 'core_metadata attribute is missing',
+                transform_error: "core_metadata attribute is missing",
               }),
-            ).toString('base64'),
+            ).toString("base64"),
           }),
         })
         continue
       }
 
       // Transform to 1P format
-      const formatted = to1PEventFormat(
-        coreMetadata,
-        userMetadata,
-        eventMetadata,
-      )
+      const formatted = to1PEventFormat(coreMetadata, userMetadata, eventMetadata)
 
       // _PROTO_* keys are PII-tagged values meant only for privileged BQ
       // columns. Hoist known keys to proto fields, then defensively strip any
       // remaining _PROTO_* so an unrecognized future key can't silently land
       // in the general-access additional_metadata blob. sink.ts applies the
       // same strip before Datadog; this closes the 1P side.
-      const {
-        _PROTO_skill_name,
-        _PROTO_plugin_name,
-        _PROTO_marketplace_name,
-        ...rest
-      } = formatted.additional
+      const { _PROTO_skill_name, _PROTO_plugin_name, _PROTO_marketplace_name, ...rest } = formatted.additional
       const additionalMetadata = stripProtoFields(rest)
 
       events.push({
-        event_type: 'ClaudeCodeInternalEvent',
+        event_type: "ClaudeCodeInternalEvent",
         event_data: ClaudeCodeInternalEvent.toJSON({
           event_id: attributes.event_id as string | undefined,
           event_name: eventName,
@@ -736,23 +631,12 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
           ...formatted.core,
           env: formatted.env,
           process: formatted.process,
-          skill_name:
-            typeof _PROTO_skill_name === 'string'
-              ? _PROTO_skill_name
-              : undefined,
-          plugin_name:
-            typeof _PROTO_plugin_name === 'string'
-              ? _PROTO_plugin_name
-              : undefined,
-          marketplace_name:
-            typeof _PROTO_marketplace_name === 'string'
-              ? _PROTO_marketplace_name
-              : undefined,
+          skill_name: typeof _PROTO_skill_name === "string" ? _PROTO_skill_name : undefined,
+          plugin_name: typeof _PROTO_plugin_name === "string" ? _PROTO_plugin_name : undefined,
+          marketplace_name: typeof _PROTO_marketplace_name === "string" ? _PROTO_marketplace_name : undefined,
           additional_metadata:
             Object.keys(additionalMetadata).length > 0
-              ? Buffer.from(jsonStringify(additionalMetadata)).toString(
-                  'base64',
-                )
+              ? Buffer.from(jsonStringify(additionalMetadata)).toString("base64")
               : undefined,
         }),
       })
@@ -765,15 +649,15 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     this.isShutdown = true
     this.resetBackoff()
     await this.forceFlush()
-    if (process.env.USER_TYPE === 'ant') {
-      logForDebugging('1P event logging exporter shutdown complete')
+    if (process.env.USER_TYPE === "ant") {
+      logForDebugging("1P event logging exporter shutdown complete")
     }
   }
 
   async forceFlush(): Promise<void> {
     await Promise.all(this.pendingExports)
-    if (process.env.USER_TYPE === 'ant') {
-      logForDebugging('1P event logging exporter flush complete')
+    if (process.env.USER_TYPE === "ant") {
+      logForDebugging("1P event logging exporter flush complete")
     }
   }
 }
@@ -785,7 +669,7 @@ function getAxiosErrorContext(error: unknown): string {
 
   const parts: string[] = []
 
-  const requestId = error.response?.headers?.['request-id']
+  const requestId = error.response?.headers?.["request-id"]
   if (requestId) {
     parts.push(`request-id=${requestId}`)
   }
@@ -802,5 +686,5 @@ function getAxiosErrorContext(error: unknown): string {
     parts.push(error.message)
   }
 
-  return parts.join(', ')
+  return parts.join(", ")
 }

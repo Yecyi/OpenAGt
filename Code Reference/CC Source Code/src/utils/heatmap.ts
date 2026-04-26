@@ -1,6 +1,6 @@
-import chalk from 'chalk'
-import type { DailyActivity } from './stats.js'
-import { toDateString } from './statsCache.js'
+import chalk from "chalk"
+import type { DailyActivity } from "./stats.js"
+import { toDateString } from "./statsCache.js"
 
 export type HeatmapOptions = {
   terminalWidth?: number // Terminal width in characters
@@ -16,12 +16,10 @@ type Percentiles = {
 /**
  * Pre-calculates percentiles from activity data for use in intensity calculations
  */
-function calculatePercentiles(
-  dailyActivity: DailyActivity[],
-): Percentiles | null {
+function calculatePercentiles(dailyActivity: DailyActivity[]): Percentiles | null {
   const counts = dailyActivity
-    .map(a => a.messageCount)
-    .filter(c => c > 0)
+    .map((a) => a.messageCount)
+    .filter((c) => c > 0)
     .sort((a, b) => a - b)
 
   if (counts.length === 0) return null
@@ -36,10 +34,7 @@ function calculatePercentiles(
 /**
  * Generates a GitHub-style activity heatmap for the terminal
  */
-export function generateHeatmap(
-  dailyActivity: DailyActivity[],
-  options: HeatmapOptions = {},
-): string {
+export function generateHeatmap(dailyActivity: DailyActivity[], options: HeatmapOptions = {}): string {
   const { terminalWidth = 80, showMonthLabels = true } = options
 
   // Day labels take 4 characters ("Mon "), calculate weeks that fit
@@ -71,9 +66,7 @@ export function generateHeatmap(
 
   // Generate grid (7 rows for days of week, width columns for weeks)
   // Also track which week each month starts for labels
-  const grid: string[][] = Array.from({ length: 7 }, () =>
-    Array(width).fill(''),
-  )
+  const grid: string[][] = Array.from({ length: 7 }, () => Array(width).fill(""))
   const monthStarts: { month: number; week: number }[] = []
   let lastMonth = -1
 
@@ -82,7 +75,7 @@ export function generateHeatmap(
     for (let day = 0; day < 7; day++) {
       // Don't show future dates
       if (currentDate > today) {
-        grid[day]![week] = ' '
+        grid[day]![week] = " "
         currentDate.setDate(currentDate.getDate() + 1)
         continue
       }
@@ -112,63 +105,38 @@ export function generateHeatmap(
 
   // Month labels - evenly spaced across the grid
   if (showMonthLabels) {
-    const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ]
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
     // Build label line with fixed-width month labels
-    const uniqueMonths = monthStarts.map(m => m.month)
+    const uniqueMonths = monthStarts.map((m) => m.month)
     const labelWidth = Math.floor(width / Math.max(uniqueMonths.length, 1))
-    const monthLabels = uniqueMonths
-      .map(month => monthNames[month]!.padEnd(labelWidth))
-      .join('')
+    const monthLabels = uniqueMonths.map((month) => monthNames[month]!.padEnd(labelWidth)).join("")
 
     // 4 spaces for day label column prefix
-    lines.push('    ' + monthLabels)
+    lines.push("    " + monthLabels)
   }
 
   // Day labels
-  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
   // Grid
   for (let day = 0; day < 7; day++) {
     // Only show labels for Mon, Wed, Fri
-    const label = [1, 3, 5].includes(day) ? dayLabels[day]!.padEnd(3) : '   '
-    const row = label + ' ' + grid[day]!.join('')
+    const label = [1, 3, 5].includes(day) ? dayLabels[day]!.padEnd(3) : "   "
+    const row = label + " " + grid[day]!.join("")
     lines.push(row)
   }
 
   // Legend
-  lines.push('')
+  lines.push("")
   lines.push(
-    '    Less ' +
-      [
-        claudeOrange('░'),
-        claudeOrange('▒'),
-        claudeOrange('▓'),
-        claudeOrange('█'),
-      ].join(' ') +
-      ' More',
+    "    Less " + [claudeOrange("░"), claudeOrange("▒"), claudeOrange("▓"), claudeOrange("█")].join(" ") + " More",
   )
 
-  return lines.join('\n')
+  return lines.join("\n")
 }
 
-function getIntensity(
-  messageCount: number,
-  percentiles: Percentiles | null,
-): number {
+function getIntensity(messageCount: number, percentiles: Percentiles | null): number {
   if (messageCount === 0 || !percentiles) return 0
 
   if (messageCount >= percentiles.p75) return 4
@@ -178,21 +146,21 @@ function getIntensity(
 }
 
 // Claude orange color (hex #da7756)
-const claudeOrange = chalk.hex('#da7756')
+const claudeOrange = chalk.hex("#da7756")
 
 function getHeatmapChar(intensity: number): string {
   switch (intensity) {
     case 0:
-      return chalk.gray('·')
+      return chalk.gray("·")
     case 1:
-      return claudeOrange('░')
+      return claudeOrange("░")
     case 2:
-      return claudeOrange('▒')
+      return claudeOrange("▒")
     case 3:
-      return claudeOrange('▓')
+      return claudeOrange("▓")
     case 4:
-      return claudeOrange('█')
+      return claudeOrange("█")
     default:
-      return chalk.gray('·')
+      return chalk.gray("·")
   }
 }

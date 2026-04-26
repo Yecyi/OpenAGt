@@ -1,4 +1,4 @@
-import type { Diff } from './frame.js'
+import type { Diff } from "./frame.js"
 
 /**
  * Optimize a diff by applying all optimization rules in a single pass.
@@ -25,11 +25,11 @@ export function optimize(diff: Diff): Diff {
     const type = patch.type
 
     // Skip no-ops
-    if (type === 'stdout') {
-      if (patch.content === '') continue
-    } else if (type === 'cursorMove') {
+    if (type === "stdout") {
+      if (patch.content === "") continue
+    } else if (type === "cursorMove") {
       if (patch.x === 0 && patch.y === 0) continue
-    } else if (type === 'clear') {
+    } else if (type === "clear") {
       if (patch.count === 0) continue
     }
 
@@ -40,9 +40,9 @@ export function optimize(diff: Diff): Diff {
       const lastType = last.type
 
       // Merge consecutive cursorMove
-      if (type === 'cursorMove' && lastType === 'cursorMove') {
+      if (type === "cursorMove" && lastType === "cursorMove") {
         result[lastIdx] = {
-          type: 'cursorMove',
+          type: "cursorMove",
           x: last.x + patch.x,
           y: last.y + patch.y,
         }
@@ -50,7 +50,7 @@ export function optimize(diff: Diff): Diff {
       }
 
       // Collapse consecutive cursorTo (only the last one matters)
-      if (type === 'cursorTo' && lastType === 'cursorTo') {
+      if (type === "cursorTo" && lastType === "cursorTo") {
         result[lastIdx] = patch
         continue
       }
@@ -60,24 +60,20 @@ export function optimize(diff: Diff): Diff {
       // the first is only sound if its undo-codes are a subset of the
       // second's, which is NOT guaranteed. e.g. [\e[49m, \e[2m]: dropping
       // the bg reset leaks it into the next \e[2J/\e[2K via BCE.
-      if (type === 'styleStr' && lastType === 'styleStr') {
-        result[lastIdx] = { type: 'styleStr', str: last.str + patch.str }
+      if (type === "styleStr" && lastType === "styleStr") {
+        result[lastIdx] = { type: "styleStr", str: last.str + patch.str }
         continue
       }
 
       // Dedupe hyperlinks
-      if (
-        type === 'hyperlink' &&
-        lastType === 'hyperlink' &&
-        patch.uri === last.uri
-      ) {
+      if (type === "hyperlink" && lastType === "hyperlink" && patch.uri === last.uri) {
         continue
       }
 
       // Cancel cursor hide/show pairs
       if (
-        (type === 'cursorShow' && lastType === 'cursorHide') ||
-        (type === 'cursorHide' && lastType === 'cursorShow')
+        (type === "cursorShow" && lastType === "cursorHide") ||
+        (type === "cursorHide" && lastType === "cursorShow")
       ) {
         result.pop()
         len--

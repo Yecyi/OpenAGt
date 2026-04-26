@@ -1,5 +1,5 @@
-import { getHistory } from '../../history.js'
-import { logForDebugging } from '../debug.js'
+import { getHistory } from "../../history.js"
+import { logForDebugging } from "../debug.js"
 
 /**
  * Result of shell history completion lookup
@@ -34,7 +34,7 @@ async function getShellHistoryCommands(): Promise<string[]> {
   try {
     // Read history entries and filter for bash commands
     for await (const entry of getHistory()) {
-      if (entry.display && entry.display.startsWith('!')) {
+      if (entry.display && entry.display.startsWith("!")) {
         // Remove the '!' prefix to get the actual command
         const command = entry.display.slice(1).trim()
         if (command && !seen.has(command)) {
@@ -88,9 +88,7 @@ export function prependToShellHistoryCache(command: string): void {
  * @param input The current user input (without '!' prefix)
  * @returns The best match, or null if no match found
  */
-export async function getShellHistoryCompletion(
-  input: string,
-): Promise<ShellHistoryMatch | null> {
+export async function getShellHistoryCompletion(input: string): Promise<ShellHistoryMatch | null> {
   // Don't suggest for empty or very short input
   if (!input || input.length < 2) {
     return null

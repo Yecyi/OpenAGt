@@ -6,28 +6,28 @@
  * what to do with them (e.g., convert to SDK messages, log, etc.).
  */
 
-import { HOOK_EVENTS } from 'src/entrypoints/sdk/coreTypes.js'
+import { HOOK_EVENTS } from "src/entrypoints/sdk/coreTypes.js"
 
-import { logForDebugging } from '../debug.js'
+import { logForDebugging } from "../debug.js"
 
 /**
  * Hook events that are always emitted regardless of the includeHookEvents
  * option. These are low-noise lifecycle events that were in the original
  * allowlist and are backwards-compatible.
  */
-const ALWAYS_EMITTED_HOOK_EVENTS = ['SessionStart', 'Setup'] as const
+const ALWAYS_EMITTED_HOOK_EVENTS = ["SessionStart", "Setup"] as const
 
 const MAX_PENDING_EVENTS = 100
 
 export type HookStartedEvent = {
-  type: 'started'
+  type: "started"
   hookId: string
   hookName: string
   hookEvent: string
 }
 
 export type HookProgressEvent = {
-  type: 'progress'
+  type: "progress"
   hookId: string
   hookName: string
   hookEvent: string
@@ -37,7 +37,7 @@ export type HookProgressEvent = {
 }
 
 export type HookResponseEvent = {
-  type: 'response'
+  type: "response"
   hookId: string
   hookName: string
   hookEvent: string
@@ -45,22 +45,17 @@ export type HookResponseEvent = {
   stdout: string
   stderr: string
   exitCode?: number
-  outcome: 'success' | 'error' | 'cancelled'
+  outcome: "success" | "error" | "cancelled"
 }
 
-export type HookExecutionEvent =
-  | HookStartedEvent
-  | HookProgressEvent
-  | HookResponseEvent
+export type HookExecutionEvent = HookStartedEvent | HookProgressEvent | HookResponseEvent
 export type HookEventHandler = (event: HookExecutionEvent) => void
 
 const pendingEvents: HookExecutionEvent[] = []
 let eventHandler: HookEventHandler | null = null
 let allHookEventsEnabled = false
 
-export function registerHookEventHandler(
-  handler: HookEventHandler | null,
-): void {
+export function registerHookEventHandler(handler: HookEventHandler | null): void {
   eventHandler = handler
   if (handler && pendingEvents.length > 0) {
     for (const event of pendingEvents.splice(0)) {
@@ -84,21 +79,14 @@ function shouldEmit(hookEvent: string): boolean {
   if ((ALWAYS_EMITTED_HOOK_EVENTS as readonly string[]).includes(hookEvent)) {
     return true
   }
-  return (
-    allHookEventsEnabled &&
-    (HOOK_EVENTS as readonly string[]).includes(hookEvent)
-  )
+  return allHookEventsEnabled && (HOOK_EVENTS as readonly string[]).includes(hookEvent)
 }
 
-export function emitHookStarted(
-  hookId: string,
-  hookName: string,
-  hookEvent: string,
-): void {
+export function emitHookStarted(hookId: string, hookName: string, hookEvent: string): void {
   if (!shouldEmit(hookEvent)) return
 
   emit({
-    type: 'started',
+    type: "started",
     hookId,
     hookName,
     hookEvent,
@@ -116,7 +104,7 @@ export function emitHookProgress(data: {
   if (!shouldEmit(data.hookEvent)) return
 
   emit({
-    type: 'progress',
+    type: "progress",
     ...data,
   })
 }
@@ -130,7 +118,7 @@ export function startHookProgressInterval(params: {
 }): () => void {
   if (!shouldEmit(params.hookEvent)) return () => {}
 
-  let lastEmittedOutput = ''
+  let lastEmittedOutput = ""
   const interval = setInterval(() => {
     void params.getOutput().then(({ stdout, stderr, output }) => {
       if (output === lastEmittedOutput) return
@@ -158,20 +146,18 @@ export function emitHookResponse(data: {
   stdout: string
   stderr: string
   exitCode?: number
-  outcome: 'success' | 'error' | 'cancelled'
+  outcome: "success" | "error" | "cancelled"
 }): void {
   // Always log full hook output to debug log for verbose mode debugging
   const outputToLog = data.stdout || data.stderr || data.output
   if (outputToLog) {
-    logForDebugging(
-      `Hook ${data.hookName} (${data.hookEvent}) ${data.outcome}:\n${outputToLog}`,
-    )
+    logForDebugging(`Hook ${data.hookName} (${data.hookEvent}) ${data.outcome}:\n${outputToLog}`)
   }
 
   if (!shouldEmit(data.hookEvent)) return
 
   emit({
-    type: 'response',
+    type: "response",
     ...data,
   })
 }

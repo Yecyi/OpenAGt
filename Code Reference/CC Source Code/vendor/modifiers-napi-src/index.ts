@@ -1,6 +1,6 @@
-import { createRequire } from 'module'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { createRequire } from "module"
+import { fileURLToPath } from "url"
+import { dirname, join } from "path"
 
 type ModifiersNapi = {
   getModifiers(): string[]
@@ -15,7 +15,7 @@ function loadModule(): ModifiersNapi | null {
   }
 
   // Only works on macOS
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     return null
   }
 
@@ -28,10 +28,10 @@ function loadModule(): ModifiersNapi | null {
       // Dev mode - load from vendor directory
       const modulePath = join(
         dirname(fileURLToPath(import.meta.url)),
-        '..',
-        'modifiers-napi',
+        "..",
+        "modifiers-napi",
         `${process.arch}-darwin`,
-        'modifiers.node',
+        "modifiers.node",
       )
       cachedModule = createRequire(import.meta.url)(modulePath) as ModifiersNapi
     }

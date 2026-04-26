@@ -1,4 +1,4 @@
-import type { AppState } from '../state/AppState.js'
+import type { AppState } from "../state/AppState.js"
 
 /**
  * Parse `@agent-name message` syntax for direct team member messaging.
@@ -23,7 +23,7 @@ export type DirectMessageResult =
   | { success: true; recipientName: string }
   | {
       success: false
-      error: 'no_team_context' | 'unknown_recipient'
+      error: "no_team_context" | "unknown_recipient"
       recipientName?: string
     }
 
@@ -39,26 +39,24 @@ type WriteToMailboxFn = (
 export async function sendDirectMemberMessage(
   recipientName: string,
   message: string,
-  teamContext: AppState['teamContext'],
+  teamContext: AppState["teamContext"],
   writeToMailbox?: WriteToMailboxFn,
 ): Promise<DirectMessageResult> {
   if (!teamContext || !writeToMailbox) {
-    return { success: false, error: 'no_team_context' }
+    return { success: false, error: "no_team_context" }
   }
 
   // Find team member by name
-  const member = Object.values(teamContext.teammates ?? {}).find(
-    t => t.name === recipientName,
-  )
+  const member = Object.values(teamContext.teammates ?? {}).find((t) => t.name === recipientName)
 
   if (!member) {
-    return { success: false, error: 'unknown_recipient', recipientName }
+    return { success: false, error: "unknown_recipient", recipientName }
   }
 
   await writeToMailbox(
     recipientName,
     {
-      from: 'user',
+      from: "user",
       text: message,
       timestamp: new Date().toISOString(),
     },

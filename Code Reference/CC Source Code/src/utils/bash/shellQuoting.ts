@@ -1,4 +1,4 @@
-import { quote } from './shellQuote.js'
+import { quote } from "./shellQuote.js"
 
 /**
  * Detects if a command contains a heredoc pattern
@@ -32,9 +32,7 @@ function containsMultilineString(command: string): boolean {
   const singleQuoteMultiline = /'(?:[^'\\]|\\.)*\n(?:[^'\\]|\\.)*'/
   const doubleQuoteMultiline = /"(?:[^"\\]|\\.)*\n(?:[^"\\]|\\.)*"/
 
-  return (
-    singleQuoteMultiline.test(command) || doubleQuoteMultiline.test(command)
-  )
+  return singleQuoteMultiline.test(command) || doubleQuoteMultiline.test(command)
 }
 
 /**
@@ -43,10 +41,7 @@ function containsMultilineString(command: string): boolean {
  * @param addStdinRedirect Whether to add < /dev/null
  * @returns The properly quoted command
  */
-export function quoteShellCommand(
-  command: string,
-  addStdinRedirect: boolean = true,
-): string {
+export function quoteShellCommand(command: string, addStdinRedirect: boolean = true): string {
   // If command contains heredoc or multiline strings, handle specially
   // The shell-quote library incorrectly escapes ! to \! in these cases
   if (containsHeredoc(command) || containsMultilineString(command)) {
@@ -67,7 +62,7 @@ export function quoteShellCommand(
 
   // For regular commands, use shell-quote
   if (addStdinRedirect) {
-    return quote([command, '<', '/dev/null'])
+    return quote([command, "<", "/dev/null"])
   }
 
   return quote([command])
@@ -124,5 +119,5 @@ export function shouldAddStdinRedirect(command: string): boolean {
 const NUL_REDIRECT_REGEX = /(\d?&?>+\s*)[Nn][Uu][Ll](?=\s|$|[|&;)\n])/g
 
 export function rewriteWindowsNullRedirect(command: string): string {
-  return command.replace(NUL_REDIRECT_REGEX, '$1/dev/null')
+  return command.replace(NUL_REDIRECT_REGEX, "$1/dev/null")
 }

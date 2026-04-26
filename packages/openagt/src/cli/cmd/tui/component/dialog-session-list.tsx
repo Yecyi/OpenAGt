@@ -165,11 +165,7 @@ export function DialogSessionList() {
                 >
                   ●
                 </span>
-                {tokenInfo && (
-                  <span style={{ fg: theme.textMuted }}>
-                    {" "}· {Locale.number(tokenInfo.tokens)} tokens
-                  </span>
-                )}
+                {tokenInfo && <span style={{ fg: theme.textMuted }}> · {Locale.number(tokenInfo.tokens)} tokens</span>}
               </>
             )
           }
@@ -177,11 +173,7 @@ export function DialogSessionList() {
           footer = (
             <>
               {Locale.time(x.time.updated)}
-              {tokenInfo && (
-                <span style={{ fg: theme.textMuted }}>
-                  {" "}· {Locale.number(tokenInfo.tokens)} tokens
-                </span>
-              )}
+              {tokenInfo && <span style={{ fg: theme.textMuted }}> · {Locale.number(tokenInfo.tokens)} tokens</span>}
             </>
           )
         }

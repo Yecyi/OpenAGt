@@ -2,14 +2,14 @@
 // Extracted from LocalShellTask.tsx so non-React consumers (stopTask.ts via
 // print.ts) don't pull React/ink into the module graph.
 
-import type { TaskStateBase } from '../../Task.js'
-import type { AgentId } from '../../types/ids.js'
-import type { ShellCommand } from '../../utils/ShellCommand.js'
+import type { TaskStateBase } from "../../Task.js"
+import type { AgentId } from "../../types/ids.js"
+import type { ShellCommand } from "../../utils/ShellCommand.js"
 
-export type BashTaskKind = 'bash' | 'monitor'
+export type BashTaskKind = "bash" | "monitor"
 
 export type LocalShellTaskState = TaskStateBase & {
-  type: 'local_bash' // Keep as 'local_bash' for backward compatibility with persisted session state
+  type: "local_bash" // Keep as 'local_bash' for backward compatibility with persisted session state
   command: string
   result?: {
     code: number
@@ -32,10 +32,5 @@ export type LocalShellTaskState = TaskStateBase & {
 }
 
 export function isLocalShellTask(task: unknown): task is LocalShellTaskState {
-  return (
-    typeof task === 'object' &&
-    task !== null &&
-    'type' in task &&
-    task.type === 'local_bash'
-  )
+  return typeof task === "object" && task !== null && "type" in task && task.type === "local_bash"
 }

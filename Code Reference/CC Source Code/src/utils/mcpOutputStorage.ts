@@ -1,29 +1,26 @@
-import { writeFile } from 'fs/promises'
-import { join } from 'path'
+import { writeFile } from "fs/promises"
+import { join } from "path"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import type { MCPResultType } from '../services/mcp/client.js'
-import { toError } from './errors.js'
-import { formatFileSize } from './format.js'
-import { logError } from './log.js'
-import { ensureToolResultsDir, getToolResultsDir } from './toolResultStorage.js'
+} from "../services/analytics/index.js"
+import type { MCPResultType } from "../services/mcp/client.js"
+import { toError } from "./errors.js"
+import { formatFileSize } from "./format.js"
+import { logError } from "./log.js"
+import { ensureToolResultsDir, getToolResultsDir } from "./toolResultStorage.js"
 
 /**
  * Generates a format description string based on the MCP result type and schema.
  */
-export function getFormatDescription(
-  type: MCPResultType,
-  schema?: unknown,
-): string {
+export function getFormatDescription(type: MCPResultType, schema?: unknown): string {
   switch (type) {
-    case 'toolResult':
-      return 'Plain text'
-    case 'structuredContent':
-      return schema ? `JSON with schema: ${schema}` : 'JSON'
-    case 'contentArray':
-      return schema ? `JSON array with schema: ${schema}` : 'JSON array'
+    case "toolResult":
+      return "Plain text"
+    case "structuredContent":
+      return schema ? `JSON with schema: ${schema}` : "JSON"
+    case "contentArray":
+      return schema ? `JSON array with schema: ${schema}` : "JSON array"
   }
 }
 
@@ -64,56 +61,56 @@ export function getLargeOutputInstructions(
  * the Read tool dispatches on it (PDFs, images, etc. need the right ext).
  */
 export function extensionForMimeType(mimeType: string | undefined): string {
-  if (!mimeType) return 'bin'
+  if (!mimeType) return "bin"
   // Strip any charset/boundary parameter
-  const mt = (mimeType.split(';')[0] ?? '').trim().toLowerCase()
+  const mt = (mimeType.split(";")[0] ?? "").trim().toLowerCase()
   switch (mt) {
-    case 'application/pdf':
-      return 'pdf'
-    case 'application/json':
-      return 'json'
-    case 'text/csv':
-      return 'csv'
-    case 'text/plain':
-      return 'txt'
-    case 'text/html':
-      return 'html'
-    case 'text/markdown':
-      return 'md'
-    case 'application/zip':
-      return 'zip'
-    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-      return 'docx'
-    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-      return 'xlsx'
-    case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
-      return 'pptx'
-    case 'application/msword':
-      return 'doc'
-    case 'application/vnd.ms-excel':
-      return 'xls'
-    case 'audio/mpeg':
-      return 'mp3'
-    case 'audio/wav':
-      return 'wav'
-    case 'audio/ogg':
-      return 'ogg'
-    case 'video/mp4':
-      return 'mp4'
-    case 'video/webm':
-      return 'webm'
-    case 'image/png':
-      return 'png'
-    case 'image/jpeg':
-      return 'jpg'
-    case 'image/gif':
-      return 'gif'
-    case 'image/webp':
-      return 'webp'
-    case 'image/svg+xml':
-      return 'svg'
+    case "application/pdf":
+      return "pdf"
+    case "application/json":
+      return "json"
+    case "text/csv":
+      return "csv"
+    case "text/plain":
+      return "txt"
+    case "text/html":
+      return "html"
+    case "text/markdown":
+      return "md"
+    case "application/zip":
+      return "zip"
+    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      return "docx"
+    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+      return "xlsx"
+    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      return "pptx"
+    case "application/msword":
+      return "doc"
+    case "application/vnd.ms-excel":
+      return "xls"
+    case "audio/mpeg":
+      return "mp3"
+    case "audio/wav":
+      return "wav"
+    case "audio/ogg":
+      return "ogg"
+    case "video/mp4":
+      return "mp4"
+    case "video/webm":
+      return "webm"
+    case "image/png":
+      return "png"
+    case "image/jpeg":
+      return "jpg"
+    case "image/gif":
+      return "gif"
+    case "image/webp":
+      return "webp"
+    case "image/svg+xml":
+      return "svg"
     default:
-      return 'bin'
+      return "bin"
   }
 }
 
@@ -124,20 +121,18 @@ export function extensionForMimeType(mimeType: string | undefined): string {
  */
 export function isBinaryContentType(contentType: string): boolean {
   if (!contentType) return false
-  const mt = (contentType.split(';')[0] ?? '').trim().toLowerCase()
-  if (mt.startsWith('text/')) return false
+  const mt = (contentType.split(";")[0] ?? "").trim().toLowerCase()
+  if (mt.startsWith("text/")) return false
   // Structured text formats delivered with an application/ type. Use suffix
   // or exact match rather than substring so 'openxmlformats' (docx/xlsx) stays binary.
-  if (mt.endsWith('+json') || mt === 'application/json') return false
-  if (mt.endsWith('+xml') || mt === 'application/xml') return false
-  if (mt.startsWith('application/javascript')) return false
-  if (mt === 'application/x-www-form-urlencoded') return false
+  if (mt.endsWith("+json") || mt === "application/json") return false
+  if (mt.endsWith("+xml") || mt === "application/xml") return false
+  if (mt.startsWith("application/javascript")) return false
+  if (mt === "application/x-www-form-urlencoded") return false
   return true
 }
 
-export type PersistBinaryResult =
-  | { filepath: string; size: number; ext: string }
-  | { error: string }
+export type PersistBinaryResult = { filepath: string; size: number; ext: string } | { error: string }
 
 /**
  * Write raw binary bytes to the tool-results directory with a mime-derived
@@ -163,9 +158,8 @@ export async function persistBinaryContent(
   }
 
   // mime type and extension are safe fixed-vocabulary strings (not paths/code)
-  logEvent('tengu_binary_content_persisted', {
-    mimeType: (mimeType ??
-      'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+  logEvent("tengu_binary_content_persisted", {
+    mimeType: (mimeType ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     sizeBytes: bytes.length,
     ext: ext as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   })
@@ -184,6 +178,6 @@ export function getBinaryBlobSavedMessage(
   size: number,
   sourceDescription: string,
 ): string {
-  const mt = mimeType || 'unknown type'
+  const mt = mimeType || "unknown type"
   return `${sourceDescription}Binary content (${mt}, ${formatFileSize(size)}) saved to ${filepath}`
 }

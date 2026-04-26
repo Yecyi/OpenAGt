@@ -1,16 +1,7 @@
-import {
-  type AnsiCode,
-  ansiCodesToString,
-  diffAnsiCodes,
-} from '@alcalzone/ansi-tokenize'
-import {
-  type Point,
-  type Rectangle,
-  type Size,
-  unionRect,
-} from './layout/geometry.js'
-import { BEL, ESC, SEP } from './termio/ansi.js'
-import * as warn from './warn.js'
+import { type AnsiCode, ansiCodesToString, diffAnsiCodes } from "@alcalzone/ansi-tokenize"
+import { type Point, type Rectangle, type Size, unionRect } from "./layout/geometry.js"
+import { BEL, ESC, SEP } from "./termio/ansi.js"
+import * as warn from "./warn.js"
 
 // --- Shared Pools (interning for memory efficiency) ---
 
@@ -19,10 +10,10 @@ import * as warn from './warn.js'
 // so blitRegion can copy IDs directly (no re-interning) and
 // diffEach can compare IDs as integers (no string lookup).
 export class CharPool {
-  private strings: string[] = [' ', ''] // Index 0 = space, 1 = empty (spacer)
+  private strings: string[] = [" ", ""] // Index 0 = space, 1 = empty (spacer)
   private stringMap = new Map<string, number>([
-    [' ', 0],
-    ['', 1],
+    [" ", 0],
+    ["", 1],
   ])
   private ascii: Int32Array = initCharAscii() // charCode → index, -1 = not interned
 
@@ -48,14 +39,14 @@ export class CharPool {
   }
 
   get(index: number): string {
-    return this.strings[index] ?? ' '
+    return this.strings[index] ?? " "
   }
 }
 
 // Hyperlink string pool shared across all screens.
 // Index 0 = no hyperlink.
 export class HyperlinkPool {
-  private strings: string[] = [''] // Index 0 = no hyperlink
+  private strings: string[] = [""] // Index 0 = no hyperlink
   private stringMap = new Map<string, number>()
 
   intern(hyperlink: string | undefined): number {
@@ -78,16 +69,16 @@ export class HyperlinkPool {
 // so bit 0 of the resulting styleId is set → renderer won't skip inverted
 // spaces as invisible.
 const INVERSE_CODE: AnsiCode = {
-  type: 'ansi',
-  code: '\x1b[7m',
-  endCode: '\x1b[27m',
+  type: "ansi",
+  code: "\x1b[7m",
+  endCode: "\x1b[27m",
 }
 // Bold (SGR 1) — stacks cleanly, no reflow in monospace. endCode 22
 // also cancels dim (SGR 2); harmless here since we never add dim.
 const BOLD_CODE: AnsiCode = {
-  type: 'ansi',
-  code: '\x1b[1m',
-  endCode: '\x1b[22m',
+  type: "ansi",
+  code: "\x1b[1m",
+  endCode: "\x1b[22m",
 }
 // Underline (SGR 4). Kept alongside yellow+bold — the underline is the
 // unambiguous visible-on-any-theme marker. Yellow-bg-via-inverse can
@@ -95,18 +86,18 @@ const BOLD_CODE: AnsiCode = {
 // bg). If you see underline but no yellow, the yellow is being lost in
 // the existing cell styling — the overlay IS finding the match.
 const UNDERLINE_CODE: AnsiCode = {
-  type: 'ansi',
-  code: '\x1b[4m',
-  endCode: '\x1b[24m',
+  type: "ansi",
+  code: "\x1b[4m",
+  endCode: "\x1b[24m",
 }
 // fg→yellow (SGR 33). With inverse already in the stack, the terminal
 // swaps fg↔bg at render — so yellow-fg becomes yellow-BG. Original bg
 // becomes fg (readable on most themes: dark-bg → dark-text on yellow).
 // endCode 39 is 'default fg' — cancels any prior fg color cleanly.
 const YELLOW_FG_CODE: AnsiCode = {
-  type: 'ansi',
-  code: '\x1b[33m',
-  endCode: '\x1b[39m',
+  type: "ansi",
+  code: "\x1b[33m",
+  endCode: "\x1b[39m",
 }
 
 export class StylePool {
@@ -127,14 +118,12 @@ export class StylePool {
    * with a single bitmask check on the packed word.
    */
   intern(styles: AnsiCode[]): number {
-    const key = styles.length === 0 ? '' : styles.map(s => s.code).join('\0')
+    const key = styles.length === 0 ? "" : styles.map((s) => s.code).join("\0")
     let id = this.ids.get(key)
     if (id === undefined) {
       const rawId = this.styles.length
       this.styles.push(styles.length === 0 ? [] : styles)
-      id =
-        (rawId << 1) |
-        (styles.length > 0 && hasVisibleSpaceEffect(styles) ? 1 : 0)
+      id = (rawId << 1) | (styles.length > 0 && hasVisibleSpaceEffect(styles) ? 1 : 0)
       this.ids.set(key, id)
     }
     return id
@@ -151,7 +140,7 @@ export class StylePool {
    * for a given pair.
    */
   transition(fromId: number, toId: number): string {
-    if (fromId === toId) return ''
+    if (fromId === toId) return ""
     const key = fromId * 0x100000 + toId
     let str = this.transitionCache.get(key)
     if (str === undefined) {
@@ -172,7 +161,7 @@ export class StylePool {
     if (id === undefined) {
       const baseCodes = this.get(baseId)
       // If already inverted, use as-is (avoids SGR 7 stacking)
-      const hasInverse = baseCodes.some(c => c.endCode === '\x1b[27m')
+      const hasInverse = baseCodes.some((c) => c.endCode === "\x1b[27m")
       id = hasInverse ? baseId : this.intern([...baseCodes, INVERSE_CODE])
       this.inverseCache.set(baseId, id)
     }
@@ -198,21 +187,17 @@ export class StylePool {
       // when both colors are explicit). Filtering both gives clean
       // yellow-bg + terminal-default-fg everywhere. Bold/dim/italic
       // coexist — keep those.
-      const codes = baseCodes.filter(
-        c => c.endCode !== '\x1b[39m' && c.endCode !== '\x1b[49m',
-      )
+      const codes = baseCodes.filter((c) => c.endCode !== "\x1b[39m" && c.endCode !== "\x1b[49m")
       // fg-yellow FIRST so inverse swaps it to bg. Bold after inverse is
       // fine — SGR 1 is fg-attribute-only, order-independent vs 7.
       codes.push(YELLOW_FG_CODE)
-      if (!baseCodes.some(c => c.endCode === '\x1b[27m'))
-        codes.push(INVERSE_CODE)
-      if (!baseCodes.some(c => c.endCode === '\x1b[22m')) codes.push(BOLD_CODE)
+      if (!baseCodes.some((c) => c.endCode === "\x1b[27m")) codes.push(INVERSE_CODE)
+      if (!baseCodes.some((c) => c.endCode === "\x1b[22m")) codes.push(BOLD_CODE)
       // Underline as the unambiguous marker — yellow-bg can clash with
       // existing bg styling (user-prompt bg, syntax bg). If you see
       // underline but no yellow on a match, the overlay IS finding it;
       // the yellow is just losing a styling fight.
-      if (!baseCodes.some(c => c.endCode === '\x1b[24m'))
-        codes.push(UNDERLINE_CODE)
+      if (!baseCodes.some((c) => c.endCode === "\x1b[24m")) codes.push(UNDERLINE_CODE)
       id = this.intern(codes)
       this.currentMatchCache.set(baseId, id)
     }
@@ -248,9 +233,7 @@ export class StylePool {
     if (id === undefined) {
       // Keep everything except bg (49m) and inverse (27m). Fg, bold, dim,
       // italic, underline, strikethrough all preserved.
-      const kept = this.get(baseId).filter(
-        c => c.endCode !== '\x1b[49m' && c.endCode !== '\x1b[27m',
-      )
+      const kept = this.get(baseId).filter((c) => c.endCode !== "\x1b[49m" && c.endCode !== "\x1b[27m")
       kept.push(bg)
       id = this.intern(kept)
       this.selectionBgCache.set(baseId, id)
@@ -261,11 +244,11 @@ export class StylePool {
 
 // endCodes that produce visible effects on space characters
 const VISIBLE_ON_SPACE = new Set([
-  '\x1b[49m', // background color
-  '\x1b[27m', // inverse
-  '\x1b[24m', // underline
-  '\x1b[29m', // strikethrough
-  '\x1b[55m', // overline
+  "\x1b[49m", // background color
+  "\x1b[27m", // inverse
+  "\x1b[24m", // underline
+  "\x1b[29m", // strikethrough
+  "\x1b[55m", // overline
 ])
 
 function hasVisibleSpaceEffect(styles: AnsiCode[]): boolean {
@@ -339,11 +322,7 @@ const HYPERLINK_MASK = 0x7fff // 15 bits
 const WIDTH_MASK = 3 // 2 bits
 
 // Pack styleId, hyperlinkId, and width into a single Int32
-function packWord1(
-  styleId: number,
-  hyperlinkId: number,
-  width: number,
-): number {
+function packWord1(styleId: number, hyperlinkId: number, width: number): number {
   return (styleId << STYLE_SHIFT) | (hyperlinkId << HYPERLINK_SHIFT) | width
 }
 
@@ -434,12 +413,7 @@ export function isCellEmpty(screen: Screen, cell: Cell): boolean {
   // Note: After cellAt mapping, unwritten cells have emptyStyleId, so this
   // returns true for both unwritten AND cleared cells. Use isEmptyCellAt
   // for the internal distinction.
-  return (
-    cell.char === ' ' &&
-    cell.styleId === screen.emptyStyleId &&
-    cell.width === CellWidth.Narrow &&
-    !cell.hyperlink
-  )
+  return cell.char === " " && cell.styleId === screen.emptyStyleId && cell.width === CellWidth.Narrow && !cell.hyperlink
 }
 // Intern a hyperlink string and return its ID (0 = no hyperlink)
 function internHyperlink(screen: Screen, hyperlink: Hyperlink): number {
@@ -456,8 +430,8 @@ export function createScreen(
   hyperlinkPool: HyperlinkPool,
 ): Screen {
   // Warn if dimensions are not valid integers (likely bad yoga layout output)
-  warn.ifNotInteger(width, 'createScreen width')
-  warn.ifNotInteger(height, 'createScreen height')
+  warn.ifNotInteger(width, "createScreen width")
+  warn.ifNotInteger(height, "createScreen height")
 
   // Ensure width and height are valid integers to prevent crashes
   if (!Number.isInteger(width) || width < 0) {
@@ -498,14 +472,10 @@ export function createScreen(
  * For double-buffering, this allows swapping between front and back buffers
  * without allocating new Screen objects each frame.
  */
-export function resetScreen(
-  screen: Screen,
-  width: number,
-  height: number,
-): void {
+export function resetScreen(screen: Screen, width: number, height: number): void {
   // Warn if dimensions are not valid integers
-  warn.ifNotInteger(width, 'resetScreen width')
-  warn.ifNotInteger(height, 'resetScreen height')
+  warn.ifNotInteger(width, "resetScreen width")
+  warn.ifNotInteger(height, "resetScreen height")
 
   // Ensure width and height are valid integers to prevent crashes
   if (!Number.isInteger(width) || width < 0) {
@@ -551,11 +521,7 @@ export function resetScreen(
  *
  * O(width * height) but only called occasionally (e.g., between conversation turns).
  */
-export function migrateScreenPools(
-  screen: Screen,
-  charPool: CharPool,
-  hyperlinkPool: HyperlinkPool,
-): void {
+export function migrateScreenPools(screen: Screen, charPool: CharPool, hyperlinkPool: HyperlinkPool): void {
   const oldCharPool = screen.charPool
   const oldHyperlinkPool = screen.hyperlinkPool
   if (oldCharPool === charPool && oldHyperlinkPool === hyperlinkPool) return
@@ -591,8 +557,7 @@ export function migrateScreenPools(
  * this is intentional as cells are stored packed, not as objects.
  */
 export function cellAt(screen: Screen, x: number, y: number): Cell | undefined {
-  if (x < 0 || y < 0 || x >= screen.width || y >= screen.height)
-    return undefined
+  if (x < 0 || y < 0 || x >= screen.width || y >= screen.height) return undefined
   return cellAtIndex(screen, y * screen.width + x)
 }
 /**
@@ -663,13 +628,8 @@ function cellAtCI(screen: Screen, ci: number, out: Cell): void {
   out.hyperlink = hid === 0 ? undefined : screen.hyperlinkPool.get(hid)
 }
 
-export function charInCellAt(
-  screen: Screen,
-  x: number,
-  y: number,
-): string | undefined {
-  if (x < 0 || y < 0 || x >= screen.width || y >= screen.height)
-    return undefined
+export function charInCellAt(screen: Screen, x: number, y: number): string | undefined {
+  if (x < 0 || y < 0 || x >= screen.width || y >= screen.height) return undefined
   const ci = (y * screen.width + x) << 1
   return screen.charPool.get(screen.cells[ci]!)
 }
@@ -690,12 +650,7 @@ export function charInCellAt(
  * wrap to the next line. This function doesn't need to handle SpacerHead
  * automatically - it will be set directly by the wrapping code.
  */
-export function setCellAt(
-  screen: Screen,
-  x: number,
-  y: number,
-  cell: Cell,
-): void {
+export function setCellAt(screen: Screen, x: number, y: number, cell: Cell): void {
   if (x < 0 || y < 0 || x >= screen.width || y >= screen.height) return
   const ci = (y * screen.width + x) << 1
   const cells = screen.cells
@@ -710,20 +665,13 @@ export function setCellAt(
       const spacerCI = ci + 2
       if ((cells[spacerCI + 1]! & WIDTH_MASK) === CellWidth.SpacerTail) {
         cells[spacerCI] = EMPTY_CHAR_INDEX
-        cells[spacerCI + 1] = packWord1(
-          screen.emptyStyleId,
-          0,
-          CellWidth.Narrow,
-        )
+        cells[spacerCI + 1] = packWord1(screen.emptyStyleId, 0, CellWidth.Narrow)
       }
     }
   }
   // Track cleared Wide position for damage expansion below
   let clearedWideX = -1
-  if (
-    prevWidth === CellWidth.SpacerTail &&
-    cell.width !== CellWidth.SpacerTail
-  ) {
+  if (prevWidth === CellWidth.SpacerTail && cell.width !== CellWidth.SpacerTail) {
     // Overwriting a SpacerTail: clear the orphaned Wide char at (x-1).
     // Keeping the wide character with Narrow width would cause the terminal
     // to still render it with width 2, desyncing the cursor model.
@@ -739,11 +687,7 @@ export function setCellAt(
 
   // Pack cell data into cells array
   cells[ci] = internCharString(screen, cell.char)
-  cells[ci + 1] = packWord1(
-    cell.styleId,
-    internHyperlink(screen, cell.hyperlink),
-    cell.width,
-  )
+  cells[ci + 1] = packWord1(cell.styleId, internHyperlink(screen, cell.hyperlink), cell.width)
 
   // Track damage - expand bounds in place instead of allocating new objects
   // Include the main cell position and any cleared orphan cells
@@ -781,24 +725,13 @@ export function setCellAt(
       // yoga squishes a💻 to height 0 and 本 renders at the same y.
       if ((cells[spacerCI + 1]! & WIDTH_MASK) === CellWidth.Wide) {
         const orphanCI = spacerCI + 2
-        if (
-          spacerX + 1 < screen.width &&
-          (cells[orphanCI + 1]! & WIDTH_MASK) === CellWidth.SpacerTail
-        ) {
+        if (spacerX + 1 < screen.width && (cells[orphanCI + 1]! & WIDTH_MASK) === CellWidth.SpacerTail) {
           cells[orphanCI] = EMPTY_CHAR_INDEX
-          cells[orphanCI + 1] = packWord1(
-            screen.emptyStyleId,
-            0,
-            CellWidth.Narrow,
-          )
+          cells[orphanCI + 1] = packWord1(screen.emptyStyleId, 0, CellWidth.Narrow)
         }
       }
       cells[spacerCI] = SPACER_CHAR_INDEX
-      cells[spacerCI + 1] = packWord1(
-        screen.emptyStyleId,
-        0,
-        CellWidth.SpacerTail,
-      )
+      cells[spacerCI + 1] = packWord1(screen.emptyStyleId, 0, CellWidth.SpacerTail)
 
       // Expand damage to include SpacerTail so diff() scans it
       const d = screen.damage
@@ -814,12 +747,7 @@ export function setCellAt(
  * or hyperlink. Preserves empty cells as-is (char stays ' '). Tracks damage
  * for the cell so diffEach picks up the change.
  */
-export function setCellStyleId(
-  screen: Screen,
-  x: number,
-  y: number,
-  styleId: number,
-): void {
+export function setCellStyleId(screen: Screen, x: number, y: number, styleId: number): void {
   if (x < 0 || y < 0 || x >= screen.width || y >= screen.height) return
   const ci = (y * screen.width + x) << 1
   const cells = screen.cells
@@ -931,11 +859,7 @@ export function blitRegion(
     for (let y = regionY; y < maxY; y++) {
       if ((srcCells[srcLastCI + 1]! & WIDTH_MASK) === CellWidth.Wide) {
         dstCells[dstSpacerCI] = SPACER_CHAR_INDEX
-        dstCells[dstSpacerCI + 1] = packWord1(
-          dst.emptyStyleId,
-          0,
-          CellWidth.SpacerTail,
-        )
+        dstCells[dstSpacerCI + 1] = packWord1(dst.emptyStyleId, 0, CellWidth.SpacerTail)
         wroteSpacerOutsideRegion = true
       }
       srcLastCI += srcStride
@@ -980,11 +904,7 @@ export function clearRegion(
   // word0=EMPTY_CHAR_INDEX(0), word1=packWord1(0,0,0)=0
   if (startX === 0 && maxX === screenWidth) {
     // Full-width: single fill, no boundary checks needed
-    cells64.fill(
-      EMPTY_CELL_VALUE,
-      rowBase,
-      rowBase + (maxY - startY) * screenWidth,
-    )
+    cells64.fill(EMPTY_CELL_VALUE, rowBase, rowBase + (maxY - startY) * screenWidth)
   } else {
     // Partial-width: single loop handles boundary cleanup and fill per row.
     const stride = screenWidth << 1 // 2 Int32s per cell
@@ -1054,12 +974,7 @@ export function clearRegion(
  * noSelect bitmap are shifted so text-selection markers stay aligned when
  * this is applied to next.screen during scroll fast path.
  */
-export function shiftRows(
-  screen: Screen,
-  top: number,
-  bottom: number,
-  n: number,
-): void {
+export function shiftRows(screen: Screen, top: number, bottom: number, n: number): void {
   if (n === 0 || top < 0 || bottom >= screen.height || top > bottom) return
   const w = screen.width
   const cells64 = screen.cells64
@@ -1096,9 +1011,7 @@ const OSC8_REGEX = new RegExp(`^${ESC}\\]8${SEP}${SEP}([^${BEL}]*)${BEL}$`)
 // OSC8 prefix: ESC ] 8 ; — cheap check to skip regex for the vast majority of styles (SGR = ESC [)
 export const OSC8_PREFIX = `${ESC}]8${SEP}`
 
-export function extractHyperlinkFromStyles(
-  styles: AnsiCode[],
-): Hyperlink | null {
+export function extractHyperlinkFromStyles(styles: AnsiCode[]): Hyperlink | null {
   for (const style of styles) {
     const code = style.code
     if (code.length < 5 || !code.startsWith(OSC8_PREFIX)) continue
@@ -1111,10 +1024,7 @@ export function extractHyperlinkFromStyles(
 }
 
 export function filterOutHyperlinkStyles(styles: AnsiCode[]): AnsiCode[] {
-  return styles.filter(
-    style =>
-      !style.code.startsWith(OSC8_PREFIX) || !OSC8_REGEX.test(style.code),
-  )
+  return styles.filter((style) => !style.code.startsWith(OSC8_PREFIX) || !OSC8_REGEX.test(style.code))
 }
 
 // ---
@@ -1123,28 +1033,16 @@ export function filterOutHyperlinkStyles(styles: AnsiCode[]): AnsiCode[] {
  * Returns an array of all changes between two screens. Used by tests.
  * Production code should use diffEach() to avoid allocations.
  */
-export function diff(
-  prev: Screen,
-  next: Screen,
-): [point: Point, removed: Cell | undefined, added: Cell | undefined][] {
+export function diff(prev: Screen, next: Screen): [point: Point, removed: Cell | undefined, added: Cell | undefined][] {
   const output: [Point, Cell | undefined, Cell | undefined][] = []
   diffEach(prev, next, (x, y, removed, added) => {
     // Copy cells since diffEach reuses the objects
-    output.push([
-      { x, y },
-      removed ? { ...removed } : undefined,
-      added ? { ...added } : undefined,
-    ])
+    output.push([{ x, y }, removed ? { ...removed } : undefined, added ? { ...added } : undefined])
   })
   return output
 }
 
-type DiffCallback = (
-  x: number,
-  y: number,
-  removed: Cell | undefined,
-  added: Cell | undefined,
-) => boolean | void
+type DiffCallback = (x: number, y: number, removed: Cell | undefined, added: Cell | undefined) => boolean | void
 
 /**
  * Like diff(), but calls a callback for each change instead of building an array.
@@ -1153,11 +1051,7 @@ type DiffCallback = (
  *
  * Returns true if the callback ever returned true (early exit signal).
  */
-export function diffEach(
-  prev: Screen,
-  next: Screen,
-  cb: DiffCallback,
-): boolean {
+export function diffEach(prev: Screen, next: Screen, cb: DiffCallback): boolean {
   const prevWidth = prev.width
   const nextWidth = next.width
   const prevHeight = prev.height
@@ -1210,12 +1104,7 @@ export function diffEach(
  * Returns the number of matching cells before the first difference,
  * or `count` if all cells match. Tiny and pure for JIT inlining.
  */
-function findNextDiff(
-  a: Int32Array,
-  b: Int32Array,
-  w0: number,
-  count: number,
-): number {
+function findNextDiff(a: Int32Array, b: Int32Array, w0: number, count: number): number {
   for (let i = 0; i < count; i++, w0 += 2) {
     const w1 = w0 | 1
     if (a[w0] !== b[w0] || a[w1] !== b[w1]) return i
@@ -1319,13 +1208,13 @@ function diffSameWidth(
   const stride = width << 1
 
   const prevCell: Cell = {
-    char: ' ',
+    char: " ",
     styleId: 0,
     width: CellWidth.Narrow,
     hyperlink: undefined,
   }
   const nextCell: Cell = {
-    char: ' ',
+    char: " ",
     styleId: 0,
     width: CellWidth.Narrow,
     hyperlink: undefined,
@@ -1339,30 +1228,11 @@ function diffSameWidth(
     const nextIn = y < nextHeight
 
     if (prevIn && nextIn) {
-      if (
-        diffRowBoth(
-          prevCells,
-          nextCells,
-          prev,
-          next,
-          rowCI,
-          y,
-          startX,
-          rowEndX,
-          prevCell,
-          nextCell,
-          cb,
-        )
-      )
-        return true
+      if (diffRowBoth(prevCells, nextCells, prev, next, rowCI, y, startX, rowEndX, prevCell, nextCell, cb)) return true
     } else if (prevIn) {
-      if (diffRowRemoved(prev, rowCI, y, startX, rowEndX, prevCell, cb))
-        return true
+      if (diffRowRemoved(prev, rowCI, y, startX, rowEndX, prevCell, cb)) return true
     } else if (nextIn) {
-      if (
-        diffRowAdded(nextCells, next, rowCI, y, startX, rowEndX, nextCell, cb)
-      )
-        return true
+      if (diffRowAdded(nextCells, next, rowCI, y, startX, rowEndX, nextCell, cb)) return true
     }
 
     rowCI += stride
@@ -1390,13 +1260,13 @@ function diffDifferentWidth(
   const nextCells = next.cells
 
   const prevCell: Cell = {
-    char: ' ',
+    char: " ",
     styleId: 0,
     width: CellWidth.Narrow,
     hyperlink: undefined,
   }
   const nextCell: Cell = {
-    char: ' ',
+    char: " ",
     styleId: 0,
     width: CellWidth.Narrow,
     hyperlink: undefined,
@@ -1418,10 +1288,7 @@ function diffDifferentWidth(
     let nextCI = nextRowCI
 
     for (let x = startX; x < bothEndX; x++) {
-      if (
-        prevCells[prevCI] === nextCells[nextCI] &&
-        prevCells[prevCI + 1] === nextCells[nextCI + 1]
-      ) {
+      if (prevCells[prevCI] === nextCells[nextCI] && prevCells[prevCI + 1] === nextCells[nextCI + 1]) {
         prevCI += 2
         nextCI += 2
         continue
@@ -1468,13 +1335,7 @@ function diffDifferentWidth(
  * renders. No damage tracking — noSelect doesn't affect terminal output,
  * only getSelectedText/applySelectionOverlay which read it directly.
  */
-export function markNoSelectRegion(
-  screen: Screen,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): void {
+export function markNoSelectRegion(screen: Screen, x: number, y: number, width: number, height: number): void {
   const maxX = Math.min(x + width, screen.width)
   const maxY = Math.min(y + height, screen.height)
   const noSel = screen.noSelect

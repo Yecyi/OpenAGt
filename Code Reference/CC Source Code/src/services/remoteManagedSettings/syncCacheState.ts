@@ -21,15 +21,15 @@
  * subsequent read hits the cached bool instead of re-running the auth chain.
  */
 
-import { join } from 'path'
-import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
-import { readFileSync } from '../../utils/fileRead.js'
-import { stripBOM } from '../../utils/jsonRead.js'
-import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
-import type { SettingsJson } from '../../utils/settings/types.js'
-import { jsonParse } from '../../utils/slowOperations.js'
+import { join } from "path"
+import { getClaudeConfigHomeDir } from "../../utils/envUtils.js"
+import { readFileSync } from "../../utils/fileRead.js"
+import { stripBOM } from "../../utils/jsonRead.js"
+import { resetSettingsCache } from "../../utils/settings/settingsCache.js"
+import type { SettingsJson } from "../../utils/settings/types.js"
+import { jsonParse } from "../../utils/slowOperations.js"
 
-const SETTINGS_FILENAME = 'remote-settings.json'
+const SETTINGS_FILENAME = "remote-settings.json"
 
 let sessionCache: SettingsJson | null = null
 let eligible: boolean | undefined
@@ -58,7 +58,7 @@ function loadSettings(): SettingsJson | null {
   try {
     const content = readFileSync(getSettingsPath())
     const data: unknown = jsonParse(stripBOM(content))
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
       return null
     }
     return data as SettingsJson

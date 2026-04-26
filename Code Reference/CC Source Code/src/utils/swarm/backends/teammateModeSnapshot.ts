@@ -6,11 +6,11 @@
  * affect the teammate mode for the current session.
  */
 
-import { getGlobalConfig } from '../../../utils/config.js'
-import { logForDebugging } from '../../../utils/debug.js'
-import { logError } from '../../../utils/log.js'
+import { getGlobalConfig } from "../../../utils/config.js"
+import { logForDebugging } from "../../../utils/debug.js"
+import { logError } from "../../../utils/log.js"
 
-export type TeammateMode = 'auto' | 'tmux' | 'in-process'
+export type TeammateMode = "auto" | "tmux" | "in-process"
 
 // Module-level variable to hold the captured mode at startup
 let initialTeammateMode: TeammateMode | null = null
@@ -43,9 +43,7 @@ export function getCliTeammateModeOverride(): TeammateMode | null {
 export function clearCliTeammateModeOverride(newMode: TeammateMode): void {
   cliTeammateModeOverride = null
   initialTeammateMode = newMode
-  logForDebugging(
-    `[TeammateModeSnapshot] CLI override cleared, new mode: ${newMode}`,
-  )
+  logForDebugging(`[TeammateModeSnapshot] CLI override cleared, new mode: ${newMode}`)
 }
 
 /**
@@ -56,15 +54,11 @@ export function clearCliTeammateModeOverride(newMode: TeammateMode): void {
 export function captureTeammateModeSnapshot(): void {
   if (cliTeammateModeOverride) {
     initialTeammateMode = cliTeammateModeOverride
-    logForDebugging(
-      `[TeammateModeSnapshot] Captured from CLI override: ${initialTeammateMode}`,
-    )
+    logForDebugging(`[TeammateModeSnapshot] Captured from CLI override: ${initialTeammateMode}`)
   } else {
     const config = getGlobalConfig()
-    initialTeammateMode = config.teammateMode ?? 'auto'
-    logForDebugging(
-      `[TeammateModeSnapshot] Captured from config: ${initialTeammateMode}`,
-    )
+    initialTeammateMode = config.teammateMode ?? "auto"
+    logForDebugging(`[TeammateModeSnapshot] Captured from config: ${initialTeammateMode}`)
   }
 }
 
@@ -75,13 +69,9 @@ export function captureTeammateModeSnapshot(): void {
 export function getTeammateModeFromSnapshot(): TeammateMode {
   if (initialTeammateMode === null) {
     // This indicates an initialization bug - capture should happen in setup()
-    logError(
-      new Error(
-        'getTeammateModeFromSnapshot called before capture - this indicates an initialization bug',
-      ),
-    )
+    logError(new Error("getTeammateModeFromSnapshot called before capture - this indicates an initialization bug"))
     captureTeammateModeSnapshot()
   }
   // Fallback to 'auto' if somehow still null (shouldn't happen, but safe)
-  return initialTeammateMode ?? 'auto'
+  return initialTeammateMode ?? "auto"
 }

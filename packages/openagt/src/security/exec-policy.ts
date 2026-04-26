@@ -100,12 +100,7 @@ export function tokenizeCommand(command: string): string[] {
         quote = null
         continue
       }
-      if (
-        quote === '"' &&
-        char === "\\" &&
-        next &&
-        (next === '"' || next === "\\" || next === "$")
-      ) {
+      if (quote === '"' && char === "\\" && next && (next === '"' || next === "\\" || next === "$")) {
         current.push(next)
         index += 1
         continue
@@ -119,11 +114,7 @@ export function tokenizeCommand(command: string): string[] {
       continue
     }
 
-    if (
-      char === "\\" &&
-      next &&
-      (/\s/.test(next) || next === '"' || next === "'" || next === "\\")
-    ) {
+    if (char === "\\" && next && (/\s/.test(next) || next === '"' || next === "'" || next === "\\")) {
       current.push(next)
       index += 1
       continue
@@ -141,11 +132,7 @@ export function tokenizeCommand(command: string): string[] {
   return tokens
 }
 
-function matchesPattern(
-  pattern: PatternToken[],
-  tokens: string[],
-  shellFamily: ShellFamily,
-) {
+function matchesPattern(pattern: PatternToken[], tokens: string[], shellFamily: ShellFamily) {
   if (tokens.length < pattern.length) return false
 
   for (let i = 0; i < pattern.length; i++) {
@@ -163,10 +150,7 @@ function summarizeMatch(rule: Rule) {
   return rule.pattern.map((item) => (Array.isArray(item) ? item.join("|") : item))
 }
 
-function strictestDecision(
-  left: ExecPolicyDecision,
-  right: ExecPolicyDecision,
-): ExecPolicyDecision {
+function strictestDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): ExecPolicyDecision {
   return DECISION_ORDER[left] >= DECISION_ORDER[right] ? left : right
 }
 
@@ -194,12 +178,14 @@ export const layer = Layer.effect(
       const tokens = tokenizeCommand(input.command)
       const matchedRules = rules.flatMap((rule, index) => {
         if (!matchesPattern(rule.pattern, tokens, input.shellFamily)) return []
-        return [{
-          index,
-          pattern: summarizeMatch(rule),
-          decision: rule.decision ?? "allow",
-          ...(rule.justification ? { justification: rule.justification } : {}),
-        } satisfies MatchedRule]
+        return [
+          {
+            index,
+            pattern: summarizeMatch(rule),
+            decision: rule.decision ?? "allow",
+            ...(rule.justification ? { justification: rule.justification } : {}),
+          } satisfies MatchedRule,
+        ]
       })
 
       const decision = matchedRules.reduce<ExecPolicyDecision>((current, rule) => {

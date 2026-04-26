@@ -6,16 +6,8 @@
  */
 
 import { Effect, Layer, Context } from "effect"
-import {
-  extractPathsFromInput as extractPaths,
-  pathsOverlap,
-  detectPathConflicts,
-} from "@/tool/path-overlap"
-import {
-  isConcurrencySafe,
-  partitionToolCalls,
-  type ToolCallItem as PartitionToolCallItem,
-} from "@/tool/partition"
+import { extractPathsFromInput as extractPaths, pathsOverlap, detectPathConflicts } from "@/tool/path-overlap"
+import { isConcurrencySafe, partitionToolCalls, type ToolCallItem as PartitionToolCallItem } from "@/tool/partition"
 import { Tool } from "@/tool"
 import { Log } from "@/util"
 
@@ -104,7 +96,7 @@ export function partitionTools(tools: RunningToolCall[]): RunningToolCall[][] {
     const concurrentTools = tools.filter(
       (t) =>
         !assigned.has(t.id) &&
-        (t.id === tool.id || (!hasPathOverlap(tool, t) || (!isWriteTool(tool.tool) && !isWriteTool(t.tool)))),
+        (t.id === tool.id || !hasPathOverlap(tool, t) || (!isWriteTool(tool.tool) && !isWriteTool(t.tool))),
     )
 
     const partition = concurrentTools.filter((t) => !assigned.has(t.id))

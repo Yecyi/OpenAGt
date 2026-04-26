@@ -1,9 +1,9 @@
 /* eslint-disable eslint-plugin-n/no-unsupported-features/node-builtins */
 
-import { errorMessage } from '../utils/errors.js'
-import { jsonStringify } from '../utils/slowOperations.js'
-import type { DirectConnectConfig } from './directConnectManager.js'
-import { connectResponseSchema } from './types.js'
+import { errorMessage } from "../utils/errors.js"
+import { jsonStringify } from "../utils/slowOperations.js"
+import type { DirectConnectConfig } from "./directConnectManager.js"
+import { connectResponseSchema } from "./types.js"
 
 /**
  * Errors thrown by createDirectConnectSession when the connection fails.
@@ -11,7 +11,7 @@ import { connectResponseSchema } from './types.js'
 export class DirectConnectError extends Error {
   constructor(message: string) {
     super(message)
-    this.name = 'DirectConnectError'
+    this.name = "DirectConnectError"
   }
 }
 
@@ -38,16 +38,16 @@ export async function createDirectConnectSession({
   workDir?: string
 }> {
   const headers: Record<string, string> = {
-    'content-type': 'application/json',
+    "content-type": "application/json",
   }
   if (authToken) {
-    headers['authorization'] = `Bearer ${authToken}`
+    headers["authorization"] = `Bearer ${authToken}`
   }
 
   let resp: Response
   try {
     resp = await fetch(`${serverUrl}/sessions`, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: jsonStringify({
         cwd,
@@ -57,22 +57,16 @@ export async function createDirectConnectSession({
       }),
     })
   } catch (err) {
-    throw new DirectConnectError(
-      `Failed to connect to server at ${serverUrl}: ${errorMessage(err)}`,
-    )
+    throw new DirectConnectError(`Failed to connect to server at ${serverUrl}: ${errorMessage(err)}`)
   }
 
   if (!resp.ok) {
-    throw new DirectConnectError(
-      `Failed to create session: ${resp.status} ${resp.statusText}`,
-    )
+    throw new DirectConnectError(`Failed to create session: ${resp.status} ${resp.statusText}`)
   }
 
   const result = connectResponseSchema().safeParse(await resp.json())
   if (!result.success) {
-    throw new DirectConnectError(
-      `Invalid session response: ${result.error.message}`,
-    )
+    throw new DirectConnectError(`Invalid session response: ${result.error.message}`)
   }
 
   const data = result.data

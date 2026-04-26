@@ -1,6 +1,6 @@
-import { getClientDevManifest } from "./dev-client-manifest.js";
-import { getClientProdManifest } from "./prod-client-manifest.js";
+import { getClientDevManifest } from "./dev-client-manifest.js"
+import { getClientProdManifest } from "./prod-client-manifest.js"
 export function getClientManifest() {
-    return import.meta.env.DEV ? getClientDevManifest() : getClientProdManifest();
+  return import.meta.env.DEV ? getClientDevManifest() : getClientProdManifest()
 }
-export { getClientManifest as getManifest };
+export { getClientManifest as getManifest }

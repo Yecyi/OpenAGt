@@ -46,14 +46,14 @@ node dist/cli.js --version
 
 ### What the Build Script Does
 
-| Phase | Action |
-|-------|--------|
-| **1. Copy** | `src/` → `build-src/` (original untouched) |
-| **2. Transform** | `feature('X')` → `false` (enables dead code elimination) |
+| Phase             | Action                                                        |
+| ----------------- | ------------------------------------------------------------- |
+| **1. Copy**       | `src/` → `build-src/` (original untouched)                    |
+| **2. Transform**  | `feature('X')` → `false` (enables dead code elimination)      |
 | **2b. Transform** | `MACRO.VERSION` → `'2.1.88'` (compile-time version injection) |
-| **2c. Transform** | `import from 'bun:bundle'` → stub import |
-| **3. Entry** | Create wrapper that injects MACRO globals |
-| **4. Bundle** | esbuild with iterative stub creation for missing modules |
+| **2c. Transform** | `import from 'bun:bundle'` → stub import                      |
+| **3. Entry**      | Create wrapper that injects MACRO globals                     |
+| **4. Bundle**     | esbuild with iterative stub creation for missing modules      |
 
 ### Known Issues
 

@@ -1,4 +1,4 @@
-export const LIST_MCP_RESOURCES_TOOL_NAME = 'ListMcpResourcesTool'
+export const LIST_MCP_RESOURCES_TOOL_NAME = "ListMcpResourcesTool"
 
 export const DESCRIPTION = `
 Lists available resources from configured MCP servers.

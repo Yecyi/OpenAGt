@@ -1,41 +1,29 @@
-import { execFileSync } from 'child_process'
-import { diffLines } from 'diff'
-import { constants as fsConstants } from 'fs'
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  unlink,
-  writeFile,
-} from 'fs/promises'
-import { tmpdir } from 'os'
-import { extname, join } from 'path'
-import type { Command } from '../commands.js'
-import { queryWithModel } from '../services/api/claude.js'
-import {
-  AGENT_TOOL_NAME,
-  LEGACY_AGENT_TOOL_NAME,
-} from '../tools/AgentTool/constants.js'
-import type { LogOption } from '../types/logs.js'
-import { getClaudeConfigHomeDir } from '../utils/envUtils.js'
-import { toError } from '../utils/errors.js'
-import { execFileNoThrow } from '../utils/execFileNoThrow.js'
-import { logError } from '../utils/log.js'
-import { extractTextContent } from '../utils/messages.js'
-import { getDefaultOpusModel } from '../utils/model/model.js'
+import { execFileSync } from "child_process"
+import { diffLines } from "diff"
+import { constants as fsConstants } from "fs"
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, unlink, writeFile } from "fs/promises"
+import { tmpdir } from "os"
+import { extname, join } from "path"
+import type { Command } from "../commands.js"
+import { queryWithModel } from "../services/api/claude.js"
+import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME } from "../tools/AgentTool/constants.js"
+import type { LogOption } from "../types/logs.js"
+import { getClaudeConfigHomeDir } from "../utils/envUtils.js"
+import { toError } from "../utils/errors.js"
+import { execFileNoThrow } from "../utils/execFileNoThrow.js"
+import { logError } from "../utils/log.js"
+import { extractTextContent } from "../utils/messages.js"
+import { getDefaultOpusModel } from "../utils/model/model.js"
 import {
   getProjectsDir,
   getSessionFilesWithMtime,
   getSessionIdFromLog,
   loadAllLogsFromSessionFile,
-} from '../utils/sessionStorage.js'
-import { jsonParse, jsonStringify } from '../utils/slowOperations.js'
-import { countCharInString } from '../utils/stringUtils.js'
-import { asSystemPrompt } from '../utils/systemPromptType.js'
-import { escapeXmlAttr as escapeHtml } from '../utils/xml.js'
+} from "../utils/sessionStorage.js"
+import { jsonParse, jsonStringify } from "../utils/slowOperations.js"
+import { countCharInString } from "../utils/stringUtils.js"
+import { asSystemPrompt } from "../utils/systemPromptType.js"
+import { escapeXmlAttr as escapeHtml } from "../utils/xml.js"
 
 // Model for facet extraction and summarization (Opus - best quality)
 function getAnalysisModel(): string {
@@ -58,22 +46,16 @@ type RemoteHostInfo = {
 
 /* eslint-disable custom-rules/no-process-env-top-level */
 const getRunningRemoteHosts: () => Promise<string[]> =
-  process.env.USER_TYPE === 'ant'
+  process.env.USER_TYPE === "ant"
     ? async () => {
-        const { stdout, code } = await execFileNoThrow(
-          'coder',
-          ['list', '-o', 'json'],
-          { timeout: 30000 },
-        )
+        const { stdout, code } = await execFileNoThrow("coder", ["list", "-o", "json"], { timeout: 30000 })
         if (code !== 0) return []
         try {
           const workspaces = jsonParse(stdout) as Array<{
             name: string
             latest_build?: { status?: string }
           }>
-          return workspaces
-            .filter(w => w.latest_build?.status === 'running')
-            .map(w => w.name)
+          return workspaces.filter((w) => w.latest_build?.status === "running").map((w) => w.name)
         } catch {
           return []
         }
@@ -81,14 +63,11 @@ const getRunningRemoteHosts: () => Promise<string[]> =
     : async () => []
 
 const getRemoteHostSessionCount: (hs: string) => Promise<number> =
-  process.env.USER_TYPE === 'ant'
+  process.env.USER_TYPE === "ant"
     ? async (homespace: string) => {
         const { stdout, code } = await execFileNoThrow(
-          'ssh',
-          [
-            `${homespace}.coder`,
-            'find /root/.claude/projects -name "*.jsonl" 2>/dev/null | wc -l',
-          ],
+          "ssh",
+          [`${homespace}.coder`, 'find /root/.claude/projects -name "*.jsonl" 2>/dev/null | wc -l'],
           { timeout: 30000 },
         )
         if (code !== 0) return 0
@@ -96,22 +75,19 @@ const getRemoteHostSessionCount: (hs: string) => Promise<number> =
       }
     : async () => 0
 
-const collectFromRemoteHost: (
-  hs: string,
-  destDir: string,
-) => Promise<{ copied: number; skipped: number }> =
-  process.env.USER_TYPE === 'ant'
+const collectFromRemoteHost: (hs: string, destDir: string) => Promise<{ copied: number; skipped: number }> =
+  process.env.USER_TYPE === "ant"
     ? async (homespace: string, destDir: string) => {
         const result = { copied: 0, skipped: 0 }
 
         // Create temp directory
-        const tempDir = await mkdtemp(join(tmpdir(), 'claude-hs-'))
+        const tempDir = await mkdtemp(join(tmpdir(), "claude-hs-"))
 
         try {
           // SCP the projects folder
           const scpResult = await execFileNoThrow(
-            'scp',
-            ['-rq', `${homespace}.coder:/root/.claude/projects/`, tempDir],
+            "scp",
+            ["-rq", `${homespace}.coder:/root/.claude/projects/`, tempDir],
             { timeout: 300000 },
           )
           if (scpResult.code !== 0) {
@@ -119,7 +95,7 @@ const collectFromRemoteHost: (
             return result
           }
 
-          const projectsDir = join(tempDir, 'projects')
+          const projectsDir = join(tempDir, "projects")
           let projectDirents: Awaited<ReturnType<typeof readdir>>
           try {
             projectDirents = await readdir(projectsDir, { withFileTypes: true })
@@ -129,7 +105,7 @@ const collectFromRemoteHost: (
 
           // Merge into destination (parallel per project directory)
           await Promise.all(
-            projectDirents.map(async dirent => {
+            projectDirents.map(async (dirent) => {
               const projectName = dirent.name
               const projectPath = join(projectsDir, projectName)
 
@@ -153,9 +129,9 @@ const collectFromRemoteHost: (
                 return
               }
               await Promise.all(
-                files.map(async fileDirent => {
+                files.map(async (fileDirent) => {
                   const fileName = fileDirent.name
-                  if (!fileName.endsWith('.jsonl')) return
+                  if (!fileName.endsWith(".jsonl")) return
 
                   const srcFile = join(projectPath, fileName)
                   const destFile = join(destProjectPath, fileName)
@@ -188,7 +164,7 @@ const collectAllRemoteHostData: (destDir: string) => Promise<{
   totalCopied: number
   totalSkipped: number
 }> =
-  process.env.USER_TYPE === 'ant'
+  process.env.USER_TYPE === "ant"
     ? async (destDir: string) => {
         const rHosts = await getRunningRemoteHosts()
         const result: RemoteHostInfo[] = []
@@ -197,13 +173,10 @@ const collectAllRemoteHostData: (destDir: string) => Promise<{
 
         // Collect from all hosts in parallel (SCP per host can take seconds)
         const hostResults = await Promise.all(
-          rHosts.map(async hs => {
+          rHosts.map(async (hs) => {
             const sessionCount = await getRemoteHostSessionCount(hs)
             if (sessionCount > 0) {
-              const { copied, skipped } = await collectFromRemoteHost(
-                hs,
-                destDir,
-              )
+              const { copied, skipped } = await collectFromRemoteHost(hs, destDir)
               return { name: hs, sessionCount, copied, skipped }
             }
             return { name: hs, sessionCount, copied: 0, skipped: 0 }
@@ -330,101 +303,101 @@ type AggregatedData = {
 // ============================================================================
 
 const EXTENSION_TO_LANGUAGE: Record<string, string> = {
-  '.ts': 'TypeScript',
-  '.tsx': 'TypeScript',
-  '.js': 'JavaScript',
-  '.jsx': 'JavaScript',
-  '.py': 'Python',
-  '.rb': 'Ruby',
-  '.go': 'Go',
-  '.rs': 'Rust',
-  '.java': 'Java',
-  '.md': 'Markdown',
-  '.json': 'JSON',
-  '.yaml': 'YAML',
-  '.yml': 'YAML',
-  '.sh': 'Shell',
-  '.css': 'CSS',
-  '.html': 'HTML',
+  ".ts": "TypeScript",
+  ".tsx": "TypeScript",
+  ".js": "JavaScript",
+  ".jsx": "JavaScript",
+  ".py": "Python",
+  ".rb": "Ruby",
+  ".go": "Go",
+  ".rs": "Rust",
+  ".java": "Java",
+  ".md": "Markdown",
+  ".json": "JSON",
+  ".yaml": "YAML",
+  ".yml": "YAML",
+  ".sh": "Shell",
+  ".css": "CSS",
+  ".html": "HTML",
 }
 
 // Label map for cleaning up category names (matching Python reference)
 const LABEL_MAP: Record<string, string> = {
   // Goal categories
-  debug_investigate: 'Debug/Investigate',
-  implement_feature: 'Implement Feature',
-  fix_bug: 'Fix Bug',
-  write_script_tool: 'Write Script/Tool',
-  refactor_code: 'Refactor Code',
-  configure_system: 'Configure System',
-  create_pr_commit: 'Create PR/Commit',
-  analyze_data: 'Analyze Data',
-  understand_codebase: 'Understand Codebase',
-  write_tests: 'Write Tests',
-  write_docs: 'Write Docs',
-  deploy_infra: 'Deploy/Infra',
-  warmup_minimal: 'Cache Warmup',
+  debug_investigate: "Debug/Investigate",
+  implement_feature: "Implement Feature",
+  fix_bug: "Fix Bug",
+  write_script_tool: "Write Script/Tool",
+  refactor_code: "Refactor Code",
+  configure_system: "Configure System",
+  create_pr_commit: "Create PR/Commit",
+  analyze_data: "Analyze Data",
+  understand_codebase: "Understand Codebase",
+  write_tests: "Write Tests",
+  write_docs: "Write Docs",
+  deploy_infra: "Deploy/Infra",
+  warmup_minimal: "Cache Warmup",
   // Success factors
-  fast_accurate_search: 'Fast/Accurate Search',
-  correct_code_edits: 'Correct Code Edits',
-  good_explanations: 'Good Explanations',
-  proactive_help: 'Proactive Help',
-  multi_file_changes: 'Multi-file Changes',
-  handled_complexity: 'Multi-file Changes',
-  good_debugging: 'Good Debugging',
+  fast_accurate_search: "Fast/Accurate Search",
+  correct_code_edits: "Correct Code Edits",
+  good_explanations: "Good Explanations",
+  proactive_help: "Proactive Help",
+  multi_file_changes: "Multi-file Changes",
+  handled_complexity: "Multi-file Changes",
+  good_debugging: "Good Debugging",
   // Friction types
-  misunderstood_request: 'Misunderstood Request',
-  wrong_approach: 'Wrong Approach',
-  buggy_code: 'Buggy Code',
-  user_rejected_action: 'User Rejected Action',
-  claude_got_blocked: 'Claude Got Blocked',
-  user_stopped_early: 'User Stopped Early',
-  wrong_file_or_location: 'Wrong File/Location',
-  excessive_changes: 'Excessive Changes',
-  slow_or_verbose: 'Slow/Verbose',
-  tool_failed: 'Tool Failed',
-  user_unclear: 'User Unclear',
-  external_issue: 'External Issue',
+  misunderstood_request: "Misunderstood Request",
+  wrong_approach: "Wrong Approach",
+  buggy_code: "Buggy Code",
+  user_rejected_action: "User Rejected Action",
+  claude_got_blocked: "Claude Got Blocked",
+  user_stopped_early: "User Stopped Early",
+  wrong_file_or_location: "Wrong File/Location",
+  excessive_changes: "Excessive Changes",
+  slow_or_verbose: "Slow/Verbose",
+  tool_failed: "Tool Failed",
+  user_unclear: "User Unclear",
+  external_issue: "External Issue",
   // Satisfaction labels
-  frustrated: 'Frustrated',
-  dissatisfied: 'Dissatisfied',
-  likely_satisfied: 'Likely Satisfied',
-  satisfied: 'Satisfied',
-  happy: 'Happy',
-  unsure: 'Unsure',
-  neutral: 'Neutral',
-  delighted: 'Delighted',
+  frustrated: "Frustrated",
+  dissatisfied: "Dissatisfied",
+  likely_satisfied: "Likely Satisfied",
+  satisfied: "Satisfied",
+  happy: "Happy",
+  unsure: "Unsure",
+  neutral: "Neutral",
+  delighted: "Delighted",
   // Session types
-  single_task: 'Single Task',
-  multi_task: 'Multi Task',
-  iterative_refinement: 'Iterative Refinement',
-  exploration: 'Exploration',
-  quick_question: 'Quick Question',
+  single_task: "Single Task",
+  multi_task: "Multi Task",
+  iterative_refinement: "Iterative Refinement",
+  exploration: "Exploration",
+  quick_question: "Quick Question",
   // Outcomes
-  fully_achieved: 'Fully Achieved',
-  mostly_achieved: 'Mostly Achieved',
-  partially_achieved: 'Partially Achieved',
-  not_achieved: 'Not Achieved',
-  unclear_from_transcript: 'Unclear',
+  fully_achieved: "Fully Achieved",
+  mostly_achieved: "Mostly Achieved",
+  partially_achieved: "Partially Achieved",
+  not_achieved: "Not Achieved",
+  unclear_from_transcript: "Unclear",
   // Helpfulness
-  unhelpful: 'Unhelpful',
-  slightly_helpful: 'Slightly Helpful',
-  moderately_helpful: 'Moderately Helpful',
-  very_helpful: 'Very Helpful',
-  essential: 'Essential',
+  unhelpful: "Unhelpful",
+  slightly_helpful: "Slightly Helpful",
+  moderately_helpful: "Moderately Helpful",
+  very_helpful: "Very Helpful",
+  essential: "Essential",
 }
 
 // Lazy getters: getClaudeConfigHomeDir() is memoized and reads process.env.
 // Calling it at module scope would populate the memoize cache before
 // entrypoints can set CLAUDE_CONFIG_DIR, breaking all 150+ other callers.
 function getDataDir(): string {
-  return join(getClaudeConfigHomeDir(), 'usage-data')
+  return join(getClaudeConfigHomeDir(), "usage-data")
 }
 function getFacetsDir(): string {
-  return join(getDataDir(), 'facets')
+  return join(getDataDir(), "facets")
 }
 function getSessionMetaDir(): string {
-  return join(getDataDir(), 'session-meta')
+  return join(getDataDir(), "session-meta")
 }
 
 const FACET_EXTRACTION_PROMPT = `Analyze this Claude Code session and extract structured facets.
@@ -516,7 +489,7 @@ function extractToolStats(log: LogOption): {
     // Get message timestamp for response time calculation
     const msgTimestamp = (msg as { timestamp?: string }).timestamp
 
-    if (msg.type === 'assistant' && msg.message) {
+    if (msg.type === "assistant" && msg.message) {
       // Track timestamp for response time calculation
       if (msgTimestamp) {
         lastAssistantTimestamp = msgTimestamp
@@ -535,38 +508,34 @@ function extractToolStats(log: LogOption): {
       const content = msg.message.content
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'tool_use' && 'name' in block) {
+          if (block.type === "tool_use" && "name" in block) {
             const toolName = block.name as string
             toolCounts[toolName] = (toolCounts[toolName] || 0) + 1
 
             // Check for special tool usage
-            if (
-              toolName === AGENT_TOOL_NAME ||
-              toolName === LEGACY_AGENT_TOOL_NAME
-            )
-              usesTaskAgent = true
-            if (toolName.startsWith('mcp__')) usesMcp = true
-            if (toolName === 'WebSearch') usesWebSearch = true
-            if (toolName === 'WebFetch') usesWebFetch = true
+            if (toolName === AGENT_TOOL_NAME || toolName === LEGACY_AGENT_TOOL_NAME) usesTaskAgent = true
+            if (toolName.startsWith("mcp__")) usesMcp = true
+            if (toolName === "WebSearch") usesWebSearch = true
+            if (toolName === "WebFetch") usesWebFetch = true
 
             const input = (block as { input?: Record<string, unknown> }).input
 
             if (input) {
-              const filePath = (input.file_path as string) || ''
+              const filePath = (input.file_path as string) || ""
               if (filePath) {
                 const lang = getLanguageFromPath(filePath)
                 if (lang) {
                   languages[lang] = (languages[lang] || 0) + 1
                 }
                 // Track files modified by Edit/Write tools
-                if (toolName === 'Edit' || toolName === 'Write') {
+                if (toolName === "Edit" || toolName === "Write") {
                   filesModified.add(filePath)
                 }
               }
 
-              if (toolName === 'Edit') {
-                const oldString = (input.old_string as string) || ''
-                const newString = (input.new_string as string) || ''
+              if (toolName === "Edit") {
+                const oldString = (input.old_string as string) || ""
+                const newString = (input.new_string as string) || ""
                 for (const change of diffLines(oldString, newString)) {
                   if (change.added) linesAdded += change.count || 0
                   if (change.removed) linesRemoved += change.count || 0
@@ -574,16 +543,16 @@ function extractToolStats(log: LogOption): {
               }
 
               // Track lines from Write tool (all added)
-              if (toolName === 'Write') {
-                const writeContent = (input.content as string) || ''
+              if (toolName === "Write") {
+                const writeContent = (input.content as string) || ""
                 if (writeContent) {
-                  linesAdded += countCharInString(writeContent, '\n') + 1
+                  linesAdded += countCharInString(writeContent, "\n") + 1
                 }
               }
 
-              const command = (input.command as string) || ''
-              if (command.includes('git commit')) gitCommits++
-              if (command.includes('git push')) gitPushes++
+              const command = (input.command as string) || ""
+              if (command.includes("git commit")) gitCommits++
+              if (command.includes("git push")) gitPushes++
             }
           }
         }
@@ -591,17 +560,17 @@ function extractToolStats(log: LogOption): {
     }
 
     // Check user messages
-    if (msg.type === 'user' && msg.message) {
+    if (msg.type === "user" && msg.message) {
       const content = msg.message.content
 
       // Check if this is an actual human message (has text) vs just tool_result
       // matching Python reference logic
       let isHumanMessage = false
-      if (typeof content === 'string' && content.trim()) {
+      if (typeof content === "string" && content.trim()) {
         isHumanMessage = true
       } else if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && 'text' in block) {
+          if (block.type === "text" && "text" in block) {
             isHumanMessage = true
             break
           }
@@ -639,60 +608,50 @@ function extractToolStats(log: LogOption): {
       // Process tool results (for error tracking)
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'tool_result' && 'content' in block) {
+          if (block.type === "tool_result" && "content" in block) {
             const isError = (block as { is_error?: boolean }).is_error
 
             // Count and categorize tool errors (matching Python reference logic)
             if (isError) {
               toolErrors++
               const resultContent = (block as { content?: string }).content
-              let category = 'Other'
-              if (typeof resultContent === 'string') {
+              let category = "Other"
+              if (typeof resultContent === "string") {
                 const lowerContent = resultContent.toLowerCase()
-                if (lowerContent.includes('exit code')) {
-                  category = 'Command Failed'
+                if (lowerContent.includes("exit code")) {
+                  category = "Command Failed"
+                } else if (lowerContent.includes("rejected") || lowerContent.includes("doesn't want")) {
+                  category = "User Rejected"
                 } else if (
-                  lowerContent.includes('rejected') ||
-                  lowerContent.includes("doesn't want")
+                  lowerContent.includes("string to replace not found") ||
+                  lowerContent.includes("no changes")
                 ) {
-                  category = 'User Rejected'
-                } else if (
-                  lowerContent.includes('string to replace not found') ||
-                  lowerContent.includes('no changes')
-                ) {
-                  category = 'Edit Failed'
-                } else if (lowerContent.includes('modified since read')) {
-                  category = 'File Changed'
-                } else if (
-                  lowerContent.includes('exceeds maximum') ||
-                  lowerContent.includes('too large')
-                ) {
-                  category = 'File Too Large'
-                } else if (
-                  lowerContent.includes('file not found') ||
-                  lowerContent.includes('does not exist')
-                ) {
-                  category = 'File Not Found'
+                  category = "Edit Failed"
+                } else if (lowerContent.includes("modified since read")) {
+                  category = "File Changed"
+                } else if (lowerContent.includes("exceeds maximum") || lowerContent.includes("too large")) {
+                  category = "File Too Large"
+                } else if (lowerContent.includes("file not found") || lowerContent.includes("does not exist")) {
+                  category = "File Not Found"
                 }
               }
-              toolErrorCategories[category] =
-                (toolErrorCategories[category] || 0) + 1
+              toolErrorCategories[category] = (toolErrorCategories[category] || 0) + 1
             }
           }
         }
       }
 
       // Check for interruptions (matching Python reference)
-      if (typeof content === 'string') {
-        if (content.includes('[Request interrupted by user')) {
+      if (typeof content === "string") {
+        if (content.includes("[Request interrupted by user")) {
           userInterruptions++
         }
       } else if (Array.isArray(content)) {
         for (const block of content) {
           if (
-            block.type === 'text' &&
-            'text' in block &&
-            (block.text as string).includes('[Request interrupted by user')
+            block.type === "text" &&
+            "text" in block &&
+            (block.text as string).includes("[Request interrupted by user")
           ) {
             userInterruptions++
             break
@@ -728,34 +687,29 @@ function extractToolStats(log: LogOption): {
 }
 
 function hasValidDates(log: LogOption): boolean {
-  return (
-    !Number.isNaN(log.created.getTime()) &&
-    !Number.isNaN(log.modified.getTime())
-  )
+  return !Number.isNaN(log.created.getTime()) && !Number.isNaN(log.modified.getTime())
 }
 
 function logToSessionMeta(log: LogOption): SessionMeta {
   const stats = extractToolStats(log)
-  const sessionId = getSessionIdFromLog(log) || 'unknown'
+  const sessionId = getSessionIdFromLog(log) || "unknown"
   const startTime = log.created.toISOString()
-  const durationMinutes = Math.round(
-    (log.modified.getTime() - log.created.getTime()) / 1000 / 60,
-  )
+  const durationMinutes = Math.round((log.modified.getTime() - log.created.getTime()) / 1000 / 60)
 
   let userMessageCount = 0
   let assistantMessageCount = 0
   for (const msg of log.messages) {
-    if (msg.type === 'assistant') assistantMessageCount++
+    if (msg.type === "assistant") assistantMessageCount++
     // Only count user messages that have actual text content (human messages)
     // not just tool_result messages (matching Python reference)
-    if (msg.type === 'user' && msg.message) {
+    if (msg.type === "user" && msg.message) {
       const content = msg.message.content
       let isHumanMessage = false
-      if (typeof content === 'string' && content.trim()) {
+      if (typeof content === "string" && content.trim()) {
         isHumanMessage = true
       } else if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && 'text' in block) {
+          if (block.type === "text" && "text" in block) {
             isHumanMessage = true
             break
           }
@@ -769,7 +723,7 @@ function logToSessionMeta(log: LogOption): SessionMeta {
 
   return {
     session_id: sessionId,
-    project_path: log.projectPath || '',
+    project_path: log.projectPath || "",
     start_time: startTime,
     duration_minutes: durationMinutes,
     user_message_count: userMessageCount,
@@ -780,7 +734,7 @@ function logToSessionMeta(log: LogOption): SessionMeta {
     git_pushes: stats.gitPushes,
     input_tokens: stats.inputTokens,
     output_tokens: stats.outputTokens,
-    first_prompt: log.firstPrompt || '',
+    first_prompt: log.firstPrompt || "",
     summary: log.summary,
     // New stats
     user_interruptions: stats.userInterruptions,
@@ -836,27 +790,27 @@ function formatTranscriptForFacets(log: LogOption): string {
   lines.push(`Date: ${meta.start_time}`)
   lines.push(`Project: ${meta.project_path}`)
   lines.push(`Duration: ${meta.duration_minutes} min`)
-  lines.push('')
+  lines.push("")
 
   for (const msg of log.messages) {
-    if (msg.type === 'user' && msg.message) {
+    if (msg.type === "user" && msg.message) {
       const content = msg.message.content
-      if (typeof content === 'string') {
+      if (typeof content === "string") {
         lines.push(`[User]: ${content.slice(0, 500)}`)
       } else if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && 'text' in block) {
+          if (block.type === "text" && "text" in block) {
             lines.push(`[User]: ${(block.text as string).slice(0, 500)}`)
           }
         }
       }
-    } else if (msg.type === 'assistant' && msg.message) {
+    } else if (msg.type === "assistant" && msg.message) {
       const content = msg.message.content
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && 'text' in block) {
+          if (block.type === "text" && "text" in block) {
             lines.push(`[Assistant]: ${(block.text as string).slice(0, 300)}`)
-          } else if (block.type === 'tool_use' && 'name' in block) {
+          } else if (block.type === "tool_use" && "name" in block) {
             lines.push(`[Tool: ${block.name}]`)
           }
         }
@@ -864,7 +818,7 @@ function formatTranscriptForFacets(log: LogOption): string {
     }
   }
 
-  return lines.join('\n')
+  return lines.join("\n")
 }
 
 const SUMMARIZE_CHUNK_PROMPT = `Summarize this portion of a Claude Code session transcript. Focus on:
@@ -886,7 +840,7 @@ async function summarizeTranscriptChunk(chunk: string): Promise<string> {
       signal: new AbortController().signal,
       options: {
         model: getAnalysisModel(),
-        querySource: 'insights',
+        querySource: "insights",
         agents: [],
         isNonInteractiveSession: true,
         hasAppendSystemPrompt: false,
@@ -903,9 +857,7 @@ async function summarizeTranscriptChunk(chunk: string): Promise<string> {
   }
 }
 
-async function formatTranscriptWithSummarization(
-  log: LogOption,
-): Promise<string> {
+async function formatTranscriptWithSummarization(log: LogOption): Promise<string> {
   const fullTranscript = formatTranscriptForFacets(log)
 
   // If under 30k chars, use as-is
@@ -932,18 +884,16 @@ async function formatTranscriptWithSummarization(
     `Project: ${meta.project_path}`,
     `Duration: ${meta.duration_minutes} min`,
     `[Long session - ${chunks.length} parts summarized]`,
-    '',
-  ].join('\n')
+    "",
+  ].join("\n")
 
-  return header + summaries.join('\n\n---\n\n')
+  return header + summaries.join("\n\n---\n\n")
 }
 
-async function loadCachedFacets(
-  sessionId: string,
-): Promise<SessionFacets | null> {
+async function loadCachedFacets(sessionId: string): Promise<SessionFacets | null> {
   const facetPath = join(getFacetsDir(), `${sessionId}.json`)
   try {
-    const content = await readFile(facetPath, { encoding: 'utf-8' })
+    const content = await readFile(facetPath, { encoding: "utf-8" })
     const parsed: unknown = jsonParse(content)
     if (!isValidSessionFacets(parsed)) {
       // Delete corrupted cache file so it gets re-extracted next run
@@ -968,17 +918,15 @@ async function saveFacets(facets: SessionFacets): Promise<void> {
   }
   const facetPath = join(getFacetsDir(), `${facets.session_id}.json`)
   await writeFile(facetPath, jsonStringify(facets, null, 2), {
-    encoding: 'utf-8',
+    encoding: "utf-8",
     mode: 0o600,
   })
 }
 
-async function loadCachedSessionMeta(
-  sessionId: string,
-): Promise<SessionMeta | null> {
+async function loadCachedSessionMeta(sessionId: string): Promise<SessionMeta | null> {
   const metaPath = join(getSessionMetaDir(), `${sessionId}.json`)
   try {
-    const content = await readFile(metaPath, { encoding: 'utf-8' })
+    const content = await readFile(metaPath, { encoding: "utf-8" })
     return jsonParse(content)
   } catch {
     return null
@@ -993,15 +941,12 @@ async function saveSessionMeta(meta: SessionMeta): Promise<void> {
   }
   const metaPath = join(getSessionMetaDir(), `${meta.session_id}.json`)
   await writeFile(metaPath, jsonStringify(meta, null, 2), {
-    encoding: 'utf-8',
+    encoding: "utf-8",
     mode: 0o600,
   })
 }
 
-async function extractFacetsFromAPI(
-  log: LogOption,
-  sessionId: string,
-): Promise<SessionFacets | null> {
+async function extractFacetsFromAPI(log: LogOption, sessionId: string): Promise<SessionFacets | null> {
   try {
     // Use summarization for long transcripts
     const transcript = await formatTranscriptWithSummarization(log)
@@ -1029,7 +974,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
       signal: new AbortController().signal,
       options: {
         model: getAnalysisModel(),
-        querySource: 'insights',
+        querySource: "insights",
         agents: [],
         isNonInteractiveSession: true,
         hasAppendSystemPrompt: false,
@@ -1096,10 +1041,7 @@ export function detectMultiClauding(
     const msg = allSessionMessages[i]!
 
     // Shrink window from the left
-    while (
-      windowStart < i &&
-      msg.ts - allSessionMessages[windowStart]!.ts > OVERLAP_WINDOW_MS
-    ) {
+    while (windowStart < i && msg.ts - allSessionMessages[windowStart]!.ts > OVERLAP_WINDOW_MS) {
       const expiring = allSessionMessages[windowStart]!
       if (sessionLastIndex.get(expiring.sessionId) === windowStart) {
         sessionLastIndex.delete(expiring.sessionId)
@@ -1113,11 +1055,9 @@ export function detectMultiClauding(
       for (let j = prevIndex + 1; j < i; j++) {
         const between = allSessionMessages[j]!
         if (between.sessionId !== msg.sessionId) {
-          const pair = [msg.sessionId, between.sessionId].sort().join(':')
+          const pair = [msg.sessionId, between.sessionId].sort().join(":")
           multiClaudeSessionPairs.add(pair)
-          messagesDuringMulticlaude.add(
-            `${allSessionMessages[prevIndex]!.ts}:${msg.sessionId}`,
-          )
+          messagesDuringMulticlaude.add(`${allSessionMessages[prevIndex]!.ts}:${msg.sessionId}`)
           messagesDuringMulticlaude.add(`${between.ts}:${between.sessionId}`)
           messagesDuringMulticlaude.add(`${msg.ts}:${msg.sessionId}`)
           break
@@ -1130,7 +1070,7 @@ export function detectMultiClauding(
 
   const sessionsWithOverlaps = new Set<string>()
   for (const pair of multiClaudeSessionPairs) {
-    const [s1, s2] = pair.split(':')
+    const [s1, s2] = pair.split(":")
     if (s1) sessionsWithOverlaps.add(s1)
     if (s2) sessionsWithOverlaps.add(s2)
   }
@@ -1142,14 +1082,11 @@ export function detectMultiClauding(
   }
 }
 
-function aggregateData(
-  sessions: SessionMeta[],
-  facets: Map<string, SessionFacets>,
-): AggregatedData {
+function aggregateData(sessions: SessionMeta[], facets: Map<string, SessionFacets>): AggregatedData {
   const result: AggregatedData = {
     total_sessions: sessions.length,
     sessions_with_facets: facets.size,
-    date_range: { start: '', end: '' },
+    date_range: { start: "", end: "" },
     total_messages: 0,
     total_duration_hours: 0,
     total_input_tokens: 0,
@@ -1210,8 +1147,7 @@ function aggregateData(
     result.total_interruptions += session.user_interruptions
     result.total_tool_errors += session.tool_errors
     for (const [cat, count] of Object.entries(session.tool_error_categories)) {
-      result.tool_error_categories[cat] =
-        (result.tool_error_categories[cat] || 0) + count
+      result.tool_error_categories[cat] = (result.tool_error_categories[cat] || 0) + count
     }
     allResponseTimes.push(...session.user_response_times)
     if (session.uses_task_agent) result.sessions_using_task_agent++
@@ -1234,8 +1170,7 @@ function aggregateData(
     }
 
     if (session.project_path) {
-      result.projects[session.project_path] =
-        (result.projects[session.project_path] || 0) + 1
+      result.projects[session.project_path] = (result.projects[session.project_path] || 0) + 1
     }
 
     const sessionFacets = facets.get(session.session_id)
@@ -1243,19 +1178,15 @@ function aggregateData(
       // Goal categories
       for (const [cat, count] of safeEntries(sessionFacets.goal_categories)) {
         if (count > 0) {
-          result.goal_categories[cat] =
-            (result.goal_categories[cat] || 0) + count
+          result.goal_categories[cat] = (result.goal_categories[cat] || 0) + count
         }
       }
 
       // Outcomes
-      result.outcomes[sessionFacets.outcome] =
-        (result.outcomes[sessionFacets.outcome] || 0) + 1
+      result.outcomes[sessionFacets.outcome] = (result.outcomes[sessionFacets.outcome] || 0) + 1
 
       // Satisfaction counts
-      for (const [level, count] of safeEntries(
-        sessionFacets.user_satisfaction_counts,
-      )) {
+      for (const [level, count] of safeEntries(sessionFacets.user_satisfaction_counts)) {
         if (count > 0) {
           result.satisfaction[level] = (result.satisfaction[level] || 0) + count
         }
@@ -1266,8 +1197,7 @@ function aggregateData(
         (result.helpfulness[sessionFacets.claude_helpfulness] || 0) + 1
 
       // Session types
-      result.session_types[sessionFacets.session_type] =
-        (result.session_types[sessionFacets.session_type] || 0) + 1
+      result.session_types[sessionFacets.session_type] = (result.session_types[sessionFacets.session_type] || 0) + 1
 
       // Friction counts
       for (const [type, count] of safeEntries(sessionFacets.friction_counts)) {
@@ -1277,16 +1207,15 @@ function aggregateData(
       }
 
       // Success factors
-      if (sessionFacets.primary_success !== 'none') {
-        result.success[sessionFacets.primary_success] =
-          (result.success[sessionFacets.primary_success] || 0) + 1
+      if (sessionFacets.primary_success !== "none") {
+        result.success[sessionFacets.primary_success] = (result.success[sessionFacets.primary_success] || 0) + 1
       }
     }
 
     if (result.session_summaries.length < 50) {
       result.session_summaries.push({
         id: session.session_id.slice(0, 8),
-        date: session.start_time.split('T')[0] || '',
+        date: session.start_time.split("T")[0] || "",
         summary: session.summary || session.first_prompt.slice(0, 100),
         goal: sessionFacets?.underlying_goal,
       })
@@ -1294,25 +1223,22 @@ function aggregateData(
   }
 
   dates.sort()
-  result.date_range.start = dates[0]?.split('T')[0] || ''
-  result.date_range.end = dates[dates.length - 1]?.split('T')[0] || ''
+  result.date_range.start = dates[0]?.split("T")[0] || ""
+  result.date_range.end = dates[dates.length - 1]?.split("T")[0] || ""
 
   // Calculate response time stats
   result.user_response_times = allResponseTimes
   if (allResponseTimes.length > 0) {
     const sorted = [...allResponseTimes].sort((a, b) => a - b)
     result.median_response_time = sorted[Math.floor(sorted.length / 2)] || 0
-    result.avg_response_time =
-      allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length
+    result.avg_response_time = allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length
   }
 
   // Calculate days active and messages per day
-  const uniqueDays = new Set(dates.map(d => d.split('T')[0]))
+  const uniqueDays = new Set(dates.map((d) => d.split("T")[0]))
   result.days_active = uniqueDays.size
   result.messages_per_day =
-    result.days_active > 0
-      ? Math.round((result.total_messages / result.days_active) * 10) / 10
-      : 0
+    result.days_active > 0 ? Math.round((result.total_messages / result.days_active) * 10) / 10 : 0
 
   // Store message hours for time-of-day chart
   result.message_hours = allMessageHours
@@ -1335,7 +1261,7 @@ type InsightSection = {
 // Sections that run in parallel first
 const INSIGHT_SECTIONS: InsightSection[] = [
   {
-    name: 'project_areas',
+    name: "project_areas",
     prompt: `Analyze this Claude Code usage data and identify project areas.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1349,7 +1275,7 @@ Include 4-5 areas. Skip internal CC operations.`,
     maxTokens: 8192,
   },
   {
-    name: 'interaction_style',
+    name: "interaction_style",
     prompt: `Analyze this Claude Code usage data and describe the user's interaction style.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1360,7 +1286,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
     maxTokens: 8192,
   },
   {
-    name: 'what_works',
+    name: "what_works",
     prompt: `Analyze this Claude Code usage data and identify what's working well for this user. Use second person ("you").
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1375,7 +1301,7 @@ Include 3 impressive workflows.`,
     maxTokens: 8192,
   },
   {
-    name: 'friction_analysis',
+    name: "friction_analysis",
     prompt: `Analyze this Claude Code usage data and identify friction points for this user. Use second person ("you").
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1390,7 +1316,7 @@ Include 3 friction categories with 2 examples each.`,
     maxTokens: 8192,
   },
   {
-    name: 'suggestions',
+    name: "suggestions",
     prompt: `Analyze this Claude Code usage data and suggest improvements.
 
 ## CC FEATURES REFERENCE (pick from these for features_to_try):
@@ -1433,7 +1359,7 @@ IMPORTANT for features_to_try: Pick 2-3 from the CC FEATURES REFERENCE above. In
     maxTokens: 8192,
   },
   {
-    name: 'on_the_horizon',
+    name: "on_the_horizon",
     prompt: `Analyze this Claude Code usage data and identify future opportunities.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1447,10 +1373,10 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 Include 3 opportunities. Think BIG - autonomous workflows, parallel agents, iterating against tests.`,
     maxTokens: 8192,
   },
-  ...(process.env.USER_TYPE === 'ant'
+  ...(process.env.USER_TYPE === "ant"
     ? [
         {
-          name: 'cc_team_improvements',
+          name: "cc_team_improvements",
           prompt: `Analyze this Claude Code usage data and suggest product improvements for the CC team.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1464,7 +1390,7 @@ Include 2-3 improvements based on friction patterns observed.`,
           maxTokens: 8192,
         },
         {
-          name: 'model_behavior_improvements',
+          name: "model_behavior_improvements",
           prompt: `Analyze this Claude Code usage data and suggest model behavior improvements.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1480,7 +1406,7 @@ Include 2-3 improvements based on friction patterns observed.`,
       ]
     : []),
   {
-    name: 'fun_ending',
+    name: "fun_ending",
     prompt: `Analyze this Claude Code usage data and find a memorable moment.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
@@ -1576,11 +1502,11 @@ async function generateSectionInsight(
   try {
     const result = await queryWithModel({
       systemPrompt: asSystemPrompt([]),
-      userPrompt: section.prompt + '\n\nDATA:\n' + dataContext,
+      userPrompt: section.prompt + "\n\nDATA:\n" + dataContext,
       signal: new AbortController().signal,
       options: {
         model: getInsightsModel(),
-        querySource: 'insights',
+        querySource: "insights",
         agents: [],
         isNonInteractiveSession: true,
         hasAppendSystemPrompt: false,
@@ -1616,20 +1542,20 @@ async function generateParallelInsights(
   // Build data context string
   const facetSummaries = Array.from(facets.values())
     .slice(0, 50)
-    .map(f => `- ${f.brief_summary} (${f.outcome}, ${f.claude_helpfulness})`)
-    .join('\n')
+    .map((f) => `- ${f.brief_summary} (${f.outcome}, ${f.claude_helpfulness})`)
+    .join("\n")
 
   const frictionDetails = Array.from(facets.values())
-    .filter(f => f.friction_detail)
+    .filter((f) => f.friction_detail)
     .slice(0, 20)
-    .map(f => `- ${f.friction_detail}`)
-    .join('\n')
+    .map((f) => `- ${f.friction_detail}`)
+    .join("\n")
 
   const userInstructions = Array.from(facets.values())
-    .flatMap(f => f.user_instructions_to_claude || [])
+    .flatMap((f) => f.user_instructions_to_claude || [])
     .slice(0, 15)
-    .map(i => `- ${i}`)
-    .join('\n')
+    .map((i) => `- ${i}`)
+    .join("\n")
 
   const dataContext = jsonStringify(
     {
@@ -1657,19 +1583,15 @@ async function generateParallelInsights(
 
   const fullContext =
     dataContext +
-    '\n\nSESSION SUMMARIES:\n' +
+    "\n\nSESSION SUMMARIES:\n" +
     facetSummaries +
-    '\n\nFRICTION DETAILS:\n' +
+    "\n\nFRICTION DETAILS:\n" +
     frictionDetails +
-    '\n\nUSER INSTRUCTIONS TO CLAUDE:\n' +
-    (userInstructions || 'None captured')
+    "\n\nUSER INSTRUCTIONS TO CLAUDE:\n" +
+    (userInstructions || "None captured")
 
   // Run sections in parallel first (excluding at_a_glance)
-  const results = await Promise.all(
-    INSIGHT_SECTIONS.map(section =>
-      generateSectionInsight(section, fullContext),
-    ),
-  )
+  const results = await Promise.all(INSIGHT_SECTIONS.map((section) => generateSectionInsight(section, fullContext)))
 
   // Combine results
   const insights: InsightResults = {}
@@ -1686,8 +1608,8 @@ async function generateParallelInsights(
         areas?: Array<{ name: string; description: string }>
       }
     )?.areas
-      ?.map(a => `- ${a.name}: ${a.description}`)
-      .join('\n') || ''
+      ?.map((a) => `- ${a.name}: ${a.description}`)
+      .join("\n") || ""
 
   const bigWinsText =
     (
@@ -1695,8 +1617,8 @@ async function generateParallelInsights(
         impressive_workflows?: Array<{ title: string; description: string }>
       }
     )?.impressive_workflows
-      ?.map(w => `- ${w.title}: ${w.description}`)
-      .join('\n') || ''
+      ?.map((w) => `- ${w.title}: ${w.description}`)
+      .join("\n") || ""
 
   const frictionText =
     (
@@ -1704,8 +1626,8 @@ async function generateParallelInsights(
         categories?: Array<{ category: string; description: string }>
       }
     )?.categories
-      ?.map(c => `- ${c.category}: ${c.description}`)
-      .join('\n') || ''
+      ?.map((c) => `- ${c.category}: ${c.description}`)
+      .join("\n") || ""
 
   const featuresText =
     (
@@ -1713,8 +1635,8 @@ async function generateParallelInsights(
         features_to_try?: Array<{ feature: string; one_liner: string }>
       }
     )?.features_to_try
-      ?.map(f => `- ${f.feature}: ${f.one_liner}`)
-      .join('\n') || ''
+      ?.map((f) => `- ${f.feature}: ${f.one_liner}`)
+      .join("\n") || ""
 
   const patternsText =
     (
@@ -1722,8 +1644,8 @@ async function generateParallelInsights(
         usage_patterns?: Array<{ title: string; suggestion: string }>
       }
     )?.usage_patterns
-      ?.map(p => `- ${p.title}: ${p.suggestion}`)
-      .join('\n') || ''
+      ?.map((p) => `- ${p.title}: ${p.suggestion}`)
+      .join("\n") || ""
 
   const horizonText =
     (
@@ -1731,8 +1653,8 @@ async function generateParallelInsights(
         opportunities?: Array<{ title: string; whats_possible: string }>
       }
     )?.opportunities
-      ?.map(o => `- ${o.title}: ${o.whats_possible}`)
-      .join('\n') || ''
+      ?.map((o) => `- ${o.title}: ${o.whats_possible}`)
+      .join("\n") || ""
 
   // Now generate "At a Glance" with access to other sections' outputs
   const atAGlancePrompt = `You're writing an "At a Glance" summary for a Claude Code usage insights report for Claude Code users. The goal is to help them understand their usage and improve how they can use Claude better, especially as models improve.
@@ -1779,12 +1701,12 @@ ${patternsText}
 ${horizonText}`
 
   const atAGlanceSection: InsightSection = {
-    name: 'at_a_glance',
+    name: "at_a_glance",
     prompt: atAGlancePrompt,
     maxTokens: 8192,
   }
 
-  const atAGlanceResult = await generateSectionInsight(atAGlanceSection, '')
+  const atAGlanceResult = await generateSectionInsight(atAGlanceSection, "")
   if (atAGlanceResult.result) {
     insights.at_a_glance = atAGlanceResult.result as {
       whats_working?: string
@@ -1800,40 +1722,28 @@ ${horizonText}`
 // Escape HTML but render **bold** as <strong>
 function escapeHtmlWithBold(text: string): string {
   const escaped = escapeHtml(text)
-  return escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  return escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
 }
 
 // Fixed orderings for specific charts (matching Python reference)
-const SATISFACTION_ORDER = [
-  'frustrated',
-  'dissatisfied',
-  'likely_satisfied',
-  'satisfied',
-  'happy',
-  'unsure',
-]
+const SATISFACTION_ORDER = ["frustrated", "dissatisfied", "likely_satisfied", "satisfied", "happy", "unsure"]
 
 const OUTCOME_ORDER = [
-  'not_achieved',
-  'partially_achieved',
-  'mostly_achieved',
-  'fully_achieved',
-  'unclear_from_transcript',
+  "not_achieved",
+  "partially_achieved",
+  "mostly_achieved",
+  "fully_achieved",
+  "unclear_from_transcript",
 ]
 
-function generateBarChart(
-  data: Record<string, number>,
-  color: string,
-  maxItems = 6,
-  fixedOrder?: string[],
-): string {
+function generateBarChart(data: Record<string, number>, color: string, maxItems = 6, fixedOrder?: string[]): string {
   let entries: [string, number][]
 
   if (fixedOrder) {
     // Use fixed order, only including items that exist in data
     entries = fixedOrder
-      .filter(key => key in data && (data[key] ?? 0) > 0)
-      .map(key => [key, data[key] ?? 0] as [string, number])
+      .filter((key) => key in data && (data[key] ?? 0) > 0)
+      .map((key) => [key, data[key] ?? 0] as [string, number])
   } else {
     // Sort by count descending
     entries = Object.entries(data)
@@ -1843,21 +1753,19 @@ function generateBarChart(
 
   if (entries.length === 0) return '<p class="empty">No data</p>'
 
-  const maxVal = Math.max(...entries.map(e => e[1]))
+  const maxVal = Math.max(...entries.map((e) => e[1]))
   return entries
     .map(([label, count]) => {
       const pct = (count / maxVal) * 100
       // Use LABEL_MAP if available, otherwise clean up underscores and title case
-      const cleanLabel =
-        LABEL_MAP[label] ||
-        label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const cleanLabel = LABEL_MAP[label] || label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
       return `<div class="bar-row">
         <div class="bar-label">${escapeHtml(cleanLabel)}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
         <div class="bar-value">${count}</div>
       </div>`
     })
-    .join('\n')
+    .join("\n")
 }
 
 function generateResponseTimeHistogram(times: number[]): string {
@@ -1865,23 +1773,23 @@ function generateResponseTimeHistogram(times: number[]): string {
 
   // Create buckets (matching Python reference)
   const buckets: Record<string, number> = {
-    '2-10s': 0,
-    '10-30s': 0,
-    '30s-1m': 0,
-    '1-2m': 0,
-    '2-5m': 0,
-    '5-15m': 0,
-    '>15m': 0,
+    "2-10s": 0,
+    "10-30s": 0,
+    "30s-1m": 0,
+    "1-2m": 0,
+    "2-5m": 0,
+    "5-15m": 0,
+    ">15m": 0,
   }
 
   for (const t of times) {
-    if (t < 10) buckets['2-10s'] = (buckets['2-10s'] ?? 0) + 1
-    else if (t < 30) buckets['10-30s'] = (buckets['10-30s'] ?? 0) + 1
-    else if (t < 60) buckets['30s-1m'] = (buckets['30s-1m'] ?? 0) + 1
-    else if (t < 120) buckets['1-2m'] = (buckets['1-2m'] ?? 0) + 1
-    else if (t < 300) buckets['2-5m'] = (buckets['2-5m'] ?? 0) + 1
-    else if (t < 900) buckets['5-15m'] = (buckets['5-15m'] ?? 0) + 1
-    else buckets['>15m'] = (buckets['>15m'] ?? 0) + 1
+    if (t < 10) buckets["2-10s"] = (buckets["2-10s"] ?? 0) + 1
+    else if (t < 30) buckets["10-30s"] = (buckets["10-30s"] ?? 0) + 1
+    else if (t < 60) buckets["30s-1m"] = (buckets["30s-1m"] ?? 0) + 1
+    else if (t < 120) buckets["1-2m"] = (buckets["1-2m"] ?? 0) + 1
+    else if (t < 300) buckets["2-5m"] = (buckets["2-5m"] ?? 0) + 1
+    else if (t < 900) buckets["5-15m"] = (buckets["5-15m"] ?? 0) + 1
+    else buckets[">15m"] = (buckets[">15m"] ?? 0) + 1
   }
 
   const maxVal = Math.max(...Object.values(buckets))
@@ -1896,7 +1804,7 @@ function generateResponseTimeHistogram(times: number[]): string {
         <div class="bar-value">${count}</div>
       </div>`
     })
-    .join('\n')
+    .join("\n")
 }
 
 function generateTimeOfDayChart(messageHours: number[]): string {
@@ -1904,10 +1812,10 @@ function generateTimeOfDayChart(messageHours: number[]): string {
 
   // Group into time periods
   const periods = [
-    { label: 'Morning (6-12)', range: [6, 7, 8, 9, 10, 11] },
-    { label: 'Afternoon (12-18)', range: [12, 13, 14, 15, 16, 17] },
-    { label: 'Evening (18-24)', range: [18, 19, 20, 21, 22, 23] },
-    { label: 'Night (0-6)', range: [0, 1, 2, 3, 4, 5] },
+    { label: "Morning (6-12)", range: [6, 7, 8, 9, 10, 11] },
+    { label: "Afternoon (12-18)", range: [12, 13, 14, 15, 16, 17] },
+    { label: "Evening (18-24)", range: [18, 19, 20, 21, 22, 23] },
+    { label: "Night (0-6)", range: [0, 1, 2, 3, 4, 5] },
   ]
 
   const hourCounts: Record<number, number> = {}
@@ -1915,23 +1823,23 @@ function generateTimeOfDayChart(messageHours: number[]): string {
     hourCounts[h] = (hourCounts[h] || 0) + 1
   }
 
-  const periodCounts = periods.map(p => ({
+  const periodCounts = periods.map((p) => ({
     label: p.label,
     count: p.range.reduce((sum, h) => sum + (hourCounts[h] || 0), 0),
   }))
 
-  const maxVal = Math.max(...periodCounts.map(p => p.count)) || 1
+  const maxVal = Math.max(...periodCounts.map((p) => p.count)) || 1
 
   const barsHtml = periodCounts
     .map(
-      p => `
+      (p) => `
       <div class="bar-row">
         <div class="bar-label">${p.label}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${(p.count / maxVal) * 100}%;background:#8b5cf6"></div></div>
         <div class="bar-value">${p.count}</div>
       </div>`,
     )
-    .join('\n')
+    .join("\n")
 
   return `<div id="hour-histogram">${barsHtml}</div>`
 }
@@ -1944,22 +1852,19 @@ function getHourCountsJson(messageHours: number[]): string {
   return jsonStringify(hourCounts)
 }
 
-function generateHtmlReport(
-  data: AggregatedData,
-  insights: InsightResults,
-): string {
+function generateHtmlReport(data: AggregatedData, insights: InsightResults): string {
   const markdownToHtml = (md: string): string => {
-    if (!md) return ''
+    if (!md) return ""
     return md
-      .split('\n\n')
-      .map(p => {
+      .split("\n\n")
+      .map((p) => {
         let html = escapeHtml(p)
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        html = html.replace(/^- /gm, '• ')
-        html = html.replace(/\n/g, '<br>')
+        html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        html = html.replace(/^- /gm, "• ")
+        html = html.replace(/\n/g, "<br>")
         return `<p>${html}</p>`
       })
-      .join('\n')
+      .join("\n")
   }
 
   // Build At a Glance section (new 4-part format with links to sections)
@@ -1969,14 +1874,14 @@ function generateHtmlReport(
     <div class="at-a-glance">
       <div class="glance-title">At a Glance</div>
       <div class="glance-sections">
-        ${atAGlance.whats_working ? `<div class="glance-section"><strong>What's working:</strong> ${escapeHtmlWithBold(atAGlance.whats_working)} <a href="#section-wins" class="see-more">Impressive Things You Did →</a></div>` : ''}
-        ${atAGlance.whats_hindering ? `<div class="glance-section"><strong>What's hindering you:</strong> ${escapeHtmlWithBold(atAGlance.whats_hindering)} <a href="#section-friction" class="see-more">Where Things Go Wrong →</a></div>` : ''}
-        ${atAGlance.quick_wins ? `<div class="glance-section"><strong>Quick wins to try:</strong> ${escapeHtmlWithBold(atAGlance.quick_wins)} <a href="#section-features" class="see-more">Features to Try →</a></div>` : ''}
-        ${atAGlance.ambitious_workflows ? `<div class="glance-section"><strong>Ambitious workflows:</strong> ${escapeHtmlWithBold(atAGlance.ambitious_workflows)} <a href="#section-horizon" class="see-more">On the Horizon →</a></div>` : ''}
+        ${atAGlance.whats_working ? `<div class="glance-section"><strong>What's working:</strong> ${escapeHtmlWithBold(atAGlance.whats_working)} <a href="#section-wins" class="see-more">Impressive Things You Did →</a></div>` : ""}
+        ${atAGlance.whats_hindering ? `<div class="glance-section"><strong>What's hindering you:</strong> ${escapeHtmlWithBold(atAGlance.whats_hindering)} <a href="#section-friction" class="see-more">Where Things Go Wrong →</a></div>` : ""}
+        ${atAGlance.quick_wins ? `<div class="glance-section"><strong>Quick wins to try:</strong> ${escapeHtmlWithBold(atAGlance.quick_wins)} <a href="#section-features" class="see-more">Features to Try →</a></div>` : ""}
+        ${atAGlance.ambitious_workflows ? `<div class="glance-section"><strong>Ambitious workflows:</strong> ${escapeHtmlWithBold(atAGlance.ambitious_workflows)} <a href="#section-horizon" class="see-more">On the Horizon →</a></div>` : ""}
       </div>
     </div>
     `
-    : ''
+    : ""
 
   // Build project areas section
   const projectAreas = insights.project_areas?.areas || []
@@ -1987,7 +1892,7 @@ function generateHtmlReport(
     <div class="project-areas">
       ${projectAreas
         .map(
-          area => `
+          (area) => `
         <div class="project-area">
           <div class="area-header">
             <span class="area-name">${escapeHtml(area.name)}</span>
@@ -1997,10 +1902,10 @@ function generateHtmlReport(
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-      : ''
+      : ""
 
   // Build interaction style section
   const interactionStyle = insights.interaction_style
@@ -2009,10 +1914,10 @@ function generateHtmlReport(
     <h2 id="section-usage">How You Use Claude Code</h2>
     <div class="narrative">
       ${markdownToHtml(interactionStyle.narrative)}
-      ${interactionStyle.key_pattern ? `<div class="key-insight"><strong>Key pattern:</strong> ${escapeHtml(interactionStyle.key_pattern)}</div>` : ''}
+      ${interactionStyle.key_pattern ? `<div class="key-insight"><strong>Key pattern:</strong> ${escapeHtml(interactionStyle.key_pattern)}</div>` : ""}
     </div>
     `
-    : ''
+    : ""
 
   // Build what works section
   const whatWorks = insights.what_works
@@ -2020,21 +1925,21 @@ function generateHtmlReport(
     whatWorks?.impressive_workflows && whatWorks.impressive_workflows.length > 0
       ? `
     <h2 id="section-wins">Impressive Things You Did</h2>
-    ${whatWorks.intro ? `<p class="section-intro">${escapeHtml(whatWorks.intro)}</p>` : ''}
+    ${whatWorks.intro ? `<p class="section-intro">${escapeHtml(whatWorks.intro)}</p>` : ""}
     <div class="big-wins">
       ${whatWorks.impressive_workflows
         .map(
-          wf => `
+          (wf) => `
         <div class="big-win">
-          <div class="big-win-title">${escapeHtml(wf.title || '')}</div>
-          <div class="big-win-desc">${escapeHtml(wf.description || '')}</div>
+          <div class="big-win-title">${escapeHtml(wf.title || "")}</div>
+          <div class="big-win-desc">${escapeHtml(wf.description || "")}</div>
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-      : ''
+      : ""
 
   // Build friction section
   const frictionAnalysis = insights.friction_analysis
@@ -2042,30 +1947,29 @@ function generateHtmlReport(
     frictionAnalysis?.categories && frictionAnalysis.categories.length > 0
       ? `
     <h2 id="section-friction">Where Things Go Wrong</h2>
-    ${frictionAnalysis.intro ? `<p class="section-intro">${escapeHtml(frictionAnalysis.intro)}</p>` : ''}
+    ${frictionAnalysis.intro ? `<p class="section-intro">${escapeHtml(frictionAnalysis.intro)}</p>` : ""}
     <div class="friction-categories">
       ${frictionAnalysis.categories
         .map(
-          cat => `
+          (cat) => `
         <div class="friction-category">
-          <div class="friction-title">${escapeHtml(cat.category || '')}</div>
-          <div class="friction-desc">${escapeHtml(cat.description || '')}</div>
-          ${cat.examples ? `<ul class="friction-examples">${cat.examples.map(ex => `<li>${escapeHtml(ex)}</li>`).join('')}</ul>` : ''}
+          <div class="friction-title">${escapeHtml(cat.category || "")}</div>
+          <div class="friction-desc">${escapeHtml(cat.description || "")}</div>
+          ${cat.examples ? `<ul class="friction-examples">${cat.examples.map((ex) => `<li>${escapeHtml(ex)}</li>`).join("")}</ul>` : ""}
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-      : ''
+      : ""
 
   // Build suggestions section
   const suggestions = insights.suggestions
   const suggestionsHtml = suggestions
     ? `
     ${
-      suggestions.claude_md_additions &&
-      suggestions.claude_md_additions.length > 0
+      suggestions.claude_md_additions && suggestions.claude_md_additions.length > 0
         ? `
     <h2 id="section-features">Existing CC Features to Try</h2>
     <div class="claude-md-section">
@@ -2078,7 +1982,7 @@ function generateHtmlReport(
         .map(
           (add, i) => `
         <div class="claude-md-item">
-          <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || 'Add to CLAUDE.md')}\\n\\n${escapeHtml(add.addition)}">
+          <input type="checkbox" id="cmd-${i}" class="cmd-checkbox" checked data-text="${escapeHtml(add.prompt_scaffold || add.where || "Add to CLAUDE.md")}\\n\\n${escapeHtml(add.addition)}">
           <label for="cmd-${i}">
             <code class="cmd-code">${escapeHtml(add.addition)}</code>
             <button class="copy-btn" onclick="copyCmdItem(${i})">Copy</button>
@@ -2087,10 +1991,10 @@ function generateHtmlReport(
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-        : ''
+        : ""
     }
     ${
       suggestions.features_to_try && suggestions.features_to_try.length > 0
@@ -2099,11 +2003,11 @@ function generateHtmlReport(
     <div class="features-section">
       ${suggestions.features_to_try
         .map(
-          feat => `
+          (feat) => `
         <div class="feature-card">
-          <div class="feature-title">${escapeHtml(feat.feature || '')}</div>
-          <div class="feature-oneliner">${escapeHtml(feat.one_liner || '')}</div>
-          <div class="feature-why"><strong>Why for you:</strong> ${escapeHtml(feat.why_for_you || '')}</div>
+          <div class="feature-title">${escapeHtml(feat.feature || "")}</div>
+          <div class="feature-oneliner">${escapeHtml(feat.one_liner || "")}</div>
+          <div class="feature-why"><strong>Why for you:</strong> ${escapeHtml(feat.why_for_you || "")}</div>
           ${
             feat.example_code
               ? `
@@ -2116,15 +2020,15 @@ function generateHtmlReport(
             </div>
           </div>
           `
-              : ''
+              : ""
           }
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-        : ''
+        : ""
     }
     ${
       suggestions.usage_patterns && suggestions.usage_patterns.length > 0
@@ -2134,11 +2038,11 @@ function generateHtmlReport(
     <div class="patterns-section">
       ${suggestions.usage_patterns
         .map(
-          pat => `
+          (pat) => `
         <div class="pattern-card">
-          <div class="pattern-title">${escapeHtml(pat.title || '')}</div>
-          <div class="pattern-summary">${escapeHtml(pat.suggestion || '')}</div>
-          ${pat.detail ? `<div class="pattern-detail">${escapeHtml(pat.detail)}</div>` : ''}
+          <div class="pattern-title">${escapeHtml(pat.title || "")}</div>
+          <div class="pattern-summary">${escapeHtml(pat.suggestion || "")}</div>
+          ${pat.detail ? `<div class="pattern-detail">${escapeHtml(pat.detail)}</div>` : ""}
           ${
             pat.copyable_prompt
               ? `
@@ -2150,18 +2054,18 @@ function generateHtmlReport(
             </div>
           </div>
           `
-              : ''
+              : ""
           }
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-        : ''
+        : ""
     }
     `
-    : ''
+    : ""
 
   // Build On the Horizon section
   const horizonData = insights.on_the_horizon
@@ -2169,33 +2073,28 @@ function generateHtmlReport(
     horizonData?.opportunities && horizonData.opportunities.length > 0
       ? `
     <h2 id="section-horizon">On the Horizon</h2>
-    ${horizonData.intro ? `<p class="section-intro">${escapeHtml(horizonData.intro)}</p>` : ''}
+    ${horizonData.intro ? `<p class="section-intro">${escapeHtml(horizonData.intro)}</p>` : ""}
     <div class="horizon-section">
       ${horizonData.opportunities
         .map(
-          opp => `
+          (opp) => `
         <div class="horizon-card">
-          <div class="horizon-title">${escapeHtml(opp.title || '')}</div>
-          <div class="horizon-possible">${escapeHtml(opp.whats_possible || '')}</div>
-          ${opp.how_to_try ? `<div class="horizon-tip"><strong>Getting started:</strong> ${escapeHtml(opp.how_to_try)}</div>` : ''}
-          ${opp.copyable_prompt ? `<div class="pattern-prompt"><div class="prompt-label">Paste into Claude Code:</div><code>${escapeHtml(opp.copyable_prompt)}</code><button class="copy-btn" onclick="copyText(this)">Copy</button></div>` : ''}
+          <div class="horizon-title">${escapeHtml(opp.title || "")}</div>
+          <div class="horizon-possible">${escapeHtml(opp.whats_possible || "")}</div>
+          ${opp.how_to_try ? `<div class="horizon-tip"><strong>Getting started:</strong> ${escapeHtml(opp.how_to_try)}</div>` : ""}
+          ${opp.copyable_prompt ? `<div class="pattern-prompt"><div class="prompt-label">Paste into Claude Code:</div><code>${escapeHtml(opp.copyable_prompt)}</code><button class="copy-btn" onclick="copyText(this)">Copy</button></div>` : ""}
         </div>
       `,
         )
-        .join('')}
+        .join("")}
     </div>
     `
-      : ''
+      : ""
 
   // Build Team Feedback section (collapsible, ant-only)
-  const ccImprovements =
-    process.env.USER_TYPE === 'ant'
-      ? insights.cc_team_improvements?.improvements || []
-      : []
+  const ccImprovements = process.env.USER_TYPE === "ant" ? insights.cc_team_improvements?.improvements || [] : []
   const modelImprovements =
-    process.env.USER_TYPE === 'ant'
-      ? insights.model_behavior_improvements?.improvements || []
-      : []
+    process.env.USER_TYPE === "ant" ? insights.model_behavior_improvements?.improvements || [] : []
   const teamFeedbackHtml =
     ccImprovements.length > 0 || modelImprovements.length > 0
       ? `
@@ -2213,20 +2112,20 @@ function generateHtmlReport(
         <div class="suggestions-section">
           ${ccImprovements
             .map(
-              imp => `
+              (imp) => `
             <div class="feedback-card team-card">
-              <div class="feedback-title">${escapeHtml(imp.title || '')}</div>
-              <div class="feedback-detail">${escapeHtml(imp.detail || '')}</div>
-              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ''}
+              <div class="feedback-title">${escapeHtml(imp.title || "")}</div>
+              <div class="feedback-detail">${escapeHtml(imp.detail || "")}</div>
+              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ""}
             </div>
           `,
             )
-            .join('')}
+            .join("")}
         </div>
       </div>
     </div>
     `
-        : ''
+        : ""
     }
     ${
       modelImprovements.length > 0
@@ -2240,23 +2139,23 @@ function generateHtmlReport(
         <div class="suggestions-section">
           ${modelImprovements
             .map(
-              imp => `
+              (imp) => `
             <div class="feedback-card model-card">
-              <div class="feedback-title">${escapeHtml(imp.title || '')}</div>
-              <div class="feedback-detail">${escapeHtml(imp.detail || '')}</div>
-              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ''}
+              <div class="feedback-title">${escapeHtml(imp.title || "")}</div>
+              <div class="feedback-detail">${escapeHtml(imp.detail || "")}</div>
+              ${imp.evidence ? `<div class="feedback-evidence"><em>Evidence:</em> ${escapeHtml(imp.evidence)}</div>` : ""}
             </div>
           `,
             )
-            .join('')}
+            .join("")}
         </div>
       </div>
     </div>
     `
-        : ''
+        : ""
     }
     `
-      : ''
+      : ""
 
   // Build Fun Ending section
   const funEnding = insights.fun_ending
@@ -2264,10 +2163,10 @@ function generateHtmlReport(
     ? `
     <div class="fun-ending">
       <div class="fun-headline">"${escapeHtml(funEnding.headline)}"</div>
-      ${funEnding.detail ? `<div class="fun-detail">${escapeHtml(funEnding.detail)}</div>` : ''}
+      ${funEnding.detail ? `<div class="fun-detail">${escapeHtml(funEnding.detail)}</div>` : ""}
     </div>
     `
-    : ''
+    : ""
 
   const css = `
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2492,7 +2391,7 @@ function generateHtmlReport(
 <body>
   <div class="container">
     <h1>Claude Code Insights</h1>
-    <p class="subtitle">${data.total_messages.toLocaleString()} messages across ${data.total_sessions} sessions${data.total_sessions_scanned && data.total_sessions_scanned > data.total_sessions ? ` (${data.total_sessions_scanned.toLocaleString()} total)` : ''} | ${data.date_range.start} to ${data.date_range.end}</p>
+    <p class="subtitle">${data.total_messages.toLocaleString()} messages across ${data.total_sessions} sessions${data.total_sessions_scanned && data.total_sessions_scanned > data.total_sessions ? ` (${data.total_sessions_scanned.toLocaleString()} total)` : ""} | ${data.date_range.start} to ${data.date_range.end}</p>
 
     ${atAGlanceHtml}
 
@@ -2520,22 +2419,22 @@ function generateHtmlReport(
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">What You Wanted</div>
-        ${generateBarChart(data.goal_categories, '#2563eb')}
+        ${generateBarChart(data.goal_categories, "#2563eb")}
       </div>
       <div class="chart-card">
         <div class="chart-title">Top Tools Used</div>
-        ${generateBarChart(data.tool_counts, '#0891b2')}
+        ${generateBarChart(data.tool_counts, "#0891b2")}
       </div>
     </div>
 
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">Languages</div>
-        ${generateBarChart(data.languages, '#10b981')}
+        ${generateBarChart(data.languages, "#10b981")}
       </div>
       <div class="chart-card">
         <div class="chart-title">Session Types</div>
-        ${generateBarChart(data.session_types || {}, '#8b5cf6')}
+        ${generateBarChart(data.session_types || {}, "#8b5cf6")}
       </div>
     </div>
 
@@ -2602,7 +2501,7 @@ function generateHtmlReport(
       </div>
       <div class="chart-card">
         <div class="chart-title">Tool Errors Encountered</div>
-        ${Object.keys(data.tool_error_categories).length > 0 ? generateBarChart(data.tool_error_categories, '#dc2626') : '<p class="empty">No tool errors</p>'}
+        ${Object.keys(data.tool_error_categories).length > 0 ? generateBarChart(data.tool_error_categories, "#dc2626") : '<p class="empty">No tool errors</p>'}
       </div>
     </div>
 
@@ -2611,11 +2510,11 @@ function generateHtmlReport(
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">What Helped Most (Claude's Capabilities)</div>
-        ${generateBarChart(data.success, '#16a34a')}
+        ${generateBarChart(data.success, "#16a34a")}
       </div>
       <div class="chart-card">
         <div class="chart-title">Outcomes</div>
-        ${generateBarChart(data.outcomes, '#8b5cf6', 6, OUTCOME_ORDER)}
+        ${generateBarChart(data.outcomes, "#8b5cf6", 6, OUTCOME_ORDER)}
       </div>
     </div>
 
@@ -2624,11 +2523,11 @@ function generateHtmlReport(
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">Primary Friction Types</div>
-        ${generateBarChart(data.friction, '#dc2626')}
+        ${generateBarChart(data.friction, "#dc2626")}
       </div>
       <div class="chart-card">
         <div class="chart-title">Inferred Satisfaction (model-estimated)</div>
-        ${generateBarChart(data.satisfaction, '#eab308', 6, SATISFACTION_ORDER)}
+        ${generateBarChart(data.satisfaction, "#eab308", 6, SATISFACTION_ORDER)}
       </div>
     </div>
 
@@ -2682,11 +2581,9 @@ export function buildExportData(
   facets: Map<string, SessionFacets>,
   remoteStats?: { hosts: RemoteHostInfo[]; totalCopied: number },
 ): InsightsExport {
-  const version = typeof MACRO !== 'undefined' ? MACRO.VERSION : 'unknown'
+  const version = typeof MACRO !== "undefined" ? MACRO.VERSION : "unknown"
 
-  const remote_hosts_collected = remoteStats?.hosts
-    .filter(h => h.sessionCount > 0)
-    .map(h => h.name)
+  const remote_hosts_collected = remoteStats?.hosts.filter((h) => h.sessionCount > 0).map((h) => h.name)
 
   const facets_summary = {
     total: facets.size,
@@ -2698,29 +2595,25 @@ export function buildExportData(
   for (const f of facets.values()) {
     for (const [cat, count] of safeEntries(f.goal_categories)) {
       if (count > 0) {
-        facets_summary.goal_categories[cat] =
-          (facets_summary.goal_categories[cat] || 0) + count
+        facets_summary.goal_categories[cat] = (facets_summary.goal_categories[cat] || 0) + count
       }
     }
-    facets_summary.outcomes[f.outcome] =
-      (facets_summary.outcomes[f.outcome] || 0) + 1
+    facets_summary.outcomes[f.outcome] = (facets_summary.outcomes[f.outcome] || 0) + 1
     for (const [level, count] of safeEntries(f.user_satisfaction_counts)) {
       if (count > 0) {
-        facets_summary.satisfaction[level] =
-          (facets_summary.satisfaction[level] || 0) + count
+        facets_summary.satisfaction[level] = (facets_summary.satisfaction[level] || 0) + count
       }
     }
     for (const [type, count] of safeEntries(f.friction_counts)) {
       if (count > 0) {
-        facets_summary.friction[type] =
-          (facets_summary.friction[type] || 0) + count
+        facets_summary.friction[type] = (facets_summary.friction[type] || 0) + count
       }
     }
   }
 
   return {
     metadata: {
-      username: process.env.SAFEUSER || process.env.USER || 'unknown',
+      username: process.env.SAFEUSER || process.env.USER || "unknown",
       generated_at: new Date().toISOString(),
       claude_code_version: version,
       date_range: data.date_range,
@@ -2762,9 +2655,7 @@ async function scanAllSessions(): Promise<LiteSessionInfo[]> {
     return []
   }
 
-  const projectDirs = dirents
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => join(projectsDir, dirent.name))
+  const projectDirs = dirents.filter((dirent) => dirent.isDirectory()).map((dirent) => join(projectsDir, dirent.name))
 
   const allSessions: LiteSessionInfo[] = []
 
@@ -2780,7 +2671,7 @@ async function scanAllSessions(): Promise<LiteSessionInfo[]> {
     }
     // Yield to event loop every 10 project directories
     if (i % 10 === 9) {
-      await new Promise<void>(resolve => setImmediate(resolve))
+      await new Promise<void>((resolve) => setImmediate(resolve))
     }
   }
 
@@ -2793,9 +2684,7 @@ async function scanAllSessions(): Promise<LiteSessionInfo[]> {
 // Main Function
 // ============================================================================
 
-export async function generateUsageReport(options?: {
-  collectRemote?: boolean
-}): Promise<{
+export async function generateUsageReport(options?: { collectRemote?: boolean }): Promise<{
   insights: InsightResults
   htmlPath: string
   data: AggregatedData
@@ -2805,8 +2694,8 @@ export async function generateUsageReport(options?: {
   let remoteStats: { hosts: RemoteHostInfo[]; totalCopied: number } | undefined
 
   // Optionally collect data from remote hosts first (ant-only)
-  if (process.env.USER_TYPE === 'ant' && options?.collectRemote) {
-    const destDir = join(getClaudeConfigHomeDir(), 'projects')
+  if (process.env.USER_TYPE === "ant" && options?.collectRemote) {
+    const destDir = join(getClaudeConfigHomeDir(), "projects")
     const { hosts, totalCopied } = await collectAllRemoteHostData(destDir)
     remoteStats = { hosts, totalCopied }
   }
@@ -2825,7 +2714,7 @@ export async function generateUsageReport(options?: {
   for (let i = 0; i < allScannedSessions.length; i += META_BATCH_SIZE) {
     const batch = allScannedSessions.slice(i, i + META_BATCH_SIZE)
     const results = await Promise.all(
-      batch.map(async sessionInfo => ({
+      batch.map(async (sessionInfo) => ({
         sessionInfo,
         cached: await loadCachedSessionMeta(sessionInfo.sessionId),
       })),
@@ -2845,13 +2734,10 @@ export async function generateUsageReport(options?: {
   // Filter out /insights meta-sessions (facet extraction API calls get logged as sessions)
   const isMetaSession = (log: LogOption): boolean => {
     for (const msg of log.messages.slice(0, 5)) {
-      if (msg.type === 'user' && msg.message) {
+      if (msg.type === "user" && msg.message) {
         const content = msg.message.content
-        if (typeof content === 'string') {
-          if (
-            content.includes('RESPOND WITH ONLY A VALID JSON OBJECT') ||
-            content.includes('record_facets')
-          ) {
+        if (typeof content === "string") {
+          if (content.includes("RESPOND WITH ONLY A VALID JSON OBJECT") || content.includes("record_facets")) {
             return true
           }
         }
@@ -2865,7 +2751,7 @@ export async function generateUsageReport(options?: {
   for (let i = 0; i < uncachedSessions.length; i += LOAD_BATCH_SIZE) {
     const batch = uncachedSessions.slice(i, i + LOAD_BATCH_SIZE)
     const batchResults = await Promise.all(
-      batch.map(async sessionInfo => {
+      batch.map(async (sessionInfo) => {
         try {
           return await loadAllLogsFromSessionFile(sessionInfo.path)
         } catch {
@@ -2885,7 +2771,7 @@ export async function generateUsageReport(options?: {
         logsForFacets.set(meta.session_id, log)
       }
     }
-    await Promise.all(metasToSave.map(meta => saveSessionMeta(meta)))
+    await Promise.all(metasToSave.map((meta) => saveSessionMeta(meta)))
   }
 
   // Deduplicate session branches (keep the one with most user messages per session_id)
@@ -2896,8 +2782,7 @@ export async function generateUsageReport(options?: {
     if (
       !existing ||
       meta.user_message_count > existing.user_message_count ||
-      (meta.user_message_count === existing.user_message_count &&
-        meta.duration_minutes > existing.duration_minutes)
+      (meta.user_message_count === existing.user_message_count && meta.duration_minutes > existing.duration_minutes)
     ) {
       bestBySession.set(meta.session_id, meta)
     }
@@ -2933,7 +2818,7 @@ export async function generateUsageReport(options?: {
 
   // Load cached facets for all substantive sessions in parallel
   const cachedFacetResults = await Promise.all(
-    substantiveMetas.map(async meta => ({
+    substantiveMetas.map(async (meta) => ({
       sessionId: meta.session_id,
       cached: await loadCachedFacets(meta.session_id),
     })),
@@ -2967,7 +2852,7 @@ export async function generateUsageReport(options?: {
         facetsToSave.push(newFacets)
       }
     }
-    await Promise.all(facetsToSave.map(f => saveFacets(f)))
+    await Promise.all(facetsToSave.map((f) => saveFacets(f)))
   }
 
   // Filter out warmup/minimal sessions (matching Python's is_minimal)
@@ -2976,13 +2861,11 @@ export async function generateUsageReport(options?: {
     const sessionFacets = facets.get(sessionId)
     if (!sessionFacets) return false
     const cats = sessionFacets.goal_categories
-    const catKeys = safeKeys(cats).filter(k => (cats[k] ?? 0) > 0)
-    return catKeys.length === 1 && catKeys[0] === 'warmup_minimal'
+    const catKeys = safeKeys(cats).filter((k) => (cats[k] ?? 0) > 0)
+    return catKeys.length === 1 && catKeys[0] === "warmup_minimal"
   }
 
-  const substantiveSessions = substantiveMetas.filter(
-    s => !isMinimalSession(s.session_id),
-  )
+  const substantiveSessions = substantiveMetas.filter((s) => !isMinimalSession(s.session_id))
 
   const substantiveFacets = new Map<string, SessionFacets>()
   for (const [sessionId, f] of facets) {
@@ -3007,9 +2890,9 @@ export async function generateUsageReport(options?: {
     // Directory may already exist
   }
 
-  const htmlPath = join(getDataDir(), 'report.html')
+  const htmlPath = join(getDataDir(), "report.html")
   await writeFile(htmlPath, htmlReport, {
-    encoding: 'utf-8',
+    encoding: "utf-8",
     mode: 0o600,
   })
 
@@ -3022,9 +2905,7 @@ export async function generateUsageReport(options?: {
   }
 }
 
-function safeEntries<V>(
-  obj: Record<string, V> | undefined | null,
-): [string, V][] {
+function safeEntries<V>(obj: Record<string, V> | undefined | null): [string, V][] {
   return obj ? Object.entries(obj) : []
 }
 
@@ -3037,20 +2918,20 @@ function safeKeys(obj: Record<string, unknown> | undefined | null): string[] {
 // ============================================================================
 
 const usageReport: Command = {
-  type: 'prompt',
-  name: 'insights',
-  description: 'Generate a report analyzing your Claude Code sessions',
+  type: "prompt",
+  name: "insights",
+  description: "Generate a report analyzing your Claude Code sessions",
   contentLength: 0, // Dynamic content
-  progressMessage: 'analyzing your sessions',
-  source: 'builtin',
+  progressMessage: "analyzing your sessions",
+  source: "builtin",
   async getPromptForCommand(args) {
     let collectRemote = false
     let remoteHosts: string[] = []
     let hasRemoteHosts = false
 
-    if (process.env.USER_TYPE === 'ant') {
+    if (process.env.USER_TYPE === "ant") {
       // Parse --homespaces flag
-      collectRemote = args?.includes('--homespaces') ?? false
+      collectRemote = args?.includes("--homespaces") ?? false
 
       // Check for available remote hosts
       remoteHosts = await getRunningRemoteHosts()
@@ -3059,36 +2940,28 @@ const usageReport: Command = {
       // Show collection message if collecting
       if (collectRemote && hasRemoteHosts) {
         // biome-ignore lint/suspicious/noConsole: intentional
-        console.error(
-          `Collecting sessions from ${remoteHosts.length} homespace(s): ${remoteHosts.join(', ')}...`,
-        )
+        console.error(`Collecting sessions from ${remoteHosts.length} homespace(s): ${remoteHosts.join(", ")}...`)
       }
     }
 
-    const { insights, htmlPath, data, remoteStats } = await generateUsageReport(
-      { collectRemote },
-    )
+    const { insights, htmlPath, data, remoteStats } = await generateUsageReport({ collectRemote })
 
     let reportUrl = `file://${htmlPath}`
-    let uploadHint = ''
+    let uploadHint = ""
 
-    if (process.env.USER_TYPE === 'ant') {
+    if (process.env.USER_TYPE === "ant") {
       // Try to upload to S3
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[-:]/g, '')
-        .replace('T', '_')
-        .slice(0, 15)
-      const username = process.env.SAFEUSER || process.env.USER || 'unknown'
+      const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").slice(0, 15)
+      const username = process.env.SAFEUSER || process.env.USER || "unknown"
       const filename = `${username}_insights_${timestamp}.html`
       const s3Path = `s3://anthropic-serve/atamkin/cc-user-reports/${filename}`
       const s3Url = `https://s3-frontend.infra.ant.dev/anthropic-serve/atamkin/cc-user-reports/${filename}`
 
       reportUrl = s3Url
       try {
-        execFileSync('ff', ['cp', htmlPath, s3Path], {
+        execFileSync("ff", ["cp", htmlPath, s3Path], {
           timeout: 60000,
-          stdio: 'pipe', // Suppress output
+          stdio: "pipe", // Suppress output
         })
       } catch {
         // Upload failed - fall back to local file and show upload command
@@ -3101,8 +2974,7 @@ Then access at: ${s3Url}`
 
     // Build header with stats
     const sessionLabel =
-      data.total_sessions_scanned &&
-      data.total_sessions_scanned > data.total_sessions
+      data.total_sessions_scanned && data.total_sessions_scanned > data.total_sessions
         ? `${data.total_sessions_scanned.toLocaleString()} sessions total · ${data.total_sessions} analyzed`
         : `${data.total_sessions} sessions`
     const stats = [
@@ -3110,16 +2982,16 @@ Then access at: ${s3Url}`
       `${data.total_messages.toLocaleString()} messages`,
       `${Math.round(data.total_duration_hours)}h`,
       `${data.git_commits} commits`,
-    ].join(' · ')
+    ].join(" · ")
 
     // Build remote host info (ant-only)
-    let remoteInfo = ''
-    if (process.env.USER_TYPE === 'ant') {
+    let remoteInfo = ""
+    if (process.env.USER_TYPE === "ant") {
       if (remoteStats && remoteStats.totalCopied > 0) {
         const hsNames = remoteStats.hosts
-          .filter(h => h.sessionCount > 0)
-          .map(h => h.name)
-          .join(', ')
+          .filter((h) => h.sessionCount > 0)
+          .map((h) => h.name)
+          .join(", ")
         remoteInfo = `\n_Collected ${remoteStats.totalCopied} new sessions from: ${hsNames}_\n`
       } else if (!collectRemote && hasRemoteHosts) {
         // Suggest using --homespaces if they have remote hosts but didn't use the flag
@@ -3132,14 +3004,14 @@ Then access at: ${s3Url}`
     const summaryText = atAGlance
       ? `## At a Glance
 
-${atAGlance.whats_working ? `**What's working:** ${atAGlance.whats_working} See _Impressive Things You Did_.` : ''}
+${atAGlance.whats_working ? `**What's working:** ${atAGlance.whats_working} See _Impressive Things You Did_.` : ""}
 
-${atAGlance.whats_hindering ? `**What's hindering you:** ${atAGlance.whats_hindering} See _Where Things Go Wrong_.` : ''}
+${atAGlance.whats_hindering ? `**What's hindering you:** ${atAGlance.whats_hindering} See _Where Things Go Wrong_.` : ""}
 
-${atAGlance.quick_wins ? `**Quick wins to try:** ${atAGlance.quick_wins} See _Features to Try_.` : ''}
+${atAGlance.quick_wins ? `**Quick wins to try:** ${atAGlance.quick_wins} See _Features to Try_.` : ""}
 
-${atAGlance.ambitious_workflows ? `**Ambitious workflows:** ${atAGlance.ambitious_workflows} See _On the Horizon_.` : ''}`
-      : '_No insights generated_'
+${atAGlance.ambitious_workflows ? `**Ambitious workflows:** ${atAGlance.ambitious_workflows} See _On the Horizon_.` : ""}`
+      : "_No insights generated_"
 
     const header = `# Claude Code Insights
 
@@ -3155,7 +3027,7 @@ Your full shareable insights report is ready: ${reportUrl}${uploadHint}`
     // Return prompt for Claude to respond to
     return [
       {
-        type: 'text',
+        type: "text",
         text: `The user just ran /insights to generate a usage report analyzing their Claude Code sessions.
 
 Here is the full insights data:
@@ -3182,18 +3054,18 @@ Want to dig into any section or try one of the suggestions?
 }
 
 function isValidSessionFacets(obj: unknown): obj is SessionFacets {
-  if (!obj || typeof obj !== 'object') return false
+  if (!obj || typeof obj !== "object") return false
   const o = obj as Record<string, unknown>
   return (
-    typeof o.underlying_goal === 'string' &&
-    typeof o.outcome === 'string' &&
-    typeof o.brief_summary === 'string' &&
+    typeof o.underlying_goal === "string" &&
+    typeof o.outcome === "string" &&
+    typeof o.brief_summary === "string" &&
     o.goal_categories !== null &&
-    typeof o.goal_categories === 'object' &&
+    typeof o.goal_categories === "object" &&
     o.user_satisfaction_counts !== null &&
-    typeof o.user_satisfaction_counts === 'object' &&
+    typeof o.user_satisfaction_counts === "object" &&
     o.friction_counts !== null &&
-    typeof o.friction_counts === 'object'
+    typeof o.friction_counts === "object"
   )
 }
 

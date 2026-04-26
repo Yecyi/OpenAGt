@@ -1,14 +1,14 @@
-import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { splitCommand_DEPRECATED } from '../../utils/bash/commands.js'
-import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
-import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "src/services/analytics/growthbook.js"
+import { splitCommand_DEPRECATED } from "../../utils/bash/commands.js"
+import { SandboxManager } from "../../utils/sandbox/sandbox-adapter.js"
+import { getSettings_DEPRECATED } from "../../utils/settings/settings.js"
 import {
   BINARY_HIJACK_VARS,
   bashPermissionRule,
   matchWildcardPattern,
   stripAllLeadingEnvVars,
   stripSafeWrappers,
-} from './bashPermissions.js'
+} from "./bashPermissions.js"
 
 type SandboxInput = {
   command?: string
@@ -20,11 +20,11 @@ type SandboxInput = {
 // system (which prompts users) is the actual security control.
 function containsExcludedCommand(command: string): boolean {
   // Check dynamic config for disabled commands and substrings (only for ants)
-  if (process.env.USER_TYPE === 'ant') {
+  if (process.env.USER_TYPE === "ant") {
     const disabledCommands = getFeatureValue_CACHED_MAY_BE_STALE<{
       commands: string[]
       substrings: string[]
-    }>('tengu_sandbox_disabled_commands', { commands: [], substrings: [] })
+    }>("tengu_sandbox_disabled_commands", { commands: [], substrings: [] })
 
     // Check if command contains any disabled substrings
     for (const substring of disabledCommands.substrings) {
@@ -37,7 +37,7 @@ function containsExcludedCommand(command: string): boolean {
     try {
       const commandParts = splitCommand_DEPRECATED(command)
       for (const part of commandParts) {
-        const baseCommand = part.trim().split(' ')[0]
+        const baseCommand = part.trim().split(" ")[0]
         if (baseCommand && disabledCommands.commands.includes(baseCommand)) {
           return true
         }
@@ -104,17 +104,17 @@ function containsExcludedCommand(command: string): boolean {
       const rule = bashPermissionRule(pattern)
       for (const cand of candidates) {
         switch (rule.type) {
-          case 'prefix':
-            if (cand === rule.prefix || cand.startsWith(rule.prefix + ' ')) {
+          case "prefix":
+            if (cand === rule.prefix || cand.startsWith(rule.prefix + " ")) {
               return true
             }
             break
-          case 'exact':
+          case "exact":
             if (cand === rule.command) {
               return true
             }
             break
-          case 'wildcard':
+          case "wildcard":
             if (matchWildcardPattern(rule.pattern, cand)) {
               return true
             }
@@ -133,10 +133,7 @@ export function shouldUseSandbox(input: Partial<SandboxInput>): boolean {
   }
 
   // Don't sandbox if explicitly overridden AND unsandboxed commands are allowed by policy
-  if (
-    input.dangerouslyDisableSandbox &&
-    SandboxManager.areUnsandboxedCommandsAllowed()
-  ) {
+  if (input.dangerouslyDisableSandbox && SandboxManager.areUnsandboxedCommandsAllowed()) {
     return false
   }
 

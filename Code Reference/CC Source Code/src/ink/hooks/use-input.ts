@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect } from 'react'
-import { useEventCallback } from 'usehooks-ts'
-import type { InputEvent, Key } from '../events/input-event.js'
-import useStdin from './use-stdin.js'
+import { useEffect, useLayoutEffect } from "react"
+import { useEventCallback } from "usehooks-ts"
+import type { InputEvent, Key } from "../events/input-event.js"
+import useStdin from "./use-stdin.js"
 
 type Handler = (input: string, key: Key, event: InputEvent) => void
 
@@ -75,16 +75,16 @@ const useInput = (inputHandler: Handler, options: Options = {}) => {
     // If app is not supposed to exit on Ctrl+C, then let input listener handle it
     // Note: discreteUpdates is called at the App level when emitting events,
     // so all listeners are already within a high-priority update context.
-    if (!(input === 'c' && key.ctrl) || !internal_exitOnCtrlC) {
+    if (!(input === "c" && key.ctrl) || !internal_exitOnCtrlC) {
       inputHandler(input, key, event)
     }
   })
 
   useEffect(() => {
-    internal_eventEmitter?.on('input', handleData)
+    internal_eventEmitter?.on("input", handleData)
 
     return () => {
-      internal_eventEmitter?.removeListener('input', handleData)
+      internal_eventEmitter?.removeListener("input", handleData)
     }
   }, [internal_eventEmitter, handleData])
 }

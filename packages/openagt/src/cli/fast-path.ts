@@ -13,17 +13,14 @@ declare const OPENAGT_VERSION: string
 declare const OPENCODE_VERSION: string
 
 // Fast-path: zero-import command handlers
-const FAST_PATH_COMMANDS = new Set([
-  "--version",
-  "-v",
-  "--help",
-  "-h",
-  "version",
-  "help",
-])
+const FAST_PATH_COMMANDS = new Set(["--version", "-v", "--help", "-h", "version", "help"])
 
 const VERSION =
-  typeof OPENAGT_VERSION === "string" ? OPENAGT_VERSION : typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : pkg.version
+  typeof OPENAGT_VERSION === "string"
+    ? OPENAGT_VERSION
+    : typeof OPENCODE_VERSION === "string"
+      ? OPENCODE_VERSION
+      : pkg.version
 
 /**
  * Check if the current command should use fast-path
@@ -37,8 +34,8 @@ export function isFastPathCommand(args: string[]): boolean {
   if (FAST_PATH_COMMANDS.has(cmd)) return true
 
   // Check for --version/-v flags with other args
-  if (cmd.startsWith("--") && (cmd === "--version")) return true
-  if (cmd.startsWith("-") && (cmd === "-v")) return true
+  if (cmd.startsWith("--") && cmd === "--version") return true
+  if (cmd.startsWith("-") && cmd === "-v") return true
 
   return false
 }

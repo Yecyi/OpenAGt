@@ -1,14 +1,9 @@
-import {
-  type AnsiCode,
-  type StyledChar,
-  styledCharsFromTokens,
-  tokenize,
-} from '@alcalzone/ansi-tokenize'
-import { logForDebugging } from '../utils/debug.js'
-import { getGraphemeSegmenter } from '../utils/intl.js'
-import sliceAnsi from '../utils/sliceAnsi.js'
-import { reorderBidi } from './bidi.js'
-import { type Rectangle, unionRect } from './layout/geometry.js'
+import { type AnsiCode, type StyledChar, styledCharsFromTokens, tokenize } from "@alcalzone/ansi-tokenize"
+import { logForDebugging } from "../utils/debug.js"
+import { getGraphemeSegmenter } from "../utils/intl.js"
+import sliceAnsi from "../utils/sliceAnsi.js"
+import { reorderBidi } from "./bidi.js"
+import { type Rectangle, unionRect } from "./layout/geometry.js"
 import {
   blitRegion,
   CellWidth,
@@ -21,9 +16,9 @@ import {
   type StylePool,
   setCellAt,
   shiftRows,
-} from './screen.js'
-import { stringWidth } from './stringWidth.js'
-import { widestLine } from './widest-line.js'
+} from "./screen.js"
+import { stringWidth } from "./stringWidth.js"
+import { widestLine } from "./widest-line.js"
 
 /**
  * A grapheme cluster with precomputed terminal width, styleId, and hyperlink.
@@ -69,7 +64,7 @@ export type Operation =
   | ShiftOperation
 
 type WriteOperation = {
-  type: 'write'
+  type: "write"
   x: number
   y: number
   text: string
@@ -84,7 +79,7 @@ type WriteOperation = {
 }
 
 type ClipOperation = {
-  type: 'clip'
+  type: "clip"
   clip: Clip
 }
 
@@ -111,30 +106,24 @@ function intersectClip(parent: Clip | undefined, child: Clip): Clip {
   }
 }
 
-function maxDefined(
-  a: number | undefined,
-  b: number | undefined,
-): number | undefined {
+function maxDefined(a: number | undefined, b: number | undefined): number | undefined {
   if (a === undefined) return b
   if (b === undefined) return a
   return Math.max(a, b)
 }
 
-function minDefined(
-  a: number | undefined,
-  b: number | undefined,
-): number | undefined {
+function minDefined(a: number | undefined, b: number | undefined): number | undefined {
   if (a === undefined) return b
   if (b === undefined) return a
   return Math.min(a, b)
 }
 
 type UnclipOperation = {
-  type: 'unclip'
+  type: "unclip"
 }
 
 type BlitOperation = {
-  type: 'blit'
+  type: "blit"
   src: Screen
   x: number
   y: number
@@ -143,14 +132,14 @@ type BlitOperation = {
 }
 
 type ShiftOperation = {
-  type: 'shift'
+  type: "shift"
   top: number
   bottom: number
   n: number
 }
 
 type ClearOperation = {
-  type: 'clear'
+  type: "clear"
   region: Rectangle
   /**
    * Set when the clear is for an absolute-positioned node's old bounds.
@@ -163,7 +152,7 @@ type ClearOperation = {
 }
 
 type NoSelectOperation = {
-  type: 'noSelect'
+  type: "noSelect"
   region: Rectangle
 }
 
@@ -208,7 +197,7 @@ export default class Output {
    * Copy cells from a source screen region (blit = block image transfer).
    */
   blit(src: Screen, x: number, y: number, width: number, height: number): void {
-    this.operations.push({ type: 'blit', src, x, y, width, height })
+    this.operations.push({ type: "blit", src, x, y, width, height })
   }
 
   /**
@@ -217,7 +206,7 @@ export default class Output {
    * prevScreen content during pure scroll, avoiding full child re-render.
    */
   shift(top: number, bottom: number, n: number): void {
-    this.operations.push({ type: 'shift', top, bottom, n })
+    this.operations.push({ type: "shift", top, bottom, n })
   }
 
   /**
@@ -225,7 +214,7 @@ export default class Output {
    * ensure stale content from the previous frame is removed.
    */
   clear(region: Rectangle, fromAbsolute?: boolean): void {
-    this.operations.push({ type: 'clear', region, fromAbsolute })
+    this.operations.push({ type: "clear", region, fromAbsolute })
   }
 
   /**
@@ -235,7 +224,7 @@ export default class Output {
    * the mark wins regardless of what's blitted into the region.
    */
   noSelect(region: Rectangle): void {
-    this.operations.push({ type: 'noSelect', region })
+    this.operations.push({ type: "noSelect", region })
   }
 
   write(x: number, y: number, text: string, softWrap?: boolean[]): void {
@@ -244,7 +233,7 @@ export default class Output {
     }
 
     this.operations.push({
-      type: 'write',
+      type: "write",
       x,
       y,
       text,
@@ -254,14 +243,14 @@ export default class Output {
 
   clip(clip: Clip) {
     this.operations.push({
-      type: 'clip',
+      type: "clip",
       clip,
     })
   }
 
   unclip() {
     this.operations.push({
-      type: 'unclip',
+      type: "unclip",
     })
   }
 
@@ -287,7 +276,7 @@ export default class Output {
     // can't have been painted on top of a sibling's current position.
     const absoluteClears: Rectangle[] = []
     for (const operation of this.operations) {
-      if (operation.type !== 'clear') continue
+      if (operation.type !== "clear") continue
       const { x, y, width, height } = operation.region
       const startX = Math.max(0, x)
       const startY = Math.max(0, y)
@@ -308,11 +297,11 @@ export default class Output {
 
     for (const operation of this.operations) {
       switch (operation.type) {
-        case 'clear':
+        case "clear":
           // handled in pass 1
           continue
 
-        case 'clip':
+        case "clip":
           // Intersect with the parent clip (if any) so nested
           // overflow:hidden boxes can't write outside their ancestor's
           // clip region. Without this, a message with overflow:hidden at
@@ -323,21 +312,15 @@ export default class Output {
           clips.push(intersectClip(clips.at(-1), operation.clip))
           continue
 
-        case 'unclip':
+        case "unclip":
           clips.pop()
           continue
 
-        case 'blit': {
+        case "blit": {
           // Bulk-copy cells from source screen region using TypedArray.set().
           // Tracking damage ensures diff() checks blitted cells for stale content
           // when a parent blits an area that previously contained child content.
-          const {
-            src,
-            x: regionX,
-            y: regionY,
-            width: regionWidth,
-            height: regionHeight,
-          } = operation
+          const { src, x: regionX, y: regionY, width: regionWidth, height: regionHeight } = operation
           // Intersect with active clip — a child's clean-blit passes its full
           // cached rect, but the parent ScrollBox may have shrunk (pill mount).
           // Without this, the blit writes past the ScrollBox's new bottom edge
@@ -345,18 +328,8 @@ export default class Output {
           const clip = clips.at(-1)
           const startX = Math.max(regionX, clip?.x1 ?? 0)
           const startY = Math.max(regionY, clip?.y1 ?? 0)
-          const maxY = Math.min(
-            regionY + regionHeight,
-            screenHeight,
-            src.height,
-            clip?.y2 ?? Infinity,
-          )
-          const maxX = Math.min(
-            regionX + regionWidth,
-            screenWidth,
-            src.width,
-            clip?.x2 ?? Infinity,
-          )
+          const maxY = Math.min(regionY + regionHeight, screenHeight, src.height, clip?.y2 ?? Infinity)
+          const maxX = Math.min(regionX + regionWidth, screenWidth, src.width, clip?.x2 ?? Infinity)
           if (startX >= maxX || startY >= maxY) continue
           // Skip rows covered by an absolute-positioned node's clear.
           // Absolute nodes overlay normal-flow siblings, so prevScreen in
@@ -371,13 +344,7 @@ export default class Output {
           for (let row = startY; row <= maxY; row++) {
             const excluded =
               row < maxY &&
-              absoluteClears.some(
-                r =>
-                  row >= r.y &&
-                  row < r.y + r.height &&
-                  startX >= r.x &&
-                  maxX <= r.x + r.width,
-              )
+              absoluteClears.some((r) => row >= r.y && row < r.y + r.height && startX >= r.x && maxX <= r.x + r.width)
             if (excluded || row === maxY) {
               if (row > rowStart) {
                 blitRegion(screen, src, startX, rowStart, maxX, row)
@@ -389,26 +356,24 @@ export default class Output {
           continue
         }
 
-        case 'shift': {
+        case "shift": {
           shiftRows(screen, operation.top, operation.bottom, operation.n)
           continue
         }
 
-        case 'write': {
+        case "write": {
           const { text, softWrap } = operation
           let { x, y } = operation
-          let lines = text.split('\n')
+          let lines = text.split("\n")
           let swFrom = 0
           let prevContentEnd = 0
 
           const clip = clips.at(-1)
 
           if (clip) {
-            const clipHorizontally =
-              typeof clip?.x1 === 'number' && typeof clip?.x2 === 'number'
+            const clipHorizontally = typeof clip?.x1 === "number" && typeof clip?.x2 === "number"
 
-            const clipVertically =
-              typeof clip?.y1 === 'number' && typeof clip?.y2 === 'number'
+            const clipVertically = typeof clip?.y1 === "number" && typeof clip?.y2 === "number"
 
             // If text is positioned outside of clipping area altogether,
             // skip to the next operation to avoid unnecessary calculations
@@ -429,7 +394,7 @@ export default class Output {
             }
 
             if (clipHorizontally) {
-              lines = lines.map(line => {
+              lines = lines.map((line) => {
                 const from = x < clip.x1! ? clip.x1! - x : 0
                 const width = stringWidth(line)
                 const to = x + width > clip.x2! ? clip.x2! - x : width
@@ -482,15 +447,7 @@ export default class Output {
             if (lineY >= screenHeight) {
               break
             }
-            const contentEnd = writeLineToScreen(
-              screen,
-              line,
-              x,
-              lineY,
-              screenWidth,
-              this.stylePool,
-              this.charCache,
-            )
+            const contentEnd = writeLineToScreen(screen, line, x, lineY, screenWidth, this.stylePool, this.charCache)
             writeCells += contentEnd - x
             // See Screen.softWrap docstring for the encoding. contentEnd
             // from writeLineToScreen is tab-expansion-aware, unlike
@@ -513,7 +470,7 @@ export default class Output {
     // blits, and moving a <NoSelect> between frames correctly clears the
     // old region (resetScreen already zeroed the bitmap).
     for (const operation of this.operations) {
-      if (operation.type === 'noSelect') {
+      if (operation.type === "noSelect") {
         const { x, y, width, height } = operation.region
         markNoSelectRegion(screen, x, y, width, height)
       }
@@ -550,10 +507,7 @@ function stylesEqual(a: AnsiCode[], b: AnsiCode[]): boolean {
  * Also precomputes styleId + hyperlink per style run (not per char) — an
  * 80-char line with 3 style runs does 3 intern calls instead of 80.
  */
-function styledCharsWithGraphemeClustering(
-  chars: StyledChar[],
-  stylePool: StylePool,
-): ClusteredChar[] {
+function styledCharsWithGraphemeClustering(chars: StyledChar[], stylePool: StylePool): ClusteredChar[] {
   const charCount = chars.length
   if (charCount === 0) return []
 
@@ -567,7 +521,7 @@ function styledCharsWithGraphemeClustering(
 
     // Different styles means we need to flush and start new buffer
     if (bufferChars.length > 0 && !stylesEqual(styles, bufferStyles)) {
-      flushBuffer(bufferChars.join(''), bufferStyles, stylePool, result)
+      flushBuffer(bufferChars.join(""), bufferStyles, stylePool, result)
       bufferChars.length = 0
     }
 
@@ -577,18 +531,13 @@ function styledCharsWithGraphemeClustering(
 
   // Final flush
   if (bufferChars.length > 0) {
-    flushBuffer(bufferChars.join(''), bufferStyles, stylePool, result)
+    flushBuffer(bufferChars.join(""), bufferStyles, stylePool, result)
   }
 
   return result
 }
 
-function flushBuffer(
-  buffer: string,
-  styles: AnsiCode[],
-  stylePool: StylePool,
-  out: ClusteredChar[],
-): void {
+function flushBuffer(buffer: string, styles: AnsiCode[], stylePool: StylePool, out: ClusteredChar[]): void {
   // Compute styleId + hyperlink ONCE for the whole style run.
   // Every grapheme in this buffer shares the same styles.
   //
@@ -599,14 +548,8 @@ function flushBuffer(
   // URL is present.
   const hyperlink = extractHyperlinkFromStyles(styles) ?? undefined
   const hasOsc8Styles =
-    hyperlink !== undefined ||
-    styles.some(
-      s =>
-        s.code.length >= OSC8_PREFIX.length && s.code.startsWith(OSC8_PREFIX),
-    )
-  const filteredStyles = hasOsc8Styles
-    ? filterOutHyperlinkStyles(styles)
-    : styles
+    hyperlink !== undefined || styles.some((s) => s.code.length >= OSC8_PREFIX.length && s.code.startsWith(OSC8_PREFIX))
+  const filteredStyles = hasOsc8Styles ? filterOutHyperlinkStyles(styles) : styles
   const styleId = stylePool.intern(filteredStyles)
 
   for (const { segment: grapheme } of getGraphemeSegmenter().segment(buffer)) {
@@ -641,12 +584,7 @@ function writeLineToScreen(
 ): number {
   let characters = charCache.get(line)
   if (!characters) {
-    characters = reorderBidi(
-      styledCharsWithGraphemeClustering(
-        styledCharsFromTokens(tokenize(line)),
-        stylePool,
-      ),
-    )
+    characters = reorderBidi(styledCharsWithGraphemeClustering(styledCharsFromTokens(tokenize(line)), stylePool))
     charCache.set(line, characters)
   }
 
@@ -666,7 +604,7 @@ function writeLineToScreen(
         const spacesToNextStop = tabWidth - (offsetX % tabWidth)
         for (let i = 0; i < spacesToNextStop && offsetX < screenWidth; i++) {
           setCellAt(screen, offsetX, y, {
-            char: ' ',
+            char: " ",
             styleId: stylePool.none,
             width: CellWidth.Narrow,
             hyperlink: undefined,
@@ -682,16 +620,11 @@ function writeLineToScreen(
       else if (codePoint === 0x1b) {
         const nextChar = characters[charIdx + 1]?.value
         const nextCode = nextChar?.codePointAt(0)
-        if (
-          nextChar === '(' ||
-          nextChar === ')' ||
-          nextChar === '*' ||
-          nextChar === '+'
-        ) {
+        if (nextChar === "(" || nextChar === ")" || nextChar === "*" || nextChar === "+") {
           // Charset selection: ESC ( X, ESC ) X, etc.
           // Skip the intermediate char and the charset designator
           charIdx += 2
-        } else if (nextChar === '[') {
+        } else if (nextChar === "[") {
           // CSI sequence: ESC [ ... final-byte
           // Final byte is in range 0x40-0x7E (@, A-Z, [\]^_`, a-z, {|}~)
           // Examples: ESC[2J (clear), ESC[?25l (cursor hide), ESC[H (home)
@@ -704,13 +637,7 @@ function writeLineToScreen(
               break
             }
           }
-        } else if (
-          nextChar === ']' ||
-          nextChar === 'P' ||
-          nextChar === '_' ||
-          nextChar === '^' ||
-          nextChar === 'X'
-        ) {
+        } else if (nextChar === "]" || nextChar === "P" || nextChar === "_" || nextChar === "^" || nextChar === "X") {
           // String-based sequences terminated by BEL (0x07) or ST (ESC \):
           // - OSC: ESC ] ... (Operating System Command)
           // - DCS: ESC P ... (Device Control String)
@@ -722,24 +649,20 @@ function writeLineToScreen(
             charIdx++
             const c = characters[charIdx]?.value
             // BEL (0x07) terminates the sequence
-            if (c === '\x07') {
+            if (c === "\x07") {
               break
             }
             // ST (String Terminator) is ESC \
             // When we see ESC, check if next char is backslash
-            if (c === '\x1b') {
+            if (c === "\x1b") {
               const nextC = characters[charIdx + 1]?.value
-              if (nextC === '\\') {
+              if (nextC === "\\") {
                 charIdx++ // skip the backslash too
                 break
               }
             }
           }
-        } else if (
-          nextCode !== undefined &&
-          nextCode >= 0x30 &&
-          nextCode <= 0x7e
-        ) {
+        } else if (nextCode !== undefined && nextCode >= 0x30 && nextCode <= 0x7e) {
           // Single-character escape sequences: ESC followed by 0x30-0x7E
           // (excluding the multi-char introducers already handled above)
           // - Fp range (0x30-0x3F): ESC 7 (save cursor), ESC 8 (restore)
@@ -772,7 +695,7 @@ function writeLineToScreen(
     // to mark the blank column, matching terminal behavior.
     if (isWideCharacter && offsetX + 2 > screenWidth) {
       setCellAt(screen, offsetX, y, {
-        char: ' ',
+        char: " ",
         styleId: stylePool.none,
         width: CellWidth.SpacerHead,
         hyperlink: undefined,

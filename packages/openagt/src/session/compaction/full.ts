@@ -81,14 +81,14 @@ When constructing the summary, try to stick to this template:
  * that an image was shared.
  */
 export function stripImagesFromMessages(messages: MessageV2.WithParts[]): MessageV2.WithParts[] {
-  return messages.map(message => {
+  return messages.map((message) => {
     if (message.info.role !== "user") {
       return message
     }
 
     let hasMediaBlock = false
 
-    const updatedParts = message.parts.map(part => {
+    const updatedParts = message.parts.map((part) => {
       // Handle text parts - check for inline images
       if (part.type === "text") {
         // Text parts don't typically contain image blocks in our model
@@ -293,9 +293,7 @@ export function formatCompactPrompt(
   }
 
   if (context.recentTools.length > 0) {
-    parts.push(
-      `RECENT TOOL CALLS:\n${context.recentTools.map((t) => `- ${t.tool}: ${t.input}`).join("\n")}\n`,
-    )
+    parts.push(`RECENT TOOL CALLS:\n${context.recentTools.map((t) => `- ${t.tool}: ${t.input}`).join("\n")}\n`)
   }
 
   if (context.pendingTasks.length > 0) {

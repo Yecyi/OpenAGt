@@ -1,49 +1,42 @@
-import { z } from 'zod/v4'
-import { getSessionId } from '../../bootstrap/state.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../../services/analytics/metadata.js'
-import type { Tool } from '../../Tool.js'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { formatAgentId } from '../../utils/agentId.js'
-import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js'
-import { getCwd } from '../../utils/cwd.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import {
-  getDefaultMainLoopModel,
-  parseUserSpecifiedModel,
-} from '../../utils/model/model.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { getResolvedTeammateMode } from '../../utils/swarm/backends/registry.js'
-import { TEAM_LEAD_NAME } from '../../utils/swarm/constants.js'
-import type { TeamFile } from '../../utils/swarm/teamHelpers.js'
+import { z } from "zod/v4"
+import { getSessionId } from "../../bootstrap/state.js"
+import { logEvent } from "../../services/analytics/index.js"
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from "../../services/analytics/metadata.js"
+import type { Tool } from "../../Tool.js"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { formatAgentId } from "../../utils/agentId.js"
+import { isAgentSwarmsEnabled } from "../../utils/agentSwarmsEnabled.js"
+import { getCwd } from "../../utils/cwd.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import { getDefaultMainLoopModel, parseUserSpecifiedModel } from "../../utils/model/model.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { getResolvedTeammateMode } from "../../utils/swarm/backends/registry.js"
+import { TEAM_LEAD_NAME } from "../../utils/swarm/constants.js"
+import type { TeamFile } from "../../utils/swarm/teamHelpers.js"
 import {
   getTeamFilePath,
   readTeamFile,
   registerTeamForSessionCleanup,
   sanitizeName,
   writeTeamFileAsync,
-} from '../../utils/swarm/teamHelpers.js'
-import { assignTeammateColor } from '../../utils/swarm/teammateLayoutManager.js'
-import {
-  ensureTasksDir,
-  resetTaskList,
-  setLeaderTeamName,
-} from '../../utils/tasks.js'
-import { generateWordSlug } from '../../utils/words.js'
-import { TEAM_CREATE_TOOL_NAME } from './constants.js'
-import { getPrompt } from './prompt.js'
-import { renderToolUseMessage } from './UI.js'
+} from "../../utils/swarm/teamHelpers.js"
+import { assignTeammateColor } from "../../utils/swarm/teammateLayoutManager.js"
+import { ensureTasksDir, resetTaskList, setLeaderTeamName } from "../../utils/tasks.js"
+import { generateWordSlug } from "../../utils/words.js"
+import { TEAM_CREATE_TOOL_NAME } from "./constants.js"
+import { getPrompt } from "./prompt.js"
+import { renderToolUseMessage } from "./UI.js"
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
-    team_name: z.string().describe('Name for the new team to create.'),
-    description: z.string().optional().describe('Team description/purpose.'),
+    team_name: z.string().describe("Name for the new team to create."),
+    description: z.string().optional().describe("Team description/purpose."),
     agent_type: z
       .string()
       .optional()
       .describe(
         'Type/role of the team lead (e.g., "researcher", "test-runner"). ' +
-          'Used for team file and inter-agent coordination.',
+          "Used for team file and inter-agent coordination.",
       ),
   }),
 )
@@ -73,12 +66,12 @@ function generateUniqueTeamName(providedName: string): string {
 
 export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
   name: TEAM_CREATE_TOOL_NAME,
-  searchHint: 'create a multi-agent swarm team',
+  searchHint: "create a multi-agent swarm team",
   maxResultSizeChars: 100_000,
   shouldDefer: true,
 
   userFacingName() {
-    return ''
+    return ""
   },
 
   get inputSchema(): InputSchema {
@@ -97,7 +90,7 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
     if (!input.team_name || input.team_name.trim().length === 0) {
       return {
         result: false,
-        message: 'team_name is required for TeamCreate',
+        message: "team_name is required for TeamCreate",
         errorCode: 9,
       }
     }
@@ -105,7 +98,7 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
   },
 
   async description() {
-    return 'Create a new team for coordinating multiple agents'
+    return "Create a new team for coordinating multiple agents"
   },
 
   async prompt() {
@@ -115,10 +108,10 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
   mapToolResultToToolResultBlockParam(data, toolUseID) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result' as const,
+      type: "tool_result" as const,
       content: [
         {
-          type: 'text' as const,
+          type: "text" as const,
           text: jsonStringify(data),
         },
       ],
@@ -147,9 +140,7 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
     const leadAgentType = agent_type || TEAM_LEAD_NAME
     // Get the team lead's current model from AppState (handles session model, settings, CLI override)
     const leadModel = parseUserSpecifiedModel(
-      appState.mainLoopModelForSession ??
-        appState.mainLoopModel ??
-        getDefaultMainLoopModel(),
+      appState.mainLoopModelForSession ?? appState.mainLoopModel ?? getDefaultMainLoopModel(),
     )
 
     const teamFilePath = getTeamFilePath(finalTeamName)
@@ -167,7 +158,7 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
           agentType: leadAgentType,
           model: leadModel,
           joinedAt: Date.now(),
-          tmuxPaneId: '',
+          tmuxPaneId: "",
           cwd: getCwd(),
           subscriptions: [],
         },
@@ -191,7 +182,7 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
     setLeaderTeamName(sanitizeName(finalTeamName))
 
     // Update AppState with team context
-    setAppState(prev => ({
+    setAppState((prev) => ({
       ...prev,
       teamContext: {
         teamName: finalTeamName,
@@ -202,8 +193,8 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
             name: TEAM_LEAD_NAME,
             agentType: leadAgentType,
             color: assignTeammateColor(leadAgentId),
-            tmuxSessionName: '',
-            tmuxPaneId: '',
+            tmuxSessionName: "",
+            tmuxPaneId: "",
             cwd: getCwd(),
             spawnedAt: Date.now(),
           },
@@ -211,14 +202,11 @@ export const TeamCreateTool: Tool<InputSchema, Output> = buildTool({
       },
     }))
 
-    logEvent('tengu_team_created', {
-      team_name:
-        finalTeamName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    logEvent("tengu_team_created", {
+      team_name: finalTeamName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       teammate_count: 1,
-      lead_agent_type:
-        leadAgentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      teammate_mode:
-        getResolvedTeammateMode() as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      lead_agent_type: leadAgentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      teammate_mode: getResolvedTeammateMode() as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
 
     // Note: We intentionally don't set CLAUDE_CODE_AGENT_ID for the team lead because:

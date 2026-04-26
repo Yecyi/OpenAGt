@@ -703,8 +703,10 @@ it.live("session.processor effect tests mark pending tools as aborted on cleanup
         expect(yield* llm.calls).toBe(1)
         expect(call?.state.status).toBe("error")
         if (call?.state.status === "error") {
-          expect(call.state.error).toBe("Tool execution aborted")
+          expect(call.state.error).toBe("Tool execution interrupted during session cleanup")
           expect(call.state.metadata?.interrupted).toBe(true)
+          expect(call.state.metadata?.interruption_origin).toBe("session_cleanup")
+          expect(call.state.metadata?.root_cause).toBe("tool_result_missing_after_session_interrupt")
           expect(call.state.time.end).toBeDefined()
         }
       }),

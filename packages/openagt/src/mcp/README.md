@@ -106,6 +106,7 @@ type AuthStatus = "authenticated" | "expired" | "not_authenticated"
 ```
 
 特点：
+
 - 命令通过 `ChildProcess.spawn` 启动
 - 环境变量从 `process.env` 继承，可覆盖或添加
 - stderr 被收集到日志
@@ -130,6 +131,7 @@ type AuthStatus = "authenticated" | "expired" | "not_authenticated"
 ```
 
 **传输协议优先级：**
+
 1. `StreamableHTTP` — 主要协议，支持 OAuth
 2. `SSE` — 备选协议
 
@@ -164,13 +166,15 @@ MCP Service 实现完整的 OAuth 1.0a 认证流程：
 ```
 
 **认证命令：**
+
 ```bash
 opencode mcp auth <server-name>
 ```
 
 **状态检查：**
+
 ```typescript
-yield* MCP.Service.getAuthStatus(mcpName)
+yield * MCP.Service.getAuthStatus(mcpName)
 // → "authenticated" | "expired" | "not_authenticated"
 ```
 
@@ -189,10 +193,14 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number
     description: mcpTool.description ?? "",
     inputSchema: jsonSchema(schema),
     execute: async (args) => {
-      return client.callTool({
-        name: mcpTool.name,
-        arguments: args as Record<string, unknown>,
-      }, CallToolResultSchema, { timeout })
+      return client.callTool(
+        {
+          name: mcpTool.name,
+          arguments: args as Record<string, unknown>,
+        },
+        CallToolResultSchema,
+        { timeout },
+      )
     },
   })
 }
@@ -202,10 +210,10 @@ function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number
 
 ```typescript
 // 读取 MCP 资源
-const resource = yield* MCP.Service.readResource(clientName, "file:///path/to/resource")
+const resource = yield * MCP.Service.readResource(clientName, "file:///path/to/resource")
 
 // 获取 Prompt
-const prompt = yield* MCP.Service.getPrompt(clientName, "my-prompt", { arg: "value" })
+const prompt = yield * MCP.Service.getPrompt(clientName, "my-prompt", { arg: "value" })
 ```
 
 ### 工具名称空间
@@ -293,35 +301,36 @@ GITHUB_TOKEN=ghp_xxx  # GitHub MCP 服务器认证
 import { MCP } from "@/mcp"
 
 // 获取所有已连接服务器的 MCP 工具
-const tools = yield* MCP.Service.tools()
+const tools = yield * MCP.Service.tools()
 
 // 读取资源
-const resource = yield* MCP.Service.readResource("github", "github://user/repo")
+const resource = yield * MCP.Service.readResource("github", "github://user/repo")
 
 // 获取 Prompt
-const prompt = yield* MCP.Service.getPrompt("github", "review-pr", { pr_number: "123" })
+const prompt = yield * MCP.Service.getPrompt("github", "review-pr", { pr_number: "123" })
 ```
 
 ### 动态添加服务器
 
 ```typescript
-yield* MCP.Service.add("new-server", {
-  type: "remote",
-  url: "https://new-server.com/mcp",
-})
+yield *
+  MCP.Service.add("new-server", {
+    type: "remote",
+    url: "https://new-server.com/mcp",
+  })
 ```
 
 ### 认证流程
 
 ```typescript
 // 开始认证
-const { authorizationUrl, oauthState } = yield* MCP.Service.startAuth("github")
+const { authorizationUrl, oauthState } = yield * MCP.Service.startAuth("github")
 
 // 完成认证
-const status = yield* MCP.Service.finishAuth("github", authorizationCode)
+const status = yield * MCP.Service.finishAuth("github", authorizationCode)
 
 // 检查状态
-const authStatus = yield* MCP.Service.getAuthStatus("github")
+const authStatus = yield * MCP.Service.getAuthStatus("github")
 ```
 
 ---
@@ -331,7 +340,7 @@ const authStatus = yield* MCP.Service.getAuthStatus("github")
 ### 查看 MCP 服务器状态
 
 ```typescript
-const status = yield* MCP.Service.status()
+const status = yield * MCP.Service.status()
 console.log(status)
 // {
 //   "filesystem": { status: "connected" },
@@ -343,7 +352,7 @@ console.log(status)
 ### 查看已发现工具
 
 ```typescript
-const tools = yield* MCP.Service.tools()
+const tools = yield * MCP.Service.tools()
 console.log(Object.keys(tools))
 // ["filesystem_read_file", "filesystem_list_directory", "github_get_pr", ...]
 ```

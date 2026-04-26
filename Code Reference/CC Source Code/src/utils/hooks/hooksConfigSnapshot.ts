@@ -1,9 +1,9 @@
-import { resetSdkInitState } from '../../bootstrap/state.js'
-import { isRestrictedToPluginOnly } from '../settings/pluginOnlyPolicy.js'
+import { resetSdkInitState } from "../../bootstrap/state.js"
+import { isRestrictedToPluginOnly } from "../settings/pluginOnlyPolicy.js"
 // Import as module object so spyOn works in tests (direct imports bypass spies)
-import * as settingsModule from '../settings/settings.js'
-import { resetSettingsCache } from '../settings/settingsCache.js'
-import type { HooksSettings } from '../settings/types.js'
+import * as settingsModule from "../settings/settings.js"
+import { resetSettingsCache } from "../settings/settingsCache.js"
+import type { HooksSettings } from "../settings/types.js"
 
 let initialHooksConfig: HooksSettings | null = null
 
@@ -16,7 +16,7 @@ let initialHooksConfig: HooksSettings | null = null
  * Otherwise, returns merged hooks from all sources (backwards compatible).
  */
 function getHooksFromAllowedSources(): HooksSettings {
-  const policySettings = settingsModule.getSettingsForSource('policySettings')
+  const policySettings = settingsModule.getSettingsForSource("policySettings")
 
   // If managed settings disables all hooks, return empty
   if (policySettings?.disableAllHooks === true) {
@@ -36,7 +36,7 @@ function getHooksFromAllowedSources(): HooksSettings {
   // plugin/built-in/policySettings agents register normally, user-sourced
   // agents skip registration under ["hooks"]. A blanket execution-time
   // block here would over-kill plugin agents' hooks.
-  if (isRestrictedToPluginOnly('hooks')) {
+  if (isRestrictedToPluginOnly("hooks")) {
     return policySettings?.hooks ?? {}
   }
 
@@ -60,16 +60,13 @@ function getHooksFromAllowedSources(): HooksSettings {
  *   cannot disable managed hooks, so they effectively become managed-only)
  */
 export function shouldAllowManagedHooksOnly(): boolean {
-  const policySettings = settingsModule.getSettingsForSource('policySettings')
+  const policySettings = settingsModule.getSettingsForSource("policySettings")
   if (policySettings?.allowManagedHooksOnly === true) {
     return true
   }
   // If disableAllHooks is set but NOT from managed settings,
   // treat as managed-only (non-managed hooks disabled, managed hooks still run)
-  if (
-    settingsModule.getSettings_DEPRECATED().disableAllHooks === true &&
-    policySettings?.disableAllHooks !== true
-  ) {
+  if (settingsModule.getSettings_DEPRECATED().disableAllHooks === true && policySettings?.disableAllHooks !== true) {
     return true
   }
   return false
@@ -81,10 +78,7 @@ export function shouldAllowManagedHooksOnly(): boolean {
  * When disableAllHooks is set in non-managed settings, managed hooks still run.
  */
 export function shouldDisableAllHooksIncludingManaged(): boolean {
-  return (
-    settingsModule.getSettingsForSource('policySettings')?.disableAllHooks ===
-    true
-  )
+  return settingsModule.getSettingsForSource("policySettings")?.disableAllHooks === true
 }
 
 /**

@@ -1,9 +1,9 @@
 /* eslint-disable custom-rules/no-top-level-side-effects */
 
-import { appendFileSync } from 'fs'
-import createReconciler from 'react-reconciler'
-import { getYogaCounters } from 'src/native-ts/yoga-layout/index.js'
-import { isEnvTruthy } from '../utils/envUtils.js'
+import { appendFileSync } from "fs"
+import createReconciler from "react-reconciler"
+import { getYogaCounters } from "src/native-ts/yoga-layout/index.js"
+import { isEnvTruthy } from "../utils/envUtils.js"
 import {
   appendChildNode,
   clearYogaNodeReferences,
@@ -20,23 +20,23 @@ import {
   setTextNodeValue,
   setTextStyles,
   type TextNode,
-} from './dom.js'
-import { Dispatcher } from './events/dispatcher.js'
-import { EVENT_HANDLER_PROPS } from './events/event-handlers.js'
-import { getFocusManager, getRootNode } from './focus.js'
-import { LayoutDisplay } from './layout/node.js'
-import applyStyles, { type Styles, type TextStyles } from './styles.js'
+} from "./dom.js"
+import { Dispatcher } from "./events/dispatcher.js"
+import { EVENT_HANDLER_PROPS } from "./events/event-handlers.js"
+import { getFocusManager, getRootNode } from "./focus.js"
+import { LayoutDisplay } from "./layout/node.js"
+import applyStyles, { type Styles, type TextStyles } from "./styles.js"
 
 // We need to conditionally perform devtools connection to avoid
 // accidentally breaking other third-party code.
 // See https://github.com/vadimdemedes/ink/issues/384
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === "development") {
   try {
     // eslint-disable-next-line custom-rules/no-top-level-dynamic-import -- dev-only; NODE_ENV check is DCE'd in production
-    void import('./devtools.js')
+    void import("./devtools.js")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND') {
+    if (error.code === "ERR_MODULE_NOT_FOUND") {
       // biome-ignore lint/suspicious/noConsole: intentional warning
       console.warn(
         `
@@ -46,7 +46,7 @@ but this failed as it was not installed. Debugging with React Devtools requires 
 To install use this command:
 
 $ npm install --save-dev react-devtools-core
-				`.trim() + '\n',
+				`.trim() + "\n",
       )
     } else {
       // eslint-disable-next-line @typescript-eslint/only-throw-error
@@ -119,9 +119,9 @@ function setEventHandler(node: DOMElement, key: string, value: unknown): void {
 }
 
 function applyProp(node: DOMElement, key: string, value: unknown): void {
-  if (key === 'children') return
+  if (key === "children") return
 
-  if (key === 'style') {
+  if (key === "style") {
     setStyle(node, value as Styles)
     if (node.yogaNode) {
       applyStyles(node.yogaNode, value as Styles)
@@ -129,7 +129,7 @@ function applyProp(node: DOMElement, key: string, value: unknown): void {
     return
   }
 
-  if (key === 'textStyles') {
+  if (key === "textStyles") {
     node.textStyles = value as TextStyles
     return
   }
@@ -164,10 +164,10 @@ export function getOwnerChain(fiber: unknown): string[] {
     seen.add(cur)
     const t = cur.elementType
     const name =
-      typeof t === 'function'
+      typeof t === "function"
         ? (t as { displayName?: string; name?: string }).displayName ||
           (t as { displayName?: string; name?: string }).name
-        : typeof t === 'string'
+        : typeof t === "string"
           ? undefined // host element (ink-box etc) — skip
           : t?.displayName || t?.name
     if (name && name !== chain[chain.length - 1]) chain.push(name)
@@ -264,17 +264,14 @@ const reconciler = createReconciler<
       _createCount = 0
       if (now - _lastLog > 1000) {
         // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
-        appendFileSync(
-          COMMIT_LOG,
-          `${now.toFixed(1)} commits=${_commits}/s maxGap=${_maxGapMs.toFixed(1)}ms\n`,
-        )
+        appendFileSync(COMMIT_LOG, `${now.toFixed(1)} commits=${_commits}/s maxGap=${_maxGapMs.toFixed(1)}ms\n`)
         _commits = 0
         _maxGapMs = 0
         _lastLog = now
       }
     }
     const _t0 = COMMIT_LOG ? performance.now() : 0
-    if (typeof rootNode.onComputeLayout === 'function') {
+    if (typeof rootNode.onComputeLayout === "function") {
       rootNode.onComputeLayout()
     }
     if (COMMIT_LOG) {
@@ -289,7 +286,7 @@ const reconciler = createReconciler<
       }
     }
 
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       if (rootNode.childNodes.length === 0 && rootNode.hasRenderedContent) {
         return
       }
@@ -306,20 +303,13 @@ const reconciler = createReconciler<
       const renderMs = performance.now() - _tr
       if (renderMs > 10) {
         // eslint-disable-next-line custom-rules/no-sync-fs -- debug instrumentation
-        appendFileSync(
-          COMMIT_LOG,
-          `${_tr.toFixed(1)} SLOW_PAINT ${renderMs.toFixed(1)}ms\n`,
-        )
+        appendFileSync(COMMIT_LOG, `${_tr.toFixed(1)} SLOW_PAINT ${renderMs.toFixed(1)}ms\n`)
       }
     }
   },
-  getChildHostContext(
-    parentHostContext: HostContext,
-    type: ElementNames,
-  ): HostContext {
+  getChildHostContext(parentHostContext: HostContext, type: ElementNames): HostContext {
     const previousIsInsideText = parentHostContext.isInsideText
-    const isInsideText =
-      type === 'ink-text' || type === 'ink-virtual-text' || type === 'ink-link'
+    const isInsideText = type === "ink-text" || type === "ink-virtual-text" || type === "ink-link"
 
     if (previousIsInsideText === isInsideText) {
       return parentHostContext
@@ -335,14 +325,11 @@ const reconciler = createReconciler<
     hostContext: HostContext,
     internalHandle?: unknown,
   ): DOMElement {
-    if (hostContext.isInsideText && originalType === 'ink-box') {
+    if (hostContext.isInsideText && originalType === "ink-box") {
       throw new Error(`<Box> can't be nested inside <Text> component`)
     }
 
-    const type =
-      originalType === 'ink-text' && hostContext.isInsideText
-        ? 'ink-virtual-text'
-        : originalType
+    const type = originalType === "ink-text" && hostContext.isInsideText ? "ink-virtual-text" : originalType
 
     const node = createNode(type)
     if (COMMIT_LOG) _createCount++
@@ -357,22 +344,16 @@ const reconciler = createReconciler<
 
     return node
   },
-  createTextInstance(
-    text: string,
-    _root: DOMElement,
-    hostContext: HostContext,
-  ): TextNode {
+  createTextInstance(text: string, _root: DOMElement, hostContext: HostContext): TextNode {
     if (!hostContext.isInsideText) {
-      throw new Error(
-        `Text string "${text}" must be rendered inside <Text> component`,
-      )
+      throw new Error(`Text string "${text}" must be rendered inside <Text> component`)
     }
 
     return createTextNode(text)
   },
   resetTextContent() {},
   hideTextInstance(node) {
-    setTextNodeValue(node, '')
+    setTextNodeValue(node, "")
   },
   unhideTextInstance(node, text) {
     setTextNodeValue(node, text)
@@ -391,12 +372,8 @@ const reconciler = createReconciler<
   appendInitialChild: appendChildNode,
   appendChild: appendChildNode,
   insertBefore: insertBeforeNode,
-  finalizeInitialChildren(
-    _node: DOMElement,
-    _type: ElementNames,
-    props: Props,
-  ): boolean {
-    return props['autoFocus'] === true
+  finalizeInitialChildren(_node: DOMElement, _type: ElementNames, props: Props): boolean {
+    return props["autoFocus"] === true
   },
   commitMount(node: DOMElement): void {
     getFocusManager(node).handleAutoFocus(node)
@@ -423,23 +400,18 @@ const reconciler = createReconciler<
     getFocusManager(node).handleNodeRemoved(removeNode, node)
   },
   // React 19 commitUpdate receives old and new props directly instead of an updatePayload
-  commitUpdate(
-    node: DOMElement,
-    _type: ElementNames,
-    oldProps: Props,
-    newProps: Props,
-  ): void {
+  commitUpdate(node: DOMElement, _type: ElementNames, oldProps: Props, newProps: Props): void {
     const props = diff(oldProps, newProps)
-    const style = diff(oldProps['style'] as Styles, newProps['style'] as Styles)
+    const style = diff(oldProps["style"] as Styles, newProps["style"] as Styles)
 
     if (props) {
       for (const [key, value] of Object.entries(props)) {
-        if (key === 'style') {
+        if (key === "style") {
           setStyle(node, value as Styles)
           continue
         }
 
-        if (key === 'textStyles') {
+        if (key === "textStyles") {
           setTextStyles(node, value as TextStyles)
           continue
         }
@@ -454,7 +426,7 @@ const reconciler = createReconciler<
     }
 
     if (style && node.yogaNode) {
-      applyStyles(node.yogaNode, style, newProps['style'] as Styles)
+      applyStyles(node.yogaNode, style, newProps["style"] as Styles)
     }
   },
   commitTextUpdate(node: TextNode, _oldText: string, newText: string): void {
@@ -463,7 +435,7 @@ const reconciler = createReconciler<
   removeChild(node, removeNode) {
     removeChildNode(node, removeNode)
     cleanupYogaNode(removeNode)
-    if (removeNode.nodeName !== '#text') {
+    if (removeNode.nodeName !== "#text") {
       const root = getRootNode(node)
       root.focusManager!.handleNodeRemoved(removeNode, root)
     }
@@ -482,7 +454,7 @@ const reconciler = createReconciler<
   },
   NotPendingTransition: null,
   HostTransitionContext: {
-    $$typeof: Symbol.for('react.context'),
+    $$typeof: Symbol.for("react.context"),
     _currentValue: null,
   } as never,
   setCurrentUpdatePriority(newPriority: number): void {

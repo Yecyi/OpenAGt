@@ -12,7 +12,9 @@ afterEach(async () => {
   await Instance.disposeAll()
 })
 
-const it = testEffect(Layer.mergeAll(Config.defaultLayer, CrossSpawnSpawner.defaultLayer, Session.defaultLayer, TaskRuntime.defaultLayer))
+const it = testEffect(
+  Layer.mergeAll(Config.defaultLayer, CrossSpawnSpawner.defaultLayer, Session.defaultLayer, TaskRuntime.defaultLayer),
+)
 
 describe("task runtime agentic scheduling", () => {
   it.live("allows implement tasks with distinct write_scope to run in parallel", () =>
@@ -69,10 +71,10 @@ describe("task runtime agentic scheduling", () => {
           dependsOn: [],
         })
 
-        const [first, second] = yield* Effect.all([
-          tasks.tryStartPending(task.task_id, parent.id),
-          tasks.tryStartPending(task.task_id, parent.id),
-        ], { concurrency: "unbounded" })
+        const [first, second] = yield* Effect.all(
+          [tasks.tryStartPending(task.task_id, parent.id), tasks.tryStartPending(task.task_id, parent.id)],
+          { concurrency: "unbounded" },
+        )
 
         expect([first, second].filter(Boolean)).toHaveLength(1)
         expect((yield* tasks.list(parent.id)).find((item) => item.task_id === task.task_id)?.status).toBe("running")

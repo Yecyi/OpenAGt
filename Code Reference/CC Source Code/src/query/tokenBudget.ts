@@ -1,4 +1,4 @@
-import { getBudgetContinuationMessage } from '../utils/tokenBudget.js'
+import { getBudgetContinuationMessage } from "../utils/tokenBudget.js"
 
 const COMPLETION_THRESHOLD = 0.9
 const DIMINISHING_THRESHOLD = 500
@@ -20,7 +20,7 @@ export function createBudgetTracker(): BudgetTracker {
 }
 
 type ContinueDecision = {
-  action: 'continue'
+  action: "continue"
   nudgeMessage: string
   continuationCount: number
   pct: number
@@ -29,7 +29,7 @@ type ContinueDecision = {
 }
 
 type StopDecision = {
-  action: 'stop'
+  action: "stop"
   completionEvent: {
     continuationCount: number
     pct: number
@@ -49,7 +49,7 @@ export function checkTokenBudget(
   globalTurnTokens: number,
 ): TokenBudgetDecision {
   if (agentId || budget === null || budget <= 0) {
-    return { action: 'stop', completionEvent: null }
+    return { action: "stop", completionEvent: null }
   }
 
   const turnTokens = globalTurnTokens
@@ -66,7 +66,7 @@ export function checkTokenBudget(
     tracker.lastDeltaTokens = deltaSinceLastCheck
     tracker.lastGlobalTurnTokens = globalTurnTokens
     return {
-      action: 'continue',
+      action: "continue",
       nudgeMessage: getBudgetContinuationMessage(pct, turnTokens, budget),
       continuationCount: tracker.continuationCount,
       pct,
@@ -77,7 +77,7 @@ export function checkTokenBudget(
 
   if (isDiminishing || tracker.continuationCount > 0) {
     return {
-      action: 'stop',
+      action: "stop",
       completionEvent: {
         continuationCount: tracker.continuationCount,
         pct,
@@ -89,5 +89,5 @@ export function checkTokenBudget(
     }
   }
 
-  return { action: 'stop', completionEvent: null }
+  return { action: "stop", completionEvent: null }
 }

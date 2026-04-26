@@ -1,16 +1,16 @@
-import Fuse from 'fuse.js'
-import { basename } from 'path'
-import type { SuggestionItem } from 'src/components/PromptInput/PromptInputFooterSuggestions.js'
-import { generateFileSuggestions } from 'src/hooks/fileSuggestions.js'
-import type { ServerResource } from 'src/services/mcp/types.js'
-import { getAgentColor } from 'src/tools/AgentTool/agentColorManager.js'
-import type { AgentDefinition } from 'src/tools/AgentTool/loadAgentsDir.js'
-import { truncateToWidth } from 'src/utils/format.js'
-import { logError } from 'src/utils/log.js'
-import type { Theme } from 'src/utils/theme.js'
+import Fuse from "fuse.js"
+import { basename } from "path"
+import type { SuggestionItem } from "src/components/PromptInput/PromptInputFooterSuggestions.js"
+import { generateFileSuggestions } from "src/hooks/fileSuggestions.js"
+import type { ServerResource } from "src/services/mcp/types.js"
+import { getAgentColor } from "src/tools/AgentTool/agentColorManager.js"
+import type { AgentDefinition } from "src/tools/AgentTool/loadAgentsDir.js"
+import { truncateToWidth } from "src/utils/format.js"
+import { logError } from "src/utils/log.js"
+import type { Theme } from "src/utils/theme.js"
 
 type FileSuggestionSource = {
-  type: 'file'
+  type: "file"
   displayText: string
   description?: string
   path: string
@@ -19,7 +19,7 @@ type FileSuggestionSource = {
 }
 
 type McpResourceSuggestionSource = {
-  type: 'mcp_resource'
+  type: "mcp_resource"
   displayText: string
   description: string
   server: string
@@ -28,36 +28,33 @@ type McpResourceSuggestionSource = {
 }
 
 type AgentSuggestionSource = {
-  type: 'agent'
+  type: "agent"
   displayText: string
   description: string
   agentType: string
   color?: keyof Theme
 }
 
-type SuggestionSource =
-  | FileSuggestionSource
-  | McpResourceSuggestionSource
-  | AgentSuggestionSource
+type SuggestionSource = FileSuggestionSource | McpResourceSuggestionSource | AgentSuggestionSource
 
 /**
  * Creates a unified suggestion item from a source
  */
 function createSuggestionFromSource(source: SuggestionSource): SuggestionItem {
   switch (source.type) {
-    case 'file':
+    case "file":
       return {
         id: `file-${source.path}`,
         displayText: source.displayText,
         description: source.description,
       }
-    case 'mcp_resource':
+    case "mcp_resource":
       return {
         id: `mcp-resource-${source.server}__${source.uri}`,
         displayText: source.displayText,
         description: source.description,
       }
-    case 'agent':
+    case "agent":
       return {
         id: `agent-${source.agentType}`,
         displayText: source.displayText,
@@ -84,8 +81,8 @@ function generateAgentSuggestions(
   }
 
   try {
-    const agentSources: AgentSuggestionSource[] = agents.map(agent => ({
-      type: 'agent' as const,
+    const agentSources: AgentSuggestionSource[] = agents.map((agent) => ({
+      type: "agent" as const,
       displayText: `${agent.agentType} (agent)`,
       description: truncateDescription(agent.whenToUse),
       agentType: agent.agentType,
@@ -98,9 +95,8 @@ function generateAgentSuggestions(
 
     const queryLower = query.toLowerCase()
     return agentSources.filter(
-      agent =>
-        agent.agentType.toLowerCase().includes(queryLower) ||
-        agent.displayText.toLowerCase().includes(queryLower),
+      (agent) =>
+        agent.agentType.toLowerCase().includes(queryLower) || agent.displayText.toLowerCase().includes(queryLower),
     )
   } catch (error) {
     logError(error as Error)
@@ -123,25 +119,21 @@ export async function generateUnifiedSuggestions(
     Promise.resolve(generateAgentSuggestions(agents, query, showOnEmpty)),
   ])
 
-  const fileSources: FileSuggestionSource[] = fileSuggestions.map(
-    suggestion => ({
-      type: 'file' as const,
-      displayText: suggestion.displayText,
-      description: suggestion.description,
-      path: suggestion.displayText, // Use displayText as path for files
-      filename: basename(suggestion.displayText),
-      score: (suggestion.metadata as { score?: number } | undefined)?.score,
-    }),
-  )
+  const fileSources: FileSuggestionSource[] = fileSuggestions.map((suggestion) => ({
+    type: "file" as const,
+    displayText: suggestion.displayText,
+    description: suggestion.description,
+    path: suggestion.displayText, // Use displayText as path for files
+    filename: basename(suggestion.displayText),
+    score: (suggestion.metadata as { score?: number } | undefined)?.score,
+  }))
 
   const mcpSources: McpResourceSuggestionSource[] = Object.values(mcpResources)
     .flat()
-    .map(resource => ({
-      type: 'mcp_resource' as const,
+    .map((resource) => ({
+      type: "mcp_resource" as const,
       displayText: `${resource.server}:${resource.uri}`,
-      description: truncateDescription(
-        resource.description || resource.name || resource.uri,
-      ),
+      description: truncateDescription(resource.description || resource.name || resource.uri),
       server: resource.server,
       uri: resource.uri,
       name: resource.name || resource.uri,
@@ -149,9 +141,7 @@ export async function generateUnifiedSuggestions(
 
   if (!query) {
     const allSources = [...fileSources, ...mcpSources, ...agentSources]
-    return allSources
-      .slice(0, MAX_UNIFIED_SUGGESTIONS)
-      .map(createSuggestionFromSource)
+    return allSources.slice(0, MAX_UNIFIED_SUGGESTIONS).map(createSuggestionFromSource)
   }
 
   const nonFileSources: SuggestionSource[] = [...mcpSources, ...agentSources]
@@ -175,11 +165,11 @@ export async function generateUnifiedSuggestions(
       includeScore: true,
       threshold: 0.6, // Allow more matches through, we'll sort by score
       keys: [
-        { name: 'displayText', weight: 2 },
-        { name: 'name', weight: 3 },
-        { name: 'server', weight: 1 },
-        { name: 'description', weight: 1 },
-        { name: 'agentType', weight: 3 },
+        { name: "displayText", weight: 2 },
+        { name: "name", weight: 3 },
+        { name: "server", weight: 1 },
+        { name: "description", weight: 1 },
+        { name: "agentType", weight: 3 },
       ],
     })
 
@@ -197,6 +187,6 @@ export async function generateUnifiedSuggestions(
 
   return scoredResults
     .slice(0, MAX_UNIFIED_SUGGESTIONS)
-    .map(r => r.source)
+    .map((r) => r.source)
     .map(createSuggestionFromSource)
 }

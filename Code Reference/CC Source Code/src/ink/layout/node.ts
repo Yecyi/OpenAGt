@@ -2,93 +2,86 @@
 // Adapter interface for the layout engine (Yoga)
 
 export const LayoutEdge = {
-  All: 'all',
-  Horizontal: 'horizontal',
-  Vertical: 'vertical',
-  Left: 'left',
-  Right: 'right',
-  Top: 'top',
-  Bottom: 'bottom',
-  Start: 'start',
-  End: 'end',
+  All: "all",
+  Horizontal: "horizontal",
+  Vertical: "vertical",
+  Left: "left",
+  Right: "right",
+  Top: "top",
+  Bottom: "bottom",
+  Start: "start",
+  End: "end",
 } as const
 export type LayoutEdge = (typeof LayoutEdge)[keyof typeof LayoutEdge]
 
 export const LayoutGutter = {
-  All: 'all',
-  Column: 'column',
-  Row: 'row',
+  All: "all",
+  Column: "column",
+  Row: "row",
 } as const
 export type LayoutGutter = (typeof LayoutGutter)[keyof typeof LayoutGutter]
 
 export const LayoutDisplay = {
-  Flex: 'flex',
-  None: 'none',
+  Flex: "flex",
+  None: "none",
 } as const
 export type LayoutDisplay = (typeof LayoutDisplay)[keyof typeof LayoutDisplay]
 
 export const LayoutFlexDirection = {
-  Row: 'row',
-  RowReverse: 'row-reverse',
-  Column: 'column',
-  ColumnReverse: 'column-reverse',
+  Row: "row",
+  RowReverse: "row-reverse",
+  Column: "column",
+  ColumnReverse: "column-reverse",
 } as const
-export type LayoutFlexDirection =
-  (typeof LayoutFlexDirection)[keyof typeof LayoutFlexDirection]
+export type LayoutFlexDirection = (typeof LayoutFlexDirection)[keyof typeof LayoutFlexDirection]
 
 export const LayoutAlign = {
-  Auto: 'auto',
-  Stretch: 'stretch',
-  FlexStart: 'flex-start',
-  Center: 'center',
-  FlexEnd: 'flex-end',
+  Auto: "auto",
+  Stretch: "stretch",
+  FlexStart: "flex-start",
+  Center: "center",
+  FlexEnd: "flex-end",
 } as const
 export type LayoutAlign = (typeof LayoutAlign)[keyof typeof LayoutAlign]
 
 export const LayoutJustify = {
-  FlexStart: 'flex-start',
-  Center: 'center',
-  FlexEnd: 'flex-end',
-  SpaceBetween: 'space-between',
-  SpaceAround: 'space-around',
-  SpaceEvenly: 'space-evenly',
+  FlexStart: "flex-start",
+  Center: "center",
+  FlexEnd: "flex-end",
+  SpaceBetween: "space-between",
+  SpaceAround: "space-around",
+  SpaceEvenly: "space-evenly",
 } as const
 export type LayoutJustify = (typeof LayoutJustify)[keyof typeof LayoutJustify]
 
 export const LayoutWrap = {
-  NoWrap: 'nowrap',
-  Wrap: 'wrap',
-  WrapReverse: 'wrap-reverse',
+  NoWrap: "nowrap",
+  Wrap: "wrap",
+  WrapReverse: "wrap-reverse",
 } as const
 export type LayoutWrap = (typeof LayoutWrap)[keyof typeof LayoutWrap]
 
 export const LayoutPositionType = {
-  Relative: 'relative',
-  Absolute: 'absolute',
+  Relative: "relative",
+  Absolute: "absolute",
 } as const
-export type LayoutPositionType =
-  (typeof LayoutPositionType)[keyof typeof LayoutPositionType]
+export type LayoutPositionType = (typeof LayoutPositionType)[keyof typeof LayoutPositionType]
 
 export const LayoutOverflow = {
-  Visible: 'visible',
-  Hidden: 'hidden',
-  Scroll: 'scroll',
+  Visible: "visible",
+  Hidden: "hidden",
+  Scroll: "scroll",
 } as const
-export type LayoutOverflow =
-  (typeof LayoutOverflow)[keyof typeof LayoutOverflow]
+export type LayoutOverflow = (typeof LayoutOverflow)[keyof typeof LayoutOverflow]
 
-export type LayoutMeasureFunc = (
-  width: number,
-  widthMode: LayoutMeasureMode,
-) => { width: number; height: number }
+export type LayoutMeasureFunc = (width: number, widthMode: LayoutMeasureMode) => { width: number; height: number }
 
 export const LayoutMeasureMode = {
-  Undefined: 'undefined',
-  Exactly: 'exactly',
-  AtMost: 'at-most',
+  Undefined: "undefined",
+  Exactly: "exactly",
+  AtMost: "at-most",
 } as const
-export type LayoutMeasureMode =
-  (typeof LayoutMeasureMode)[keyof typeof LayoutMeasureMode]
+export type LayoutMeasureMode = (typeof LayoutMeasureMode)[keyof typeof LayoutMeasureMode]
 
 export type LayoutNode = {
   // Tree

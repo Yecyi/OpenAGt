@@ -6,22 +6,12 @@
  * identifies boundaries for use by keyboard input parsing.
  */
 
-import { C0, ESC_TYPE, isEscFinal } from './ansi.js'
-import { isCSIFinal, isCSIIntermediate, isCSIParam } from './csi.js'
+import { C0, ESC_TYPE, isEscFinal } from "./ansi.js"
+import { isCSIFinal, isCSIIntermediate, isCSIParam } from "./csi.js"
 
-export type Token =
-  | { type: 'text'; value: string }
-  | { type: 'sequence'; value: string }
+export type Token = { type: "text"; value: string } | { type: "sequence"; value: string }
 
-type State =
-  | 'ground'
-  | 'escape'
-  | 'escapeIntermediate'
-  | 'csi'
-  | 'ss3'
-  | 'osc'
-  | 'dcs'
-  | 'apc'
+type State = "ground" | "escape" | "escapeIntermediate" | "csi" | "ss3" | "osc" | "dcs" | "apc"
 
 export type Tokenizer = {
   /** Feed input and get resulting tokens */
@@ -55,34 +45,28 @@ type TokenizerOptions = {
  * ```
  */
 export function createTokenizer(options?: TokenizerOptions): Tokenizer {
-  let currentState: State = 'ground'
-  let currentBuffer = ''
+  let currentState: State = "ground"
+  let currentBuffer = ""
   const x10Mouse = options?.x10Mouse ?? false
 
   return {
     feed(input: string): Token[] {
-      const result = tokenize(
-        input,
-        currentState,
-        currentBuffer,
-        false,
-        x10Mouse,
-      )
+      const result = tokenize(input, currentState, currentBuffer, false, x10Mouse)
       currentState = result.state.state
       currentBuffer = result.state.buffer
       return result.tokens
     },
 
     flush(): Token[] {
-      const result = tokenize('', currentState, currentBuffer, true, x10Mouse)
+      const result = tokenize("", currentState, currentBuffer, true, x10Mouse)
       currentState = result.state.state
       currentBuffer = result.state.buffer
       return result.tokens
     },
 
     reset(): void {
-      currentState = 'ground'
-      currentBuffer = ''
+      currentState = "ground"
+      currentBuffer = ""
     },
 
     buffer(): string {
@@ -106,7 +90,7 @@ function tokenize(
   const tokens: Token[] = []
   const result: InternalState = {
     state: initialState,
-    buffer: '',
+    buffer: "",
   }
 
   const data = initialBuffer + input
@@ -118,7 +102,7 @@ function tokenize(
     if (i > textStart) {
       const text = data.slice(textStart, i)
       if (text) {
-        tokens.push({ type: 'text', value: text })
+        tokens.push({ type: "text", value: text })
       }
     }
     textStart = i
@@ -126,9 +110,9 @@ function tokenize(
 
   const emitSequence = (seq: string): void => {
     if (seq) {
-      tokens.push({ type: 'sequence', value: seq })
+      tokens.push({ type: "sequence", value: seq })
     }
-    result.state = 'ground'
+    result.state = "ground"
     textStart = i
   }
 
@@ -136,37 +120,37 @@ function tokenize(
     const code = data.charCodeAt(i)
 
     switch (result.state) {
-      case 'ground':
+      case "ground":
         if (code === C0.ESC) {
           flushText()
           seqStart = i
-          result.state = 'escape'
+          result.state = "escape"
           i++
         } else {
           i++
         }
         break
 
-      case 'escape':
+      case "escape":
         if (code === ESC_TYPE.CSI) {
-          result.state = 'csi'
+          result.state = "csi"
           i++
         } else if (code === ESC_TYPE.OSC) {
-          result.state = 'osc'
+          result.state = "osc"
           i++
         } else if (code === ESC_TYPE.DCS) {
-          result.state = 'dcs'
+          result.state = "dcs"
           i++
         } else if (code === ESC_TYPE.APC) {
-          result.state = 'apc'
+          result.state = "apc"
           i++
         } else if (code === 0x4f) {
           // 'O' - SS3
-          result.state = 'ss3'
+          result.state = "ss3"
           i++
         } else if (isCSIIntermediate(code)) {
           // Intermediate byte (e.g., ESC ( for charset) - continue buffering
-          result.state = 'escapeIntermediate'
+          result.state = "escapeIntermediate"
           i++
         } else if (isEscFinal(code)) {
           // Two-character escape sequence
@@ -176,16 +160,16 @@ function tokenize(
           // Double escape - emit first, start new
           emitSequence(data.slice(seqStart, i))
           seqStart = i
-          result.state = 'escape'
+          result.state = "escape"
           i++
         } else {
           // Invalid - treat ESC as text
-          result.state = 'ground'
+          result.state = "ground"
           textStart = seqStart
         }
         break
 
-      case 'escapeIntermediate':
+      case "escapeIntermediate":
         // After intermediate byte(s), wait for final byte
         if (isCSIIntermediate(code)) {
           // More intermediate bytes
@@ -196,12 +180,12 @@ function tokenize(
           emitSequence(data.slice(seqStart, i))
         } else {
           // Invalid - treat as text
-          result.state = 'ground'
+          result.state = "ground"
           textStart = seqStart
         }
         break
 
-      case 'csi':
+      case "csi":
         // X10 mouse: CSI M + 3 raw payload bytes (Cb+32, Cx+32, Cy+32).
         // M immediately after [ (offset 2) means no params — SGR mouse
         // (CSI < … M) has a `<` param byte first and reaches M at offset > 2.
@@ -250,32 +234,28 @@ function tokenize(
           i++
         } else {
           // Invalid CSI - abort, treat as text
-          result.state = 'ground'
+          result.state = "ground"
           textStart = seqStart
         }
         break
 
-      case 'ss3':
+      case "ss3":
         // SS3 sequences: ESC O followed by a single final byte
         if (code >= 0x40 && code <= 0x7e) {
           i++
           emitSequence(data.slice(seqStart, i))
         } else {
           // Invalid - treat as text
-          result.state = 'ground'
+          result.state = "ground"
           textStart = seqStart
         }
         break
 
-      case 'osc':
+      case "osc":
         if (code === C0.BEL) {
           i++
           emitSequence(data.slice(seqStart, i))
-        } else if (
-          code === C0.ESC &&
-          i + 1 < data.length &&
-          data.charCodeAt(i + 1) === ESC_TYPE.ST
-        ) {
+        } else if (code === C0.ESC && i + 1 < data.length && data.charCodeAt(i + 1) === ESC_TYPE.ST) {
           i += 2
           emitSequence(data.slice(seqStart, i))
         } else {
@@ -283,16 +263,12 @@ function tokenize(
         }
         break
 
-      case 'dcs':
-      case 'apc':
+      case "dcs":
+      case "apc":
         if (code === C0.BEL) {
           i++
           emitSequence(data.slice(seqStart, i))
-        } else if (
-          code === C0.ESC &&
-          i + 1 < data.length &&
-          data.charCodeAt(i + 1) === ESC_TYPE.ST
-        ) {
+        } else if (code === C0.ESC && i + 1 < data.length && data.charCodeAt(i + 1) === ESC_TYPE.ST) {
           i += 2
           emitSequence(data.slice(seqStart, i))
         } else {
@@ -303,13 +279,13 @@ function tokenize(
   }
 
   // Handle end of input
-  if (result.state === 'ground') {
+  if (result.state === "ground") {
     flushText()
   } else if (flush) {
     // Force output incomplete sequence
     const remaining = data.slice(seqStart)
-    if (remaining) tokens.push({ type: 'sequence', value: remaining })
-    result.state = 'ground'
+    if (remaining) tokens.push({ type: "sequence", value: remaining })
+    result.state = "ground"
   } else {
     // Buffer incomplete sequence for next call
     result.buffer = data.slice(seqStart)

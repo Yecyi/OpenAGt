@@ -1,225 +1,327 @@
-<!DOCTYPE html>
+<!doctype html>
 
-<html class="light" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>OpenCode Workspace</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Public+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>OpenCode Workspace</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Public+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
         theme: {
           extend: {
-            "colors": {
-                    "background": "#f9f9f9",
-                    "on-secondary-fixed": "#1b1b1b",
-                    "on-surface": "#1b1b1b",
-                    "surface-container": "#eeeeee",
-                    "on-secondary": "#ffffff",
-                    "surface-variant": "#e2e2e2",
-                    "outline": "#777777",
-                    "on-primary": "#e2e2e2",
-                    "error": "#ba1a1a",
-                    "tertiary-fixed-dim": "#474747",
-                    "tertiary": "#3b3b3b",
-                    "inverse-primary": "#c6c6c6",
-                    "surface-container-high": "#e8e8e8",
-                    "on-secondary-container": "#1b1b1b",
-                    "on-tertiary-container": "#ffffff",
-                    "on-primary-fixed-variant": "#e2e2e2",
-                    "secondary": "#5e5e5e",
-                    "on-tertiary": "#e2e2e2",
-                    "secondary-fixed-dim": "#ababab",
-                    "secondary-container": "#d4d4d4",
-                    "on-primary-fixed": "#ffffff",
-                    "outline-variant": "#c6c6c6",
-                    "surface-tint": "#5e5e5e",
-                    "primary-container": "#3b3b3b",
-                    "inverse-on-surface": "#f1f1f1",
-                    "on-error": "#ffffff",
-                    "surface-container-low": "#f3f3f3",
-                    "on-primary-container": "#ffffff",
-                    "primary-fixed": "#5e5e5e",
-                    "primary-fixed-dim": "#474747",
-                    "on-tertiary-fixed-variant": "#e2e2e2",
-                    "surface-container-lowest": "#ffffff",
-                    "tertiary-fixed": "#5e5e5e",
-                    "tertiary-container": "#747474",
-                    "on-tertiary-fixed": "#ffffff",
-                    "surface-dim": "#dadada",
-                    "surface-bright": "#f9f9f9",
-                    "secondary-fixed": "#c6c6c6",
-                    "on-background": "#1b1b1b",
-                    "surface-container-highest": "#e2e2e2",
-                    "error-container": "#ffdad6",
-                    "inverse-surface": "#303030",
-                    "on-secondary-fixed-variant": "#3b3b3b",
-                    "on-surface-variant": "#474747",
-                    "on-error-container": "#410002",
-                    "primary": "#000000",
-                    "surface": "#f9f9f9"
+            colors: {
+              background: "#f9f9f9",
+              "on-secondary-fixed": "#1b1b1b",
+              "on-surface": "#1b1b1b",
+              "surface-container": "#eeeeee",
+              "on-secondary": "#ffffff",
+              "surface-variant": "#e2e2e2",
+              outline: "#777777",
+              "on-primary": "#e2e2e2",
+              error: "#ba1a1a",
+              "tertiary-fixed-dim": "#474747",
+              tertiary: "#3b3b3b",
+              "inverse-primary": "#c6c6c6",
+              "surface-container-high": "#e8e8e8",
+              "on-secondary-container": "#1b1b1b",
+              "on-tertiary-container": "#ffffff",
+              "on-primary-fixed-variant": "#e2e2e2",
+              secondary: "#5e5e5e",
+              "on-tertiary": "#e2e2e2",
+              "secondary-fixed-dim": "#ababab",
+              "secondary-container": "#d4d4d4",
+              "on-primary-fixed": "#ffffff",
+              "outline-variant": "#c6c6c6",
+              "surface-tint": "#5e5e5e",
+              "primary-container": "#3b3b3b",
+              "inverse-on-surface": "#f1f1f1",
+              "on-error": "#ffffff",
+              "surface-container-low": "#f3f3f3",
+              "on-primary-container": "#ffffff",
+              "primary-fixed": "#5e5e5e",
+              "primary-fixed-dim": "#474747",
+              "on-tertiary-fixed-variant": "#e2e2e2",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed": "#5e5e5e",
+              "tertiary-container": "#747474",
+              "on-tertiary-fixed": "#ffffff",
+              "surface-dim": "#dadada",
+              "surface-bright": "#f9f9f9",
+              "secondary-fixed": "#c6c6c6",
+              "on-background": "#1b1b1b",
+              "surface-container-highest": "#e2e2e2",
+              "error-container": "#ffdad6",
+              "inverse-surface": "#303030",
+              "on-secondary-fixed-variant": "#3b3b3b",
+              "on-surface-variant": "#474747",
+              "on-error-container": "#410002",
+              primary: "#000000",
+              surface: "#f9f9f9",
             },
-            "borderRadius": {
-                    "DEFAULT": "0px",
-                    "lg": "0px",
-                    "xl": "0px",
-                    "full": "0px"
+            borderRadius: {
+              DEFAULT: "0px",
+              lg: "0px",
+              xl: "0px",
+              full: "0px",
             },
-            "spacing": {},
-            "fontFamily": {
-                    "headline": [
-                            "Newsreader"
-                    ],
-                    "body": [
-                            "Public Sans"
-                    ],
-                    "label": [
-                            "Public Sans"
-                    ]
-            }
-        },
+            spacing: {},
+            fontFamily: {
+              headline: ["Newsreader"],
+              body: ["Public Sans"],
+              label: ["Public Sans"],
+            },
+          },
         },
       }
     </script>
-<style>
-        body { font-family: 'Public Sans', sans-serif; }
-        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Newsreader', serif; }
-        /* No scrollbar styling */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    <style>
+      body {
+        font-family: "Public Sans", sans-serif;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      .font-headline {
+        font-family: "Newsreader", serif;
+      }
+      /* No scrollbar styling */
+      ::-webkit-scrollbar {
+        width: 0px;
+        background: transparent;
+      }
     </style>
-</head>
-<body class="bg-background text-on-background h-screen flex flex-col overflow-hidden">
-<!-- TopNavBar Component -->
-<header class="bg-stone-50/80 dark:bg-stone-950/80 backdrop-blur-md text-stone-900 dark:text-stone-100 font-['Newsreader'] italic tracking-tight rounded-none border-b border-stone-200 dark:border-stone-800 shrink-0 z-50">
-<div class="flex justify-between items-center w-full px-8 py-6 max-w-[1440px] mx-auto">
-<div class="flex items-center gap-12">
-<div class="text-4xl font-black uppercase tracking-tighter font-['Newsreader'] text-stone-900 dark:text-stone-100">
-                    THE AGENTIC TIMES
-                </div>
-<nav class="hidden md:flex gap-8">
-<a class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg" href="#">Editions</a>
-<a class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg" href="#">Agents</a>
-<a class="text-stone-900 dark:text-stone-100 border-b-2 border-stone-900 dark:border-stone-100 font-bold hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg" href="#">Terminal</a>
-<a class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg" href="#">Archive</a>
-</nav>
-</div>
-<div class="flex items-center gap-6">
-<div class="relative group">
-<span class="material-symbols-outlined text-stone-500 hover:text-stone-900 cursor-pointer transition-colors duration-200 absolute left-0 top-1/2 -translate-y-1/2">search</span>
-<input class="bg-transparent border-b border-stone-300 focus:border-stone-900 focus:outline-none focus:ring-0 pl-8 pr-2 py-1 text-sm font-['Public_Sans'] not-italic text-stone-900 placeholder:text-stone-400 w-48 transition-all duration-300 group-hover:w-64" placeholder="Search archives..." type="text"/>
-</div>
-<button class="bg-primary text-on-primary px-6 py-2 font-['Public_Sans'] not-italic text-sm font-semibold tracking-wider hover:bg-primary-container transition-colors duration-200 flex items-center gap-2">
-<span class="material-symbols-outlined text-sm">add</span>
-                    New Session
-                </button>
-</div>
-</div>
-</header>
-<!-- Main 3-Pane Layout -->
-<main class="flex-1 flex overflow-hidden">
-<!-- Left Pane: Session Switcher (SideNavBar conceptually adapted) -->
-<aside class="w-72 bg-surface-container-low flex flex-col shrink-0">
-<div class="p-6">
-<h2 class="font-headline text-2xl tracking-wide mb-1">Project Manifest</h2>
-<p class="font-label text-xs uppercase tracking-widest text-on-surface-variant">v2.4.0-stable</p>
-</div>
-<nav class="flex-1 overflow-y-auto pt-4 px-4 space-y-1">
-<div class="text-[10px] font-label uppercase tracking-widest text-on-surface-variant mb-4 pl-4 border-b border-outline-variant/20 pb-2">Active Sessions</div>
-<a class="group flex items-start gap-4 p-4 bg-surface-container-lowest border-l-4 border-primary" href="#">
-<span class="material-symbols-outlined text-primary text-xl mt-0.5">terminal</span>
-<div>
-<h3 class="font-body text-sm font-bold text-on-surface group-hover:text-primary">React Auth Implementation</h3>
-<p class="font-body text-xs text-on-surface-variant mt-1 line-clamp-1">Last active 2m ago</p>
-</div>
-</a>
-<a class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150" href="#">
-<span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5 group-hover:text-primary">psychology</span>
-<div>
-<h3 class="font-body text-sm text-on-surface-variant group-hover:text-on-surface">Data Pipeline Optimization</h3>
-<p class="font-body text-xs text-outline mt-1 line-clamp-1">Last active 1h ago</p>
-</div>
-</a>
-<a class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150" href="#">
-<span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5 group-hover:text-primary">rocket_launch</span>
-<div>
-<h3 class="font-body text-sm text-on-surface-variant group-hover:text-on-surface">Deploy Scripts CI/CD</h3>
-<p class="font-body text-xs text-outline mt-1 line-clamp-1">Last active yesterday</p>
-</div>
-</a>
-<div class="text-[10px] font-label uppercase tracking-widest text-on-surface-variant mb-4 mt-8 pl-4 border-b border-outline-variant/20 pb-2">Archived</div>
-<a class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150" href="#">
-<span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5">folder</span>
-<div>
-<h3 class="font-body text-sm text-on-surface-variant">Legacy API Migration</h3>
-</div>
-</a>
-</nav>
-<div class="p-6 border-t border-outline-variant/20">
-<a class="flex items-center gap-3 text-on-surface-variant hover:text-on-surface transition-colors duration-150" href="#">
-<span class="material-symbols-outlined">settings</span>
-<span class="font-label text-xs uppercase tracking-widest">Settings</span>
-</a>
-</div>
-</aside>
-<!-- Center Pane: Streaming Chat -->
-<section class="flex-1 bg-surface flex flex-col relative border-r border-outline-variant/20 shadow-[0_0_48px_rgba(0,0,0,0.04)] z-10">
-<!-- Chat Header -->
-<div class="px-12 py-8 bg-surface/80 backdrop-blur-md sticky top-0 z-20 border-b border-outline-variant/20">
-<div class="flex items-baseline justify-between">
-<h1 class="font-headline text-4xl tracking-tight text-primary">React Auth Implementation</h1>
-<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Session Active</span>
-</div>
-</div>
-<!-- Chat Feed -->
-<div class="flex-1 overflow-y-auto px-12 py-8 space-y-12">
-<!-- User Message -->
-<div class="max-w-3xl ml-auto flex gap-6">
-<div class="flex-1 text-right">
-<div class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2">User</div>
-<div class="font-body text-lg text-primary leading-relaxed">
-                            We need to implement a JWT-based authentication flow for the new React dashboard. Can you outline the architecture and provide the initial context provider setup? We're using React 18 and Vite.
-                        </div>
-</div>
-<div class="w-10 h-10 bg-surface-container-high shrink-0 flex items-center justify-center border border-outline-variant/20">
-<span class="material-symbols-outlined text-on-surface-variant">person</span>
-</div>
-</div>
-<!-- Agent Reasoning (Editorial Separation) -->
-<div class="max-w-3xl mr-auto pl-16 relative">
-<div class="absolute left-6 top-0 bottom-0 w-[0.5px] bg-outline-variant/50"></div>
-<div class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-3 flex items-center gap-2">
-<span class="material-symbols-outlined text-[14px]">memory</span>
-                        Internal Monologue
-                    </div>
-<div class="font-headline italic text-xl text-on-surface-variant leading-relaxed opacity-80">
-                        Analyzing request. The user requires a JWT authentication architecture for a React 18 application built with Vite. Key components needed: Authentication Context, Hook for accessing auth state, secure storage strategy (avoiding localStorage for tokens if possible, or outlining risks), and interceptors for API calls. I will propose a structure utilizing React Context and standard functional components.
-                    </div>
-</div>
-<!-- Agent Output -->
-<div class="max-w-3xl mr-auto flex gap-6">
-<div class="w-10 h-10 bg-primary shrink-0 flex items-center justify-center">
-<span class="material-symbols-outlined text-on-primary">smart_toy</span>
-</div>
-<div class="flex-1">
-<div class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2">OpenCode Agent</div>
-<div class="font-body text-base text-primary leading-relaxed space-y-6">
-<p>To establish a robust JWT authentication flow in your React 18 application, we need a centralized state management solution. The most idiomatic approach is utilizing React Context combined with a custom hook.</p>
-<h3 class="font-headline text-2xl tracking-tight mt-8 mb-4 border-b border-outline-variant/20 pb-2">Proposed Architecture</h3>
-<ul class="list-none space-y-2 text-on-surface-variant ml-4 border-l border-outline-variant/30 pl-4">
-<li><strong>AuthContext:</strong> Holds the global state (user data, isAuthenticated, loading status).</li>
-<li><strong>AuthProvider:</strong> Wraps the application, managing token lifecycle and decoding.</li>
-<li><strong>useAuth Hook:</strong> A convenience wrapper for consuming the context.</li>
-</ul>
-<p class="mt-6">Here is the foundational setup for your Auth Provider.</p>
-<!-- Code Block styling -->
-<div class="bg-surface-container-highest border border-outline-variant/20 p-6 font-mono text-sm overflow-x-auto relative mt-4">
-<div class="absolute top-2 right-2 flex gap-2">
-<button class="text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-sm">content_copy</span></button>
-</div>
-<pre class="text-on-surface"><code>import React, { createContext, useContext, useState, useEffect } from 'react';
+  </head>
+  <body class="bg-background text-on-background h-screen flex flex-col overflow-hidden">
+    <!-- TopNavBar Component -->
+    <header
+      class="bg-stone-50/80 dark:bg-stone-950/80 backdrop-blur-md text-stone-900 dark:text-stone-100 font-['Newsreader'] italic tracking-tight rounded-none border-b border-stone-200 dark:border-stone-800 shrink-0 z-50"
+    >
+      <div class="flex justify-between items-center w-full px-8 py-6 max-w-[1440px] mx-auto">
+        <div class="flex items-center gap-12">
+          <div
+            class="text-4xl font-black uppercase tracking-tighter font-['Newsreader'] text-stone-900 dark:text-stone-100"
+          >
+            THE AGENTIC TIMES
+          </div>
+          <nav class="hidden md:flex gap-8">
+            <a
+              class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg"
+              href="#"
+              >Editions</a
+            >
+            <a
+              class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg"
+              href="#"
+              >Agents</a
+            >
+            <a
+              class="text-stone-900 dark:text-stone-100 border-b-2 border-stone-900 dark:border-stone-100 font-bold hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg"
+              href="#"
+              >Terminal</a
+            >
+            <a
+              class="text-stone-500 dark:text-stone-400 font-normal hover:text-stone-600 dark:hover:text-stone-300 transition-colors duration-200 text-lg"
+              href="#"
+              >Archive</a
+            >
+          </nav>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="relative group">
+            <span
+              class="material-symbols-outlined text-stone-500 hover:text-stone-900 cursor-pointer transition-colors duration-200 absolute left-0 top-1/2 -translate-y-1/2"
+              >search</span
+            >
+            <input
+              class="bg-transparent border-b border-stone-300 focus:border-stone-900 focus:outline-none focus:ring-0 pl-8 pr-2 py-1 text-sm font-['Public_Sans'] not-italic text-stone-900 placeholder:text-stone-400 w-48 transition-all duration-300 group-hover:w-64"
+              placeholder="Search archives..."
+              type="text"
+            />
+          </div>
+          <button
+            class="bg-primary text-on-primary px-6 py-2 font-['Public_Sans'] not-italic text-sm font-semibold tracking-wider hover:bg-primary-container transition-colors duration-200 flex items-center gap-2"
+          >
+            <span class="material-symbols-outlined text-sm">add</span>
+            New Session
+          </button>
+        </div>
+      </div>
+    </header>
+    <!-- Main 3-Pane Layout -->
+    <main class="flex-1 flex overflow-hidden">
+      <!-- Left Pane: Session Switcher (SideNavBar conceptually adapted) -->
+      <aside class="w-72 bg-surface-container-low flex flex-col shrink-0">
+        <div class="p-6">
+          <h2 class="font-headline text-2xl tracking-wide mb-1">Project Manifest</h2>
+          <p class="font-label text-xs uppercase tracking-widest text-on-surface-variant">v2.4.0-stable</p>
+        </div>
+        <nav class="flex-1 overflow-y-auto pt-4 px-4 space-y-1">
+          <div
+            class="text-[10px] font-label uppercase tracking-widest text-on-surface-variant mb-4 pl-4 border-b border-outline-variant/20 pb-2"
+          >
+            Active Sessions
+          </div>
+          <a class="group flex items-start gap-4 p-4 bg-surface-container-lowest border-l-4 border-primary" href="#">
+            <span class="material-symbols-outlined text-primary text-xl mt-0.5">terminal</span>
+            <div>
+              <h3 class="font-body text-sm font-bold text-on-surface group-hover:text-primary">
+                React Auth Implementation
+              </h3>
+              <p class="font-body text-xs text-on-surface-variant mt-1 line-clamp-1">Last active 2m ago</p>
+            </div>
+          </a>
+          <a
+            class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150"
+            href="#"
+          >
+            <span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5 group-hover:text-primary"
+              >psychology</span
+            >
+            <div>
+              <h3 class="font-body text-sm text-on-surface-variant group-hover:text-on-surface">
+                Data Pipeline Optimization
+              </h3>
+              <p class="font-body text-xs text-outline mt-1 line-clamp-1">Last active 1h ago</p>
+            </div>
+          </a>
+          <a
+            class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150"
+            href="#"
+          >
+            <span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5 group-hover:text-primary"
+              >rocket_launch</span
+            >
+            <div>
+              <h3 class="font-body text-sm text-on-surface-variant group-hover:text-on-surface">
+                Deploy Scripts CI/CD
+              </h3>
+              <p class="font-body text-xs text-outline mt-1 line-clamp-1">Last active yesterday</p>
+            </div>
+          </a>
+          <div
+            class="text-[10px] font-label uppercase tracking-widest text-on-surface-variant mb-4 mt-8 pl-4 border-b border-outline-variant/20 pb-2"
+          >
+            Archived
+          </div>
+          <a
+            class="group flex items-start gap-4 p-4 hover:bg-surface-container-highest transition-colors duration-150"
+            href="#"
+          >
+            <span class="material-symbols-outlined text-on-surface-variant text-xl mt-0.5">folder</span>
+            <div>
+              <h3 class="font-body text-sm text-on-surface-variant">Legacy API Migration</h3>
+            </div>
+          </a>
+        </nav>
+        <div class="p-6 border-t border-outline-variant/20">
+          <a
+            class="flex items-center gap-3 text-on-surface-variant hover:text-on-surface transition-colors duration-150"
+            href="#"
+          >
+            <span class="material-symbols-outlined">settings</span>
+            <span class="font-label text-xs uppercase tracking-widest">Settings</span>
+          </a>
+        </div>
+      </aside>
+      <!-- Center Pane: Streaming Chat -->
+      <section
+        class="flex-1 bg-surface flex flex-col relative border-r border-outline-variant/20 shadow-[0_0_48px_rgba(0,0,0,0.04)] z-10"
+      >
+        <!-- Chat Header -->
+        <div class="px-12 py-8 bg-surface/80 backdrop-blur-md sticky top-0 z-20 border-b border-outline-variant/20">
+          <div class="flex items-baseline justify-between">
+            <h1 class="font-headline text-4xl tracking-tight text-primary">React Auth Implementation</h1>
+            <span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Session Active</span>
+          </div>
+        </div>
+        <!-- Chat Feed -->
+        <div class="flex-1 overflow-y-auto px-12 py-8 space-y-12">
+          <!-- User Message -->
+          <div class="max-w-3xl ml-auto flex gap-6">
+            <div class="flex-1 text-right">
+              <div class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2">User</div>
+              <div class="font-body text-lg text-primary leading-relaxed">
+                We need to implement a JWT-based authentication flow for the new React dashboard. Can you outline the
+                architecture and provide the initial context provider setup? We're using React 18 and Vite.
+              </div>
+            </div>
+            <div
+              class="w-10 h-10 bg-surface-container-high shrink-0 flex items-center justify-center border border-outline-variant/20"
+            >
+              <span class="material-symbols-outlined text-on-surface-variant">person</span>
+            </div>
+          </div>
+          <!-- Agent Reasoning (Editorial Separation) -->
+          <div class="max-w-3xl mr-auto pl-16 relative">
+            <div class="absolute left-6 top-0 bottom-0 w-[0.5px] bg-outline-variant/50"></div>
+            <div
+              class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-3 flex items-center gap-2"
+            >
+              <span class="material-symbols-outlined text-[14px]">memory</span>
+              Internal Monologue
+            </div>
+            <div class="font-headline italic text-xl text-on-surface-variant leading-relaxed opacity-80">
+              Analyzing request. The user requires a JWT authentication architecture for a React 18 application built
+              with Vite. Key components needed: Authentication Context, Hook for accessing auth state, secure storage
+              strategy (avoiding localStorage for tokens if possible, or outlining risks), and interceptors for API
+              calls. I will propose a structure utilizing React Context and standard functional components.
+            </div>
+          </div>
+          <!-- Agent Output -->
+          <div class="max-w-3xl mr-auto flex gap-6">
+            <div class="w-10 h-10 bg-primary shrink-0 flex items-center justify-center">
+              <span class="material-symbols-outlined text-on-primary">smart_toy</span>
+            </div>
+            <div class="flex-1">
+              <div class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-2">
+                OpenCode Agent
+              </div>
+              <div class="font-body text-base text-primary leading-relaxed space-y-6">
+                <p>
+                  To establish a robust JWT authentication flow in your React 18 application, we need a centralized
+                  state management solution. The most idiomatic approach is utilizing React Context combined with a
+                  custom hook.
+                </p>
+                <h3 class="font-headline text-2xl tracking-tight mt-8 mb-4 border-b border-outline-variant/20 pb-2">
+                  Proposed Architecture
+                </h3>
+                <ul class="list-none space-y-2 text-on-surface-variant ml-4 border-l border-outline-variant/30 pl-4">
+                  <li>
+                    <strong>AuthContext:</strong> Holds the global state (user data, isAuthenticated, loading status).
+                  </li>
+                  <li><strong>AuthProvider:</strong> Wraps the application, managing token lifecycle and decoding.</li>
+                  <li><strong>useAuth Hook:</strong> A convenience wrapper for consuming the context.</li>
+                </ul>
+                <p class="mt-6">Here is the foundational setup for your Auth Provider.</p>
+                <!-- Code Block styling -->
+                <div
+                  class="bg-surface-container-highest border border-outline-variant/20 p-6 font-mono text-sm overflow-x-auto relative mt-4"
+                >
+                  <div class="absolute top-2 right-2 flex gap-2">
+                    <button class="text-on-surface-variant hover:text-primary transition-colors">
+                      <span class="material-symbols-outlined text-sm">content_copy</span>
+                    </button>
+                  </div>
+                  <pre
+                    class="text-on-surface"
+                  ><code>import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -247,100 +349,152 @@ export const AuthProvider = ({ children }) =&gt; {
 
 export const useAuth = () =&gt; useContext(AuthContext);</code>
 </pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<!-- Command Bar -->
-<div class="p-8 bg-surface border-t border-outline-variant/20 mt-auto">
-<div class="max-w-4xl mx-auto relative bg-surface-container-lowest border border-outline-variant/50 focus-within:border-primary transition-colors duration-300 flex items-end shadow-[0_0_48px_rgba(0,0,0,0.02)]">
-<textarea class="w-full bg-transparent border-none focus:ring-0 resize-none font-body text-base py-4 pl-6 pr-16 text-primary placeholder:text-on-surface-variant/50 min-h-[60px] max-h-[200px]" placeholder="Instruct the agent..." rows="1"></textarea>
-<div class="absolute right-4 bottom-3 flex items-center gap-3">
-<button class="text-on-surface-variant hover:text-primary transition-colors duration-200">
-<span class="material-symbols-outlined text-xl">attach_file</span>
-</button>
-<button class="bg-primary text-on-primary w-8 h-8 flex items-center justify-center hover:bg-primary-container transition-colors duration-200">
-<span class="material-symbols-outlined text-sm">arrow_upward</span>
-</button>
-</div>
-</div>
-<div class="max-w-4xl mx-auto mt-3 flex justify-between items-center text-[10px] font-label uppercase tracking-widest text-on-surface-variant">
-<div class="flex gap-4">
-<span class="hover:text-primary cursor-pointer flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">keyboard_command_key</span> Commands</span>
-<span class="hover:text-primary cursor-pointer flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">history</span> History</span>
-</div>
-<span>Model: GPT-4o</span>
-</div>
-</div>
-</section>
-<!-- Right Pane: Context & Files -->
-<aside class="w-80 bg-surface-container-low flex flex-col shrink-0 border-l border-outline-variant/20">
-<div class="p-6 border-b border-outline-variant/20">
-<h3 class="font-headline text-xl tracking-tight mb-4 flex items-center gap-2">
-<span class="material-symbols-outlined">folder_open</span>
-                    Workspace Context
-                </h3>
-<!-- Status Box -->
-<div class="bg-surface border border-outline-variant/30 p-4 mb-6">
-<div class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Current Task</div>
-<div class="font-body text-sm font-semibold text-primary">Implementing AuthProvider</div>
-<div class="w-full bg-surface-variant h-1 mt-3">
-<div class="bg-primary h-full w-1/3"></div>
-</div>
-</div>
-</div>
-<div class="flex-1 overflow-y-auto p-6 space-y-8">
-<!-- File Tree -->
-<div>
-<h4 class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">Referenced Files</h4>
-<ul class="space-y-2">
-<li class="flex items-center gap-3 group cursor-pointer">
-<span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors">description</span>
-<span class="font-mono text-sm text-on-surface group-hover:text-primary transition-colors truncate">src/App.jsx</span>
-</li>
-<li class="flex items-center gap-3 group cursor-pointer">
-<span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors">description</span>
-<span class="font-mono text-sm text-on-surface group-hover:text-primary transition-colors truncate">src/context/AuthContext.jsx</span>
-<span class="ml-auto text-[10px] font-label text-primary bg-primary-container/10 px-1">Active</span>
-</li>
-<li class="flex items-center gap-3 group cursor-pointer">
-<span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors">data_object</span>
-<span class="font-mono text-sm text-on-surface-variant group-hover:text-primary transition-colors truncate">package.json</span>
-</li>
-</ul>
-</div>
-<!-- Environment Box -->
-<div class="bg-surface-container-lowest border border-outline-variant/20 p-5">
-<h4 class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">Environment Details</h4>
-<div class="space-y-3">
-<div class="flex justify-between items-baseline border-b border-outline-variant/20 pb-1">
-<span class="font-body text-xs text-on-surface-variant">Framework</span>
-<span class="font-mono text-xs text-primary">React 18</span>
-</div>
-<div class="flex justify-between items-baseline border-b border-outline-variant/20 pb-1">
-<span class="font-body text-xs text-on-surface-variant">Build Tool</span>
-<span class="font-mono text-xs text-primary">Vite</span>
-</div>
-<div class="flex justify-between items-baseline">
-<span class="font-body text-xs text-on-surface-variant">Node</span>
-<span class="font-mono text-xs text-primary">v20.11.0</span>
-</div>
-</div>
-</div>
-</div>
-</aside>
-</main>
-<!-- Footer Component -->
-<footer class="bg-stone-50 dark:bg-stone-950 text-stone-400 dark:text-stone-600 font-['Public_Sans'] text-[10px] uppercase tracking-[0.2em] rounded-none border-t border-stone-200 dark:border-stone-800 w-full flex justify-between items-center px-12 py-8 mt-auto shrink-0 z-50">
-<div class="opacity-80 hover:opacity-100 transition-opacity">
-            © 2024 THE MODERN ARCHIVE. ALL SYSTEMS OPERATIONAL.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-<nav class="flex gap-6">
-<a class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity" href="#">Telemetry</a>
-<a class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity" href="#">Privacy</a>
-<a class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity" href="#">Status</a>
-<a class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity" href="#">API</a>
-</nav>
-</footer>
-</body></html>
+        <!-- Command Bar -->
+        <div class="p-8 bg-surface border-t border-outline-variant/20 mt-auto">
+          <div
+            class="max-w-4xl mx-auto relative bg-surface-container-lowest border border-outline-variant/50 focus-within:border-primary transition-colors duration-300 flex items-end shadow-[0_0_48px_rgba(0,0,0,0.02)]"
+          >
+            <textarea
+              class="w-full bg-transparent border-none focus:ring-0 resize-none font-body text-base py-4 pl-6 pr-16 text-primary placeholder:text-on-surface-variant/50 min-h-[60px] max-h-[200px]"
+              placeholder="Instruct the agent..."
+              rows="1"
+            ></textarea>
+            <div class="absolute right-4 bottom-3 flex items-center gap-3">
+              <button class="text-on-surface-variant hover:text-primary transition-colors duration-200">
+                <span class="material-symbols-outlined text-xl">attach_file</span>
+              </button>
+              <button
+                class="bg-primary text-on-primary w-8 h-8 flex items-center justify-center hover:bg-primary-container transition-colors duration-200"
+              >
+                <span class="material-symbols-outlined text-sm">arrow_upward</span>
+              </button>
+            </div>
+          </div>
+          <div
+            class="max-w-4xl mx-auto mt-3 flex justify-between items-center text-[10px] font-label uppercase tracking-widest text-on-surface-variant"
+          >
+            <div class="flex gap-4">
+              <span class="hover:text-primary cursor-pointer flex items-center gap-1"
+                ><span class="material-symbols-outlined text-[12px]">keyboard_command_key</span> Commands</span
+              >
+              <span class="hover:text-primary cursor-pointer flex items-center gap-1"
+                ><span class="material-symbols-outlined text-[12px]">history</span> History</span
+              >
+            </div>
+            <span>Model: GPT-4o</span>
+          </div>
+        </div>
+      </section>
+      <!-- Right Pane: Context & Files -->
+      <aside class="w-80 bg-surface-container-low flex flex-col shrink-0 border-l border-outline-variant/20">
+        <div class="p-6 border-b border-outline-variant/20">
+          <h3 class="font-headline text-xl tracking-tight mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined">folder_open</span>
+            Workspace Context
+          </h3>
+          <!-- Status Box -->
+          <div class="bg-surface border border-outline-variant/30 p-4 mb-6">
+            <div class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">
+              Current Task
+            </div>
+            <div class="font-body text-sm font-semibold text-primary">Implementing AuthProvider</div>
+            <div class="w-full bg-surface-variant h-1 mt-3">
+              <div class="bg-primary h-full w-1/3"></div>
+            </div>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+          <!-- File Tree -->
+          <div>
+            <h4 class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">
+              Referenced Files
+            </h4>
+            <ul class="space-y-2">
+              <li class="flex items-center gap-3 group cursor-pointer">
+                <span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors"
+                  >description</span
+                >
+                <span class="font-mono text-sm text-on-surface group-hover:text-primary transition-colors truncate"
+                  >src/App.jsx</span
+                >
+              </li>
+              <li class="flex items-center gap-3 group cursor-pointer">
+                <span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors"
+                  >description</span
+                >
+                <span class="font-mono text-sm text-on-surface group-hover:text-primary transition-colors truncate"
+                  >src/context/AuthContext.jsx</span
+                >
+                <span class="ml-auto text-[10px] font-label text-primary bg-primary-container/10 px-1">Active</span>
+              </li>
+              <li class="flex items-center gap-3 group cursor-pointer">
+                <span class="material-symbols-outlined text-outline text-sm group-hover:text-primary transition-colors"
+                  >data_object</span
+                >
+                <span
+                  class="font-mono text-sm text-on-surface-variant group-hover:text-primary transition-colors truncate"
+                  >package.json</span
+                >
+              </li>
+            </ul>
+          </div>
+          <!-- Environment Box -->
+          <div class="bg-surface-container-lowest border border-outline-variant/20 p-5">
+            <h4 class="font-label text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">
+              Environment Details
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-baseline border-b border-outline-variant/20 pb-1">
+                <span class="font-body text-xs text-on-surface-variant">Framework</span>
+                <span class="font-mono text-xs text-primary">React 18</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-outline-variant/20 pb-1">
+                <span class="font-body text-xs text-on-surface-variant">Build Tool</span>
+                <span class="font-mono text-xs text-primary">Vite</span>
+              </div>
+              <div class="flex justify-between items-baseline">
+                <span class="font-body text-xs text-on-surface-variant">Node</span>
+                <span class="font-mono text-xs text-primary">v20.11.0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+    <!-- Footer Component -->
+    <footer
+      class="bg-stone-50 dark:bg-stone-950 text-stone-400 dark:text-stone-600 font-['Public_Sans'] text-[10px] uppercase tracking-[0.2em] rounded-none border-t border-stone-200 dark:border-stone-800 w-full flex justify-between items-center px-12 py-8 mt-auto shrink-0 z-50"
+    >
+      <div class="opacity-80 hover:opacity-100 transition-opacity">
+        © 2024 THE MODERN ARCHIVE. ALL SYSTEMS OPERATIONAL.
+      </div>
+      <nav class="flex gap-6">
+        <a
+          class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity"
+          href="#"
+          >Telemetry</a
+        >
+        <a
+          class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity"
+          href="#"
+          >Privacy</a
+        >
+        <a
+          class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity"
+          href="#"
+          >Status</a
+        >
+        <a
+          class="text-stone-400 dark:text-stone-600 hover:text-stone-900 dark:hover:text-stone-100 underline decoration-stone-300 opacity-80 hover:opacity-100 transition-opacity"
+          href="#"
+          >API</a
+        >
+      </nav>
+    </footer>
+  </body>
+</html>

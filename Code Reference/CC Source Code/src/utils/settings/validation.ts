@@ -1,45 +1,43 @@
-import type { ConfigScope } from 'src/services/mcp/types.js'
-import type { ZodError, ZodIssue } from 'zod/v4'
-import { jsonParse } from '../slowOperations.js'
-import { plural } from '../stringUtils.js'
-import { validatePermissionRule } from './permissionValidation.js'
-import { generateSettingsJSONSchema } from './schemaOutput.js'
-import type { SettingsJson } from './types.js'
-import { SettingsSchema } from './types.js'
-import { getValidationTip } from './validationTips.js'
+import type { ConfigScope } from "src/services/mcp/types.js"
+import type { ZodError, ZodIssue } from "zod/v4"
+import { jsonParse } from "../slowOperations.js"
+import { plural } from "../stringUtils.js"
+import { validatePermissionRule } from "./permissionValidation.js"
+import { generateSettingsJSONSchema } from "./schemaOutput.js"
+import type { SettingsJson } from "./types.js"
+import { SettingsSchema } from "./types.js"
+import { getValidationTip } from "./validationTips.js"
 
 /**
  * Helper type guards for specific Zod v4 issue types
  * In v4, issue types have different structures than v3
  */
 function isInvalidTypeIssue(issue: ZodIssue): issue is ZodIssue & {
-  code: 'invalid_type'
+  code: "invalid_type"
   expected: string
   input: unknown
 } {
-  return issue.code === 'invalid_type'
+  return issue.code === "invalid_type"
 }
 
 function isInvalidValueIssue(issue: ZodIssue): issue is ZodIssue & {
-  code: 'invalid_value'
+  code: "invalid_value"
   values: unknown[]
   input: unknown
 } {
-  return issue.code === 'invalid_value'
+  return issue.code === "invalid_value"
 }
 
-function isUnrecognizedKeysIssue(
-  issue: ZodIssue,
-): issue is ZodIssue & { code: 'unrecognized_keys'; keys: string[] } {
-  return issue.code === 'unrecognized_keys'
+function isUnrecognizedKeysIssue(issue: ZodIssue): issue is ZodIssue & { code: "unrecognized_keys"; keys: string[] } {
+  return issue.code === "unrecognized_keys"
 }
 
 function isTooSmallIssue(issue: ZodIssue): issue is ZodIssue & {
-  code: 'too_small'
+  code: "too_small"
   minimum: number | bigint
   origin: string
 } {
-  return issue.code === 'too_small'
+  return issue.code === "too_small"
 }
 
 /** Field path in dot notation (e.g., "permissions.defaultMode", "env.DEBUG") */
@@ -67,7 +65,7 @@ export type ValidationError = {
     /** The server name if error is specific to a server */
     serverName?: string
     /** Severity of the error */
-    severity?: 'fatal' | 'warning'
+    severity?: "fatal" | "warning"
   }
 }
 
@@ -83,9 +81,9 @@ export type SettingsWithErrors = {
  * Get the type string for an unknown value (for error messages)
  */
 function getReceivedType(value: unknown): string {
-  if (value === null) return 'null'
-  if (value === undefined) return 'undefined'
-  if (Array.isArray(value)) return 'array'
+  if (value === null) return "null"
+  if (value === undefined) return "undefined"
+  if (Array.isArray(value)) return "array"
   return typeof value
 }
 
@@ -94,12 +92,9 @@ function extractReceivedFromMessage(msg: string): string | undefined {
   return match ? match[1] : undefined
 }
 
-export function formatZodError(
-  error: ZodError,
-  filePath: string,
-): ValidationError[] {
+export function formatZodError(error: ZodError, filePath: string): ValidationError[] {
   return error.issues.map((issue): ValidationError => {
-    const path = issue.path.map(String).join('.')
+    const path = issue.path.map(String).join(".")
     let message = issue.message
     let expected: string | undefined
 
@@ -109,8 +104,8 @@ export function formatZodError(
     let invalidValue: unknown
 
     if (isInvalidValueIssue(issue)) {
-      enumValues = issue.values.map(v => String(v))
-      expectedValue = enumValues.join(' | ')
+      enumValues = issue.values.map((v) => String(v))
+      expectedValue = enumValues.join(" | ")
       receivedValue = undefined
       invalidValue = undefined
     } else if (isInvalidTypeIssue(issue)) {
@@ -120,7 +115,7 @@ export function formatZodError(
       invalidValue = receivedType ?? getReceivedType(issue.input)
     } else if (isTooSmallIssue(issue)) {
       expectedValue = String(issue.minimum)
-    } else if (issue.code === 'custom' && 'params' in issue) {
+    } else if (issue.code === "custom" && "params" in issue) {
       const params = issue.params as { received?: unknown }
       receivedValue = params.received
       invalidValue = receivedValue
@@ -137,24 +132,18 @@ export function formatZodError(
     })
 
     if (isInvalidValueIssue(issue)) {
-      expected = enumValues?.map(v => `"${v}"`).join(', ')
+      expected = enumValues?.map((v) => `"${v}"`).join(", ")
       message = `Invalid value. Expected one of: ${expected}`
     } else if (isInvalidTypeIssue(issue)) {
-      const receivedType =
-        extractReceivedFromMessage(issue.message) ??
-        getReceivedType(issue.input)
-      if (
-        issue.expected === 'object' &&
-        receivedType === 'null' &&
-        path === ''
-      ) {
-        message = 'Invalid or malformed JSON'
+      const receivedType = extractReceivedFromMessage(issue.message) ?? getReceivedType(issue.input)
+      if (issue.expected === "object" && receivedType === "null" && path === "") {
+        message = "Invalid or malformed JSON"
       } else {
         message = `Expected ${issue.expected}, but received ${receivedType}`
       }
     } else if (isUnrecognizedKeysIssue(issue)) {
-      const keys = issue.keys.join(', ')
-      message = `Unrecognized ${plural(issue.keys.length, 'field')}: ${keys}`
+      const keys = issue.keys.join(", ")
+      message = `Unrecognized ${plural(issue.keys.length, "field")}: ${keys}`
     } else if (isTooSmallIssue(issue)) {
       message = `Number must be greater than or equal to ${issue.minimum}`
       expected = String(issue.minimum)
@@ -197,10 +186,9 @@ export function validateSettingsFileContent(content: string):
     }
 
     // Format the validation error in a helpful way
-    const errors = formatZodError(result.error, 'settings')
+    const errors = formatZodError(result.error, "settings")
     const errorMessage =
-      'Settings validation failed:\n' +
-      errors.map(err => `- ${err.path}: ${err.message}`).join('\n')
+      "Settings validation failed:\n" + errors.map((err) => `- ${err.path}: ${err.message}`).join("\n")
 
     return {
       isValid: false,
@@ -210,7 +198,7 @@ export function validateSettingsFileContent(content: string):
   } catch (parseError) {
     return {
       isValid: false,
-      error: `Invalid JSON: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`,
+      error: `Invalid JSON: ${parseError instanceof Error ? parseError.message : "Unknown parsing error"}`,
       fullSchema: generateSettingsJSONSchema(),
     }
   }
@@ -221,22 +209,19 @@ export function validateSettingsFileContent(content: string):
  * This prevents one bad rule from poisoning the entire settings file.
  * Returns warnings for each filtered rule.
  */
-export function filterInvalidPermissionRules(
-  data: unknown,
-  filePath: string,
-): ValidationError[] {
-  if (!data || typeof data !== 'object') return []
+export function filterInvalidPermissionRules(data: unknown, filePath: string): ValidationError[] {
+  if (!data || typeof data !== "object") return []
   const obj = data as Record<string, unknown>
-  if (!obj.permissions || typeof obj.permissions !== 'object') return []
+  if (!obj.permissions || typeof obj.permissions !== "object") return []
   const perms = obj.permissions as Record<string, unknown>
 
   const warnings: ValidationError[] = []
-  for (const key of ['allow', 'deny', 'ask']) {
+  for (const key of ["allow", "deny", "ask"]) {
     const rules = perms[key]
     if (!Array.isArray(rules)) continue
 
-    perms[key] = rules.filter(rule => {
-      if (typeof rule !== 'string') {
+    perms[key] = rules.filter((rule) => {
+      if (typeof rule !== "string") {
         warnings.push({
           file: filePath,
           path: `permissions.${key}`,

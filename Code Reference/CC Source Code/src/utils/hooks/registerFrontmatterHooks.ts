@@ -1,8 +1,8 @@
-import { HOOK_EVENTS, type HookEvent } from 'src/entrypoints/agentSdkTypes.js'
-import type { AppState } from 'src/state/AppState.js'
-import { logForDebugging } from '../debug.js'
-import type { HooksSettings } from '../settings/types.js'
-import { addSessionHook } from './sessionHooks.js'
+import { HOOK_EVENTS, type HookEvent } from "src/entrypoints/agentSdkTypes.js"
+import type { AppState } from "src/state/AppState.js"
+import { logForDebugging } from "../debug.js"
+import type { HooksSettings } from "../settings/types.js"
+import { addSessionHook } from "./sessionHooks.js"
 
 /**
  * Register hooks from frontmatter (agent or skill) into session-scoped hooks.
@@ -37,15 +37,13 @@ export function registerFrontmatterHooks(
     // For agents, convert Stop hooks to SubagentStop since that's what fires when an agent completes
     // (executeStopHooks uses SubagentStop when called with an agentId)
     let targetEvent: HookEvent = event
-    if (isAgent && event === 'Stop') {
-      targetEvent = 'SubagentStop'
-      logForDebugging(
-        `Converting Stop hook to SubagentStop for ${sourceName} (subagents trigger SubagentStop)`,
-      )
+    if (isAgent && event === "Stop") {
+      targetEvent = "SubagentStop"
+      logForDebugging(`Converting Stop hook to SubagentStop for ${sourceName} (subagents trigger SubagentStop)`)
     }
 
     for (const matcherConfig of matchers) {
-      const matcher = matcherConfig.matcher ?? ''
+      const matcher = matcherConfig.matcher ?? ""
       const hooksArray = matcherConfig.hooks
 
       if (!hooksArray || hooksArray.length === 0) {
@@ -60,8 +58,6 @@ export function registerFrontmatterHooks(
   }
 
   if (hookCount > 0) {
-    logForDebugging(
-      `Registered ${hookCount} frontmatter hook(s) from ${sourceName} for session ${sessionId}`,
-    )
+    logForDebugging(`Registered ${hookCount} frontmatter hook(s) from ${sourceName} for session ${sessionId}`)
   }
 }

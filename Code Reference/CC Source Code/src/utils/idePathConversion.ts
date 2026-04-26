@@ -3,7 +3,7 @@
  * Handles conversions between Claude's environment and the IDE's environment
  */
 
-import { execFileSync } from 'child_process'
+import { execFileSync } from "child_process"
 
 export interface IDEPathConverter {
   /**
@@ -30,9 +30,7 @@ export class WindowsToWSLConverter implements IDEPathConverter {
 
     // Check if this is a path from a different WSL distro
     if (this.wslDistroName) {
-      const wslUncMatch = windowsPath.match(
-        /^\\\\wsl(?:\.localhost|\$)\\([^\\]+)(.*)$/,
-      )
+      const wslUncMatch = windowsPath.match(/^\\\\wsl(?:\.localhost|\$)\\([^\\]+)(.*)$/)
       if (wslUncMatch && wslUncMatch[1] !== this.wslDistroName) {
         // Different distro - wslpath will fail, so return original path
         return windowsPath
@@ -41,16 +39,16 @@ export class WindowsToWSLConverter implements IDEPathConverter {
 
     try {
       // Use wslpath to convert Windows paths to WSL paths
-      const result = execFileSync('wslpath', ['-u', windowsPath], {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore'], // wslpath writes "wslpath: <errortext>" to stderr
+      const result = execFileSync("wslpath", ["-u", windowsPath], {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "ignore"], // wslpath writes "wslpath: <errortext>" to stderr
       }).trim()
 
       return result
     } catch {
       // If wslpath fails, fall back to manual conversion
       return windowsPath
-        .replace(/\\/g, '/') // Convert backslashes to forward slashes
+        .replace(/\\/g, "/") // Convert backslashes to forward slashes
         .replace(/^([A-Z]):/i, (_, letter) => `/mnt/${letter.toLowerCase()}`)
     }
   }
@@ -60,9 +58,9 @@ export class WindowsToWSLConverter implements IDEPathConverter {
 
     try {
       // Use wslpath to convert WSL paths to Windows paths
-      const result = execFileSync('wslpath', ['-w', wslPath], {
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore'], // wslpath writes "wslpath: <errortext>" to stderr
+      const result = execFileSync("wslpath", ["-w", wslPath], {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "ignore"], // wslpath writes "wslpath: <errortext>" to stderr
       }).trim()
 
       return result
@@ -76,13 +74,8 @@ export class WindowsToWSLConverter implements IDEPathConverter {
 /**
  * Check if distro names match for WSL UNC paths
  */
-export function checkWSLDistroMatch(
-  windowsPath: string,
-  wslDistroName: string,
-): boolean {
-  const wslUncMatch = windowsPath.match(
-    /^\\\\wsl(?:\.localhost|\$)\\([^\\]+)(.*)$/,
-  )
+export function checkWSLDistroMatch(windowsPath: string, wslDistroName: string): boolean {
+  const wslUncMatch = windowsPath.match(/^\\\\wsl(?:\.localhost|\$)\\([^\\]+)(.*)$/)
   if (wslUncMatch) {
     return wslUncMatch[1] === wslDistroName
   }

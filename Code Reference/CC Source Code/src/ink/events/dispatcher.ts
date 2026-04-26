@@ -3,17 +3,17 @@ import {
   DefaultEventPriority,
   DiscreteEventPriority,
   NoEventPriority,
-} from 'react-reconciler/constants.js'
-import { logError } from '../../utils/log.js'
-import { HANDLER_FOR_EVENT } from './event-handlers.js'
-import type { EventTarget, TerminalEvent } from './terminal-event.js'
+} from "react-reconciler/constants.js"
+import { logError } from "../../utils/log.js"
+import { HANDLER_FOR_EVENT } from "./event-handlers.js"
+import type { EventTarget, TerminalEvent } from "./terminal-event.js"
 
 // --
 
 type DispatchListener = {
   node: EventTarget
   handler: (event: TerminalEvent) => void
-  phase: 'capturing' | 'at_target' | 'bubbling'
+  phase: "capturing" | "at_target" | "bubbling"
 }
 
 function getHandler(
@@ -43,10 +43,7 @@ function getHandler(
  *
  * Result: [root-cap, ..., parent-cap, target-cap, target-bub, parent-bub, ..., root-bub]
  */
-function collectListeners(
-  target: EventTarget,
-  event: TerminalEvent,
-): DispatchListener[] {
+function collectListeners(target: EventTarget, event: TerminalEvent): DispatchListener[] {
   const listeners: DispatchListener[] = []
 
   let node: EventTarget | undefined = target
@@ -60,7 +57,7 @@ function collectListeners(
       listeners.unshift({
         node,
         handler: captureHandler,
-        phase: isTarget ? 'at_target' : 'capturing',
+        phase: isTarget ? "at_target" : "capturing",
       })
     }
 
@@ -68,7 +65,7 @@ function collectListeners(
       listeners.push({
         node,
         handler: bubbleHandler,
-        phase: isTarget ? 'at_target' : 'bubbling',
+        phase: isTarget ? "at_target" : "bubbling",
       })
     }
 
@@ -84,10 +81,7 @@ function collectListeners(
  * Before each handler, calls event._prepareForTarget(node) so event
  * subclasses can do per-node setup.
  */
-function processDispatchQueue(
-  listeners: DispatchListener[],
-  event: TerminalEvent,
-): void {
+function processDispatchQueue(listeners: DispatchListener[], event: TerminalEvent): void {
   let previousNode: EventTarget | undefined
 
   for (const { node, handler, phase } of listeners) {
@@ -121,16 +115,16 @@ function processDispatchQueue(
  */
 function getEventPriority(eventType: string): number {
   switch (eventType) {
-    case 'keydown':
-    case 'keyup':
-    case 'click':
-    case 'focus':
-    case 'blur':
-    case 'paste':
+    case "keydown":
+    case "keyup":
+    case "click":
+    case "focus":
+    case "blur":
+    case "paste":
       return DiscreteEventPriority as number
-    case 'resize':
-    case 'scroll':
-    case 'mousemove':
+    case "resize":
+    case "scroll":
+    case "mousemove":
       return ContinuousEventPriority as number
     default:
       return DefaultEventPriority as number
@@ -139,13 +133,7 @@ function getEventPriority(eventType: string): number {
 
 // --
 
-type DiscreteUpdates = <A, B>(
-  fn: (a: A, b: B) => boolean,
-  a: A,
-  b: B,
-  c: undefined,
-  d: undefined,
-) => boolean
+type DiscreteUpdates = <A, B>(fn: (a: A, b: B) => boolean, a: A, b: B, c: undefined, d: undefined) => boolean
 
 /**
  * Owns event dispatch state and the capture/bubble dispatch loop.
@@ -191,7 +179,7 @@ export class Dispatcher {
       const listeners = collectListeners(target, event)
       processDispatchQueue(listeners, event)
 
-      event._setEventPhase('none')
+      event._setEventPhase("none")
       event._setCurrentTarget(null)
 
       return !event.defaultPrevented
@@ -208,13 +196,7 @@ export class Dispatcher {
     if (!this.discreteUpdates) {
       return this.dispatch(target, event)
     }
-    return this.discreteUpdates(
-      (t, e) => this.dispatch(t, e),
-      target,
-      event,
-      undefined,
-      undefined,
-    )
+    return this.discreteUpdates((t, e) => this.dispatch(t, e), target, event, undefined, undefined)
   }
 
   /**

@@ -1,4 +1,4 @@
-import { basename, extname, posix, sep } from 'path'
+import { basename, extname, posix, sep } from "path"
 
 /**
  * File patterns that should be excluded from attribution.
@@ -7,55 +7,55 @@ import { basename, extname, posix, sep } from 'path'
 
 // Exact file name matches (case-insensitive)
 const EXCLUDED_FILENAMES = new Set([
-  'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-  'bun.lockb',
-  'bun.lock',
-  'composer.lock',
-  'gemfile.lock',
-  'cargo.lock',
-  'poetry.lock',
-  'pipfile.lock',
-  'shrinkwrap.json',
-  'npm-shrinkwrap.json',
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "bun.lockb",
+  "bun.lock",
+  "composer.lock",
+  "gemfile.lock",
+  "cargo.lock",
+  "poetry.lock",
+  "pipfile.lock",
+  "shrinkwrap.json",
+  "npm-shrinkwrap.json",
 ])
 
 // File extension patterns (case-insensitive)
 const EXCLUDED_EXTENSIONS = new Set([
-  '.lock',
-  '.min.js',
-  '.min.css',
-  '.min.html',
-  '.bundle.js',
-  '.bundle.css',
-  '.generated.ts',
-  '.generated.js',
-  '.d.ts', // TypeScript declaration files
+  ".lock",
+  ".min.js",
+  ".min.css",
+  ".min.html",
+  ".bundle.js",
+  ".bundle.css",
+  ".generated.ts",
+  ".generated.js",
+  ".d.ts", // TypeScript declaration files
 ])
 
 // Directory patterns that indicate generated/vendored content
 const EXCLUDED_DIRECTORIES = [
-  '/dist/',
-  '/build/',
-  '/out/',
-  '/output/',
-  '/node_modules/',
-  '/vendor/',
-  '/vendored/',
-  '/third_party/',
-  '/third-party/',
-  '/external/',
-  '/.next/',
-  '/.nuxt/',
-  '/.svelte-kit/',
-  '/coverage/',
-  '/__pycache__/',
-  '/.tox/',
-  '/venv/',
-  '/.venv/',
-  '/target/release/',
-  '/target/debug/',
+  "/dist/",
+  "/build/",
+  "/out/",
+  "/output/",
+  "/node_modules/",
+  "/vendor/",
+  "/vendored/",
+  "/third_party/",
+  "/third-party/",
+  "/external/",
+  "/.next/",
+  "/.nuxt/",
+  "/.svelte-kit/",
+  "/coverage/",
+  "/__pycache__/",
+  "/.tox/",
+  "/venv/",
+  "/.venv/",
+  "/target/release/",
+  "/target/debug/",
 ]
 
 // Filename patterns using regex for more complex matching
@@ -84,8 +84,7 @@ const EXCLUDED_FILENAME_PATTERNS = [
  */
 export function isGeneratedFile(filePath: string): boolean {
   // Normalize path separators for consistent pattern matching (patterns use posix-style /)
-  const normalizedPath =
-    posix.sep + filePath.split(sep).join(posix.sep).replace(/^\/+/, '')
+  const normalizedPath = posix.sep + filePath.split(sep).join(posix.sep).replace(/^\/+/, "")
   const fileName = basename(filePath).toLowerCase()
   const ext = extname(filePath).toLowerCase()
 
@@ -100,9 +99,9 @@ export function isGeneratedFile(filePath: string): boolean {
   }
 
   // Check for compound extensions like .min.js
-  const parts = fileName.split('.')
+  const parts = fileName.split(".")
   if (parts.length > 2) {
-    const compoundExt = '.' + parts.slice(-2).join('.')
+    const compoundExt = "." + parts.slice(-2).join(".")
     if (EXCLUDED_EXTENSIONS.has(compoundExt)) {
       return true
     }
@@ -132,5 +131,5 @@ export function isGeneratedFile(filePath: string): boolean {
  * @returns Array of files that are not generated
  */
 export function filterGeneratedFiles(files: string[]): string[] {
-  return files.filter(file => !isGeneratedFile(file))
+  return files.filter((file) => !isGeneratedFile(file))
 }

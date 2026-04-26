@@ -13,21 +13,19 @@
  * marketplace plugins (`{name}@{marketplace}`).
  */
 
-import type { Command } from '../commands.js'
-import type { BundledSkillDefinition } from '../skills/bundledSkills.js'
-import type { BuiltinPluginDefinition, LoadedPlugin } from '../types/plugin.js'
-import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
+import type { Command } from "../commands.js"
+import type { BundledSkillDefinition } from "../skills/bundledSkills.js"
+import type { BuiltinPluginDefinition, LoadedPlugin } from "../types/plugin.js"
+import { getSettings_DEPRECATED } from "../utils/settings/settings.js"
 
 const BUILTIN_PLUGINS: Map<string, BuiltinPluginDefinition> = new Map()
 
-export const BUILTIN_MARKETPLACE_NAME = 'builtin'
+export const BUILTIN_MARKETPLACE_NAME = "builtin"
 
 /**
  * Register a built-in plugin. Call this from initBuiltinPlugins() at startup.
  */
-export function registerBuiltinPlugin(
-  definition: BuiltinPluginDefinition,
-): void {
+export function registerBuiltinPlugin(definition: BuiltinPluginDefinition): void {
   BUILTIN_PLUGINS.set(definition.name, definition)
 }
 
@@ -43,9 +41,7 @@ export function isBuiltinPluginId(pluginId: string): boolean {
  * Useful for the /plugin UI to show the skills/hooks/MCP list without
  * a marketplace lookup.
  */
-export function getBuiltinPluginDefinition(
-  name: string,
-): BuiltinPluginDefinition | undefined {
+export function getBuiltinPluginDefinition(name: string): BuiltinPluginDefinition | undefined {
   return BUILTIN_PLUGINS.get(name)
 }
 
@@ -70,10 +66,7 @@ export function getBuiltinPlugins(): {
     const pluginId = `${name}@${BUILTIN_MARKETPLACE_NAME}`
     const userSetting = settings?.enabledPlugins?.[pluginId]
     // Enabled state: user preference > plugin default > true
-    const isEnabled =
-      userSetting !== undefined
-        ? userSetting === true
-        : (definition.defaultEnabled ?? true)
+    const isEnabled = userSetting !== undefined ? userSetting === true : (definition.defaultEnabled ?? true)
 
     const plugin: LoadedPlugin = {
       name,
@@ -131,7 +124,7 @@ export function clearBuiltinPlugins(): void {
 
 function skillDefinitionToCommand(definition: BundledSkillDefinition): Command {
   return {
-    type: 'prompt',
+    type: "prompt",
     name: definition.name,
     description: definition.description,
     hasUserSpecifiedDescription: true,
@@ -146,14 +139,14 @@ function skillDefinitionToCommand(definition: BundledSkillDefinition): Command {
     // slash commands (/help, /clear). Using 'bundled' keeps these skills in
     // the Skill tool's listing, analytics name logging, and prompt-truncation
     // exemption. The user-toggleable aspect is tracked on LoadedPlugin.isBuiltin.
-    source: 'bundled',
-    loadedFrom: 'bundled',
+    source: "bundled",
+    loadedFrom: "bundled",
     hooks: definition.hooks,
     context: definition.context,
     agent: definition.agent,
     isEnabled: definition.isEnabled ?? (() => true),
     isHidden: !(definition.userInvocable ?? true),
-    progressMessage: 'running',
+    progressMessage: "running",
     getPromptForCommand: definition.getPromptForCommand,
   }
 }

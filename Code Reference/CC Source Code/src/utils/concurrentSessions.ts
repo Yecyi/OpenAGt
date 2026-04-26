@@ -1,25 +1,21 @@
-import { feature } from 'bun:bundle'
-import { chmod, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises'
-import { join } from 'path'
-import {
-  getOriginalCwd,
-  getSessionId,
-  onSessionSwitch,
-} from '../bootstrap/state.js'
-import { registerCleanup } from './cleanupRegistry.js'
-import { logForDebugging } from './debug.js'
-import { getClaudeConfigHomeDir } from './envUtils.js'
-import { errorMessage, isFsInaccessible } from './errors.js'
-import { isProcessRunning } from './genericProcessUtils.js'
-import { getPlatform } from './platform.js'
-import { jsonParse, jsonStringify } from './slowOperations.js'
-import { getAgentId } from './teammate.js'
+import { feature } from "bun:bundle"
+import { chmod, mkdir, readdir, readFile, unlink, writeFile } from "fs/promises"
+import { join } from "path"
+import { getOriginalCwd, getSessionId, onSessionSwitch } from "../bootstrap/state.js"
+import { registerCleanup } from "./cleanupRegistry.js"
+import { logForDebugging } from "./debug.js"
+import { getClaudeConfigHomeDir } from "./envUtils.js"
+import { errorMessage, isFsInaccessible } from "./errors.js"
+import { isProcessRunning } from "./genericProcessUtils.js"
+import { getPlatform } from "./platform.js"
+import { jsonParse, jsonStringify } from "./slowOperations.js"
+import { getAgentId } from "./teammate.js"
 
-export type SessionKind = 'interactive' | 'bg' | 'daemon' | 'daemon-worker'
-export type SessionStatus = 'busy' | 'idle' | 'waiting'
+export type SessionKind = "interactive" | "bg" | "daemon" | "daemon-worker"
+export type SessionStatus = "busy" | "idle" | "waiting"
 
 function getSessionsDir(): string {
-  return join(getClaudeConfigHomeDir(), 'sessions')
+  return join(getClaudeConfigHomeDir(), "sessions")
 }
 
 /**
@@ -29,9 +25,9 @@ function getSessionsDir(): string {
  * Gated so the env-var string is DCE'd from external builds.
  */
 function envSessionKind(): SessionKind | undefined {
-  if (feature('BG_SESSIONS')) {
+  if (feature("BG_SESSIONS")) {
     const k = process.env.CLAUDE_CODE_SESSION_KIND
-    if (k === 'bg' || k === 'daemon' || k === 'daemon-worker') return k
+    if (k === "bg" || k === "daemon" || k === "daemon-worker") return k
   }
   return undefined
 }
@@ -42,7 +38,7 @@ function envSessionKind(): SessionKind | undefined {
  * instead of killing the process.
  */
 export function isBgSession(): boolean {
-  return envSessionKind() === 'bg'
+  return envSessionKind() === "bg"
 }
 
 /**
@@ -59,7 +55,7 @@ export function isBgSession(): boolean {
 export async function registerSession(): Promise<boolean> {
   if (getAgentId() != null) return false
 
-  const kind: SessionKind = envSessionKind() ?? 'interactive'
+  const kind: SessionKind = envSessionKind() ?? "interactive"
   const dir = getSessionsDir()
   const pidFile = join(dir, `${process.pid}.json`)
 
@@ -83,10 +79,8 @@ export async function registerSession(): Promise<boolean> {
         startedAt: Date.now(),
         kind,
         entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT,
-        ...(feature('UDS_INBOX')
-          ? { messagingSocketPath: process.env.CLAUDE_CODE_MESSAGING_SOCKET }
-          : {}),
-        ...(feature('BG_SESSIONS')
+        ...(feature("UDS_INBOX") ? { messagingSocketPath: process.env.CLAUDE_CODE_MESSAGING_SOCKET } : {}),
+        ...(feature("BG_SESSIONS")
           ? {
               name: process.env.CLAUDE_CODE_SESSION_NAME,
               logPath: process.env.CLAUDE_CODE_SESSION_LOG,
@@ -98,7 +92,7 @@ export async function registerSession(): Promise<boolean> {
     // --resume / /resume mutates getSessionId() via switchSession. Without
     // this, the PID file's sessionId goes stale and `claude ps` sparkline
     // reads the wrong transcript.
-    onSessionSwitch(id => {
+    onSessionSwitch((id) => {
       void updatePidFile({ sessionId: id })
     })
     return true
@@ -116,21 +110,14 @@ export async function registerSession(): Promise<boolean> {
 async function updatePidFile(patch: Record<string, unknown>): Promise<void> {
   const pidFile = join(getSessionsDir(), `${process.pid}.json`)
   try {
-    const data = jsonParse(await readFile(pidFile, 'utf8')) as Record<
-      string,
-      unknown
-    >
+    const data = jsonParse(await readFile(pidFile, "utf8")) as Record<string, unknown>
     await writeFile(pidFile, jsonStringify({ ...data, ...patch }))
   } catch (e) {
-    logForDebugging(
-      `[concurrentSessions] updatePidFile failed: ${errorMessage(e)}`,
-    )
+    logForDebugging(`[concurrentSessions] updatePidFile failed: ${errorMessage(e)}`)
   }
 }
 
-export async function updateSessionName(
-  name: string | undefined,
-): Promise<void> {
+export async function updateSessionName(name: string | undefined): Promise<void> {
   if (!name) return
   await updatePidFile({ name })
 }
@@ -141,9 +128,7 @@ export async function updateSessionName(
  * once (local wins). Cleared on bridge teardown so stale IDs don't
  * suppress a legitimately-remote session after reconnect.
  */
-export async function updateSessionBridgeId(
-  bridgeSessionId: string | null,
-): Promise<void> {
+export async function updateSessionBridgeId(bridgeSessionId: string | null): Promise<void> {
   await updatePidFile({ bridgeSessionId })
 }
 
@@ -152,11 +137,8 @@ export async function updateSessionBridgeId(
  * status-change effect — a dropped write just means ps falls back to
  * transcript-tail derivation for one refresh.
  */
-export async function updateSessionActivity(patch: {
-  status?: SessionStatus
-  waitingFor?: string
-}): Promise<void> {
-  if (!feature('BG_SESSIONS')) return
+export async function updateSessionActivity(patch: { status?: SessionStatus; waitingFor?: string }): Promise<void> {
+  if (!feature("BG_SESSIONS")) return
   await updatePidFile({ ...patch, updatedAt: Date.now() })
 }
 
@@ -191,7 +173,7 @@ export async function countConcurrentSessions(): Promise<number> {
     }
     if (isProcessRunning(pid)) {
       count++
-    } else if (getPlatform() !== 'wsl') {
+    } else if (getPlatform() !== "wsl") {
       // Stale file from a crashed session — sweep it. Skip on WSL: if
       // ~/.claude/sessions/ is shared with Windows-native Claude (symlink
       // or CLAUDE_CONFIG_DIR), a Windows PID won't be probeable from WSL

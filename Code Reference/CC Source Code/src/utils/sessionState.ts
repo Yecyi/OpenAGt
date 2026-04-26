@@ -1,4 +1,4 @@
-export type SessionState = 'idle' | 'running' | 'requires_action'
+export type SessionState = "idle" | "running" | "requires_action"
 
 /**
  * Context carried with requires_action transitions so downstream
@@ -23,9 +23,9 @@ export type RequiresActionDetails = {
   input?: Record<string, unknown>
 }
 
-import { isEnvTruthy } from './envUtils.js'
-import type { PermissionMode } from './permissions/PermissionMode.js'
-import { enqueueSdkEvent } from './sdkEventQueue.js'
+import { isEnvTruthy } from "./envUtils.js"
+import type { PermissionMode } from "./permissions/PermissionMode.js"
+import { enqueueSdkEvent } from "./sdkEventQueue.js"
 
 // CCR external_metadata keys — push in onChangeAppState, restore in
 // externalMetadataToAppState.
@@ -44,28 +44,19 @@ export type SessionExternalMetadata = {
   task_summary?: string | null
 }
 
-type SessionStateChangedListener = (
-  state: SessionState,
-  details?: RequiresActionDetails,
-) => void
-type SessionMetadataChangedListener = (
-  metadata: SessionExternalMetadata,
-) => void
+type SessionStateChangedListener = (state: SessionState, details?: RequiresActionDetails) => void
+type SessionMetadataChangedListener = (metadata: SessionExternalMetadata) => void
 type PermissionModeChangedListener = (mode: PermissionMode) => void
 
 let stateListener: SessionStateChangedListener | null = null
 let metadataListener: SessionMetadataChangedListener | null = null
 let permissionModeListener: PermissionModeChangedListener | null = null
 
-export function setSessionStateChangedListener(
-  cb: SessionStateChangedListener | null,
-): void {
+export function setSessionStateChangedListener(cb: SessionStateChangedListener | null): void {
   stateListener = cb
 }
 
-export function setSessionMetadataChangedListener(
-  cb: SessionMetadataChangedListener | null,
-): void {
+export function setSessionMetadataChangedListener(cb: SessionMetadataChangedListener | null): void {
   metadataListener = cb
 }
 
@@ -76,30 +67,25 @@ export function setSessionMetadataChangedListener(
  * toolPermissionContext.mode (Shift+Tab, ExitPlanMode dialog, slash command,
  * bridge set_permission_mode, etc.).
  */
-export function setPermissionModeChangedListener(
-  cb: PermissionModeChangedListener | null,
-): void {
+export function setPermissionModeChangedListener(cb: PermissionModeChangedListener | null): void {
   permissionModeListener = cb
 }
 
 let hasPendingAction = false
-let currentState: SessionState = 'idle'
+let currentState: SessionState = "idle"
 
 export function getSessionState(): SessionState {
   return currentState
 }
 
-export function notifySessionStateChanged(
-  state: SessionState,
-  details?: RequiresActionDetails,
-): void {
+export function notifySessionStateChanged(state: SessionState, details?: RequiresActionDetails): void {
   currentState = state
   stateListener?.(state, details)
 
   // Mirror details into external_metadata so GetSession carries the
   // pending-action context without proto changes. Cleared via RFC 7396
   // null on the next non-blocked transition.
-  if (state === 'requires_action' && details) {
+  if (state === "requires_action" && details) {
     hasPendingAction = true
     metadataListener?.({
       pending_action: details,
@@ -111,7 +97,7 @@ export function notifySessionStateChanged(
 
   // task_summary is written mid-turn by the forked summarizer; clear it at
   // idle so the next turn doesn't briefly show the previous turn's progress.
-  if (state === 'idle') {
+  if (state === "idle") {
     metadataListener?.({ task_summary: null })
   }
 
@@ -126,16 +112,14 @@ export function notifySessionStateChanged(
   // https://anthropic.slack.com/archives/C093BJBD1CP/p1774152406752229
   if (isEnvTruthy(process.env.CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS)) {
     enqueueSdkEvent({
-      type: 'system',
-      subtype: 'session_state_changed',
+      type: "system",
+      subtype: "session_state_changed",
       state,
     })
   }
 }
 
-export function notifySessionMetadataChanged(
-  metadata: SessionExternalMetadata,
-): void {
+export function notifySessionMetadataChanged(metadata: SessionExternalMetadata): void {
   metadataListener?.(metadata)
 }
 

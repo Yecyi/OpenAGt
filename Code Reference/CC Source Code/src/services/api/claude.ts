@@ -16,18 +16,12 @@ import type {
   BetaToolUnion,
   BetaUsage,
   BetaMessageParam as MessageParam,
-} from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import type { TextBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import type { Stream } from '@anthropic-ai/sdk/streaming.mjs'
-import { randomUUID } from 'crypto'
-import {
-  getAPIProvider,
-  isFirstPartyAnthropicBaseUrl,
-} from 'src/utils/model/providers.js'
-import {
-  getAttributionHeader,
-  getCLISyspromptPrefix,
-} from '../../constants/system.js'
+} from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs"
+import type { TextBlockParam } from "@anthropic-ai/sdk/resources/index.mjs"
+import type { Stream } from "@anthropic-ai/sdk/streaming.mjs"
+import { randomUUID } from "crypto"
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from "src/utils/model/providers.js"
+import { getAttributionHeader, getCLISyspromptPrefix } from "../../constants/system.js"
 import {
   getEmptyToolPermissionContext,
   type QueryChainTracking,
@@ -35,43 +29,24 @@ import {
   type ToolPermissionContext,
   type Tools,
   toolMatchesName,
-} from '../../Tool.js'
-import type { AgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js'
-import {
-  type ConnectorTextBlock,
-  type ConnectorTextDelta,
-  isConnectorTextBlock,
-} from '../../types/connectorText.js'
-import type {
-  AssistantMessage,
-  Message,
-  StreamEvent,
-  SystemAPIErrorMessage,
-  UserMessage,
-} from '../../types/message.js'
-import {
-  type CacheScope,
-  logAPIPrefix,
-  splitSysPromptPrefix,
-  toolToAPISchema,
-} from '../../utils/api.js'
-import { getOauthAccountInfo } from '../../utils/auth.js'
-import {
-  getBedrockExtraBodyParamsBetas,
-  getMergedBetas,
-  getModelBetas,
-} from '../../utils/betas.js'
-import { getOrCreateUserID } from '../../utils/config.js'
+} from "../../Tool.js"
+import type { AgentDefinition } from "../../tools/AgentTool/loadAgentsDir.js"
+import { type ConnectorTextBlock, type ConnectorTextDelta, isConnectorTextBlock } from "../../types/connectorText.js"
+import type { AssistantMessage, Message, StreamEvent, SystemAPIErrorMessage, UserMessage } from "../../types/message.js"
+import { type CacheScope, logAPIPrefix, splitSysPromptPrefix, toolToAPISchema } from "../../utils/api.js"
+import { getOauthAccountInfo } from "../../utils/auth.js"
+import { getBedrockExtraBodyParamsBetas, getMergedBetas, getModelBetas } from "../../utils/betas.js"
+import { getOrCreateUserID } from "../../utils/config.js"
 import {
   CAPPED_DEFAULT_MAX_TOKENS,
   getModelMaxOutputTokens,
   getSonnet1mExpTreatmentEnabled,
-} from '../../utils/context.js'
-import { resolveAppliedEffort } from '../../utils/effort.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
-import { errorMessage } from '../../utils/errors.js'
-import { computeFingerprintFromMessages } from '../../utils/fingerprint.js'
-import { captureAPIRequest, logError } from '../../utils/log.js'
+} from "../../utils/context.js"
+import { resolveAppliedEffort } from "../../utils/effort.js"
+import { isEnvTruthy } from "../../utils/envUtils.js"
+import { errorMessage } from "../../utils/errors.js"
+import { computeFingerprintFromMessages } from "../../utils/fingerprint.js"
+import { captureAPIRequest, logError } from "../../utils/log.js"
 import {
   createAssistantAPIErrorMessage,
   createUserMessage,
@@ -81,38 +56,27 @@ import {
   stripAdvisorBlocks,
   stripCallerFieldFromAssistantMessage,
   stripToolReferenceBlocksFromUserMessage,
-} from '../../utils/messages.js'
+} from "../../utils/messages.js"
 import {
   getDefaultOpusModel,
   getDefaultSonnetModel,
   getSmallFastModel,
   isNonCustomOpusModel,
-} from '../../utils/model/model.js'
-import {
-  asSystemPrompt,
-  type SystemPrompt,
-} from '../../utils/systemPromptType.js'
-import { tokenCountFromLastAPIResponse } from '../../utils/tokens.js'
-import { getDynamicConfig_BLOCKS_ON_INIT } from '../analytics/growthbook.js'
-import {
-  currentLimits,
-  extractQuotaStatusFromError,
-  extractQuotaStatusFromHeaders,
-} from '../claudeAiLimits.js'
-import { getAPIContextManagement } from '../compact/apiMicrocompact.js'
+} from "../../utils/model/model.js"
+import { asSystemPrompt, type SystemPrompt } from "../../utils/systemPromptType.js"
+import { tokenCountFromLastAPIResponse } from "../../utils/tokens.js"
+import { getDynamicConfig_BLOCKS_ON_INIT } from "../analytics/growthbook.js"
+import { currentLimits, extractQuotaStatusFromError, extractQuotaStatusFromHeaders } from "../claudeAiLimits.js"
+import { getAPIContextManagement } from "../compact/apiMicrocompact.js"
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
+const autoModeStateModule = feature("TRANSCRIPT_CLASSIFIER")
+  ? (require("../../utils/permissions/autoModeState.js") as typeof import("../../utils/permissions/autoModeState.js"))
   : null
 
-import { feature } from 'bun:bundle'
-import type { ClientOptions } from '@anthropic-ai/sdk'
-import {
-  APIConnectionTimeoutError,
-  APIError,
-  APIUserAbortError,
-} from '@anthropic-ai/sdk/error'
+import { feature } from "bun:bundle"
+import type { ClientOptions } from "@anthropic-ai/sdk"
+import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk/error"
 import {
   getAfkModeHeaderLatched,
   getCacheEditingHeaderLatched,
@@ -129,7 +93,7 @@ import {
   setPromptCache1hAllowlist,
   setPromptCache1hEligible,
   setThinkingClearLatched,
-} from 'src/bootstrap/state.js'
+} from "src/bootstrap/state.js"
 import {
   AFK_MODE_BETA_HEADER,
   CONTEXT_1M_BETA_HEADER,
@@ -140,101 +104,80 @@ import {
   REDACT_THINKING_BETA_HEADER,
   STRUCTURED_OUTPUTS_BETA_HEADER,
   TASK_BUDGETS_BETA_HEADER,
-} from 'src/constants/betas.js'
-import type { QuerySource } from 'src/constants/querySource.js'
-import type { Notification } from 'src/context/notifications.js'
-import { addToTotalSessionCost } from 'src/cost-tracker.js'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import type { AgentId } from 'src/types/ids.js'
+} from "src/constants/betas.js"
+import type { QuerySource } from "src/constants/querySource.js"
+import type { Notification } from "src/context/notifications.js"
+import { addToTotalSessionCost } from "src/cost-tracker.js"
+import { getFeatureValue_CACHED_MAY_BE_STALE } from "src/services/analytics/growthbook.js"
+import type { AgentId } from "src/types/ids.js"
 import {
   ADVISOR_TOOL_INSTRUCTIONS,
   getExperimentAdvisorModels,
   isAdvisorEnabled,
   isValidAdvisorModel,
   modelSupportsAdvisor,
-} from 'src/utils/advisor.js'
-import { getAgentContext } from 'src/utils/agentContext.js'
-import { isClaudeAISubscriber } from 'src/utils/auth.js'
+} from "src/utils/advisor.js"
+import { getAgentContext } from "src/utils/agentContext.js"
+import { isClaudeAISubscriber } from "src/utils/auth.js"
 import {
   getToolSearchBetaHeader,
   modelSupportsStructuredOutputs,
   shouldIncludeFirstPartyOnlyBetas,
   shouldUseGlobalCacheScope,
-} from 'src/utils/betas.js'
-import { CLAUDE_IN_CHROME_MCP_SERVER_NAME } from 'src/utils/claudeInChrome/common.js'
-import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from 'src/utils/claudeInChrome/prompt.js'
-import { getMaxThinkingTokensForModel } from 'src/utils/context.js'
-import { logForDebugging } from 'src/utils/debug.js'
-import { logForDiagnosticsNoPII } from 'src/utils/diagLogs.js'
-import { type EffortValue, modelSupportsEffort } from 'src/utils/effort.js'
+} from "src/utils/betas.js"
+import { CLAUDE_IN_CHROME_MCP_SERVER_NAME } from "src/utils/claudeInChrome/common.js"
+import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from "src/utils/claudeInChrome/prompt.js"
+import { getMaxThinkingTokensForModel } from "src/utils/context.js"
+import { logForDebugging } from "src/utils/debug.js"
+import { logForDiagnosticsNoPII } from "src/utils/diagLogs.js"
+import { type EffortValue, modelSupportsEffort } from "src/utils/effort.js"
 import {
   isFastModeAvailable,
   isFastModeCooldown,
   isFastModeEnabled,
   isFastModeSupportedByModel,
-} from 'src/utils/fastMode.js'
-import { returnValue } from 'src/utils/generators.js'
-import { headlessProfilerCheckpoint } from 'src/utils/headlessProfiler.js'
-import { isMcpInstructionsDeltaEnabled } from 'src/utils/mcpInstructionsDelta.js'
-import { calculateUSDCost } from 'src/utils/modelCost.js'
-import { endQueryProfile, queryCheckpoint } from 'src/utils/queryProfiler.js'
-import {
-  modelSupportsAdaptiveThinking,
-  modelSupportsThinking,
-  type ThinkingConfig,
-} from 'src/utils/thinking.js'
-import {
-  extractDiscoveredToolNames,
-  isDeferredToolsDeltaEnabled,
-  isToolSearchEnabled,
-} from 'src/utils/toolSearch.js'
-import { API_MAX_MEDIA_PER_REQUEST } from '../../constants/apiLimits.js'
-import { ADVISOR_BETA_HEADER } from '../../constants/betas.js'
-import {
-  formatDeferredToolLine,
-  isDeferredTool,
-  TOOL_SEARCH_TOOL_NAME,
-} from '../../tools/ToolSearchTool/prompt.js'
-import { count } from '../../utils/array.js'
-import { insertBlockAfterToolResults } from '../../utils/contentArray.js'
-import { validateBoundedIntEnvVar } from '../../utils/envValidation.js'
-import { safeParseJSON } from '../../utils/json.js'
-import { getInferenceProfileBackingModel } from '../../utils/model/bedrock.js'
-import {
-  normalizeModelStringForAPI,
-  parseUserSpecifiedModel,
-} from '../../utils/model/model.js'
-import {
-  startSessionActivity,
-  stopSessionActivity,
-} from '../../utils/sessionActivity.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
+} from "src/utils/fastMode.js"
+import { returnValue } from "src/utils/generators.js"
+import { headlessProfilerCheckpoint } from "src/utils/headlessProfiler.js"
+import { isMcpInstructionsDeltaEnabled } from "src/utils/mcpInstructionsDelta.js"
+import { calculateUSDCost } from "src/utils/modelCost.js"
+import { endQueryProfile, queryCheckpoint } from "src/utils/queryProfiler.js"
+import { modelSupportsAdaptiveThinking, modelSupportsThinking, type ThinkingConfig } from "src/utils/thinking.js"
+import { extractDiscoveredToolNames, isDeferredToolsDeltaEnabled, isToolSearchEnabled } from "src/utils/toolSearch.js"
+import { API_MAX_MEDIA_PER_REQUEST } from "../../constants/apiLimits.js"
+import { ADVISOR_BETA_HEADER } from "../../constants/betas.js"
+import { formatDeferredToolLine, isDeferredTool, TOOL_SEARCH_TOOL_NAME } from "../../tools/ToolSearchTool/prompt.js"
+import { count } from "../../utils/array.js"
+import { insertBlockAfterToolResults } from "../../utils/contentArray.js"
+import { validateBoundedIntEnvVar } from "../../utils/envValidation.js"
+import { safeParseJSON } from "../../utils/json.js"
+import { getInferenceProfileBackingModel } from "../../utils/model/bedrock.js"
+import { normalizeModelStringForAPI, parseUserSpecifiedModel } from "../../utils/model/model.js"
+import { startSessionActivity, stopSessionActivity } from "../../utils/sessionActivity.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
 import {
   isBetaTracingEnabled,
   type LLMRequestNewContext,
   startLLMRequestSpan,
-} from '../../utils/telemetry/sessionTracing.js'
+} from "../../utils/telemetry/sessionTracing.js"
 /* eslint-enable @typescript-eslint/no-require-imports */
-import {
-  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  logEvent,
-} from '../analytics/index.js'
+import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from "../analytics/index.js"
 import {
   consumePendingCacheEdits,
   getPinnedCacheEdits,
   markToolsSentToAPIState,
   pinCacheEdits,
-} from '../compact/microCompact.js'
-import { getInitializationStatus } from '../lsp/manager.js'
-import { isToolFromMcpServer } from '../mcp/utils.js'
-import { withStreamingVCR, withVCR } from '../vcr.js'
-import { CLIENT_REQUEST_ID_HEADER, getAnthropicClient } from './client.js'
+} from "../compact/microCompact.js"
+import { getInitializationStatus } from "../lsp/manager.js"
+import { isToolFromMcpServer } from "../mcp/utils.js"
+import { withStreamingVCR, withVCR } from "../vcr.js"
+import { CLIENT_REQUEST_ID_HEADER, getAnthropicClient } from "./client.js"
 import {
   API_ERROR_MESSAGE_PREFIX,
   CUSTOM_OFF_SWITCH_MESSAGE,
   getAssistantMessageFromError,
   getErrorMessageIfRefusal,
-} from './errors.js'
+} from "./errors.js"
 import {
   EMPTY_USAGE,
   type GlobalCacheStrategy,
@@ -242,19 +185,9 @@ import {
   logAPIQuery,
   logAPISuccessAndDuration,
   type NonNullableUsage,
-} from './logging.js'
-import {
-  CACHE_TTL_1HOUR_MS,
-  checkResponseForCacheBreak,
-  recordPromptState,
-} from './promptCacheBreakDetection.js'
-import {
-  CannotRetryError,
-  FallbackTriggeredError,
-  is529Error,
-  type RetryContext,
-  withRetry,
-} from './withRetry.js'
+} from "./logging.js"
+import { CACHE_TTL_1HOUR_MS, checkResponseForCacheBreak, recordPromptState } from "./promptCacheBreakDetection.js"
+import { CannotRetryError, FallbackTriggeredError, is529Error, type RetryContext, withRetry } from "./withRetry.js"
 
 // Define a type that represents valid JSON values
 type JsonValue = string | number | boolean | null | JsonObject | JsonArray
@@ -279,37 +212,30 @@ export function getExtraBodyParams(betaHeaders?: string[]): JsonObject {
       // Parse as JSON, which can be null, boolean, number, string, array or object
       const parsed = safeParseJSON(extraBodyStr)
       // We expect an object with key-value pairs to spread into API parameters
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         // Shallow clone — safeParseJSON is LRU-cached and returns the same
         // object reference for the same string. Mutating `result` below
         // would poison the cache, causing stale values to persist.
         result = { ...(parsed as JsonObject) }
       } else {
-        logForDebugging(
-          `CLAUDE_CODE_EXTRA_BODY env var must be a JSON object, but was given ${extraBodyStr}`,
-          { level: 'error' },
-        )
+        logForDebugging(`CLAUDE_CODE_EXTRA_BODY env var must be a JSON object, but was given ${extraBodyStr}`, {
+          level: "error",
+        })
       }
     } catch (error) {
-      logForDebugging(
-        `Error parsing CLAUDE_CODE_EXTRA_BODY: ${errorMessage(error)}`,
-        { level: 'error' },
-      )
+      logForDebugging(`Error parsing CLAUDE_CODE_EXTRA_BODY: ${errorMessage(error)}`, { level: "error" })
     }
   }
 
   // Anti-distillation: send fake_tools opt-in for 1P CLI only
   if (
-    feature('ANTI_DISTILLATION_CC')
-      ? process.env.CLAUDE_CODE_ENTRYPOINT === 'cli' &&
+    feature("ANTI_DISTILLATION_CC")
+      ? process.env.CLAUDE_CODE_ENTRYPOINT === "cli" &&
         shouldIncludeFirstPartyOnlyBetas() &&
-        getFeatureValue_CACHED_MAY_BE_STALE(
-          'tengu_anti_distill_fake_tool_injection',
-          false,
-        )
+        getFeatureValue_CACHED_MAY_BE_STALE("tengu_anti_distill_fake_tool_injection", false)
       : false
   ) {
-    result.anti_distillation = ['fake_tools']
+    result.anti_distillation = ["fake_tools"]
   }
 
   // Handle beta headers if provided
@@ -317,9 +243,7 @@ export function getExtraBodyParams(betaHeaders?: string[]): JsonObject {
     if (result.anthropic_beta && Array.isArray(result.anthropic_beta)) {
       // Add to existing array, avoiding duplicates
       const existingHeaders = result.anthropic_beta as string[]
-      const newHeaders = betaHeaders.filter(
-        header => !existingHeaders.includes(header),
-      )
+      const newHeaders = betaHeaders.filter((header) => !existingHeaders.includes(header))
       result.anthropic_beta = [...existingHeaders, ...newHeaders]
     } else {
       // Create new array with the beta headers
@@ -362,14 +286,14 @@ export function getCacheControl({
   scope?: CacheScope
   querySource?: QuerySource
 } = {}): {
-  type: 'ephemeral'
-  ttl?: '1h'
+  type: "ephemeral"
+  ttl?: "1h"
   scope?: CacheScope
 } {
   return {
-    type: 'ephemeral',
-    ...(should1hCacheTTL(querySource) && { ttl: '1h' }),
-    ...(scope === 'global' && { scope }),
+    type: "ephemeral",
+    ...(should1hCacheTTL(querySource) && { ttl: "1h" }),
+    ...(scope === "global" && { scope }),
   }
 }
 
@@ -393,10 +317,7 @@ export function getCacheControl({
 function should1hCacheTTL(querySource?: QuerySource): boolean {
   // 3P Bedrock users get 1h TTL when opted in via env var — they manage their own billing
   // No GrowthBook gating needed since 3P users don't have GrowthBook configured
-  if (
-    getAPIProvider() === 'bedrock' &&
-    isEnvTruthy(process.env.ENABLE_PROMPT_CACHING_1H_BEDROCK)
-  ) {
+  if (getAPIProvider() === "bedrock" && isEnvTruthy(process.env.ENABLE_PROMPT_CACHING_1H_BEDROCK)) {
     return true
   }
 
@@ -405,9 +326,7 @@ function should1hCacheTTL(querySource?: QuerySource): boolean {
   // would bust the server-side prompt cache (~20K tokens per flip).
   let userEligible = getPromptCache1hEligible()
   if (userEligible === null) {
-    userEligible =
-      process.env.USER_TYPE === 'ant' ||
-      (isClaudeAISubscriber() && !currentLimits.isUsingOverage)
+    userEligible = process.env.USER_TYPE === "ant" || (isClaudeAISubscriber() && !currentLimits.isUsingOverage)
     setPromptCache1hEligible(userEligible)
   }
   if (!userEligible) return false
@@ -418,17 +337,15 @@ function should1hCacheTTL(querySource?: QuerySource): boolean {
   if (allowlist === null) {
     const config = getFeatureValue_CACHED_MAY_BE_STALE<{
       allowlist?: string[]
-    }>('tengu_prompt_cache_1h_config', {})
+    }>("tengu_prompt_cache_1h_config", {})
     allowlist = config.allowlist ?? []
     setPromptCache1hAllowlist(allowlist)
   }
 
   return (
     querySource !== undefined &&
-    allowlist.some(pattern =>
-      pattern.endsWith('*')
-        ? querySource.startsWith(pattern.slice(0, -1))
-        : querySource === pattern,
+    allowlist.some((pattern) =>
+      pattern.endsWith("*") ? querySource.startsWith(pattern.slice(0, -1)) : querySource === pattern,
     )
   )
 }
@@ -444,20 +361,19 @@ function configureEffortParams(
   betas: string[],
   model: string,
 ): void {
-  if (!modelSupportsEffort(model) || 'effort' in outputConfig) {
+  if (!modelSupportsEffort(model) || "effort" in outputConfig) {
     return
   }
 
   if (effortValue === undefined) {
     betas.push(EFFORT_BETA_HEADER)
-  } else if (typeof effortValue === 'string') {
+  } else if (typeof effortValue === "string") {
     // Send string effort level as is
     outputConfig.effort = effortValue
     betas.push(EFFORT_BETA_HEADER)
-  } else if (process.env.USER_TYPE === 'ant') {
+  } else if (process.env.USER_TYPE === "ant") {
     // Numeric effort override - ant-only (uses anthropic_internal)
-    const existingInternal =
-      (extraBodyParams.anthropic_internal as Record<string, unknown>) || {}
+    const existingInternal = (extraBodyParams.anthropic_internal as Record<string, unknown>) || {}
     extraBodyParams.anthropic_internal = {
       ...existingInternal,
       effort_override: effortValue,
@@ -471,25 +387,21 @@ function configureEffortParams(
 // api/api/schemas/messages/request/output_config.py:12-39 in the monorepo.
 // Beta: task-budgets-2026-03-13 (EAP, claude-strudel-eap only as of Mar 2026).
 type TaskBudgetParam = {
-  type: 'tokens'
+  type: "tokens"
   total: number
   remaining?: number
 }
 
 export function configureTaskBudgetParams(
-  taskBudget: Options['taskBudget'],
+  taskBudget: Options["taskBudget"],
   outputConfig: BetaOutputConfig & { task_budget?: TaskBudgetParam },
   betas: string[],
 ): void {
-  if (
-    !taskBudget ||
-    'task_budget' in outputConfig ||
-    !shouldIncludeFirstPartyOnlyBetas()
-  ) {
+  if (!taskBudget || "task_budget" in outputConfig || !shouldIncludeFirstPartyOnlyBetas()) {
     return
   }
   outputConfig.task_budget = {
-    type: 'tokens',
+    type: "tokens",
     total: taskBudget.total,
     ...(taskBudget.remaining !== undefined && {
       remaining: taskBudget.remaining,
@@ -506,13 +418,12 @@ export function getAPIMetadata() {
   const extraStr = process.env.CLAUDE_CODE_EXTRA_METADATA
   if (extraStr) {
     const parsed = safeParseJSON(extraStr, false)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       extra = parsed as JsonObject
     } else {
-      logForDebugging(
-        `CLAUDE_CODE_EXTRA_METADATA env var must be a JSON object, but was given ${extraStr}`,
-        { level: 'error' },
-      )
+      logForDebugging(`CLAUDE_CODE_EXTRA_METADATA env var must be a JSON object, but was given ${extraStr}`, {
+        level: "error",
+      })
     }
   }
 
@@ -521,16 +432,13 @@ export function getAPIMetadata() {
       ...extra,
       device_id: getOrCreateUserID(),
       // Only include OAuth account UUID when actively using OAuth authentication
-      account_uuid: getOauthAccountInfo()?.accountUuid ?? '',
+      account_uuid: getOauthAccountInfo()?.accountUuid ?? "",
       session_id: getSessionId(),
     }),
   }
 }
 
-export async function verifyApiKey(
-  apiKey: string,
-  isNonInteractiveSession: boolean,
-): Promise<boolean> {
+export async function verifyApiKey(apiKey: string, isNonInteractiveSession: boolean): Promise<boolean> {
   // Skip API verification if running in print mode (isNonInteractiveSession)
   if (isNonInteractiveSession) {
     return true
@@ -547,10 +455,10 @@ export async function verifyApiKey(
             apiKey,
             maxRetries: 3,
             model,
-            source: 'verify_api_key',
+            source: "verify_api_key",
           }),
-        async anthropic => {
-          const messages: MessageParam[] = [{ role: 'user', content: 'test' }]
+        async (anthropic) => {
+          const messages: MessageParam[] = [{ role: "user", content: "test" }]
           // biome-ignore lint/plugin: API key verification is intentionally a minimal direct call
           await anthropic.beta.messages.create({
             model,
@@ -563,7 +471,7 @@ export async function verifyApiKey(
           })
           return true
         },
-        { maxRetries: 2, model, thinkingConfig: { type: 'disabled' } }, // Use fewer retries for API key verification
+        { maxRetries: 2, model, thinkingConfig: { type: "disabled" } }, // Use fewer retries for API key verification
       ),
     )
   } catch (errorFromRetry) {
@@ -575,9 +483,7 @@ export async function verifyApiKey(
     // Check for authentication error
     if (
       error instanceof Error &&
-      error.message.includes(
-        '{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
-      )
+      error.message.includes('{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}')
     ) {
       return false
     }
@@ -592,12 +498,12 @@ export function userMessageToMessageParam(
   querySource?: QuerySource,
 ): MessageParam {
   if (addCache) {
-    if (typeof message.message.content === 'string') {
+    if (typeof message.message.content === "string") {
       return {
-        role: 'user',
+        role: "user",
         content: [
           {
-            type: 'text',
+            type: "text",
             text: message.message.content,
             ...(enablePromptCaching && {
               cache_control: getCacheControl({ querySource }),
@@ -607,7 +513,7 @@ export function userMessageToMessageParam(
       }
     } else {
       return {
-        role: 'user',
+        role: "user",
         content: message.message.content.map((_, i) => ({
           ..._,
           ...(i === message.message.content.length - 1
@@ -623,10 +529,8 @@ export function userMessageToMessageParam(
   // splice) from contaminating the original message. Without cloning, multiple calls
   // to addCacheBreakpoints share the same array and each splices in duplicate cache_edits.
   return {
-    role: 'user',
-    content: Array.isArray(message.message.content)
-      ? [...message.message.content]
-      : message.message.content,
+    role: "user",
+    content: Array.isArray(message.message.content) ? [...message.message.content] : message.message.content,
   }
 }
 
@@ -637,12 +541,12 @@ export function assistantMessageToMessageParam(
   querySource?: QuerySource,
 ): MessageParam {
   if (addCache) {
-    if (typeof message.message.content === 'string') {
+    if (typeof message.message.content === "string") {
       return {
-        role: 'assistant',
+        role: "assistant",
         content: [
           {
-            type: 'text',
+            type: "text",
             text: message.message.content,
             ...(enablePromptCaching && {
               cache_control: getCacheControl({ querySource }),
@@ -652,13 +556,13 @@ export function assistantMessageToMessageParam(
       }
     } else {
       return {
-        role: 'assistant',
+        role: "assistant",
         content: message.message.content.map((_, i) => ({
           ..._,
           ...(i === message.message.content.length - 1 &&
-          _.type !== 'thinking' &&
-          _.type !== 'redacted_thinking' &&
-          (feature('CONNECTOR_TEXT') ? !isConnectorTextBlock(_) : true)
+          _.type !== "thinking" &&
+          _.type !== "redacted_thinking" &&
+          (feature("CONNECTOR_TEXT") ? !isConnectorTextBlock(_) : true)
             ? enablePromptCaching
               ? { cache_control: getCacheControl({ querySource }) }
               : {}
@@ -668,7 +572,7 @@ export function assistantMessageToMessageParam(
     }
   }
   return {
-    role: 'assistant',
+    role: "assistant",
     content: message.message.content,
   }
 }
@@ -686,7 +590,7 @@ export type Options = {
   agents: AgentDefinition[]
   allowedAgentTypes?: string[]
   hasAppendSystemPrompt: boolean
-  fetchOverride?: ClientOptions['fetch']
+  fetchOverride?: ClientOptions["fetch"]
   enablePromptCaching?: boolean
   skipCacheWrite?: boolean
   temperatureOverride?: number
@@ -725,16 +629,9 @@ export async function queryModelWithoutStreaming({
   // logAPISuccessAndDuration gets called (which happens after all yields)
   let assistantMessage: AssistantMessage | undefined
   for await (const message of withStreamingVCR(messages, async function* () {
-    yield* queryModel(
-      messages,
-      systemPrompt,
-      thinkingConfig,
-      tools,
-      signal,
-      options,
-    )
+    yield* queryModel(messages, systemPrompt, thinkingConfig, tools, signal, options)
   })) {
-    if (message.type === 'assistant') {
+    if (message.type === "assistant") {
       assistantMessage = message
     }
   }
@@ -744,7 +641,7 @@ export async function queryModelWithoutStreaming({
     if (signal.aborted) {
       throw new APIUserAbortError()
     }
-    throw new Error('No assistant message found')
+    throw new Error("No assistant message found")
   }
   return assistantMessage
 }
@@ -763,19 +660,9 @@ export async function* queryModelWithStreaming({
   tools: Tools
   signal: AbortSignal
   options: Options
-}): AsyncGenerator<
-  StreamEvent | AssistantMessage | SystemAPIErrorMessage,
-  void
-> {
+}): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage, void> {
   return yield* withStreamingVCR(messages, async function* () {
-    yield* queryModel(
-      messages,
-      systemPrompt,
-      thinkingConfig,
-      tools,
-      signal,
-      options,
-    )
+    yield* queryModel(messages, systemPrompt, thinkingConfig, tools, signal, options)
   })
 }
 
@@ -784,12 +671,12 @@ export async function* queryModelWithStreaming({
  * because LSP initialization is not yet complete.
  */
 function shouldDeferLspTool(tool: Tool): boolean {
-  if (!('isLsp' in tool) || !tool.isLsp) {
+  if (!("isLsp" in tool) || !tool.isLsp) {
     return false
   }
   const status = getInitializationStatus()
   // Defer when pending or not started
-  return status.status === 'pending' || status.status === 'not-started'
+  return status.status === "pending" || status.status === "not-started"
 }
 
 /**
@@ -805,7 +692,7 @@ function shouldDeferLspTool(tool: Tool): boolean {
  * approaching the API's 10-minute non-streaming boundary.
  */
 function getNonstreamingFallbackTimeoutMs(): number {
-  const override = parseInt(process.env.API_TIMEOUT_MS || '', 10)
+  const override = parseInt(process.env.API_TIMEOUT_MS || "", 10)
   if (override) return override
   return isEnvTruthy(process.env.CLAUDE_CODE_REMOTE) ? 120_000 : 300_000
 }
@@ -818,7 +705,7 @@ function getNonstreamingFallbackTimeoutMs(): number {
 export async function* executeNonStreamingRequest(
   clientOptions: {
     model: string
-    fetchOverride?: Options['fetchOverride']
+    fetchOverride?: Options["fetchOverride"]
     source: string
   },
   retryOptions: {
@@ -854,10 +741,7 @@ export async function* executeNonStreamingRequest(
       captureRequest(retryParams)
       onAttempt(attempt, start, retryParams.max_tokens)
 
-      const adjustedParams = adjustParamsForNonStreaming(
-        retryParams,
-        MAX_NON_STREAMING_TOKENS,
-      )
+      const adjustedParams = adjustParamsForNonStreaming(retryParams, MAX_NON_STREAMING_TOKENS)
 
       try {
         // biome-ignore lint/plugin: non-streaming API call
@@ -878,18 +762,16 @@ export async function* executeNonStreamingRequest(
         // Instrumentation: record when the non-streaming request errors (including
         // timeouts). Lets us distinguish "fallback hung past container kill"
         // (no event) from "fallback hit the bounded timeout" (this event).
-        logForDiagnosticsNoPII('error', 'cli_nonstreaming_fallback_error')
-        logEvent('tengu_nonstreaming_fallback_error', {
-          model:
-            clientOptions.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        logForDiagnosticsNoPII("error", "cli_nonstreaming_fallback_error")
+        logEvent("tengu_nonstreaming_fallback_error", {
+          model: clientOptions.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           error:
             err instanceof Error
               ? (err.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-              : ('unknown' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+              : ("unknown" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
           attempt,
           timeout_ms: fallbackTimeoutMs,
-          request_id: (originatingRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          request_id: (originatingRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
         throw err
       }
@@ -908,7 +790,7 @@ export async function* executeNonStreamingRequest(
   let e
   do {
     e = await generator.next()
-    if (!e.done && e.value.type === 'system') {
+    if (!e.done && e.value.type === "system") {
       yield e.value
     }
   } while (!e.done)
@@ -925,28 +807,22 @@ export async function* executeNonStreamingRequest(
  * query chain (main thread, subagent, teammate) tracks its own request chain
  * independently, and rollback/undo naturally updates the value.
  */
-function getPreviousRequestIdFromMessages(
-  messages: Message[],
-): string | undefined {
+function getPreviousRequestIdFromMessages(messages: Message[]): string | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]!
-    if (msg.type === 'assistant' && msg.requestId) {
+    if (msg.type === "assistant" && msg.requestId) {
       return msg.requestId
     }
   }
   return undefined
 }
 
-function isMedia(
-  block: BetaContentBlockParam,
-): block is BetaImageBlockParam | BetaRequestDocumentBlock {
-  return block.type === 'image' || block.type === 'document'
+function isMedia(block: BetaContentBlockParam): block is BetaImageBlockParam | BetaRequestDocumentBlock {
+  return block.type === "image" || block.type === "document"
 }
 
-function isToolResult(
-  block: BetaContentBlockParam,
-): block is BetaToolResultBlockParam {
-  return block.type === 'tool_result'
+function isToolResult(block: BetaContentBlockParam): block is BetaToolResultBlockParam {
+  return block.type === "tool_result"
 }
 
 /**
@@ -972,32 +848,25 @@ export function stripExcessMediaItems(
   toRemove -= limit
   if (toRemove <= 0) return messages
 
-  return messages.map(msg => {
+  return messages.map((msg) => {
     if (toRemove <= 0) return msg
     const content = msg.message.content
     if (!Array.isArray(content)) return msg
 
     const before = toRemove
     const stripped = content
-      .map(block => {
-        if (
-          toRemove <= 0 ||
-          !isToolResult(block) ||
-          !Array.isArray(block.content)
-        )
-          return block
-        const filtered = block.content.filter(n => {
+      .map((block) => {
+        if (toRemove <= 0 || !isToolResult(block) || !Array.isArray(block.content)) return block
+        const filtered = block.content.filter((n) => {
           if (toRemove > 0 && isMedia(n)) {
             toRemove--
             return false
           }
           return true
         })
-        return filtered.length === block.content.length
-          ? block
-          : { ...block, content: filtered }
+        return filtered.length === block.content.length ? block : { ...block, content: filtered }
       })
-      .filter(block => {
+      .filter((block) => {
         if (toRemove > 0 && isMedia(block)) {
           toRemove--
           return false
@@ -1021,10 +890,7 @@ async function* queryModel(
   tools: Tools,
   signal: AbortSignal,
   options: Options,
-): AsyncGenerator<
-  StreamEvent | AssistantMessage | SystemAPIErrorMessage,
-  void
-> {
+): AsyncGenerator<StreamEvent | AssistantMessage | SystemAPIErrorMessage, void> {
   // Check cheap conditions first — the off-switch await blocks on GrowthBook
   // init (~10ms). For non-Opus models (haiku, sonnet) this skips the await
   // entirely. Subscribers don't hit this path at all.
@@ -1032,19 +898,13 @@ async function* queryModel(
     !isClaudeAISubscriber() &&
     isNonCustomOpusModel(options.model) &&
     (
-      await getDynamicConfig_BLOCKS_ON_INIT<{ activated: boolean }>(
-        'tengu-off-switch',
-        {
-          activated: false,
-        },
-      )
+      await getDynamicConfig_BLOCKS_ON_INIT<{ activated: boolean }>("tengu-off-switch", {
+        activated: false,
+      })
     ).activated
   ) {
-    logEvent('tengu_off_switch_query', {})
-    yield getAssistantMessageFromError(
-      new Error(CUSTOM_OFF_SWITCH_MESSAGE),
-      options.model,
-    )
+    logEvent("tengu_off_switch_query", {})
+    yield getAssistantMessageFromError(new Error(CUSTOM_OFF_SWITCH_MESSAGE), options.model)
     return
   }
 
@@ -1055,19 +915,17 @@ async function* queryModel(
   const previousRequestId = getPreviousRequestIdFromMessages(messages)
 
   const resolvedModel =
-    getAPIProvider() === 'bedrock' &&
-    options.model.includes('application-inference-profile')
-      ? ((await getInferenceProfileBackingModel(options.model)) ??
-        options.model)
+    getAPIProvider() === "bedrock" && options.model.includes("application-inference-profile")
+      ? ((await getInferenceProfileBackingModel(options.model)) ?? options.model)
       : options.model
 
-  queryCheckpoint('query_tool_schema_build_start')
+  queryCheckpoint("query_tool_schema_build_start")
   const isAgenticQuery =
-    options.querySource.startsWith('repl_main_thread') ||
-    options.querySource.startsWith('agent:') ||
-    options.querySource === 'sdk' ||
-    options.querySource === 'hook_agent' ||
-    options.querySource === 'verification_agent'
+    options.querySource.startsWith("repl_main_thread") ||
+    options.querySource.startsWith("agent:") ||
+    options.querySource === "sdk" ||
+    options.querySource === "hook_agent" ||
+    options.querySource === "verification_agent"
   const betas = getMergedBetas(options.model, { isAgenticQuery })
 
   // Always send the advisor beta header when advisor is enabled, so
@@ -1083,10 +941,7 @@ async function* queryModel(
 
     const advisorExperiment = getExperimentAdvisorModels()
     if (advisorExperiment !== undefined) {
-      if (
-        normalizeModelStringForAPI(advisorExperiment.baseModel) ===
-        normalizeModelStringForAPI(options.model)
-      ) {
+      if (normalizeModelStringForAPI(advisorExperiment.baseModel) === normalizeModelStringForAPI(options.model)) {
         // Override the advisor model if the base model matches. We
         // should only have experiment models if the user cannot
         // configure it themselves.
@@ -1095,22 +950,14 @@ async function* queryModel(
     }
 
     if (advisorOption) {
-      const normalizedAdvisorModel = normalizeModelStringForAPI(
-        parseUserSpecifiedModel(advisorOption),
-      )
+      const normalizedAdvisorModel = normalizeModelStringForAPI(parseUserSpecifiedModel(advisorOption))
       if (!modelSupportsAdvisor(options.model)) {
-        logForDebugging(
-          `[AdvisorTool] Skipping advisor - base model ${options.model} does not support advisor`,
-        )
+        logForDebugging(`[AdvisorTool] Skipping advisor - base model ${options.model} does not support advisor`)
       } else if (!isValidAdvisorModel(normalizedAdvisorModel)) {
-        logForDebugging(
-          `[AdvisorTool] Skipping advisor - ${normalizedAdvisorModel} is not a valid advisor model`,
-        )
+        logForDebugging(`[AdvisorTool] Skipping advisor - ${normalizedAdvisorModel} is not a valid advisor model`)
       } else {
         advisorModel = normalizedAdvisorModel
-        logForDebugging(
-          `[AdvisorTool] Server-side tool enabled with ${advisorModel} as the advisor model`,
-        )
+        logForDebugging(`[AdvisorTool] Server-side tool enabled with ${advisorModel} as the advisor model`)
       }
     }
   }
@@ -1122,7 +969,7 @@ async function* queryModel(
     tools,
     options.getToolPermissionContext,
     options.agents,
-    'query',
+    "query",
   )
 
   // Precompute once — isDeferredTool does 2 GrowthBook lookups per call
@@ -1136,14 +983,8 @@ async function* queryModel(
   // Even if tool search mode is enabled, skip if there are no deferred tools
   // AND no MCP servers are still connecting. When servers are pending, keep
   // ToolSearch available so the model can discover tools after they connect.
-  if (
-    useToolSearch &&
-    deferredToolNames.size === 0 &&
-    !options.hasPendingMcpServers
-  ) {
-    logForDebugging(
-      'Tool search disabled: no deferred tools available to search',
-    )
+  if (useToolSearch && deferredToolNames.size === 0 && !options.hasPendingMcpServers) {
+    logForDebugging("Tool search disabled: no deferred tools available to search")
     useToolSearch = false
   }
 
@@ -1157,7 +998,7 @@ async function* queryModel(
     // to predeclare all deferred tools upfront and removes limits on tool quantity.
     const discoveredToolNames = extractDiscoveredToolNames(messages)
 
-    filteredTools = tools.filter(tool => {
+    filteredTools = tools.filter((tool) => {
       // Always include non-deferred tools
       if (!deferredToolNames.has(tool.name)) return true
       // Always include ToolSearchTool (so it can discover more tools)
@@ -1166,16 +1007,14 @@ async function* queryModel(
       return discoveredToolNames.has(tool.name)
     })
   } else {
-    filteredTools = tools.filter(
-      t => !toolMatchesName(t, TOOL_SEARCH_TOOL_NAME),
-    )
+    filteredTools = tools.filter((t) => !toolMatchesName(t, TOOL_SEARCH_TOOL_NAME))
   }
 
   // Add tool search beta header if enabled - required for defer_loading to be accepted
   // Header differs by provider: 1P/Foundry use advanced-tool-use, Vertex/Bedrock use tool-search-tool
   // For Bedrock, this header must go in extraBodyParams, not the betas array
   const toolSearchHeader = useToolSearch ? getToolSearchBetaHeader() : null
-  if (toolSearchHeader && getAPIProvider() !== 'bedrock') {
+  if (toolSearchHeader && getAPIProvider() !== "bedrock") {
     if (!betas.includes(toolSearchHeader)) {
       betas.push(toolSearchHeader)
     }
@@ -1186,14 +1025,12 @@ async function* queryModel(
   // The beta header is also captured here to avoid a top-level import of the
   // ant-only CACHE_EDITING_BETA_HEADER constant.
   let cachedMCEnabled = false
-  let cacheEditingBetaHeader = ''
-  if (feature('CACHED_MICROCOMPACT')) {
-    const {
-      isCachedMicrocompactEnabled,
-      isModelSupportedForCacheEditing,
-      getCachedMCConfig,
-    } = await import('../compact/cachedMicrocompact.js')
-    const betas = await import('src/constants/betas.js')
+  let cacheEditingBetaHeader = ""
+  if (feature("CACHED_MICROCOMPACT")) {
+    const { isCachedMicrocompactEnabled, isModelSupportedForCacheEditing, getCachedMCConfig } = await import(
+      "../compact/cachedMicrocompact.js"
+    )
+    const betas = await import("src/constants/betas.js")
     cacheEditingBetaHeader = betas.CACHE_EDITING_BETA_HEADER
     const featureEnabled = isCachedMicrocompactEnabled()
     const modelSupported = isModelSupportedForCacheEditing(options.model)
@@ -1205,35 +1042,30 @@ async function* queryModel(
   }
 
   const useGlobalCacheFeature = shouldUseGlobalCacheScope()
-  const willDefer = (t: Tool) =>
-    useToolSearch && (deferredToolNames.has(t.name) || shouldDeferLspTool(t))
+  const willDefer = (t: Tool) => useToolSearch && (deferredToolNames.has(t.name) || shouldDeferLspTool(t))
   // MCP tools are per-user → dynamic tool section → can't globally cache.
   // Only gate when an MCP tool will actually render (not defer_loading).
   const needsToolBasedCacheMarker =
-    useGlobalCacheFeature &&
-    filteredTools.some(t => t.isMcp === true && !willDefer(t))
+    useGlobalCacheFeature && filteredTools.some((t) => t.isMcp === true && !willDefer(t))
 
   // Ensure prompt_caching_scope beta header is present when global cache is enabled.
-  if (
-    useGlobalCacheFeature &&
-    !betas.includes(PROMPT_CACHING_SCOPE_BETA_HEADER)
-  ) {
+  if (useGlobalCacheFeature && !betas.includes(PROMPT_CACHING_SCOPE_BETA_HEADER)) {
     betas.push(PROMPT_CACHING_SCOPE_BETA_HEADER)
   }
 
   // Determine global cache strategy for logging
   const globalCacheStrategy: GlobalCacheStrategy = useGlobalCacheFeature
     ? needsToolBasedCacheMarker
-      ? 'none'
-      : 'system_prompt'
-    : 'none'
+      ? "none"
+      : "system_prompt"
+    : "none"
 
   // Build tool schemas, adding defer_loading for MCP tools when tool search is enabled
   // Note: We pass the full `tools` list (not filteredTools) to toolToAPISchema so that
   // ToolSearchTool's prompt can list ALL available MCP tools. The filtering only affects
   // which tools are actually sent to the API, not what the model sees in tool descriptions.
   const toolSchemas = await Promise.all(
-    filteredTools.map(tool =>
+    filteredTools.map((tool) =>
       toolToAPISchema(tool, {
         getToolPermissionContext: options.getToolPermissionContext,
         tools,
@@ -1246,25 +1078,21 @@ async function* queryModel(
   )
 
   if (useToolSearch) {
-    const includedDeferredTools = count(filteredTools, t =>
-      deferredToolNames.has(t.name),
-    )
-    logForDebugging(
-      `Dynamic tool loading: ${includedDeferredTools}/${deferredToolNames.size} deferred tools included`,
-    )
+    const includedDeferredTools = count(filteredTools, (t) => deferredToolNames.has(t.name))
+    logForDebugging(`Dynamic tool loading: ${includedDeferredTools}/${deferredToolNames.size} deferred tools included`)
   }
 
-  queryCheckpoint('query_tool_schema_build_end')
+  queryCheckpoint("query_tool_schema_build_end")
 
   // Normalize messages before building system prompt (needed for fingerprinting)
   // Instrumentation: Track message count before normalization
-  logEvent('tengu_api_before_normalize', {
+  logEvent("tengu_api_before_normalize", {
     preNormalizedMessageCount: messages.length,
   })
 
-  queryCheckpoint('query_message_normalization_start')
+  queryCheckpoint("query_message_normalization_start")
   let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools)
-  queryCheckpoint('query_message_normalization_end')
+  queryCheckpoint("query_message_normalization_end")
 
   // Model-specific post-processing: strip tool-search-specific fields if the
   // selected model doesn't support tool search.
@@ -1281,12 +1109,12 @@ async function* queryModel(
   // tool inputs, so stripCallerFieldFromAssistantMessage only needs to remove the
   // 'caller' field (not re-normalize inputs).
   if (!useToolSearch) {
-    messagesForAPI = messagesForAPI.map(msg => {
+    messagesForAPI = messagesForAPI.map((msg) => {
       switch (msg.type) {
-        case 'user':
+        case "user":
           // Strip tool_reference blocks from tool_result content
           return stripToolReferenceBlocksFromUserMessage(msg)
-        case 'assistant':
+        case "assistant":
           // Strip 'caller' field from tool_use blocks
           return stripCallerFieldFromAssistantMessage(msg)
         default:
@@ -1309,13 +1137,10 @@ async function* queryModel(
   // The API rejects requests with >100 media items but returns a confusing error.
   // Rather than erroring (which is hard to recover from in Cowork/CCD), we
   // silently drop the oldest media items to stay within the limit.
-  messagesForAPI = stripExcessMediaItems(
-    messagesForAPI,
-    API_MAX_MEDIA_PER_REQUEST,
-  )
+  messagesForAPI = stripExcessMediaItems(messagesForAPI, API_MAX_MEDIA_PER_REQUEST)
 
   // Instrumentation: Track message count after normalization
-  logEvent('tengu_api_after_normalize', {
+  logEvent("tengu_api_after_normalize", {
     postNormalizedMessageCount: messagesForAPI.length,
   })
 
@@ -1329,10 +1154,10 @@ async function* queryModel(
   // ephemeral prepend (which busts cache whenever the pool changes).
   if (useToolSearch && !isDeferredToolsDeltaEnabled()) {
     const deferredToolList = tools
-      .filter(t => deferredToolNames.has(t.name))
+      .filter((t) => deferredToolNames.has(t.name))
       .map(formatDeferredToolLine)
       .sort()
-      .join('\n')
+      .join("\n")
     if (deferredToolList) {
       messagesForAPI = [
         createUserMessage({
@@ -1348,11 +1173,8 @@ async function* queryModel(
   // these are carried as a client-side block in mcp_instructions_delta
   // (attachments.ts) instead of here. This per-request sys-prompt append
   // busts the prompt cache when chrome connects late.
-  const hasChromeTools = filteredTools.some(t =>
-    isToolFromMcpServer(t.name, CLAUDE_IN_CHROME_MCP_SERVER_NAME),
-  )
-  const injectChromeHere =
-    useToolSearch && hasChromeTools && !isMcpInstructionsDeltaEnabled()
+  const hasChromeTools = filteredTools.some((t) => isToolFromMcpServer(t.name, CLAUDE_IN_CHROME_MCP_SERVER_NAME))
+  const injectChromeHere = useToolSearch && hasChromeTools && !isMcpInstructionsDeltaEnabled()
 
   // filter(Boolean) works by converting each element to a boolean - empty strings become false and are filtered out.
   systemPrompt = asSystemPrompt(
@@ -1371,8 +1193,7 @@ async function* queryModel(
   // Prepend system prompt block for easy API identification
   logAPIPrefix(systemPrompt)
 
-  const enablePromptCaching =
-    options.enablePromptCaching ?? getPromptCachingEnabled(options.model)
+  const enablePromptCaching = options.enablePromptCaching ?? getPromptCachingEnabled(options.model)
   const system = buildSystemPromptBlocks(systemPrompt, enablePromptCaching, {
     skipGlobalCacheForSystemPrompt: needsToolBasedCacheMarker,
     querySource: options.querySource,
@@ -1388,8 +1209,8 @@ async function* queryModel(
     // toolSchemas (which carries the cache_control marker) so toggling /advisor
     // only churns the small suffix, not the cached prefix.
     extraToolSchemas.push({
-      type: 'advisor_20260301',
-      name: 'advisor',
+      type: "advisor_20260301",
+      name: "advisor",
       model: advisorModel,
     } as unknown as BetaToolUnion)
   }
@@ -1410,7 +1231,7 @@ async function* queryModel(
   // per-call so non-agentic queries keep their own stable header set.
 
   let afkHeaderLatched = getAfkModeHeaderLatched() === true
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+  if (feature("TRANSCRIPT_CLASSIFIER")) {
     if (
       !afkHeaderLatched &&
       isAgenticQuery &&
@@ -1429,12 +1250,12 @@ async function* queryModel(
   }
 
   let cacheEditingHeaderLatched = getCacheEditingHeaderLatched() === true
-  if (feature('CACHED_MICROCOMPACT')) {
+  if (feature("CACHED_MICROCOMPACT")) {
     if (
       !cacheEditingHeaderLatched &&
       cachedMCEnabled &&
-      getAPIProvider() === 'firstParty' &&
-      options.querySource === 'repl_main_thread'
+      getAPIProvider() === "firstParty" &&
+      options.querySource === "repl_main_thread"
     ) {
       cacheEditingHeaderLatched = true
       setCacheEditingHeaderLatched(true)
@@ -1446,10 +1267,7 @@ async function* queryModel(
   let thinkingClearLatched = getThinkingClearLatched() === true
   if (!thinkingClearLatched && isAgenticQuery) {
     const lastCompletion = getLastApiCompletionTimestamp()
-    if (
-      lastCompletion !== null &&
-      Date.now() - lastCompletion > CACHE_TTL_1HOUR_MS
-    ) {
+    if (lastCompletion !== null && Date.now() - lastCompletion > CACHE_TTL_1HOUR_MS) {
       thinkingClearLatched = true
       setThinkingClearLatched(true)
     }
@@ -1457,14 +1275,12 @@ async function* queryModel(
 
   const effort = resolveAppliedEffort(options.model, options.effortValue)
 
-  if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
+  if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
     // Exclude defer_loading tools from the hash -- the API strips them from the
     // prompt, so they never affect the actual cache key. Including them creates
     // false-positive "tool schemas changed" breaks when tools are discovered or
     // MCP servers reconnect.
-    const toolsForCacheDetection = allTools.filter(
-      t => !('defer_loading' in t && t.defer_loading),
-    )
+    const toolsForCacheDetection = allTools.filter((t) => !("defer_loading" in t && t.defer_loading))
     // Capture everything that could affect the server-side cache key.
     // Pass latched header values (not live state) so break detection
     // reflects what we actually send, not what the user toggled.
@@ -1487,7 +1303,7 @@ async function* queryModel(
 
   const newContext: LLMRequestNewContext | undefined = isBetaTracingEnabled()
     ? {
-        systemPrompt: systemPrompt.join('\n\n'),
+        systemPrompt: systemPrompt.join("\n\n"),
         querySource: options.querySource,
         tools: jsonStringify(allTools),
       }
@@ -1495,12 +1311,7 @@ async function* queryModel(
 
   // Capture the span so we can pass it to endLLMRequestSpan later
   // This ensures responses are matched to the correct request when multiple requests run in parallel
-  const llmSpan = startLLMRequestSpan(
-    options.model,
-    newContext,
-    messagesForAPI,
-    isFastMode,
-  )
+  const llmSpan = startLLMRequestSpan(options.model, newContext, messagesForAPI, isFastMode)
 
   const startIncludingRetries = Date.now()
   let start = Date.now()
@@ -1539,20 +1350,14 @@ async function* queryModel(
     const betasParams = [...betas]
 
     // Append 1M beta dynamically for the Sonnet 1M experiment.
-    if (
-      !betasParams.includes(CONTEXT_1M_BETA_HEADER) &&
-      getSonnet1mExpTreatmentEnabled(retryContext.model)
-    ) {
+    if (!betasParams.includes(CONTEXT_1M_BETA_HEADER) && getSonnet1mExpTreatmentEnabled(retryContext.model)) {
       betasParams.push(CONTEXT_1M_BETA_HEADER)
     }
 
     // For Bedrock, include both model-based betas and dynamically-added tool search header
     const bedrockBetas =
-      getAPIProvider() === 'bedrock'
-        ? [
-            ...getBedrockExtraBodyParamsBetas(retryContext.model),
-            ...(toolSearchHeader ? [toolSearchHeader] : []),
-          ]
+      getAPIProvider() === "bedrock"
+        ? [...getBedrockExtraBodyParamsBetas(retryContext.model), ...(toolSearchHeader ? [toolSearchHeader] : [])]
         : []
     const extraBodyParams = getExtraBodyParams(bedrockBetas)
 
@@ -1560,13 +1365,7 @@ async function* queryModel(
       ...((extraBodyParams.output_config as BetaOutputConfig) ?? {}),
     }
 
-    configureEffortParams(
-      effort,
-      outputConfig,
-      extraBodyParams,
-      betasParams,
-      options.model,
-    )
+    configureEffortParams(effort, outputConfig, extraBodyParams, betasParams, options.model)
 
     configureTaskBudgetParams(
       options.taskBudget,
@@ -1576,27 +1375,20 @@ async function* queryModel(
 
     // Merge outputFormat into extraBodyParams.output_config alongside effort
     // Requires structured-outputs beta header per SDK (see parse() in messages.mjs)
-    if (options.outputFormat && !('format' in outputConfig)) {
+    if (options.outputFormat && !("format" in outputConfig)) {
       outputConfig.format = options.outputFormat as BetaJSONOutputFormat
       // Add beta header if not already present and provider supports it
-      if (
-        modelSupportsStructuredOutputs(options.model) &&
-        !betasParams.includes(STRUCTURED_OUTPUTS_BETA_HEADER)
-      ) {
+      if (modelSupportsStructuredOutputs(options.model) && !betasParams.includes(STRUCTURED_OUTPUTS_BETA_HEADER)) {
         betasParams.push(STRUCTURED_OUTPUTS_BETA_HEADER)
       }
     }
 
     // Retry context gets preference because it tries to course correct if we exceed the context window limit
     const maxOutputTokens =
-      retryContext?.maxTokensOverride ||
-      options.maxOutputTokensOverride ||
-      getMaxOutputTokensForModel(options.model)
+      retryContext?.maxTokensOverride || options.maxOutputTokensOverride || getMaxOutputTokensForModel(options.model)
 
-    const hasThinking =
-      thinkingConfig.type !== 'disabled' &&
-      !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_THINKING)
-    let thinking: BetaMessageStreamParams['thinking'] | undefined = undefined
+    const hasThinking = thinkingConfig.type !== "disabled" && !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_THINKING)
+    let thinking: BetaMessageStreamParams["thinking"] | undefined = undefined
 
     // IMPORTANT: Do not change the adaptive-vs-budget thinking selection below
     // without notifying the model launch DRI and research. This is a sensitive
@@ -1609,23 +1401,20 @@ async function* queryModel(
         // For models that support adaptive thinking, always use adaptive
         // thinking without a budget.
         thinking = {
-          type: 'adaptive',
-        } satisfies BetaMessageStreamParams['thinking']
+          type: "adaptive",
+        } satisfies BetaMessageStreamParams["thinking"]
       } else {
         // For models that do not support adaptive thinking, use the default
         // thinking budget unless explicitly specified.
         let thinkingBudget = getMaxThinkingTokensForModel(options.model)
-        if (
-          thinkingConfig.type === 'enabled' &&
-          thinkingConfig.budgetTokens !== undefined
-        ) {
+        if (thinkingConfig.type === "enabled" && thinkingConfig.budgetTokens !== undefined) {
           thinkingBudget = thinkingConfig.budgetTokens
         }
         thinkingBudget = Math.min(maxOutputTokens - 1, thinkingBudget)
         thinking = {
           budget_tokens: thinkingBudget,
-          type: 'enabled',
-        } satisfies BetaMessageStreamParams['thinking']
+          type: "enabled",
+        } satisfies BetaMessageStreamParams["thinking"]
       }
     }
 
@@ -1636,13 +1425,12 @@ async function* queryModel(
       clearAllThinking: thinkingClearLatched,
     })
 
-    const enablePromptCaching =
-      options.enablePromptCaching ?? getPromptCachingEnabled(retryContext.model)
+    const enablePromptCaching = options.enablePromptCaching ?? getPromptCachingEnabled(retryContext.model)
 
     // Fast mode: header is latched session-stable (cache-safe), but
     // `speed='fast'` stays dynamic so cooldown still suppresses the actual
     // fast-mode request without changing the cache key.
-    let speed: BetaMessageStreamParams['speed']
+    let speed: BetaMessageStreamParams["speed"]
     const isFastModeForRetry =
       isFastModeEnabled() &&
       isFastModeAvailable() &&
@@ -1650,7 +1438,7 @@ async function* queryModel(
       isFastModeSupportedByModel(options.model) &&
       !!retryContext.fastMode
     if (isFastModeForRetry) {
-      speed = 'fast'
+      speed = "fast"
     }
     if (fastModeHeaderLatched && !betasParams.includes(FAST_MODE_BETA_HEADER)) {
       betasParams.push(FAST_MODE_BETA_HEADER)
@@ -1658,7 +1446,7 @@ async function* queryModel(
 
     // AFK mode beta: latched once auto mode is first activated. Still gated
     // by isAgenticQuery per-call so classifiers/compaction don't get it.
-    if (feature('TRANSCRIPT_CLASSIFIER')) {
+    if (feature("TRANSCRIPT_CLASSIFIER")) {
       if (
         afkHeaderLatched &&
         shouldIncludeFirstPartyOnlyBetas() &&
@@ -1673,26 +1461,20 @@ async function* queryModel(
     // (controls cache_edits body behavior) stays live so edits stop when
     // the feature disables but the header doesn't flip.
     const useCachedMC =
-      cachedMCEnabled &&
-      getAPIProvider() === 'firstParty' &&
-      options.querySource === 'repl_main_thread'
+      cachedMCEnabled && getAPIProvider() === "firstParty" && options.querySource === "repl_main_thread"
     if (
       cacheEditingHeaderLatched &&
-      getAPIProvider() === 'firstParty' &&
-      options.querySource === 'repl_main_thread' &&
+      getAPIProvider() === "firstParty" &&
+      options.querySource === "repl_main_thread" &&
       !betasParams.includes(cacheEditingBetaHeader)
     ) {
       betasParams.push(cacheEditingBetaHeader)
-      logForDebugging(
-        'Cache editing beta header enabled for cached microcompact',
-      )
+      logForDebugging("Cache editing beta header enabled for cached microcompact")
     }
 
     // Only send temperature when thinking is disabled — the API requires
     // temperature: 1 when thinking is enabled, which is already the default.
-    const temperature = !hasThinking
-      ? (options.temperatureOverride ?? 1)
-      : undefined
+    const temperature = !hasThinking ? (options.temperatureOverride ?? 1) : undefined
 
     lastRequestBetas = betasParams
 
@@ -1739,9 +1521,9 @@ async function* queryModel(
     })
     const logMessagesLength = queryParams.messages.length
     const logBetas = useBetas ? (queryParams.betas ?? []) : []
-    const logThinkingType = queryParams.thinking?.type ?? 'disabled'
+    const logThinkingType = queryParams.thinking?.type ?? "disabled"
     const logEffortValue = queryParams.output_config?.effort
-    void options.getToolPermissionContext().then(permissionContext => {
+    void options.getToolPermissionContext().then((permissionContext) => {
       logAPIQuery({
         model: options.model,
         messagesLength: logMessagesLength,
@@ -1774,7 +1556,7 @@ async function* queryModel(
   let isAdvisorInProgress = false
 
   try {
-    queryCheckpoint('query_client_creation_start')
+    queryCheckpoint("query_client_creation_start")
     const generator = withRetry(
       () =>
         getAnthropicClient({
@@ -1792,7 +1574,7 @@ async function* queryModel(
         // once per attempt; on retries the client is usually cached (withRetry
         // only calls getClient() again after auth errors), so the delta from
         // client_creation_start is meaningful on attempt 1.
-        queryCheckpoint('query_client_creation_end')
+        queryCheckpoint("query_client_creation_end")
 
         const params = paramsFromContext(context)
         captureAPIRequest(params, options.querySource) // Capture for bug reports
@@ -1802,18 +1584,15 @@ async function* queryModel(
         // Fire immediately before the fetch is dispatched. .withResponse() below
         // awaits until response headers arrive, so this MUST be before the await
         // or the "Network TTFB" phase measurement is wrong.
-        queryCheckpoint('query_api_request_sent')
+        queryCheckpoint("query_api_request_sent")
         if (!options.agentId) {
-          headlessProfilerCheckpoint('api_request_sent')
+          headlessProfilerCheckpoint("api_request_sent")
         }
 
         // Generate and track client request ID so timeouts (which return no
         // server request ID) can still be correlated with server logs.
         // First-party only — 3P providers don't log it (inc-4029 class).
-        clientRequestId =
-          getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
-            ? randomUUID()
-            : undefined
+        clientRequestId = getAPIProvider() === "firstParty" && isFirstPartyAnthropicBaseUrl() ? randomUUID() : undefined
 
         // Use raw stream instead of BetaMessageStream to avoid O(n²) partial JSON parsing
         // BetaMessageStream calls partialParse() on every input_json_delta, which we don't need
@@ -1830,7 +1609,7 @@ async function* queryModel(
             },
           )
           .withResponse()
-        queryCheckpoint('query_response_headers_received')
+        queryCheckpoint("query_response_headers_received")
         streamRequestId = result.request_id
         streamResponse = result.response
         return result.data
@@ -1850,7 +1629,7 @@ async function* queryModel(
       e = await generator.next()
 
       // yield API error messages (the stream has a 'controller' property, error messages don't)
-      if (!('controller' in e.value)) {
+      if (!("controller" in e.value)) {
         yield e.value
       }
     } while (!e.done)
@@ -1871,11 +1650,8 @@ async function* queryModel(
     // kill hung streams. Without this, a silently dropped connection can hang
     // the session indefinitely since the SDK's request timeout only covers the
     // initial fetch(), not the streaming body.
-    const streamWatchdogEnabled = isEnvTruthy(
-      process.env.CLAUDE_ENABLE_STREAM_WATCHDOG,
-    )
-    const STREAM_IDLE_TIMEOUT_MS =
-      parseInt(process.env.CLAUDE_STREAM_IDLE_TIMEOUT_MS || '', 10) || 90_000
+    const streamWatchdogEnabled = isEnvTruthy(process.env.CLAUDE_ENABLE_STREAM_WATCHDOG)
+    const STREAM_IDLE_TIMEOUT_MS = parseInt(process.env.CLAUDE_STREAM_IDLE_TIMEOUT_MS || "", 10) || 90_000
     const STREAM_IDLE_WARNING_MS = STREAM_IDLE_TIMEOUT_MS / 2
     let streamIdleAborted = false
     // performance.now() snapshot when watchdog fires, for measuring abort propagation delay
@@ -1898,12 +1674,9 @@ async function* queryModel(
         return
       }
       streamIdleWarningTimer = setTimeout(
-        warnMs => {
-          logForDebugging(
-            `Streaming idle warning: no chunks received for ${warnMs / 1000}s`,
-            { level: 'warn' },
-          )
-          logForDiagnosticsNoPII('warn', 'cli_streaming_idle_warning')
+        (warnMs) => {
+          logForDebugging(`Streaming idle warning: no chunks received for ${warnMs / 1000}s`, { level: "warn" })
+          logForDiagnosticsNoPII("warn", "cli_streaming_idle_warning")
         },
         STREAM_IDLE_WARNING_MS,
         STREAM_IDLE_WARNING_MS,
@@ -1913,14 +1686,12 @@ async function* queryModel(
         streamWatchdogFiredAt = performance.now()
         logForDebugging(
           `Streaming idle timeout: no chunks received for ${STREAM_IDLE_TIMEOUT_MS / 1000}s, aborting stream`,
-          { level: 'error' },
+          { level: "error" },
         )
-        logForDiagnosticsNoPII('error', 'cli_streaming_idle_timeout')
-        logEvent('tengu_streaming_idle_timeout', {
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        logForDiagnosticsNoPII("error", "cli_streaming_idle_timeout")
+        logEvent("tengu_streaming_idle_timeout", {
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           timeout_ms: STREAM_IDLE_TIMEOUT_MS,
         })
         releaseStreamResources()
@@ -1928,7 +1699,7 @@ async function* queryModel(
     }
     resetStreamIdleTimer()
 
-    startSessionActivity('api_call')
+    startSessionActivity("api_call")
     try {
       // stream in and accumulate state
       let isFirstChunk = true
@@ -1949,74 +1720,66 @@ async function* queryModel(
             totalStallTime += timeSinceLastEvent
             logForDebugging(
               `Streaming stall detected: ${(timeSinceLastEvent / 1000).toFixed(1)}s gap between events (stall #${stallCount})`,
-              { level: 'warn' },
+              { level: "warn" },
             )
-            logEvent('tengu_streaming_stall', {
+            logEvent("tengu_streaming_stall", {
               stall_duration_ms: timeSinceLastEvent,
               stall_count: stallCount,
               total_stall_time_ms: totalStallTime,
-              event_type:
-                part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              model:
-                options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              request_id: (streamRequestId ??
-                'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              event_type: part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
             })
           }
         }
         lastEventTime = now
 
         if (isFirstChunk) {
-          logForDebugging('Stream started - received first chunk')
-          queryCheckpoint('query_first_chunk_received')
+          logForDebugging("Stream started - received first chunk")
+          queryCheckpoint("query_first_chunk_received")
           if (!options.agentId) {
-            headlessProfilerCheckpoint('first_chunk')
+            headlessProfilerCheckpoint("first_chunk")
           }
           endQueryProfile()
           isFirstChunk = false
         }
 
         switch (part.type) {
-          case 'message_start': {
+          case "message_start": {
             partialMessage = part.message
             ttftMs = Date.now() - start
             usage = updateUsage(usage, part.message?.usage)
             // Capture research from message_start if available (internal only).
             // Always overwrite with the latest value.
-            if (
-              process.env.USER_TYPE === 'ant' &&
-              'research' in (part.message as unknown as Record<string, unknown>)
-            ) {
-              research = (part.message as unknown as Record<string, unknown>)
-                .research
+            if (process.env.USER_TYPE === "ant" && "research" in (part.message as unknown as Record<string, unknown>)) {
+              research = (part.message as unknown as Record<string, unknown>).research
             }
             break
           }
-          case 'content_block_start':
+          case "content_block_start":
             switch (part.content_block.type) {
-              case 'tool_use':
+              case "tool_use":
                 contentBlocks[part.index] = {
                   ...part.content_block,
-                  input: '',
+                  input: "",
                 }
                 break
-              case 'server_tool_use':
+              case "server_tool_use":
                 contentBlocks[part.index] = {
                   ...part.content_block,
-                  input: '' as unknown as { [key: string]: unknown },
+                  input: "" as unknown as { [key: string]: unknown },
                 }
-                if ((part.content_block.name as string) === 'advisor') {
+                if ((part.content_block.name as string) === "advisor") {
                   isAdvisorInProgress = true
                   logForDebugging(`[AdvisorTool] Advisor tool called`)
-                  logEvent('tengu_advisor_tool_call', {
-                    model:
-                      options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  logEvent("tengu_advisor_tool_call", {
+                    model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     advisor_model: (advisorModel ??
-                      'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                   })
                 }
                 break
-              case 'text':
+              case "text":
                 contentBlocks[part.index] = {
                   ...part.content_block,
                   // awkwardly, the sdk sometimes returns text as part of a
@@ -2024,16 +1787,16 @@ async function* queryModel(
                   // again in a content_block_delta message. we ignore it here
                   // since there doesn't seem to be a way to detect when a
                   // content_block_delta message duplicates the text.
-                  text: '',
+                  text: "",
                 }
                 break
-              case 'thinking':
+              case "thinking":
                 contentBlocks[part.index] = {
                   ...part.content_block,
                   // also awkward
-                  thinking: '',
+                  thinking: "",
                   // initialize signature to ensure field exists even if signature_delta never arrives
-                  signature: '',
+                  signature: "",
                 }
                 break
               default:
@@ -2041,121 +1804,99 @@ async function* queryModel(
                 // as it works. we want the blocks to be immutable, so that we can
                 // accumulate state ourselves.
                 contentBlocks[part.index] = { ...part.content_block }
-                if (
-                  (part.content_block.type as string) === 'advisor_tool_result'
-                ) {
+                if ((part.content_block.type as string) === "advisor_tool_result") {
                   isAdvisorInProgress = false
                   logForDebugging(`[AdvisorTool] Advisor tool result received`)
                 }
                 break
             }
             break
-          case 'content_block_delta': {
+          case "content_block_delta": {
             const contentBlock = contentBlocks[part.index]
             const delta = part.delta as typeof part.delta | ConnectorTextDelta
             if (!contentBlock) {
-              logEvent('tengu_streaming_error', {
+              logEvent("tengu_streaming_error", {
                 error_type:
-                  'content_block_not_found_delta' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  "content_block_not_found_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                part_type: part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                 part_index: part.index,
               })
-              throw new RangeError('Content block not found')
+              throw new RangeError("Content block not found")
             }
-            if (
-              feature('CONNECTOR_TEXT') &&
-              delta.type === 'connector_text_delta'
-            ) {
-              if (contentBlock.type !== 'connector_text') {
-                logEvent('tengu_streaming_error', {
+            if (feature("CONNECTOR_TEXT") && delta.type === "connector_text_delta") {
+              if (contentBlock.type !== "connector_text") {
+                logEvent("tengu_streaming_error", {
                   error_type:
-                    'content_block_type_mismatch_connector_text' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                  expected_type:
-                    'connector_text' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                  actual_type:
-                    contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                    "content_block_type_mismatch_connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  expected_type: "connector_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  actual_type: contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                 })
-                throw new Error('Content block is not a connector_text block')
+                throw new Error("Content block is not a connector_text block")
               }
               contentBlock.connector_text += delta.connector_text
             } else {
               switch (delta.type) {
-                case 'citations_delta':
+                case "citations_delta":
                   // TODO: handle citations
                   break
-                case 'input_json_delta':
-                  if (
-                    contentBlock.type !== 'tool_use' &&
-                    contentBlock.type !== 'server_tool_use'
-                  ) {
-                    logEvent('tengu_streaming_error', {
+                case "input_json_delta":
+                  if (contentBlock.type !== "tool_use" && contentBlock.type !== "server_tool_use") {
+                    logEvent("tengu_streaming_error", {
                       error_type:
-                        'content_block_type_mismatch_input_json' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        'tool_use' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        "content_block_type_mismatch_input_json" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      expected_type: "tool_use" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      actual_type: contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     })
-                    throw new Error('Content block is not a input_json block')
+                    throw new Error("Content block is not a input_json block")
                   }
-                  if (typeof contentBlock.input !== 'string') {
-                    logEvent('tengu_streaming_error', {
+                  if (typeof contentBlock.input !== "string") {
+                    logEvent("tengu_streaming_error", {
                       error_type:
-                        'content_block_input_not_string' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        "content_block_input_not_string" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                       input_type:
                         typeof contentBlock.input as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     })
-                    throw new Error('Content block input is not a string')
+                    throw new Error("Content block input is not a string")
                   }
                   contentBlock.input += delta.partial_json
                   break
-                case 'text_delta':
-                  if (contentBlock.type !== 'text') {
-                    logEvent('tengu_streaming_error', {
+                case "text_delta":
+                  if (contentBlock.type !== "text") {
+                    logEvent("tengu_streaming_error", {
                       error_type:
-                        'content_block_type_mismatch_text' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        'text' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        "content_block_type_mismatch_text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      expected_type: "text" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      actual_type: contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     })
-                    throw new Error('Content block is not a text block')
+                    throw new Error("Content block is not a text block")
                   }
                   contentBlock.text += delta.text
                   break
-                case 'signature_delta':
-                  if (
-                    feature('CONNECTOR_TEXT') &&
-                    contentBlock.type === 'connector_text'
-                  ) {
+                case "signature_delta":
+                  if (feature("CONNECTOR_TEXT") && contentBlock.type === "connector_text") {
                     contentBlock.signature = delta.signature
                     break
                   }
-                  if (contentBlock.type !== 'thinking') {
-                    logEvent('tengu_streaming_error', {
+                  if (contentBlock.type !== "thinking") {
+                    logEvent("tengu_streaming_error", {
                       error_type:
-                        'content_block_type_mismatch_thinking_signature' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        'thinking' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        "content_block_type_mismatch_thinking_signature" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      expected_type: "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      actual_type: contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     })
-                    throw new Error('Content block is not a thinking block')
+                    throw new Error("Content block is not a thinking block")
                   }
                   contentBlock.signature = delta.signature
                   break
-                case 'thinking_delta':
-                  if (contentBlock.type !== 'thinking') {
-                    logEvent('tengu_streaming_error', {
+                case "thinking_delta":
+                  if (contentBlock.type !== "thinking") {
+                    logEvent("tengu_streaming_error", {
                       error_type:
-                        'content_block_type_mismatch_thinking_delta' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      expected_type:
-                        'thinking' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                      actual_type:
-                        contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        "content_block_type_mismatch_thinking_delta" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      expected_type: "thinking" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                      actual_type: contentBlock.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                     })
-                    throw new Error('Content block is not a thinking block')
+                    throw new Error("Content block is not a thinking block")
                   }
                   contentBlock.thinking += delta.thinking
                   break
@@ -2163,63 +1904,52 @@ async function* queryModel(
             }
             // Capture research from content_block_delta if available (internal only).
             // Always overwrite with the latest value.
-            if (process.env.USER_TYPE === 'ant' && 'research' in part) {
+            if (process.env.USER_TYPE === "ant" && "research" in part) {
               research = (part as { research: unknown }).research
             }
             break
           }
-          case 'content_block_stop': {
+          case "content_block_stop": {
             const contentBlock = contentBlocks[part.index]
             if (!contentBlock) {
-              logEvent('tengu_streaming_error', {
+              logEvent("tengu_streaming_error", {
                 error_type:
-                  'content_block_not_found_stop' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                  "content_block_not_found_stop" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                part_type: part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                 part_index: part.index,
               })
-              throw new RangeError('Content block not found')
+              throw new RangeError("Content block not found")
             }
             if (!partialMessage) {
-              logEvent('tengu_streaming_error', {
-                error_type:
-                  'partial_message_not_found' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-                part_type:
-                  part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              logEvent("tengu_streaming_error", {
+                error_type: "partial_message_not_found" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                part_type: part.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               })
-              throw new Error('Message not found')
+              throw new Error("Message not found")
             }
             const m: AssistantMessage = {
               message: {
                 ...partialMessage,
-                content: normalizeContentFromAPI(
-                  [contentBlock] as BetaContentBlock[],
-                  tools,
-                  options.agentId,
-                ),
+                content: normalizeContentFromAPI([contentBlock] as BetaContentBlock[], tools, options.agentId),
               },
               requestId: streamRequestId ?? undefined,
-              type: 'assistant',
+              type: "assistant",
               uuid: randomUUID(),
               timestamp: new Date().toISOString(),
-              ...(process.env.USER_TYPE === 'ant' &&
-                research !== undefined && { research }),
+              ...(process.env.USER_TYPE === "ant" && research !== undefined && { research }),
               ...(advisorModel && { advisorModel }),
             }
             newMessages.push(m)
             yield m
             break
           }
-          case 'message_delta': {
+          case "message_delta": {
             usage = updateUsage(usage, part.usage)
             // Capture research from message_delta if available (internal only).
             // Always overwrite with the latest value. Also write back to
             // already-yielded messages since message_delta arrives after
             // content_block_stop.
-            if (
-              process.env.USER_TYPE === 'ant' &&
-              'research' in (part as unknown as Record<string, unknown>)
-            ) {
+            if (process.env.USER_TYPE === "ant" && "research" in (part as unknown as Record<string, unknown>)) {
               research = (part as unknown as Record<string, unknown>).research
               for (const msg of newMessages) {
                 msg.research = research
@@ -2249,35 +1979,28 @@ async function* queryModel(
 
             // Update cost
             const costUSDForPart = calculateUSDCost(resolvedModel, usage)
-            costUSD += addToTotalSessionCost(
-              costUSDForPart,
-              usage,
-              options.model,
-            )
+            costUSD += addToTotalSessionCost(costUSDForPart, usage, options.model)
 
-            const refusalMessage = getErrorMessageIfRefusal(
-              part.delta.stop_reason,
-              options.model,
-            )
+            const refusalMessage = getErrorMessageIfRefusal(part.delta.stop_reason, options.model)
             if (refusalMessage) {
               yield refusalMessage
             }
 
-            if (stopReason === 'max_tokens') {
-              logEvent('tengu_max_tokens_reached', {
+            if (stopReason === "max_tokens") {
+              logEvent("tengu_max_tokens_reached", {
                 max_tokens: maxOutputTokens,
               })
               yield createAssistantAPIErrorMessage({
                 content: `${API_ERROR_MESSAGE_PREFIX}: Claude's response exceeded the ${
                   maxOutputTokens
                 } output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.`,
-                apiError: 'max_output_tokens',
-                error: 'max_output_tokens',
+                apiError: "max_output_tokens",
+                error: "max_output_tokens",
               })
             }
 
-            if (stopReason === 'model_context_window_exceeded') {
-              logEvent('tengu_context_window_exceeded', {
+            if (stopReason === "model_context_window_exceeded") {
+              logEvent("tengu_context_window_exceeded", {
                 max_tokens: maxOutputTokens,
                 output_tokens: usage.output_tokens,
               })
@@ -2286,20 +2009,20 @@ async function* queryModel(
               // where you left off."
               yield createAssistantAPIErrorMessage({
                 content: `${API_ERROR_MESSAGE_PREFIX}: The model has reached its context window limit.`,
-                apiError: 'max_output_tokens',
-                error: 'max_output_tokens',
+                apiError: "max_output_tokens",
+                error: "max_output_tokens",
               })
             }
             break
           }
-          case 'message_stop':
+          case "message_stop":
             break
         }
 
         yield {
-          type: 'stream_event',
+          type: "stream_event",
           event: part,
-          ...(part.type === 'message_start' ? { ttftMs } : undefined),
+          ...(part.type === "message_start" ? { ttftMs } : undefined),
         }
       }
       // Clear the idle timeout watchdog now that the stream loop has exited
@@ -2311,27 +2034,18 @@ async function* queryModel(
         // Instrumentation: proves the for-await exited after the watchdog fired
         // (vs. hung forever). exit_delay_ms measures abort propagation latency:
         // 0-10ms = abort worked; >>1000ms = something else woke the loop.
-        const exitDelayMs =
-          streamWatchdogFiredAt !== null
-            ? Math.round(performance.now() - streamWatchdogFiredAt)
-            : -1
-        logForDiagnosticsNoPII(
-          'info',
-          'cli_stream_loop_exited_after_watchdog_clean',
-        )
-        logEvent('tengu_stream_loop_exited_after_watchdog', {
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        const exitDelayMs = streamWatchdogFiredAt !== null ? Math.round(performance.now() - streamWatchdogFiredAt) : -1
+        logForDiagnosticsNoPII("info", "cli_stream_loop_exited_after_watchdog_clean")
+        logEvent("tengu_stream_loop_exited_after_watchdog", {
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           exit_delay_ms: exitDelayMs,
-          exit_path:
-            'clean' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          exit_path: "clean" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
         // Prevent double-emit: this throw lands in the catch block below,
         // whose exit_path='error' probe guards on streamWatchdogFiredAt.
         streamWatchdogFiredAt = null
-        throw new Error('Stream idle timeout - no chunks received')
+        throw new Error("Stream idle timeout - no chunks received")
       }
 
       // Detect when the stream completed without producing any assistant messages.
@@ -2350,37 +2064,33 @@ async function* queryModel(
       if (!partialMessage || (newMessages.length === 0 && !stopReason)) {
         logForDebugging(
           !partialMessage
-            ? 'Stream completed without receiving message_start event - triggering non-streaming fallback'
-            : 'Stream completed with message_start but no content blocks completed - triggering non-streaming fallback',
-          { level: 'error' },
+            ? "Stream completed without receiving message_start event - triggering non-streaming fallback"
+            : "Stream completed with message_start but no content blocks completed - triggering non-streaming fallback",
+          { level: "error" },
         )
-        logEvent('tengu_stream_no_events', {
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        logEvent("tengu_stream_no_events", {
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
-        throw new Error('Stream ended without receiving any events')
+        throw new Error("Stream ended without receiving any events")
       }
 
       // Log summary if any stalls occurred during streaming
       if (stallCount > 0) {
         logForDebugging(
           `Streaming completed with ${stallCount} stall(s), total stall time: ${(totalStallTime / 1000).toFixed(1)}s`,
-          { level: 'warn' },
+          { level: "warn" },
         )
-        logEvent('tengu_streaming_stall_summary', {
+        logEvent("tengu_streaming_stall_summary", {
           stall_count: stallCount,
           total_stall_time_ms: totalStallTime,
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
       }
 
       // Check if the cache actually broke based on response tokens
-      if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
+      if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
         void checkResponseForCacheBreak(
           options.querySource,
           usage.cache_read_input_tokens,
@@ -2409,25 +2119,17 @@ async function* queryModel(
       // threw (rather than exiting cleanly), record that the loop DID exit and
       // how long after the watchdog. Distinguishes true hangs from error exits.
       if (streamIdleAborted && streamWatchdogFiredAt !== null) {
-        const exitDelayMs = Math.round(
-          performance.now() - streamWatchdogFiredAt,
-        )
-        logForDiagnosticsNoPII(
-          'info',
-          'cli_stream_loop_exited_after_watchdog_error',
-        )
-        logEvent('tengu_stream_loop_exited_after_watchdog', {
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        const exitDelayMs = Math.round(performance.now() - streamWatchdogFiredAt)
+        logForDiagnosticsNoPII("info", "cli_stream_loop_exited_after_watchdog_error")
+        logEvent("tengu_stream_loop_exited_after_watchdog", {
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           exit_delay_ms: exitDelayMs,
-          exit_path:
-            'error' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          exit_path: "error" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           error_name:
             streamingError instanceof Error
               ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-              : ('unknown' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              : ("unknown" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
       }
 
@@ -2437,27 +2139,20 @@ async function* queryModel(
         // If not, it's likely a timeout from the SDK
         if (signal.aborted) {
           // This is a real user abort (ESC key was pressed)
-          logForDebugging(
-            `Streaming aborted by user: ${errorMessage(streamingError)}`,
-          )
+          logForDebugging(`Streaming aborted by user: ${errorMessage(streamingError)}`)
           if (isAdvisorInProgress) {
-            logEvent('tengu_advisor_tool_interrupted', {
-              model:
-                options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-              advisor_model: (advisorModel ??
-                'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            logEvent("tengu_advisor_tool_interrupted", {
+              model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              advisor_model: (advisorModel ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
             })
           }
           throw streamingError
         } else {
           // The SDK threw APIUserAbortError but our signal wasn't aborted
           // This means it's a timeout from the SDK's internal timeout
-          logForDebugging(
-            `Streaming timeout (SDK abort): ${streamingError.message}`,
-            { level: 'error' },
-          )
+          logForDebugging(`Streaming timeout (SDK abort): ${streamingError.message}`, { level: "error" })
           // Throw a more specific error for timeout
-          throw new APIConnectionTimeoutError({ message: 'Request timed out' })
+          throw new APIConnectionTimeoutError({ message: "Request timed out" })
         }
       }
 
@@ -2468,67 +2163,52 @@ async function* queryModel(
       // and runs it again. See inc-4258.
       const disableFallback =
         isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK) ||
-        getFeatureValue_CACHED_MAY_BE_STALE(
-          'tengu_disable_streaming_to_non_streaming_fallback',
-          false,
-        )
+        getFeatureValue_CACHED_MAY_BE_STALE("tengu_disable_streaming_to_non_streaming_fallback", false)
 
       if (disableFallback) {
-        logForDebugging(
-          `Error streaming (non-streaming fallback disabled): ${errorMessage(streamingError)}`,
-          { level: 'error' },
-        )
-        logEvent('tengu_streaming_fallback_to_non_streaming', {
-          model:
-            options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        logForDebugging(`Error streaming (non-streaming fallback disabled): ${errorMessage(streamingError)}`, {
+          level: "error",
+        })
+        logEvent("tengu_streaming_fallback_to_non_streaming", {
+          model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           error:
             streamingError instanceof Error
               ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-              : (String(
-                  streamingError,
-                ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+              : (String(streamingError) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
           attemptNumber,
           maxOutputTokens,
-          thinkingType:
-            thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          thinkingType: thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           fallback_disabled: true,
-          request_id: (streamRequestId ??
-            'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           fallback_cause: (streamIdleAborted
-            ? 'watchdog'
-            : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            ? "watchdog"
+            : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
         throw streamingError
       }
 
-      logForDebugging(
-        `Error streaming, falling back to non-streaming mode: ${errorMessage(streamingError)}`,
-        { level: 'error' },
-      )
+      logForDebugging(`Error streaming, falling back to non-streaming mode: ${errorMessage(streamingError)}`, {
+        level: "error",
+      })
       didFallBackToNonStreaming = true
       if (options.onStreamingFallback) {
         options.onStreamingFallback()
       }
 
-      logEvent('tengu_streaming_fallback_to_non_streaming', {
-        model:
-          options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      logEvent("tengu_streaming_fallback_to_non_streaming", {
+        model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         error:
           streamingError instanceof Error
             ? (streamingError.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
-            : (String(
-                streamingError,
-              ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
+            : (String(streamingError) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS),
         attemptNumber,
         maxOutputTokens,
-        thinkingType:
-          thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        thinkingType: thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         fallback_disabled: false,
-        request_id: (streamRequestId ??
-          'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         fallback_cause: (streamIdleAborted
-          ? 'watchdog'
-          : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          ? "watchdog"
+          : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
 
       // Fall back to non-streaming mode with retries.
@@ -2538,15 +2218,13 @@ async function* queryModel(
       // This is a speculative fix for https://github.com/anthropics/claude-code/issues/1513
       // Instrumentation: proves executeNonStreamingRequest was entered (vs. the
       // fallback event firing but the call itself hanging at dispatch).
-      logForDiagnosticsNoPII('info', 'cli_nonstreaming_fallback_started')
-      logEvent('tengu_nonstreaming_fallback_started', {
-        request_id: (streamRequestId ??
-          'unknown') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        model:
-          options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      logForDiagnosticsNoPII("info", "cli_nonstreaming_fallback_started")
+      logEvent("tengu_nonstreaming_fallback_started", {
+        request_id: (streamRequestId ?? "unknown") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         fallback_cause: (streamIdleAborted
-          ? 'watchdog'
-          : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          ? "watchdog"
+          : "other") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
       const result = yield* executeNonStreamingRequest(
         { model: options.model, source: options.querySource },
@@ -2564,24 +2242,20 @@ async function* queryModel(
           attemptNumber = attempt
           maxOutputTokens = tokens
         },
-        params => captureAPIRequest(params, options.querySource),
+        (params) => captureAPIRequest(params, options.querySource),
         streamRequestId,
       )
 
       const m: AssistantMessage = {
         message: {
           ...result,
-          content: normalizeContentFromAPI(
-            result.content,
-            tools,
-            options.agentId,
-          ),
+          content: normalizeContentFromAPI(result.content, tools, options.agentId),
         },
         requestId: streamRequestId ?? undefined,
-        type: 'assistant',
+        type: "assistant",
         uuid: randomUUID(),
         timestamp: new Date().toISOString(),
-        ...(process.env.USER_TYPE === 'ant' &&
+        ...(process.env.USER_TYPE === "ant" &&
           research !== undefined && {
             research,
           }),
@@ -2619,30 +2293,21 @@ async function* queryModel(
       // 404 is thrown at .withResponse() before streamRequestId is assigned,
       // and CannotRetryError means every retry failed — so grab the failed
       // request's ID from the error header instead.
-      const failedRequestId =
-        (errorFromRetry.originalError as APIError).requestID ?? 'unknown'
-      logForDebugging(
-        'Streaming endpoint returned 404, falling back to non-streaming mode',
-        { level: 'warn' },
-      )
+      const failedRequestId = (errorFromRetry.originalError as APIError).requestID ?? "unknown"
+      logForDebugging("Streaming endpoint returned 404, falling back to non-streaming mode", { level: "warn" })
       didFallBackToNonStreaming = true
       if (options.onStreamingFallback) {
         options.onStreamingFallback()
       }
 
-      logEvent('tengu_streaming_fallback_to_non_streaming', {
-        model:
-          options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        error:
-          '404_stream_creation' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      logEvent("tengu_streaming_fallback_to_non_streaming", {
+        model: options.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        error: "404_stream_creation" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         attemptNumber,
         maxOutputTokens,
-        thinkingType:
-          thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        request_id:
-          failedRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        fallback_cause:
-          '404_stream_creation' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        thinkingType: thinkingConfig.type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        request_id: failedRequestId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        fallback_cause: "404_stream_creation" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
 
       try {
@@ -2661,25 +2326,20 @@ async function* queryModel(
             attemptNumber = attempt
             maxOutputTokens = tokens
           },
-          params => captureAPIRequest(params, options.querySource),
+          (params) => captureAPIRequest(params, options.querySource),
           failedRequestId,
         )
 
         const m: AssistantMessage = {
           message: {
             ...result,
-            content: normalizeContentFromAPI(
-              result.content,
-              tools,
-              options.agentId,
-            ),
+            content: normalizeContentFromAPI(result.content, tools, options.agentId),
           },
           requestId: streamRequestId ?? undefined,
-          type: 'assistant',
+          type: "assistant",
           uuid: randomUUID(),
           timestamp: new Date().toISOString(),
-          ...(process.env.USER_TYPE === 'ant' &&
-            research !== undefined && { research }),
+          ...(process.env.USER_TYPE === "ant" && research !== undefined && { research }),
           ...(advisorModel && { advisorModel }),
         }
         newMessages.push(m)
@@ -2694,10 +2354,7 @@ async function* queryModel(
         }
 
         // Fallback also failed, handle as normal error
-        logForDebugging(
-          `Non-streaming fallback also failed: ${errorMessage(fallbackError)}`,
-          { level: 'error' },
-        )
+        logForDebugging(`Non-streaming fallback also failed: ${errorMessage(fallbackError)}`, { level: "error" })
 
         let error = fallbackError
         let errorModel = options.model
@@ -2713,9 +2370,7 @@ async function* queryModel(
         const requestId =
           streamRequestId ||
           (error instanceof APIError ? error.requestID : undefined) ||
-          (error instanceof APIError
-            ? (error.error as { request_id?: string })?.request_id
-            : undefined)
+          (error instanceof APIError ? (error.error as { request_id?: string })?.request_id : undefined)
 
         logAPIError({
           error,
@@ -2750,7 +2405,7 @@ async function* queryModel(
     } else {
       // Original error handling for non-404 errors
       logForDebugging(`Error in API request: ${errorMessage(errorFromRetry)}`, {
-        level: 'error',
+        level: "error",
       })
 
       let error = errorFromRetry
@@ -2769,9 +2424,7 @@ async function* queryModel(
       const requestId =
         streamRequestId ||
         (error instanceof APIError ? error.requestID : undefined) ||
-        (error instanceof APIError
-          ? (error.error as { request_id?: string })?.request_id
-          : undefined)
+        (error instanceof APIError ? (error.error as { request_id?: string })?.request_id : undefined)
 
       logAPIError({
         error,
@@ -2806,7 +2459,7 @@ async function* queryModel(
       return
     }
   } finally {
-    stopSessionActivity('api_call')
+    stopSessionActivity("api_call")
     // Must be in the finally block: if the generator is terminated early
     // via .return() (e.g. consumer breaks out of for-await-of, or query.ts
     // encounters an abort), code after the try/finally never executes.
@@ -2822,16 +2475,12 @@ async function* queryModel(
       usage = updateUsage(EMPTY_USAGE, fallbackUsage)
       stopReason = fallbackMessage.message.stop_reason
       const fallbackCost = calculateUSDCost(resolvedModel, fallbackUsage)
-      costUSD += addToTotalSessionCost(
-        fallbackCost,
-        fallbackUsage,
-        options.model,
-      )
+      costUSD += addToTotalSessionCost(fallbackCost, fallbackUsage, options.model)
     }
   }
 
   // Mark all registered tools as sent to API so they become eligible for deletion
-  if (feature('CACHED_MICROCOMPACT') && cachedMCEnabled) {
+  if (feature("CACHED_MICROCOMPACT") && cachedMCEnabled) {
     markToolsSentToAPIState()
   }
 
@@ -2843,8 +2492,7 @@ async function* queryModel(
   if (
     streamRequestId &&
     !getAgentContext() &&
-    (options.querySource.startsWith('repl_main_thread') ||
-      options.querySource === 'sdk')
+    (options.querySource.startsWith("repl_main_thread") || options.querySource === "sdk")
   ) {
     setLastMainRequestId(streamRequestId)
   }
@@ -2854,10 +2502,9 @@ async function* queryModel(
   // limit) until getToolPermissionContext() resolves.
   const logMessageCount = messagesForAPI.length
   const logMessageTokens = tokenCountFromLastAPIResponse(messagesForAPI)
-  void options.getToolPermissionContext().then(permissionContext => {
+  void options.getToolPermissionContext().then((permissionContext) => {
     logAPISuccessAndDuration({
-      model:
-        newMessages[0]?.message.model ?? partialMessage?.model ?? options.model,
+      model: newMessages[0]?.message.model ?? partialMessage?.model ?? options.model,
       preNormalizedModel: options.model,
       usage,
       start,
@@ -2895,9 +2542,7 @@ async function* queryModel(
  * Cleans up stream resources to prevent memory leaks.
  * @internal Exported for testing
  */
-export function cleanupStream(
-  stream: Stream<BetaRawMessageStreamEvent> | undefined,
-): void {
+export function cleanupStream(stream: Stream<BetaRawMessageStreamEvent> | undefined): void {
   if (!stream) {
     return
   }
@@ -2930,27 +2575,19 @@ export function updateUsage(
   }
   return {
     input_tokens:
-      partUsage.input_tokens !== null && partUsage.input_tokens > 0
-        ? partUsage.input_tokens
-        : usage.input_tokens,
+      partUsage.input_tokens !== null && partUsage.input_tokens > 0 ? partUsage.input_tokens : usage.input_tokens,
     cache_creation_input_tokens:
-      partUsage.cache_creation_input_tokens !== null &&
-      partUsage.cache_creation_input_tokens > 0
+      partUsage.cache_creation_input_tokens !== null && partUsage.cache_creation_input_tokens > 0
         ? partUsage.cache_creation_input_tokens
         : usage.cache_creation_input_tokens,
     cache_read_input_tokens:
-      partUsage.cache_read_input_tokens !== null &&
-      partUsage.cache_read_input_tokens > 0
+      partUsage.cache_read_input_tokens !== null && partUsage.cache_read_input_tokens > 0
         ? partUsage.cache_read_input_tokens
         : usage.cache_read_input_tokens,
     output_tokens: partUsage.output_tokens ?? usage.output_tokens,
     server_tool_use: {
-      web_search_requests:
-        partUsage.server_tool_use?.web_search_requests ??
-        usage.server_tool_use.web_search_requests,
-      web_fetch_requests:
-        partUsage.server_tool_use?.web_fetch_requests ??
-        usage.server_tool_use.web_fetch_requests,
+      web_search_requests: partUsage.server_tool_use?.web_search_requests ?? usage.server_tool_use.web_search_requests,
+      web_fetch_requests: partUsage.server_tool_use?.web_fetch_requests ?? usage.server_tool_use.web_fetch_requests,
     },
     service_tier: usage.service_tier,
     cache_creation: {
@@ -2967,17 +2604,13 @@ export function updateUsage(
     // so the string is eliminated from external builds by dead code elimination.
     // Uses the same > 0 guard as other token fields to prevent message_delta
     // from overwriting the real value with 0.
-    ...(feature('CACHED_MICROCOMPACT')
+    ...(feature("CACHED_MICROCOMPACT")
       ? {
           cache_deleted_input_tokens:
-            (partUsage as unknown as { cache_deleted_input_tokens?: number })
-              .cache_deleted_input_tokens != null &&
-            (partUsage as unknown as { cache_deleted_input_tokens: number })
-              .cache_deleted_input_tokens > 0
-              ? (partUsage as unknown as { cache_deleted_input_tokens: number })
-                  .cache_deleted_input_tokens
-              : ((usage as unknown as { cache_deleted_input_tokens?: number })
-                  .cache_deleted_input_tokens ?? 0),
+            (partUsage as unknown as { cache_deleted_input_tokens?: number }).cache_deleted_input_tokens != null &&
+            (partUsage as unknown as { cache_deleted_input_tokens: number }).cache_deleted_input_tokens > 0
+              ? (partUsage as unknown as { cache_deleted_input_tokens: number }).cache_deleted_input_tokens
+              : ((usage as unknown as { cache_deleted_input_tokens?: number }).cache_deleted_input_tokens ?? 0),
         }
       : {}),
     inference_geo: usage.inference_geo,
@@ -2996,39 +2629,29 @@ export function accumulateUsage(
 ): NonNullableUsage {
   return {
     input_tokens: totalUsage.input_tokens + messageUsage.input_tokens,
-    cache_creation_input_tokens:
-      totalUsage.cache_creation_input_tokens +
-      messageUsage.cache_creation_input_tokens,
-    cache_read_input_tokens:
-      totalUsage.cache_read_input_tokens + messageUsage.cache_read_input_tokens,
+    cache_creation_input_tokens: totalUsage.cache_creation_input_tokens + messageUsage.cache_creation_input_tokens,
+    cache_read_input_tokens: totalUsage.cache_read_input_tokens + messageUsage.cache_read_input_tokens,
     output_tokens: totalUsage.output_tokens + messageUsage.output_tokens,
     server_tool_use: {
       web_search_requests:
-        totalUsage.server_tool_use.web_search_requests +
-        messageUsage.server_tool_use.web_search_requests,
+        totalUsage.server_tool_use.web_search_requests + messageUsage.server_tool_use.web_search_requests,
       web_fetch_requests:
-        totalUsage.server_tool_use.web_fetch_requests +
-        messageUsage.server_tool_use.web_fetch_requests,
+        totalUsage.server_tool_use.web_fetch_requests + messageUsage.server_tool_use.web_fetch_requests,
     },
     service_tier: messageUsage.service_tier, // Use the most recent service tier
     cache_creation: {
       ephemeral_1h_input_tokens:
-        totalUsage.cache_creation.ephemeral_1h_input_tokens +
-        messageUsage.cache_creation.ephemeral_1h_input_tokens,
+        totalUsage.cache_creation.ephemeral_1h_input_tokens + messageUsage.cache_creation.ephemeral_1h_input_tokens,
       ephemeral_5m_input_tokens:
-        totalUsage.cache_creation.ephemeral_5m_input_tokens +
-        messageUsage.cache_creation.ephemeral_5m_input_tokens,
+        totalUsage.cache_creation.ephemeral_5m_input_tokens + messageUsage.cache_creation.ephemeral_5m_input_tokens,
     },
     // See comment in updateUsage — field is not on NonNullableUsage to keep
     // the string out of external builds.
-    ...(feature('CACHED_MICROCOMPACT')
+    ...(feature("CACHED_MICROCOMPACT")
       ? {
           cache_deleted_input_tokens:
-            ((totalUsage as unknown as { cache_deleted_input_tokens?: number })
-              .cache_deleted_input_tokens ?? 0) +
-            ((
-              messageUsage as unknown as { cache_deleted_input_tokens?: number }
-            ).cache_deleted_input_tokens ?? 0),
+            ((totalUsage as unknown as { cache_deleted_input_tokens?: number }).cache_deleted_input_tokens ?? 0) +
+            ((messageUsage as unknown as { cache_deleted_input_tokens?: number }).cache_deleted_input_tokens ?? 0),
         }
       : {}),
     inference_geo: messageUsage.inference_geo, // Use the most recent
@@ -3037,21 +2660,19 @@ export function accumulateUsage(
   }
 }
 
-function isToolResultBlock(
-  block: unknown,
-): block is { type: 'tool_result'; tool_use_id: string } {
+function isToolResultBlock(block: unknown): block is { type: "tool_result"; tool_use_id: string } {
   return (
     block !== null &&
-    typeof block === 'object' &&
-    'type' in block &&
-    (block as { type: string }).type === 'tool_result' &&
-    'tool_use_id' in block
+    typeof block === "object" &&
+    "type" in block &&
+    (block as { type: string }).type === "tool_result" &&
+    "tool_use_id" in block
   )
 }
 
 type CachedMCEditsBlock = {
-  type: 'cache_edits'
-  edits: { type: 'delete'; cache_reference: string }[]
+  type: "cache_edits"
+  edits: { type: "delete"; cache_reference: string }[]
 }
 
 type CachedMCPinnedEdits = {
@@ -3069,7 +2690,7 @@ export function addCacheBreakpoints(
   pinnedEdits?: CachedMCPinnedEdits[],
   skipCacheWrite = false,
 ): MessageParam[] {
-  logEvent('tengu_api_cache_breakpoints', {
+  logEvent("tengu_api_cache_breakpoints", {
     totalMessageCount: messages.length,
     cachingEnabled: enablePromptCaching,
     skipCacheWrite,
@@ -3089,20 +2710,10 @@ export function addCacheBreakpoints(
   const markerIndex = skipCacheWrite ? messages.length - 2 : messages.length - 1
   const result = messages.map((msg, index) => {
     const addCache = index === markerIndex
-    if (msg.type === 'user') {
-      return userMessageToMessageParam(
-        msg,
-        addCache,
-        enablePromptCaching,
-        querySource,
-      )
+    if (msg.type === "user") {
+      return userMessageToMessageParam(msg, addCache, enablePromptCaching, querySource)
     }
-    return assistantMessageToMessageParam(
-      msg,
-      addCache,
-      enablePromptCaching,
-      querySource,
-    )
+    return assistantMessageToMessageParam(msg, addCache, enablePromptCaching, querySource)
   })
 
   if (!useCachedMC) {
@@ -3114,7 +2725,7 @@ export function addCacheBreakpoints(
 
   // Helper to deduplicate a cache_edits block against already-seen deletions
   const deduplicateEdits = (block: CachedMCEditsBlock): CachedMCEditsBlock => {
-    const uniqueEdits = block.edits.filter(edit => {
+    const uniqueEdits = block.edits.filter((edit) => {
       if (seenDeleteRefs.has(edit.cache_reference)) {
         return false
       }
@@ -3127,9 +2738,9 @@ export function addCacheBreakpoints(
   // Re-insert all previously-pinned cache_edits at their original positions
   for (const pinned of pinnedEdits ?? []) {
     const msg = result[pinned.userMessageIndex]
-    if (msg && msg.role === 'user') {
+    if (msg && msg.role === "user") {
       if (!Array.isArray(msg.content)) {
-        msg.content = [{ type: 'text', text: msg.content as string }]
+        msg.content = [{ type: "text", text: msg.content as string }]
       }
       const dedupedBlock = deduplicateEdits(pinned.block)
       if (dedupedBlock.edits.length > 0) {
@@ -3144,16 +2755,16 @@ export function addCacheBreakpoints(
     if (dedupedNewEdits.edits.length > 0) {
       for (let i = result.length - 1; i >= 0; i--) {
         const msg = result[i]
-        if (msg && msg.role === 'user') {
+        if (msg && msg.role === "user") {
           if (!Array.isArray(msg.content)) {
-            msg.content = [{ type: 'text', text: msg.content as string }]
+            msg.content = [{ type: "text", text: msg.content as string }]
           }
           insertBlockAfterToolResults(msg.content, dedupedNewEdits)
           // Pin so this block is re-sent at the same position in future calls
           pinCacheEdits(i, newCacheEdits)
 
           logForDebugging(
-            `Added cache_edits block with ${dedupedNewEdits.edits.length} deletion(s) to message[${i}]: ${dedupedNewEdits.edits.map(e => e.cache_reference).join(', ')}`,
+            `Added cache_edits block with ${dedupedNewEdits.edits.length} deletion(s) to message[${i}]: ${dedupedNewEdits.edits.map((e) => e.cache_reference).join(", ")}`,
           )
           break
         }
@@ -3170,7 +2781,7 @@ export function addCacheBreakpoints(
       const msg = result[i]!
       if (Array.isArray(msg.content)) {
         for (const block of msg.content) {
-          if (block && typeof block === 'object' && 'cache_control' in block) {
+          if (block && typeof block === "object" && "cache_control" in block) {
             lastCCMsg = i
           }
         }
@@ -3187,7 +2798,7 @@ export function addCacheBreakpoints(
     if (lastCCMsg >= 0) {
       for (let i = 0; i < lastCCMsg; i++) {
         const msg = result[i]!
-        if (msg.role !== 'user' || !Array.isArray(msg.content)) {
+        if (msg.role !== "user" || !Array.isArray(msg.content)) {
           continue
         }
         let cloned = false
@@ -3221,9 +2832,9 @@ export function buildSystemPromptBlocks(
   // IMPORTANT: Do not add any more blocks for caching or you will get a 400
   return splitSysPromptPrefix(systemPrompt, {
     skipGlobalCacheForSystemPrompt: options?.skipGlobalCacheForSystemPrompt,
-  }).map(block => {
+  }).map((block) => {
     return {
-      type: 'text' as const,
+      type: "text" as const,
       text: block.text,
       ...(enablePromptCaching &&
         block.cacheScope !== null && {
@@ -3236,7 +2847,7 @@ export function buildSystemPromptBlocks(
   })
 }
 
-type HaikuOptions = Omit<Options, 'model' | 'getToolPermissionContext'>
+type HaikuOptions = Omit<Options, "model" | "getToolPermissionContext">
 
 export async function queryHaiku({
   systemPrompt = asSystemPrompt([]),
@@ -3254,7 +2865,7 @@ export async function queryHaiku({
   const result = await withVCR(
     [
       createUserMessage({
-        content: systemPrompt.map(text => ({ type: 'text', text })),
+        content: systemPrompt.map((text) => ({ type: "text", text })),
       }),
       createUserMessage({
         content: userPrompt,
@@ -3270,7 +2881,7 @@ export async function queryHaiku({
       const result = await queryModelWithoutStreaming({
         messages,
         systemPrompt,
-        thinkingConfig: { type: 'disabled' },
+        thinkingConfig: { type: "disabled" },
         tools: [],
         signal,
         options: {
@@ -3290,7 +2901,7 @@ export async function queryHaiku({
   return result[0]! as AssistantMessage
 }
 
-type QueryWithModelOptions = Omit<Options, 'getToolPermissionContext'>
+type QueryWithModelOptions = Omit<Options, "getToolPermissionContext">
 
 /**
  * Query a specific model through the Claude Code infrastructure.
@@ -3313,7 +2924,7 @@ export async function queryWithModel({
   const result = await withVCR(
     [
       createUserMessage({
-        content: systemPrompt.map(text => ({ type: 'text', text })),
+        content: systemPrompt.map((text) => ({ type: "text", text })),
       }),
       createUserMessage({
         content: userPrompt,
@@ -3329,7 +2940,7 @@ export async function queryWithModel({
       const result = await queryModelWithoutStreaming({
         messages,
         systemPrompt,
-        thinkingConfig: { type: 'disabled' },
+        thinkingConfig: { type: "disabled" },
         tools: [],
         signal,
         options: {
@@ -3364,7 +2975,7 @@ export const MAX_NON_STREAMING_TOKENS = 64_000
 export function adjustParamsForNonStreaming<
   T extends {
     max_tokens: number
-    thinking?: BetaMessageStreamParams['thinking']
+    thinking?: BetaMessageStreamParams["thinking"]
   },
 >(params: T, maxTokensCap: number): T {
   const cappedMaxTokens = Math.min(params.max_tokens, maxTokensCap)
@@ -3372,10 +2983,7 @@ export function adjustParamsForNonStreaming<
   // Adjust thinking budget if it would exceed capped max_tokens
   // to maintain the constraint: max_tokens > thinking.budget_tokens
   const adjustedParams = { ...params }
-  if (
-    adjustedParams.thinking?.type === 'enabled' &&
-    adjustedParams.thinking.budget_tokens
-  ) {
+  if (adjustedParams.thinking?.type === "enabled" && adjustedParams.thinking.budget_tokens) {
     adjustedParams.thinking = {
       ...adjustedParams.thinking,
       budget_tokens: Math.min(
@@ -3393,7 +3001,7 @@ export function adjustParamsForNonStreaming<
 
 function isMaxTokensCapEnabled(): boolean {
   // 3P default: false (not validated on Bedrock/Vertex)
-  return getFeatureValue_CACHED_MAY_BE_STALE('tengu_otk_slot_v1', false)
+  return getFeatureValue_CACHED_MAY_BE_STALE("tengu_otk_slot_v1", false)
 }
 
 export function getMaxOutputTokensForModel(model: string): number {
@@ -3410,7 +3018,7 @@ export function getMaxOutputTokensForModel(model: string): number {
     : maxOutputTokens.default
 
   const result = validateBoundedIntEnvVar(
-    'CLAUDE_CODE_MAX_OUTPUT_TOKENS',
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
     process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,
     defaultTokens,
     maxOutputTokens.upperLimit,

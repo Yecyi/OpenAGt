@@ -1,4 +1,4 @@
-import { getSettingsForSource } from '../settings/settings.js'
+import { getSettingsForSource } from "../settings/settings.js"
 
 /**
  * Plugin names locked by org policy (policySettings.enabledPlugins).
@@ -7,7 +7,7 @@ import { getSettingsForSource } from '../settings/settings.js'
  * case — no policy in effect).
  */
 export function getManagedPluginNames(): Set<string> | null {
-  const enabledPlugins = getSettingsForSource('policySettings')?.enabledPlugins
+  const enabledPlugins = getSettingsForSource("policySettings")?.enabledPlugins
   if (!enabledPlugins) {
     return null
   }
@@ -15,10 +15,10 @@ export function getManagedPluginNames(): Set<string> | null {
   for (const [pluginId, value] of Object.entries(enabledPlugins)) {
     // Only plugin@marketplace boolean entries (true OR false) are
     // protected. Legacy owner/repo array form is not.
-    if (typeof value !== 'boolean' || !pluginId.includes('@')) {
+    if (typeof value !== "boolean" || !pluginId.includes("@")) {
       continue
     }
-    const name = pluginId.split('@')[0]
+    const name = pluginId.split("@")[0]
     if (name) {
       names.add(name)
     }

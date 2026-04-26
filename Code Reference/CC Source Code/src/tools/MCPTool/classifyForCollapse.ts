@@ -587,8 +587,8 @@ const READ_TOOLS = new Set([
 
 function normalize(name: string): string {
   return name
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/-/g, '_')
+    .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .replace(/-/g, "_")
     .toLowerCase()
 }
 

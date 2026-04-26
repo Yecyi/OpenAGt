@@ -1,7 +1,7 @@
-import chalk from 'chalk'
-import { ctrlOToExpand } from '../components/CtrlOToExpand.js'
-import { stringWidth } from '../ink/stringWidth.js'
-import sliceAnsi from './sliceAnsi.js'
+import chalk from "chalk"
+import { ctrlOToExpand } from "../components/CtrlOToExpand.js"
+import { stringWidth } from "../ink/stringWidth.js"
+import sliceAnsi from "./sliceAnsi.js"
 
 // Text rendering utilities for terminal display
 const MAX_LINES_TO_SHOW = 3
@@ -16,11 +16,8 @@ const PADDING_TO_PREVENT_OVERFLOW = 10
  * @param wrapWidth The width at which to wrap lines (in visible characters).
  * @returns The wrapped text.
  */
-function wrapText(
-  text: string,
-  wrapWidth: number,
-): { aboveTheFold: string; remainingLines: number } {
-  const lines = text.split('\n')
+function wrapText(text: string, wrapWidth: number): { aboveTheFold: string; remainingLines: number } {
+  const lines = text.split("\n")
   const wrappedLines: string[] = []
 
   for (const line of lines) {
@@ -47,7 +44,7 @@ function wrapText(
     return {
       aboveTheFold: wrappedLines
         .slice(0, MAX_LINES_TO_SHOW + 1)
-        .join('\n')
+        .join("\n")
         .trimEnd(),
       remainingLines: 0, // All lines are shown, nothing remaining
     }
@@ -55,7 +52,7 @@ function wrapText(
 
   // Otherwise show the standard MAX_LINES_TO_SHOW
   return {
-    aboveTheFold: wrappedLines.slice(0, MAX_LINES_TO_SHOW).join('\n').trimEnd(),
+    aboveTheFold: wrappedLines.slice(0, MAX_LINES_TO_SHOW).join("\n").trimEnd(),
     remainingLines: Math.max(0, remainingLines),
   }
 }
@@ -68,14 +65,10 @@ function wrapText(
  * @param terminalWidth Terminal width for wrapping lines.
  * @returns The rendered content with truncation if needed.
  */
-export function renderTruncatedContent(
-  content: string,
-  terminalWidth: number,
-  suppressExpandHint = false,
-): string {
+export function renderTruncatedContent(content: string, terminalWidth: number, suppressExpandHint = false): string {
   const trimmedContent = content.trimEnd()
   if (!trimmedContent) {
-    return ''
+    return ""
   }
 
   const wrapWidth = Math.max(terminalWidth - PADDING_TO_PREVENT_OVERFLOW, 10)
@@ -84,32 +77,22 @@ export function renderTruncatedContent(
   // on huge outputs (e.g. 64MB binary dumps that cause 382K-row screens).
   const maxChars = MAX_LINES_TO_SHOW * wrapWidth * 4
   const preTruncated = trimmedContent.length > maxChars
-  const contentForWrapping = preTruncated
-    ? trimmedContent.slice(0, maxChars)
-    : trimmedContent
+  const contentForWrapping = preTruncated ? trimmedContent.slice(0, maxChars) : trimmedContent
 
-  const { aboveTheFold, remainingLines } = wrapText(
-    contentForWrapping,
-    wrapWidth,
-  )
+  const { aboveTheFold, remainingLines } = wrapText(contentForWrapping, wrapWidth)
 
   const estimatedRemaining = preTruncated
-    ? Math.max(
-        remainingLines,
-        Math.ceil(trimmedContent.length / wrapWidth) - MAX_LINES_TO_SHOW,
-      )
+    ? Math.max(remainingLines, Math.ceil(trimmedContent.length / wrapWidth) - MAX_LINES_TO_SHOW)
     : remainingLines
 
   return [
     aboveTheFold,
     estimatedRemaining > 0
-      ? chalk.dim(
-          `… +${estimatedRemaining} lines${suppressExpandHint ? '' : ` ${ctrlOToExpand()}`}`,
-        )
-      : '',
+      ? chalk.dim(`… +${estimatedRemaining} lines${suppressExpandHint ? "" : ` ${ctrlOToExpand()}`}`)
+      : "",
   ]
     .filter(Boolean)
-    .join('\n')
+    .join("\n")
 }
 
 /** Fast check: would OutputLine truncate this content? Counts raw newlines
@@ -121,7 +104,7 @@ export function isOutputLineTruncated(content: string): boolean {
   // Need more than MAX_LINES_TO_SHOW newlines (content fills > 3 lines).
   // The +1 accounts for wrapText showing an extra line when remainingLines==1.
   for (let i = 0; i <= MAX_LINES_TO_SHOW; i++) {
-    pos = content.indexOf('\n', pos)
+    pos = content.indexOf("\n", pos)
     if (pos === -1) return false
     pos++
   }

@@ -1,46 +1,42 @@
-import type {
-  Base64ImageSource,
-  ContentBlockParam,
-  ToolResultBlockParam,
-} from '@anthropic-ai/sdk/resources/index.mjs'
-import { readFile, stat } from 'fs/promises'
-import { getOriginalCwd } from 'src/bootstrap/state.js'
-import { logEvent } from 'src/services/analytics/index.js'
-import type { ToolPermissionContext } from 'src/Tool.js'
-import { getCwd } from 'src/utils/cwd.js'
-import { pathInAllowedWorkingPath } from 'src/utils/permissions/filesystem.js'
-import { setCwd } from 'src/utils/Shell.js'
-import { shouldMaintainProjectWorkingDir } from '../../utils/envUtils.js'
-import { maybeResizeAndDownsampleImageBuffer } from '../../utils/imageResizer.js'
-import { getMaxOutputLength } from '../../utils/shell/outputLimits.js'
-import { countCharInString, plural } from '../../utils/stringUtils.js'
+import type { Base64ImageSource, ContentBlockParam, ToolResultBlockParam } from "@anthropic-ai/sdk/resources/index.mjs"
+import { readFile, stat } from "fs/promises"
+import { getOriginalCwd } from "src/bootstrap/state.js"
+import { logEvent } from "src/services/analytics/index.js"
+import type { ToolPermissionContext } from "src/Tool.js"
+import { getCwd } from "src/utils/cwd.js"
+import { pathInAllowedWorkingPath } from "src/utils/permissions/filesystem.js"
+import { setCwd } from "src/utils/Shell.js"
+import { shouldMaintainProjectWorkingDir } from "../../utils/envUtils.js"
+import { maybeResizeAndDownsampleImageBuffer } from "../../utils/imageResizer.js"
+import { getMaxOutputLength } from "../../utils/shell/outputLimits.js"
+import { countCharInString, plural } from "../../utils/stringUtils.js"
 /**
  * Strips leading and trailing lines that contain only whitespace/newlines.
  * Unlike trim(), this preserves whitespace within content lines and only removes
  * completely empty lines from the beginning and end.
  */
 export function stripEmptyLines(content: string): string {
-  const lines = content.split('\n')
+  const lines = content.split("\n")
 
   // Find the first non-empty line
   let startIndex = 0
-  while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
+  while (startIndex < lines.length && lines[startIndex]?.trim() === "") {
     startIndex++
   }
 
   // Find the last non-empty line
   let endIndex = lines.length - 1
-  while (endIndex >= 0 && lines[endIndex]?.trim() === '') {
+  while (endIndex >= 0 && lines[endIndex]?.trim() === "") {
     endIndex--
   }
 
   // If all lines are empty, return empty string
   if (startIndex > endIndex) {
-    return ''
+    return ""
   }
 
   // Return the slice with non-empty lines
-  return lines.slice(startIndex, endIndex + 1).join('\n')
+  return lines.slice(startIndex, endIndex + 1).join("\n")
 }
 
 /**
@@ -56,9 +52,7 @@ const DATA_URI_RE = /^data:([^;]+);base64,(.+)$/
  * Parse a data-URI string into its media type and base64 payload.
  * Input is trimmed before matching.
  */
-export function parseDataUri(
-  s: string,
-): { mediaType: string; data: string } | null {
+export function parseDataUri(s: string): { mediaType: string; data: string } | null {
   const match = s.trim().match(DATA_URI_RE)
   if (!match || !match[1] || !match[2]) return null
   return { mediaType: match[1], data: match[2] }
@@ -68,21 +62,18 @@ export function parseDataUri(
  * Build an image tool_result block from shell stdout containing a data URI.
  * Returns null if parse fails so callers can fall through to text handling.
  */
-export function buildImageToolResult(
-  stdout: string,
-  toolUseID: string,
-): ToolResultBlockParam | null {
+export function buildImageToolResult(stdout: string, toolUseID: string): ToolResultBlockParam | null {
   const parsed = parseDataUri(stdout)
   if (!parsed) return null
   return {
     tool_use_id: toolUseID,
-    type: 'tool_result',
+    type: "tool_result",
     content: [
       {
-        type: 'image',
+        type: "image",
         source: {
-          type: 'base64',
-          media_type: parsed.mediaType as Base64ImageSource['media_type'],
+          type: "base64",
+          media_type: parsed.mediaType as Base64ImageSource["media_type"],
           data: parsed.data,
         },
       },
@@ -116,18 +107,14 @@ export async function resizeShellImageOutput(
   if (outputFilePath) {
     const size = outputFileSize ?? (await stat(outputFilePath)).size
     if (size > MAX_IMAGE_FILE_SIZE) return null
-    source = await readFile(outputFilePath, 'utf8')
+    source = await readFile(outputFilePath, "utf8")
   }
   const parsed = parseDataUri(source)
   if (!parsed) return null
-  const buf = Buffer.from(parsed.data, 'base64')
-  const ext = parsed.mediaType.split('/')[1] || 'png'
-  const resized = await maybeResizeAndDownsampleImageBuffer(
-    buf,
-    buf.length,
-    ext,
-  )
-  return `data:image/${resized.mediaType};base64,${resized.buffer.toString('base64')}`
+  const buf = Buffer.from(parsed.data, "base64")
+  const ext = parsed.mediaType.split("/")[1] || "png"
+  const resized = await maybeResizeAndDownsampleImageBuffer(buf, buf.length, ext)
+  return `data:image/${resized.mediaType};base64,${resized.buffer.toString("base64")}`
 }
 
 export function formatOutput(content: string): {
@@ -147,18 +134,18 @@ export function formatOutput(content: string): {
   const maxOutputLength = getMaxOutputLength()
   if (content.length <= maxOutputLength) {
     return {
-      totalLines: countCharInString(content, '\n') + 1,
+      totalLines: countCharInString(content, "\n") + 1,
       truncatedContent: content,
       isImage,
     }
   }
 
   const truncatedPart = content.slice(0, maxOutputLength)
-  const remainingLines = countCharInString(content, '\n', maxOutputLength) + 1
+  const remainingLines = countCharInString(content, "\n", maxOutputLength) + 1
   const truncated = `${truncatedPart}\n\n... [${remainingLines} lines truncated] ...`
 
   return {
-    totalLines: countCharInString(content, '\n') + 1,
+    totalLines: countCharInString(content, "\n") + 1,
     truncatedContent: truncated,
     isImage,
   }
@@ -167,9 +154,7 @@ export function formatOutput(content: string): {
 export const stdErrAppendShellResetMessage = (stderr: string): string =>
   `${stderr.trim()}\nShell cwd was reset to ${getOriginalCwd()}`
 
-export function resetCwdIfOutsideProject(
-  toolPermissionContext: ToolPermissionContext,
-): boolean {
+export function resetCwdIfOutsideProject(toolPermissionContext: ToolPermissionContext): boolean {
   const cwd = getCwd()
   const originalCwd = getOriginalCwd()
   const shouldMaintain = shouldMaintainProjectWorkingDir()
@@ -178,13 +163,12 @@ export function resetCwdIfOutsideProject(
     // Fast path: originalCwd is unconditionally in allWorkingDirectories
     // (filesystem.ts), so when cwd hasn't moved, pathInAllowedWorkingPath is
     // trivially true — skip its syscalls for the no-cd common case.
-    (cwd !== originalCwd &&
-      !pathInAllowedWorkingPath(cwd, toolPermissionContext))
+    (cwd !== originalCwd && !pathInAllowedWorkingPath(cwd, toolPermissionContext))
   ) {
     // Reset to original directory if maintaining project dir OR outside allowed working directory
     setCwd(originalCwd)
     if (!shouldMaintain) {
-      logEvent('tengu_bash_tool_reset_to_original_dir', {})
+      logEvent("tengu_bash_tool_reset_to_original_dir", {})
       return true
     }
   }
@@ -201,23 +185,23 @@ export function createContentSummary(content: ContentBlockParam[]): string {
   let imageCount = 0
 
   for (const block of content) {
-    if (block.type === 'image') {
+    if (block.type === "image") {
       imageCount++
-    } else if (block.type === 'text' && 'text' in block) {
+    } else if (block.type === "text" && "text" in block) {
       textCount++
       // Include first 200 chars of text blocks for context
       const preview = block.text.slice(0, 200)
-      parts.push(preview + (block.text.length > 200 ? '...' : ''))
+      parts.push(preview + (block.text.length > 200 ? "..." : ""))
     }
   }
 
   const summary: string[] = []
   if (imageCount > 0) {
-    summary.push(`[${imageCount} ${plural(imageCount, 'image')}]`)
+    summary.push(`[${imageCount} ${plural(imageCount, "image")}]`)
   }
   if (textCount > 0) {
-    summary.push(`[${textCount} text ${plural(textCount, 'block')}]`)
+    summary.push(`[${textCount} text ${plural(textCount, "block")}]`)
   }
 
-  return `MCP Result: ${summary.join(', ')}${parts.length > 0 ? '\n\n' + parts.join('\n\n') : ''}`
+  return `MCP Result: ${summary.join(", ")}${parts.length > 0 ? "\n\n" + parts.join("\n\n") : ""}`
 }

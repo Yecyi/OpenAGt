@@ -1,9 +1,9 @@
-import type { PermissionRule } from 'src/utils/permissions/PermissionRule.js'
-import { getSettingsForSource } from 'src/utils/settings/settings.js'
-import type { SettingsJson } from 'src/utils/settings/types.js'
-import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
-import { SAFE_ENV_VARS } from '../../utils/managedEnvConstants.js'
-import { getPermissionRulesForSource } from '../../utils/permissions/permissionsLoader.js'
+import type { PermissionRule } from "src/utils/permissions/PermissionRule.js"
+import { getSettingsForSource } from "src/utils/settings/settings.js"
+import type { SettingsJson } from "src/utils/settings/types.js"
+import { BASH_TOOL_NAME } from "../../tools/BashTool/toolName.js"
+import { SAFE_ENV_VARS } from "../../utils/managedEnvConstants.js"
+import { getPermissionRulesForSource } from "../../utils/permissions/permissionsLoader.js"
 
 function hasHooks(settings: SettingsJson | null): boolean {
   if (settings === null || settings.disableAllHooks) {
@@ -29,14 +29,14 @@ function hasHooks(settings: SettingsJson | null): boolean {
 export function getHooksSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasHooks(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasHooks(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -44,10 +44,9 @@ export function getHooksSources(): string[] {
 
 function hasBashPermission(rules: PermissionRule[]): boolean {
   return rules.some(
-    rule =>
-      rule.ruleBehavior === 'allow' &&
-      (rule.ruleValue.toolName === BASH_TOOL_NAME ||
-        rule.ruleValue.toolName.startsWith(BASH_TOOL_NAME + '(')),
+    (rule) =>
+      rule.ruleBehavior === "allow" &&
+      (rule.ruleValue.toolName === BASH_TOOL_NAME || rule.ruleValue.toolName.startsWith(BASH_TOOL_NAME + "(")),
   )
 }
 
@@ -58,14 +57,14 @@ function hasBashPermission(rules: PermissionRule[]): boolean {
 export function getBashPermissionSources(): string[] {
   const sources: string[] = []
 
-  const projectRules = getPermissionRulesForSource('projectSettings')
+  const projectRules = getPermissionRulesForSource("projectSettings")
   if (hasBashPermission(projectRules)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localRules = getPermissionRulesForSource('localSettings')
+  const localRules = getPermissionRulesForSource("localSettings")
   if (hasBashPermission(localRules)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -77,7 +76,7 @@ export function getBashPermissionSources(): string[] {
  * @param limit - Optional limit for how many items to show before summarizing (ignored if 0)
  */
 export function formatListWithAnd(items: string[], limit?: number): string {
-  if (items.length === 0) return ''
+  if (items.length === 0) return ""
 
   // Ignore limit if it's 0
   const effectiveLimit = limit === 0 ? undefined : limit
@@ -89,7 +88,7 @@ export function formatListWithAnd(items: string[], limit?: number): string {
 
     const lastItem = items[items.length - 1]!
     const allButLast = items.slice(0, -1)
-    return `${allButLast.join(', ')}, and ${lastItem}`
+    return `${allButLast.join(", ")}, and ${lastItem}`
   }
 
   // If we have more items than the limit, show first few and count the rest
@@ -100,7 +99,7 @@ export function formatListWithAnd(items: string[], limit?: number): string {
     return `${shown[0]} and ${remaining} more`
   }
 
-  return `${shown.join(', ')}, and ${remaining} more`
+  return `${shown.join(", ")}, and ${remaining} more`
 }
 
 /**
@@ -117,14 +116,14 @@ function hasOtelHeadersHelper(settings: SettingsJson | null): boolean {
 export function getOtelHeadersHelperSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasOtelHeadersHelper(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasOtelHeadersHelper(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -144,14 +143,14 @@ function hasApiKeyHelper(settings: SettingsJson | null): boolean {
 export function getApiKeyHelperSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasApiKeyHelper(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasApiKeyHelper(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -171,14 +170,14 @@ function hasAwsCommands(settings: SettingsJson | null): boolean {
 export function getAwsCommandsSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasAwsCommands(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasAwsCommands(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -198,14 +197,14 @@ function hasGcpCommands(settings: SettingsJson | null): boolean {
 export function getGcpCommandsSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasGcpCommands(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasGcpCommands(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources
@@ -219,9 +218,7 @@ function hasDangerousEnvVars(settings: SettingsJson | null): boolean {
   if (!settings?.env) {
     return false
   }
-  return Object.keys(settings.env).some(
-    key => !SAFE_ENV_VARS.has(key.toUpperCase()),
-  )
+  return Object.keys(settings.env).some((key) => !SAFE_ENV_VARS.has(key.toUpperCase()))
 }
 
 /**
@@ -231,14 +228,14 @@ function hasDangerousEnvVars(settings: SettingsJson | null): boolean {
 export function getDangerousEnvVarsSources(): string[] {
   const sources: string[] = []
 
-  const projectSettings = getSettingsForSource('projectSettings')
+  const projectSettings = getSettingsForSource("projectSettings")
   if (hasDangerousEnvVars(projectSettings)) {
-    sources.push('.claude/settings.json')
+    sources.push(".claude/settings.json")
   }
 
-  const localSettings = getSettingsForSource('localSettings')
+  const localSettings = getSettingsForSource("localSettings")
   if (hasDangerousEnvVars(localSettings)) {
-    sources.push('.claude/settings.local.json')
+    sources.push(".claude/settings.local.json")
   }
 
   return sources

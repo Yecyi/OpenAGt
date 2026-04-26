@@ -1,23 +1,14 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
-import { z } from 'zod/v4'
-import { lazySchema } from '../utils/lazySchema.js'
-import {
-  type HookEvent,
-  HOOK_EVENTS,
-  type HookInput,
-  type PermissionUpdate,
-} from 'src/entrypoints/agentSdkTypes.js'
-import type {
-  HookJSONOutput,
-  AsyncHookJSONOutput,
-  SyncHookJSONOutput,
-} from 'src/entrypoints/agentSdkTypes.js'
-import type { Message } from 'src/types/message.js'
-import type { PermissionResult } from 'src/utils/permissions/PermissionResult.js'
-import { permissionBehaviorSchema } from 'src/utils/permissions/PermissionRule.js'
-import { permissionUpdateSchema } from 'src/utils/permissions/PermissionUpdateSchema.js'
-import type { AppState } from '../state/AppState.js'
-import type { AttributionState } from '../utils/commitAttribution.js'
+import { z } from "zod/v4"
+import { lazySchema } from "../utils/lazySchema.js"
+import { type HookEvent, HOOK_EVENTS, type HookInput, type PermissionUpdate } from "src/entrypoints/agentSdkTypes.js"
+import type { HookJSONOutput, AsyncHookJSONOutput, SyncHookJSONOutput } from "src/entrypoints/agentSdkTypes.js"
+import type { Message } from "src/types/message.js"
+import type { PermissionResult } from "src/utils/permissions/PermissionResult.js"
+import { permissionBehaviorSchema } from "src/utils/permissions/PermissionRule.js"
+import { permissionUpdateSchema } from "src/utils/permissions/PermissionUpdateSchema.js"
+import type { AppState } from "../state/AppState.js"
+import type { AttributionState } from "../utils/commitAttribution.js"
 
 export function isHookEvent(value: string): value is HookEvent {
   return HOOK_EVENTS.includes(value as HookEvent)
@@ -49,115 +40,91 @@ export type PromptResponse = {
 // Sync hook response schema
 export const syncHookResponseSchema = lazySchema(() =>
   z.object({
-    continue: z
-      .boolean()
-      .describe('Whether Claude should continue after hook (default: true)')
-      .optional(),
-    suppressOutput: z
-      .boolean()
-      .describe('Hide stdout from transcript (default: false)')
-      .optional(),
-    stopReason: z
-      .string()
-      .describe('Message shown when continue is false')
-      .optional(),
-    decision: z.enum(['approve', 'block']).optional(),
-    reason: z.string().describe('Explanation for the decision').optional(),
-    systemMessage: z
-      .string()
-      .describe('Warning message shown to the user')
-      .optional(),
+    continue: z.boolean().describe("Whether Claude should continue after hook (default: true)").optional(),
+    suppressOutput: z.boolean().describe("Hide stdout from transcript (default: false)").optional(),
+    stopReason: z.string().describe("Message shown when continue is false").optional(),
+    decision: z.enum(["approve", "block"]).optional(),
+    reason: z.string().describe("Explanation for the decision").optional(),
+    systemMessage: z.string().describe("Warning message shown to the user").optional(),
     hookSpecificOutput: z
       .union([
         z.object({
-          hookEventName: z.literal('PreToolUse'),
+          hookEventName: z.literal("PreToolUse"),
           permissionDecision: permissionBehaviorSchema().optional(),
           permissionDecisionReason: z.string().optional(),
           updatedInput: z.record(z.string(), z.unknown()).optional(),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('UserPromptSubmit'),
+          hookEventName: z.literal("UserPromptSubmit"),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('SessionStart'),
+          hookEventName: z.literal("SessionStart"),
           additionalContext: z.string().optional(),
           initialUserMessage: z.string().optional(),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          watchPaths: z.array(z.string()).describe("Absolute paths to watch for FileChanged hooks").optional(),
         }),
         z.object({
-          hookEventName: z.literal('Setup'),
+          hookEventName: z.literal("Setup"),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('SubagentStart'),
+          hookEventName: z.literal("SubagentStart"),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('PostToolUse'),
+          hookEventName: z.literal("PostToolUse"),
           additionalContext: z.string().optional(),
-          updatedMCPToolOutput: z
-            .unknown()
-            .describe('Updates the output for MCP tools')
-            .optional(),
+          updatedMCPToolOutput: z.unknown().describe("Updates the output for MCP tools").optional(),
         }),
         z.object({
-          hookEventName: z.literal('PostToolUseFailure'),
+          hookEventName: z.literal("PostToolUseFailure"),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('PermissionDenied'),
+          hookEventName: z.literal("PermissionDenied"),
           retry: z.boolean().optional(),
         }),
         z.object({
-          hookEventName: z.literal('Notification'),
+          hookEventName: z.literal("Notification"),
           additionalContext: z.string().optional(),
         }),
         z.object({
-          hookEventName: z.literal('PermissionRequest'),
+          hookEventName: z.literal("PermissionRequest"),
           decision: z.union([
             z.object({
-              behavior: z.literal('allow'),
+              behavior: z.literal("allow"),
               updatedInput: z.record(z.string(), z.unknown()).optional(),
               updatedPermissions: z.array(permissionUpdateSchema()).optional(),
             }),
             z.object({
-              behavior: z.literal('deny'),
+              behavior: z.literal("deny"),
               message: z.string().optional(),
               interrupt: z.boolean().optional(),
             }),
           ]),
         }),
         z.object({
-          hookEventName: z.literal('Elicitation'),
-          action: z.enum(['accept', 'decline', 'cancel']).optional(),
+          hookEventName: z.literal("Elicitation"),
+          action: z.enum(["accept", "decline", "cancel"]).optional(),
           content: z.record(z.string(), z.unknown()).optional(),
         }),
         z.object({
-          hookEventName: z.literal('ElicitationResult'),
-          action: z.enum(['accept', 'decline', 'cancel']).optional(),
+          hookEventName: z.literal("ElicitationResult"),
+          action: z.enum(["accept", "decline", "cancel"]).optional(),
           content: z.record(z.string(), z.unknown()).optional(),
         }),
         z.object({
-          hookEventName: z.literal('CwdChanged'),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          hookEventName: z.literal("CwdChanged"),
+          watchPaths: z.array(z.string()).describe("Absolute paths to watch for FileChanged hooks").optional(),
         }),
         z.object({
-          hookEventName: z.literal('FileChanged'),
-          watchPaths: z
-            .array(z.string())
-            .describe('Absolute paths to watch for FileChanged hooks')
-            .optional(),
+          hookEventName: z.literal("FileChanged"),
+          watchPaths: z.array(z.string()).describe("Absolute paths to watch for FileChanged hooks").optional(),
         }),
         z.object({
-          hookEventName: z.literal('WorktreeCreate'),
+          hookEventName: z.literal("WorktreeCreate"),
           worktreePath: z.string(),
         }),
       ])
@@ -179,37 +146,29 @@ export const hookJSONOutputSchema = lazySchema(() => {
 type SchemaHookJSONOutput = z.infer<ReturnType<typeof hookJSONOutputSchema>>
 
 // Type guard function to check if response is sync
-export function isSyncHookJSONOutput(
-  json: HookJSONOutput,
-): json is SyncHookJSONOutput {
-  return !('async' in json && json.async === true)
+export function isSyncHookJSONOutput(json: HookJSONOutput): json is SyncHookJSONOutput {
+  return !("async" in json && json.async === true)
 }
 
 // Type guard function to check if response is async
-export function isAsyncHookJSONOutput(
-  json: HookJSONOutput,
-): json is AsyncHookJSONOutput {
-  return 'async' in json && json.async === true
+export function isAsyncHookJSONOutput(json: HookJSONOutput): json is AsyncHookJSONOutput {
+  return "async" in json && json.async === true
 }
 
 // Compile-time assertion that SDK and Zod types match
-import type { IsEqual } from 'type-fest'
+import type { IsEqual } from "type-fest"
 type Assert<T extends true> = T
-type _assertSDKTypesMatch = Assert<
-  IsEqual<SchemaHookJSONOutput, HookJSONOutput>
->
+type _assertSDKTypesMatch = Assert<IsEqual<SchemaHookJSONOutput, HookJSONOutput>>
 
 /** Context passed to callback hooks for state access */
 export type HookCallbackContext = {
   getAppState: () => AppState
-  updateAttributionState: (
-    updater: (prev: AttributionState) => AttributionState,
-  ) => void
+  updateAttributionState: (updater: (prev: AttributionState) => AttributionState) => void
 }
 
 /** Hook that is a callback. */
 export type HookCallback = {
-  type: 'callback'
+  type: "callback"
   callback: (
     input: HookInput,
     toolUseID: string | null,
@@ -232,7 +191,7 @@ export type HookCallbackMatcher = {
 }
 
 export type HookProgress = {
-  type: 'hook_progress'
+  type: "hook_progress"
   hookEvent: HookEvent
   hookName: string
   command: string
@@ -247,12 +206,12 @@ export type HookBlockingError = {
 
 export type PermissionRequestResult =
   | {
-      behavior: 'allow'
+      behavior: "allow"
       updatedInput?: Record<string, unknown>
       updatedPermissions?: PermissionUpdate[]
     }
   | {
-      behavior: 'deny'
+      behavior: "deny"
       message?: string
       interrupt?: boolean
     }
@@ -261,10 +220,10 @@ export type HookResult = {
   message?: Message
   systemMessage?: Message
   blockingError?: HookBlockingError
-  outcome: 'success' | 'blocking' | 'non_blocking_error' | 'cancelled'
+  outcome: "success" | "blocking" | "non_blocking_error" | "cancelled"
   preventContinuation?: boolean
   stopReason?: string
-  permissionBehavior?: 'ask' | 'deny' | 'allow' | 'passthrough'
+  permissionBehavior?: "ask" | "deny" | "allow" | "passthrough"
   hookPermissionDecisionReason?: string
   additionalContext?: string
   initialUserMessage?: string
@@ -280,7 +239,7 @@ export type AggregatedHookResult = {
   preventContinuation?: boolean
   stopReason?: string
   hookPermissionDecisionReason?: string
-  permissionBehavior?: PermissionResult['behavior']
+  permissionBehavior?: PermissionResult["behavior"]
   additionalContexts?: string[]
   initialUserMessage?: string
   updatedInput?: Record<string, unknown>

@@ -1,8 +1,8 @@
-import { logForDebugging } from './debug.js'
+import { logForDebugging } from "./debug.js"
 
 export type EnvVarValidationResult = {
   effective: number
-  status: 'valid' | 'capped' | 'invalid'
+  status: "valid" | "capped" | "invalid"
   message?: string
 }
 
@@ -13,13 +13,13 @@ export function validateBoundedIntEnvVar(
   upperLimit: number,
 ): EnvVarValidationResult {
   if (!value) {
-    return { effective: defaultValue, status: 'valid' }
+    return { effective: defaultValue, status: "valid" }
   }
   const parsed = parseInt(value, 10)
   if (isNaN(parsed) || parsed <= 0) {
     const result: EnvVarValidationResult = {
       effective: defaultValue,
-      status: 'invalid',
+      status: "invalid",
       message: `Invalid value "${value}" (using default: ${defaultValue})`,
     }
     logForDebugging(`${name} ${result.message}`)
@@ -28,11 +28,11 @@ export function validateBoundedIntEnvVar(
   if (parsed > upperLimit) {
     const result: EnvVarValidationResult = {
       effective: upperLimit,
-      status: 'capped',
+      status: "capped",
       message: `Capped from ${parsed} to ${upperLimit}`,
     }
     logForDebugging(`${name} ${result.message}`)
     return result
   }
-  return { effective: parsed, status: 'valid' }
+  return { effective: parsed, status: "valid" }
 }

@@ -54,7 +54,10 @@ export function extractTemplateVariables(template: string): string[] {
 /**
  * Validate that all required variables are provided
  */
-export function validateTemplate(template: string, context: CommandTemplateContext): { valid: boolean; missing: string[] } {
+export function validateTemplate(
+  template: string,
+  context: CommandTemplateContext,
+): { valid: boolean; missing: string[] } {
   const required = extractTemplateVariables(template)
   const missing = required.filter((key) => context[key] === undefined)
   return {

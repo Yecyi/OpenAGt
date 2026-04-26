@@ -14,37 +14,37 @@ const log = Log.create({ service: "compat.cc" })
 // CC tool name mappings
 const CC_TOOL_MAPPINGS: Record<string, string> = {
   // File operations
-  "BashTool": "bash",
-  "FileReadTool": "read",
-  "FileEditTool": "edit",
-  "FileWriteTool": "write",
-  "GlobTool": "glob",
-  "GrepTool": "grep",
+  BashTool: "bash",
+  FileReadTool: "read",
+  FileEditTool: "edit",
+  FileWriteTool: "write",
+  GlobTool: "glob",
+  GrepTool: "grep",
 
   // Agent operations
-  "AgentTool": "agent",
-  "TaskTool": "task",
-  "TaskCreateTool": "task_create",
-  "TaskListTool": "task_list",
-  "TaskGetTool": "task_get",
-  "TaskUpdateTool": "task_update",
-  "TaskStopTool": "task_stop",
-  "TeamCreateTool": "team_create",
-  "TeamDeleteTool": "team_delete",
-  "SendMessageTool": "message_send",
+  AgentTool: "agent",
+  TaskTool: "task",
+  TaskCreateTool: "task_create",
+  TaskListTool: "task_list",
+  TaskGetTool: "task_get",
+  TaskUpdateTool: "task_update",
+  TaskStopTool: "task_stop",
+  TeamCreateTool: "team_create",
+  TeamDeleteTool: "team_delete",
+  SendMessageTool: "message_send",
 
   // Web operations
-  "WebFetchTool": "webfetch",
-  "WebSearchTool": "websearch",
+  WebFetchTool: "webfetch",
+  WebSearchTool: "websearch",
 
   // Code operations
-  "LSPTool": "lsp",
-  "NotebookEditTool": "notebook_edit",
+  LSPTool: "lsp",
+  NotebookEditTool: "notebook_edit",
 }
 
 // Reverse mapping (OpenAGt -> CC)
 const OPENAG_TO_CC_MAPPINGS: Record<string, string> = Object.fromEntries(
-  Object.entries(CC_TOOL_MAPPINGS).map(([cc, openag]) => [openag, cc])
+  Object.entries(CC_TOOL_MAPPINGS).map(([cc, openag]) => [openag, cc]),
 )
 
 /**
@@ -52,7 +52,7 @@ const OPENAG_TO_CC_MAPPINGS: Record<string, string> = Object.fromEntries(
  */
 export function adaptCCToolCall(
   ccToolName: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
 ): { toolName: string; input: Record<string, unknown> } | null {
   const openagTool = CC_TOOL_MAPPINGS[ccToolName]
   if (!openagTool) {
@@ -72,10 +72,7 @@ export function adaptCCToolCall(
 /**
  * Adapt CC tool input to OpenAGt format
  */
-function adaptInput(
-  toolName: string,
-  input: Record<string, unknown>
-): Record<string, unknown> {
+function adaptInput(toolName: string, input: Record<string, unknown>): Record<string, unknown> {
   switch (toolName) {
     case "edit":
       return {
@@ -144,10 +141,7 @@ function adaptInput(
 /**
  * Convert OpenAGt tool result to CC format
  */
-export function adaptToolResultToCC(
-  openagTool: string,
-  result: unknown
-): unknown {
+export function adaptToolResultToCC(openagTool: string, result: unknown): unknown {
   // Most results are compatible, but we may need special handling
   switch (openagTool) {
     case "read":
@@ -203,9 +197,7 @@ export interface CCSessionMessage {
 /**
  * Convert CC session format to OpenAGt format
  */
-export function convertCCSessionToOpenAGt(
-  ccMessages: CCSessionMessage[]
-): unknown[] {
+export function convertCCSessionToOpenAGt(ccMessages: CCSessionMessage[]): unknown[] {
   return ccMessages.map((msg) => ({
     id: msg.id,
     type: msg.type,
@@ -220,9 +212,7 @@ export function convertCCSessionToOpenAGt(
 /**
  * Convert OpenAGt session format to CC format
  */
-export function convertOpenAGtSessionToCC(
-  openagMessages: unknown[]
-): CCSessionMessage[] {
+export function convertOpenAGtSessionToCC(openagMessages: unknown[]): CCSessionMessage[] {
   return openagMessages.map((msg: any) => ({
     id: msg.id,
     type: msg.type,
@@ -280,10 +270,7 @@ export function parseCCSystemPrompt(prompt: string): CCSystemPromptComponents {
 /**
  * Adapt CC system prompt to OpenAGt format
  */
-export function adaptCCSystemPrompt(
-  ccPrompt: string,
-  openagTools: string[]
-): string {
+export function adaptCCSystemPrompt(ccPrompt: string, openagTools: string[]): string {
   const sections = parseCCSystemPrompt(ccPrompt)
 
   // Build OpenAGt-style system prompt
@@ -320,14 +307,12 @@ export interface CCTaskNotification {
 /**
  * Convert OpenAGt internal task state to CC notification format
  */
-export function toCCTaskNotification(
-  task: {
-    id: string
-    status: string
-    result?: string
-    metadata?: Record<string, unknown>
-  }
-): CCTaskNotification {
+export function toCCTaskNotification(task: {
+  id: string
+  status: string
+  result?: string
+  metadata?: Record<string, unknown>
+}): CCTaskNotification {
   return {
     taskId: task.id,
     status: task.status as CCTaskNotification["status"],
@@ -391,13 +376,11 @@ export interface CCPermissionContext {
 /**
  * Convert OpenAGt permission to CC format
  */
-export function toCCPermissionContext(
-  openagPerm: {
-    allow?: string[]
-    deny?: string[]
-    tools?: Record<string, { allow: boolean }>
-  }
-): CCPermissionContext {
+export function toCCPermissionContext(openagPerm: {
+  allow?: string[]
+  deny?: string[]
+  tools?: Record<string, { allow: boolean }>
+}): CCPermissionContext {
   return {
     allow: openagPerm.allow ?? [],
     deny: openagPerm.deny ?? [],
@@ -408,7 +391,7 @@ export function toCCPermissionContext(
             Object.entries(openagPerm.tools).map(([k, v]) => [
               k,
               { mode: v.allow ? "allow" : "deny", suggestions: [] },
-            ])
+            ]),
           ),
         }
       : undefined,

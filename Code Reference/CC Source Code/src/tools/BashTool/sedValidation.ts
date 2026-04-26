@@ -1,7 +1,7 @@
-import type { ToolPermissionContext } from '../../Tool.js'
-import { splitCommand_DEPRECATED } from '../../utils/bash/commands.js'
-import { tryParseShellCommand } from '../../utils/bash/shellQuote.js'
-import type { PermissionResult } from '../../utils/permissions/PermissionResult.js'
+import type { ToolPermissionContext } from "../../Tool.js"
+import { splitCommand_DEPRECATED } from "../../utils/bash/commands.js"
+import { tryParseShellCommand } from "../../utils/bash/shellQuote.js"
+import type { PermissionResult } from "../../utils/permissions/PermissionResult.js"
 
 /**
  * Helper: Validate flags against an allowlist
@@ -10,16 +10,13 @@ import type { PermissionResult } from '../../utils/permissions/PermissionResult.
  * @param allowedFlags Array of allowed single-character and long flags
  * @returns true if all flags are valid, false otherwise
  */
-function validateFlagsAgainstAllowlist(
-  flags: string[],
-  allowedFlags: string[],
-): boolean {
+function validateFlagsAgainstAllowlist(flags: string[], allowedFlags: string[]): boolean {
   for (const flag of flags) {
     // Handle combined flags like -nE or -Er
-    if (flag.startsWith('-') && !flag.startsWith('--') && flag.length > 2) {
+    if (flag.startsWith("-") && !flag.startsWith("--") && flag.length > 2) {
       // Check each character in combined flag
       for (let i = 1; i < flag.length; i++) {
-        const singleFlag = '-' + flag[i]
+        const singleFlag = "-" + flag[i]
         if (!allowedFlags.includes(singleFlag)) {
           return false
         }
@@ -41,10 +38,7 @@ function validateFlagsAgainstAllowlist(
  * File arguments are ALLOWED for this pattern
  * @internal Exported for testing
  */
-export function isLinePrintingCommand(
-  command: string,
-  expressions: string[],
-): boolean {
+export function isLinePrintingCommand(command: string, expressions: string[]): boolean {
   const sedMatch = command.match(/^\s*sed\s+/)
   if (!sedMatch) return false
 
@@ -56,22 +50,22 @@ export function isLinePrintingCommand(
   // Extract all flags
   const flags: string[] = []
   for (const arg of parsed) {
-    if (typeof arg === 'string' && arg.startsWith('-') && arg !== '--') {
+    if (typeof arg === "string" && arg.startsWith("-") && arg !== "--") {
       flags.push(arg)
     }
   }
 
   // Validate flags - only allow -n, -E, -r, -z and their long forms
   const allowedFlags = [
-    '-n',
-    '--quiet',
-    '--silent',
-    '-E',
-    '--regexp-extended',
-    '-r',
-    '-z',
-    '--zero-terminated',
-    '--posix',
+    "-n",
+    "--quiet",
+    "--silent",
+    "-E",
+    "--regexp-extended",
+    "-r",
+    "-z",
+    "--zero-terminated",
+    "--posix",
   ]
 
   if (!validateFlagsAgainstAllowlist(flags, allowedFlags)) {
@@ -81,12 +75,12 @@ export function isLinePrintingCommand(
   // Check if -n flag is present (required for Pattern 1)
   let hasNFlag = false
   for (const flag of flags) {
-    if (flag === '-n' || flag === '--quiet' || flag === '--silent') {
+    if (flag === "-n" || flag === "--quiet" || flag === "--silent") {
       hasNFlag = true
       break
     }
     // Check in combined flags
-    if (flag.startsWith('-') && !flag.startsWith('--') && flag.includes('n')) {
+    if (flag.startsWith("-") && !flag.startsWith("--") && flag.includes("n")) {
       hasNFlag = true
       break
     }
@@ -105,7 +99,7 @@ export function isLinePrintingCommand(
   // All expressions must be print commands (strict allowlist)
   // Allow semicolon-separated commands
   for (const expr of expressions) {
-    const commands = expr.split(';')
+    const commands = expr.split(";")
     for (const cmd of commands) {
       if (!isPrintCommand(cmd.trim())) {
         return false
@@ -163,18 +157,18 @@ function isSubstitutionCommand(
   // Extract all flags
   const flags: string[] = []
   for (const arg of parsed) {
-    if (typeof arg === 'string' && arg.startsWith('-') && arg !== '--') {
+    if (typeof arg === "string" && arg.startsWith("-") && arg !== "--") {
       flags.push(arg)
     }
   }
 
   // Validate flags based on mode
   // Base allowed flags for both modes
-  const allowedFlags = ['-E', '--regexp-extended', '-r', '--posix']
+  const allowedFlags = ["-E", "--regexp-extended", "-r", "--posix"]
 
   // When allowing file writes, also permit -i and --in-place
   if (allowFileWrites) {
-    allowedFlags.push('-i', '--in-place')
+    allowedFlags.push("-i", "--in-place")
   }
 
   if (!validateFlagsAgainstAllowlist(flags, allowedFlags)) {
@@ -190,7 +184,7 @@ function isSubstitutionCommand(
 
   // STRICT ALLOWLIST: Must be exactly a substitution command starting with 's'
   // This rejects standalone commands like 'e', 'w file', etc.
-  if (!expr.startsWith('s')) {
+  if (!expr.startsWith("s")) {
     return false
   }
 
@@ -208,12 +202,12 @@ function isSubstitutionCommand(
   let lastDelimiterPos = -1
   let i = 0
   while (i < rest.length) {
-    if (rest[i] === '\\') {
+    if (rest[i] === "\\") {
       // Skip escaped character
       i += 2
       continue
     }
-    if (rest[i] === '/') {
+    if (rest[i] === "/") {
       delimiterCount++
       lastDelimiterPos = i
     }
@@ -244,10 +238,7 @@ function isSubstitutionCommand(
  * @param options.allowFileWrites When true, allows -i flag and file arguments for substitution commands
  * @returns true if the command is allowed (matches allowlist and passes denylist check), false otherwise
  */
-export function sedCommandIsAllowedByAllowlist(
-  command: string,
-  options?: { allowFileWrites?: boolean },
-): boolean {
+export function sedCommandIsAllowedByAllowlist(command: string, options?: { allowFileWrites?: boolean }): boolean {
   const allowFileWrites = options?.allowFileWrites ?? false
 
   // Extract sed expressions (content inside quotes where actual sed commands live)
@@ -285,7 +276,7 @@ export function sedCommandIsAllowedByAllowlist(
   // Pattern 2 does not allow semicolons (command separators)
   // Pattern 1 allows semicolons for separating print commands
   for (const expr of expressions) {
-    if (isPattern2 && expr.includes(';')) {
+    if (isPattern2 && expr.includes(";")) {
       return false
     }
   }
@@ -321,42 +312,37 @@ export function hasFileArgs(command: string): boolean {
       const arg = parsed[i]
 
       // Handle both string arguments and glob patterns (like *.log)
-      if (typeof arg !== 'string' && typeof arg !== 'object') continue
+      if (typeof arg !== "string" && typeof arg !== "object") continue
 
       // If it's a glob pattern, it counts as a file argument
-      if (
-        typeof arg === 'object' &&
-        arg !== null &&
-        'op' in arg &&
-        arg.op === 'glob'
-      ) {
+      if (typeof arg === "object" && arg !== null && "op" in arg && arg.op === "glob") {
         return true
       }
 
       // Skip non-string arguments that aren't glob patterns
-      if (typeof arg !== 'string') continue
+      if (typeof arg !== "string") continue
 
       // Handle -e flag followed by expression
-      if ((arg === '-e' || arg === '--expression') && i + 1 < parsed.length) {
+      if ((arg === "-e" || arg === "--expression") && i + 1 < parsed.length) {
         hasEFlag = true
         i++ // Skip the next argument since it's the expression
         continue
       }
 
       // Handle --expression=value format
-      if (arg.startsWith('--expression=')) {
+      if (arg.startsWith("--expression=")) {
         hasEFlag = true
         continue
       }
 
       // Handle -e=value format (non-standard but defense in depth)
-      if (arg.startsWith('-e=')) {
+      if (arg.startsWith("-e=")) {
         hasEFlag = true
         continue
       }
 
       // Skip other flags
-      if (arg.startsWith('-')) continue
+      if (arg.startsWith("-")) continue
 
       argCount++
 
@@ -396,7 +382,7 @@ export function extractSedExpressions(command: string): string[] {
 
   // Reject dangerous flag combinations like -ew, -eW, -ee, -we (combined -e/-w with dangerous commands)
   if (/-e[wWe]/.test(withoutSed) || /-w[eE]/.test(withoutSed)) {
-    throw new Error('Dangerous flag combination detected')
+    throw new Error("Dangerous flag combination detected")
   }
 
   // Use shell-quote to parse the arguments properly
@@ -414,13 +400,13 @@ export function extractSedExpressions(command: string): string[] {
       const arg = parsed[i]
 
       // Skip non-string arguments (like control operators)
-      if (typeof arg !== 'string') continue
+      if (typeof arg !== "string") continue
 
       // Handle -e flag followed by expression
-      if ((arg === '-e' || arg === '--expression') && i + 1 < parsed.length) {
+      if ((arg === "-e" || arg === "--expression") && i + 1 < parsed.length) {
         foundEFlag = true
         const nextArg = parsed[i + 1]
-        if (typeof nextArg === 'string') {
+        if (typeof nextArg === "string") {
           expressions.push(nextArg)
           i++ // Skip the next argument since we consumed it
         }
@@ -428,21 +414,21 @@ export function extractSedExpressions(command: string): string[] {
       }
 
       // Handle --expression=value format
-      if (arg.startsWith('--expression=')) {
+      if (arg.startsWith("--expression=")) {
         foundEFlag = true
-        expressions.push(arg.slice('--expression='.length))
+        expressions.push(arg.slice("--expression=".length))
         continue
       }
 
       // Handle -e=value format (non-standard but defense in depth)
-      if (arg.startsWith('-e=')) {
+      if (arg.startsWith("-e=")) {
         foundEFlag = true
-        expressions.push(arg.slice('-e='.length))
+        expressions.push(arg.slice("-e=".length))
         continue
       }
 
       // Skip other flags
-      if (arg.startsWith('-')) continue
+      if (arg.startsWith("-")) continue
 
       // If we haven't found any -e flags, the first non-flag argument is the sed expression
       if (!foundEFlag && !foundExpression) {
@@ -457,9 +443,7 @@ export function extractSedExpressions(command: string): string[] {
     }
   } catch (error) {
     // If shell-quote parsing fails, treat the sed command as unsafe
-    throw new Error(
-      `Failed to parse sed command: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    )
+    throw new Error(`Failed to parse sed command: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
   return expressions
@@ -486,20 +470,20 @@ function containsDangerousOperations(expression: string): boolean {
   }
 
   // Reject curly braces (blocks) - too complex to parse
-  if (cmd.includes('{') || cmd.includes('}')) {
+  if (cmd.includes("{") || cmd.includes("}")) {
     return true
   }
 
   // Reject newlines - multi-line commands are too complex
-  if (cmd.includes('\n')) {
+  if (cmd.includes("\n")) {
     return true
   }
 
   // Reject comments (# not immediately after s command)
   // Comments look like: #comment or start with #
   // Delimiter looks like: s#pattern#replacement#
-  const hashIndex = cmd.indexOf('#')
-  if (hashIndex !== -1 && !(hashIndex > 0 && cmd[hashIndex - 1] === 's')) {
+  const hashIndex = cmd.indexOf("#")
+  if (hashIndex !== -1 && !(hashIndex > 0 && cmd[hashIndex - 1] === "s")) {
     return true
   }
 
@@ -599,15 +583,15 @@ function containsDangerousOperations(expression: string): boolean {
   // Per POSIX, sed allows any character except backslash and newline as delimiter
   const substitutionMatch = cmd.match(/s([^\\\n]).*?\1.*?\1(.*?)$/)
   if (substitutionMatch) {
-    const flags = substitutionMatch[2] || ''
+    const flags = substitutionMatch[2] || ""
 
     // Check for write flag: s/old/new/w filename or s/old/new/gw filename
-    if (flags.includes('w') || flags.includes('W')) {
+    if (flags.includes("w") || flags.includes("W")) {
       return true
     }
 
     // Check for execute flag: s/old/new/e or s/old/new/ge
-    if (flags.includes('e') || flags.includes('E')) {
+    if (flags.includes("e") || flags.includes("E")) {
       return true
     }
   }
@@ -651,12 +635,12 @@ export function checkSedConstraints(
     // Skip non-sed commands
     const trimmed = cmd.trim()
     const baseCmd = trimmed.split(/\s+/)[0]
-    if (baseCmd !== 'sed') {
+    if (baseCmd !== "sed") {
       continue
     }
 
     // In acceptEdits mode, allow file writes (-i flag) but still block dangerous operations
-    const allowFileWrites = toolPermissionContext.mode === 'acceptEdits'
+    const allowFileWrites = toolPermissionContext.mode === "acceptEdits"
 
     const isAllowed = sedCommandIsAllowedByAllowlist(trimmed, {
       allowFileWrites,
@@ -664,13 +648,12 @@ export function checkSedConstraints(
 
     if (!isAllowed) {
       return {
-        behavior: 'ask',
-        message:
-          'sed command requires approval (contains potentially dangerous operations)',
+        behavior: "ask",
+        message: "sed command requires approval (contains potentially dangerous operations)",
         decisionReason: {
-          type: 'other',
+          type: "other",
           reason:
-            'sed command contains operations that require explicit approval (e.g., write commands, execute commands)',
+            "sed command contains operations that require explicit approval (e.g., write commands, execute commands)",
         },
       }
     }
@@ -678,7 +661,7 @@ export function checkSedConstraints(
 
   // No dangerous sed commands found (or no sed commands at all)
   return {
-    behavior: 'passthrough',
-    message: 'No dangerous sed operations detected',
+    behavior: "passthrough",
+    message: "No dangerous sed operations detected",
   }
 }

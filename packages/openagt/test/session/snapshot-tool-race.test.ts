@@ -171,40 +171,41 @@ function makeHttp() {
 
 const it = testEffect(makeHttp())
 
-const providerCfg = (url: string): Partial<Config.Info> => ({
-  provider: {
-    test: {
-      name: "Test",
-      id: "test",
-      env: [],
-      npm: "@ai-sdk/openai-compatible",
-      models: {
-        "test-model": {
-          id: "test-model",
-          name: "Test Model",
-          attachment: false,
-          reasoning: false,
-          temperature: false,
-          tool_call: true,
-          release_date: "2025-01-01",
-          limit: { context: 100000, output: 10000 },
-          cost: { input: 0, output: 0 },
-          options: {},
+const providerCfg = (url: string): Partial<Config.Info> =>
+  ({
+    provider: {
+      test: {
+        name: "Test",
+        id: "test",
+        env: [],
+        npm: "@ai-sdk/openai-compatible",
+        models: {
+          "test-model": {
+            id: "test-model",
+            name: "Test Model",
+            attachment: false,
+            reasoning: false,
+            temperature: false,
+            tool_call: true,
+            release_date: "2025-01-01",
+            limit: { context: 100000, output: 10000 },
+            cost: { input: 0, output: 0 },
+            options: {},
+          },
+        },
+        options: {
+          apiKey: "test-key",
+          baseURL: url,
         },
       },
-      options: {
-        apiKey: "test-key",
-        baseURL: url,
+    },
+    experimental: {
+      sandbox: {
+        backend: "process",
+        failure_policy: "fallback",
       },
     },
-  },
-  experimental: {
-    sandbox: {
-      backend: "process",
-      failure_policy: "fallback",
-    },
-  },
-} as const)
+  }) as const
 
 it.live("tool execution produces non-empty session diff (snapshot race)", () =>
   provideTmpdirServer(

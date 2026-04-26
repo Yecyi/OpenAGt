@@ -1,30 +1,25 @@
-import { readdir } from 'fs/promises'
-import { join } from 'path'
-import { coerce as semverCoerce } from 'semver'
-import { getSessionId } from '../bootstrap/state.js'
-import { getCwd } from './cwd.js'
-import { logForDebugging } from './debug.js'
-import { execFileNoThrow } from './execFileNoThrow.js'
-import { pathExists } from './file.js'
-import { gte as semverGte } from './semver.js'
+import { readdir } from "fs/promises"
+import { join } from "path"
+import { coerce as semverCoerce } from "semver"
+import { getSessionId } from "../bootstrap/state.js"
+import { getCwd } from "./cwd.js"
+import { logForDebugging } from "./debug.js"
+import { execFileNoThrow } from "./execFileNoThrow.js"
+import { pathExists } from "./file.js"
+import { gte as semverGte } from "./semver.js"
 
-const MIN_DESKTOP_VERSION = '1.1.2396'
+const MIN_DESKTOP_VERSION = "1.1.2396"
 
 function isDevMode(): boolean {
-  if ((process.env.NODE_ENV as string) === 'development') {
+  if ((process.env.NODE_ENV as string) === "development") {
     return true
   }
 
   // Local builds from build directories are dev mode even with NODE_ENV=production
-  const pathsToCheck = [process.argv[1] || '', process.execPath || '']
-  const buildDirs = [
-    '/build-ant/',
-    '/build-ant-native/',
-    '/build-external/',
-    '/build-external-native/',
-  ]
+  const pathsToCheck = [process.argv[1] || "", process.execPath || ""]
+  const buildDirs = ["/build-ant/", "/build-ant-native/", "/build-external/", "/build-external-native/"]
 
-  return pathsToCheck.some(p => buildDirs.some(dir => p.includes(dir)))
+  return pathsToCheck.some((p) => buildDirs.some((dir) => p.includes(dir)))
 }
 
 /**
@@ -33,10 +28,10 @@ function isDevMode(): boolean {
  * In dev mode: claude-dev://resume?session={sessionId}&cwd={cwd}
  */
 function buildDesktopDeepLink(sessionId: string): string {
-  const protocol = isDevMode() ? 'claude-dev' : 'claude'
+  const protocol = isDevMode() ? "claude-dev" : "claude"
   const url = new URL(`${protocol}://resume`)
-  url.searchParams.set('session', sessionId)
-  url.searchParams.set('cwd', getCwd())
+  url.searchParams.set("session", sessionId)
+  url.searchParams.set("cwd", getCwd())
   return url.toString()
 }
 
@@ -55,25 +50,17 @@ async function isDesktopInstalled(): Promise<boolean> {
 
   const platform = process.platform
 
-  if (platform === 'darwin') {
+  if (platform === "darwin") {
     // Check for Claude.app in /Applications
-    return pathExists('/Applications/Claude.app')
-  } else if (platform === 'linux') {
+    return pathExists("/Applications/Claude.app")
+  } else if (platform === "linux") {
     // Check if xdg-mime can find a handler for claude://
     // Note: xdg-mime returns exit code 0 even with no handler, so check stdout too
-    const { code, stdout } = await execFileNoThrow('xdg-mime', [
-      'query',
-      'default',
-      'x-scheme-handler/claude',
-    ])
+    const { code, stdout } = await execFileNoThrow("xdg-mime", ["query", "default", "x-scheme-handler/claude"])
     return code === 0 && stdout.trim().length > 0
-  } else if (platform === 'win32') {
+  } else if (platform === "win32") {
     // On Windows, try to query the registry for the protocol handler
-    const { code } = await execFileNoThrow('reg', [
-      'query',
-      'HKEY_CLASSES_ROOT\\claude',
-      '/ve',
-    ])
+    const { code } = await execFileNoThrow("reg", ["query", "HKEY_CLASSES_ROOT\\claude", "/ve"])
     return code === 0
   }
 
@@ -89,29 +76,29 @@ async function isDesktopInstalled(): Promise<boolean> {
 async function getDesktopVersion(): Promise<string | null> {
   const platform = process.platform
 
-  if (platform === 'darwin') {
-    const { code, stdout } = await execFileNoThrow('defaults', [
-      'read',
-      '/Applications/Claude.app/Contents/Info.plist',
-      'CFBundleShortVersionString',
+  if (platform === "darwin") {
+    const { code, stdout } = await execFileNoThrow("defaults", [
+      "read",
+      "/Applications/Claude.app/Contents/Info.plist",
+      "CFBundleShortVersionString",
     ])
     if (code !== 0) {
       return null
     }
     const version = stdout.trim()
     return version.length > 0 ? version : null
-  } else if (platform === 'win32') {
+  } else if (platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA
     if (!localAppData) {
       return null
     }
-    const installDir = join(localAppData, 'AnthropicClaude')
+    const installDir = join(localAppData, "AnthropicClaude")
     try {
       const entries = await readdir(installDir)
       const versions = entries
-        .filter(e => e.startsWith('app-'))
-        .map(e => e.slice(4))
-        .filter(v => semverCoerce(v) !== null)
+        .filter((e) => e.startsWith("app-"))
+        .map((e) => e.slice(4))
+        .filter((v) => semverCoerce(v) !== null)
         .sort((a, b) => {
           const ca = semverCoerce(a)!
           const cb = semverCoerce(b)!
@@ -127,9 +114,9 @@ async function getDesktopVersion(): Promise<string | null> {
 }
 
 export type DesktopInstallStatus =
-  | { status: 'not-installed' }
-  | { status: 'version-too-old'; version: string }
-  | { status: 'ready'; version: string }
+  | { status: "not-installed" }
+  | { status: "version-too-old"; version: string }
+  | { status: "ready"; version: string }
 
 /**
  * Check Desktop install status including version compatibility.
@@ -137,7 +124,7 @@ export type DesktopInstallStatus =
 export async function getDesktopInstallStatus(): Promise<DesktopInstallStatus> {
   const installed = await isDesktopInstalled()
   if (!installed) {
-    return { status: 'not-installed' }
+    return { status: "not-installed" }
   }
 
   let version: string | null
@@ -145,20 +132,20 @@ export async function getDesktopInstallStatus(): Promise<DesktopInstallStatus> {
     version = await getDesktopVersion()
   } catch {
     // Best effort — proceed with handoff if version detection fails
-    return { status: 'ready', version: 'unknown' }
+    return { status: "ready", version: "unknown" }
   }
 
   if (!version) {
     // Can't determine version — assume it's ready (dev mode or unknown install)
-    return { status: 'ready', version: 'unknown' }
+    return { status: "ready", version: "unknown" }
   }
 
   const coerced = semverCoerce(version)
   if (!coerced || !semverGte(coerced.version, MIN_DESKTOP_VERSION)) {
-    return { status: 'version-too-old', version }
+    return { status: "version-too-old", version }
   }
 
-  return { status: 'ready', version }
+  return { status: "ready", version }
 }
 
 /**
@@ -169,30 +156,25 @@ async function openDeepLink(deepLinkUrl: string): Promise<boolean> {
   const platform = process.platform
   logForDebugging(`Opening deep link: ${deepLinkUrl}`)
 
-  if (platform === 'darwin') {
+  if (platform === "darwin") {
     if (isDevMode()) {
       // In dev mode, `open` launches a bare Electron binary (without app code)
       // because setAsDefaultProtocolClient registers just the Electron executable.
       // Use AppleScript to route the URL to the already-running Electron app.
-      const { code } = await execFileNoThrow('osascript', [
-        '-e',
+      const { code } = await execFileNoThrow("osascript", [
+        "-e",
         `tell application "Electron" to open location "${deepLinkUrl}"`,
       ])
       return code === 0
     }
-    const { code } = await execFileNoThrow('open', [deepLinkUrl])
+    const { code } = await execFileNoThrow("open", [deepLinkUrl])
     return code === 0
-  } else if (platform === 'linux') {
-    const { code } = await execFileNoThrow('xdg-open', [deepLinkUrl])
+  } else if (platform === "linux") {
+    const { code } = await execFileNoThrow("xdg-open", [deepLinkUrl])
     return code === 0
-  } else if (platform === 'win32') {
+  } else if (platform === "win32") {
     // On Windows, use cmd /c start to open URLs
-    const { code } = await execFileNoThrow('cmd', [
-      '/c',
-      'start',
-      '',
-      deepLinkUrl,
-    ])
+    const { code } = await execFileNoThrow("cmd", ["/c", "start", "", deepLinkUrl])
     return code === 0
   }
 
@@ -215,8 +197,7 @@ export async function openCurrentSessionInDesktop(): Promise<{
   if (!installed) {
     return {
       success: false,
-      error:
-        'Claude Desktop is not installed. Install it from https://claude.ai/download',
+      error: "Claude Desktop is not installed. Install it from https://claude.ai/download",
     }
   }
 
@@ -227,7 +208,7 @@ export async function openCurrentSessionInDesktop(): Promise<{
   if (!opened) {
     return {
       success: false,
-      error: 'Failed to open Claude Desktop. Please try opening it manually.',
+      error: "Failed to open Claude Desktop. Please try opening it manually.",
       deepLinkUrl,
     }
   }

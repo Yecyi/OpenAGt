@@ -299,7 +299,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           const load = (id: string) =>
             auth?.type === "api"
               ? Effect.runPromise(
-                  withProcessEnv({ AWS_BEARER_TOKEN_BEDROCK: auth.key }, Effect.sync(() => sdk.languageModel(id))),
+                  withProcessEnv(
+                    { AWS_BEARER_TOKEN_BEDROCK: auth.key },
+                    Effect.sync(() => sdk.languageModel(id)),
+                  ),
                 )
               : sdk.languageModel(id)
 
@@ -496,7 +499,12 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options: envServiceKey ? { deploymentId, resourceGroup, serviceKey: envServiceKey } : {},
         async getModel(sdk: any, modelID: string) {
           if (auth?.type !== "api") return sdk(modelID)
-          return Effect.runPromise(withProcessEnv({ AICORE_SERVICE_KEY: auth.key }, Effect.sync(() => sdk(modelID))))
+          return Effect.runPromise(
+            withProcessEnv(
+              { AICORE_SERVICE_KEY: auth.key },
+              Effect.sync(() => sdk(modelID)),
+            ),
+          )
         },
       }
     }),

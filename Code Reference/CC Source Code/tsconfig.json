@@ -25,12 +25,6 @@
     "allowImportingTsExtensions": false,
     "noEmit": false
   },
-  "include": [
-    "src/**/*",
-    "stubs/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*", "stubs/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

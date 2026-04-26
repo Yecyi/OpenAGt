@@ -40,14 +40,14 @@ export function createCapacityWake(outerSignal: AbortSignal): CapacityWake {
       merged.abort()
       return { signal: merged.signal, cleanup: () => {} }
     }
-    outerSignal.addEventListener('abort', abort, { once: true })
+    outerSignal.addEventListener("abort", abort, { once: true })
     const capSig = wakeController.signal
-    capSig.addEventListener('abort', abort, { once: true })
+    capSig.addEventListener("abort", abort, { once: true })
     return {
       signal: merged.signal,
       cleanup: () => {
-        outerSignal.removeEventListener('abort', abort)
-        capSig.removeEventListener('abort', abort)
+        outerSignal.removeEventListener("abort", abort)
+        capSig.removeEventListener("abort", abort)
       },
     }
   }

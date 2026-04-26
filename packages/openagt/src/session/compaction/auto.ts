@@ -70,7 +70,7 @@ export interface TokenWarningState {
  */
 export function getEffectiveContextWindowSize(
   modelContextLimit: number,
-  modelMaxOutput: number = MAX_OUTPUT_TOKENS_FOR_SUMMARY
+  modelMaxOutput: number = MAX_OUTPUT_TOKENS_FOR_SUMMARY,
 ): number {
   const reservedTokensForSummary = Math.min(modelMaxOutput, MAX_OUTPUT_TOKENS_FOR_SUMMARY)
   return modelContextLimit - reservedTokensForSummary
@@ -83,7 +83,7 @@ export function getEffectiveContextWindowSize(
 export function getAutoCompactThreshold(
   modelContextLimit: number,
   modelMaxOutput: number = MAX_OUTPUT_TOKENS_FOR_SUMMARY,
-  config: AutoCompactConfig = DEFAULT_AUTO_COMPACT_CONFIG
+  config: AutoCompactConfig = DEFAULT_AUTO_COMPACT_CONFIG,
 ): number {
   const effectiveContextWindow = getEffectiveContextWindowSize(modelContextLimit, modelMaxOutput)
   return effectiveContextWindow - (config.bufferTokens ?? AUTOCOMPACT_BUFFER_TOKENS)
@@ -97,18 +97,14 @@ export function calculateTokenWarningState(
   tokenUsage: number,
   modelContextLimit: number,
   modelMaxOutput: number = MAX_OUTPUT_TOKENS_FOR_SUMMARY,
-  config: AutoCompactConfig = DEFAULT_AUTO_COMPACT_CONFIG
+  config: AutoCompactConfig = DEFAULT_AUTO_COMPACT_CONFIG,
 ): TokenWarningState {
   const autoCompactThreshold = getAutoCompactThreshold(modelContextLimit, modelMaxOutput, config)
 
-  const threshold = (config.enabled ?? true)
-    ? autoCompactThreshold
-    : getEffectiveContextWindowSize(modelContextLimit, modelMaxOutput)
+  const threshold =
+    (config.enabled ?? true) ? autoCompactThreshold : getEffectiveContextWindowSize(modelContextLimit, modelMaxOutput)
 
-  const percentLeft = Math.max(
-    0,
-    Math.round(((threshold - tokenUsage) / threshold) * 100)
-  )
+  const percentLeft = Math.max(0, Math.round(((threshold - tokenUsage) / threshold) * 100))
 
   const warningThreshold = threshold - (config.warningBufferTokens ?? WARNING_THRESHOLD_BUFFER_TOKENS)
   const errorThreshold = threshold - (config.errorBufferTokens ?? ERROR_THRESHOLD_BUFFER_TOKENS)
@@ -155,7 +151,11 @@ export function calculateTokenBudget(
         used += Token.estimate(part.text)
       } else if (part.type === "tool") {
         // Count non-compacted tool outputs
-        if (part.state.status === "completed" && !part.state.metadata?.micro_compacted && !part.state.metadata?.auto_compacted) {
+        if (
+          part.state.status === "completed" &&
+          !part.state.metadata?.micro_compacted &&
+          !part.state.metadata?.auto_compacted
+        ) {
           used += Token.estimate(part.state.output)
         }
       }
@@ -261,7 +261,7 @@ export class CircuitBreaker {
 
   constructor(
     private threshold: number = MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES,
-    private cooldownMs: number = 30_000
+    private cooldownMs: number = 30_000,
   ) {}
 
   recordSuccess(): void {

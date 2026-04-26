@@ -86,7 +86,11 @@ function model(providerID: string, id: string): Provider.Model {
   }
 }
 
-async function run<A, E>(config: unknown, models: Provider.Model[], effect: Effect.Effect<A, E, ProviderFallback.Service>) {
+async function run<A, E>(
+  config: unknown,
+  models: Provider.Model[],
+  effect: Effect.Effect<A, E, ProviderFallback.Service>,
+) {
   return Effect.runPromise(
     effect.pipe(
       Effect.provide(ProviderFallback.layer),

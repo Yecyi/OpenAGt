@@ -1,7 +1,7 @@
-export { default as lazy } from "../shared/lazy.js";
-export { getServerFunctionMeta } from "../shared/serverFunction.js";
-export { StartServer } from "./StartServer.jsx";
-export { createHandler } from "./handler.js";
+export { default as lazy } from "../shared/lazy.js"
+export { getServerFunctionMeta } from "../shared/serverFunction.js"
+export { StartServer } from "./StartServer.jsx"
+export { createHandler } from "./handler.js"
 /**
  * Checks if user has set a redirect status in the response.
  * If not, falls back to the 302 (temporary redirect)

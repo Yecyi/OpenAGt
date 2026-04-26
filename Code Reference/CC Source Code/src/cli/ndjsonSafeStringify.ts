@@ -1,4 +1,4 @@
-import { jsonStringify } from '../utils/slowOperations.js'
+import { jsonStringify } from "../utils/slowOperations.js"
 
 // JSON.stringify emits U+2028/U+2029 raw (valid per ECMA-404). When the
 // output is a single NDJSON line, any receiver that uses JavaScript
@@ -16,9 +16,7 @@ import { jsonStringify } from '../utils/slowOperations.js'
 const JS_LINE_TERMINATORS = /\u2028|\u2029/g
 
 function escapeJsLineTerminators(json: string): string {
-  return json.replace(JS_LINE_TERMINATORS, c =>
-    c === '\u2028' ? '\\u2028' : '\\u2029',
-  )
+  return json.replace(JS_LINE_TERMINATORS, (c) => (c === "\u2028" ? "\\u2028" : "\\u2029"))
 }
 
 /**

@@ -1,13 +1,13 @@
-import axios, { type AxiosError } from 'axios'
-import type { StdoutMessage } from 'src/entrypoints/sdk/controlTypes.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { logForDiagnosticsNoPII } from '../../utils/diagLogs.js'
-import { errorMessage } from '../../utils/errors.js'
-import { getSessionIngressAuthHeaders } from '../../utils/sessionIngressAuth.js'
-import { sleep } from '../../utils/sleep.js'
-import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
-import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
-import type { Transport } from './Transport.js'
+import axios, { type AxiosError } from "axios"
+import type { StdoutMessage } from "src/entrypoints/sdk/controlTypes.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { logForDiagnosticsNoPII } from "../../utils/diagLogs.js"
+import { errorMessage } from "../../utils/errors.js"
+import { getSessionIngressAuthHeaders } from "../../utils/sessionIngressAuth.js"
+import { sleep } from "../../utils/sleep.js"
+import { jsonParse, jsonStringify } from "../../utils/slowOperations.js"
+import { getClaudeCodeUserAgent } from "../../utils/userAgent.js"
+import type { Transport } from "./Transport.js"
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -64,7 +64,7 @@ export function parseSSEFrames(buffer: string): {
 
   // SSE frames are delimited by double newlines
   let idx: number
-  while ((idx = buffer.indexOf('\n\n', pos)) !== -1) {
+  while ((idx = buffer.indexOf("\n\n", pos)) !== -1) {
     const rawFrame = buffer.slice(pos, idx)
     pos = idx + 2
 
@@ -74,33 +74,30 @@ export function parseSSEFrames(buffer: string): {
     const frame: SSEFrame = {}
     let isComment = false
 
-    for (const line of rawFrame.split('\n')) {
-      if (line.startsWith(':')) {
+    for (const line of rawFrame.split("\n")) {
+      if (line.startsWith(":")) {
         // SSE comment (e.g., `:keepalive`)
         isComment = true
         continue
       }
 
-      const colonIdx = line.indexOf(':')
+      const colonIdx = line.indexOf(":")
       if (colonIdx === -1) continue
 
       const field = line.slice(0, colonIdx)
       // Per SSE spec, strip one leading space after colon if present
-      const value =
-        line[colonIdx + 1] === ' '
-          ? line.slice(colonIdx + 2)
-          : line.slice(colonIdx + 1)
+      const value = line[colonIdx + 1] === " " ? line.slice(colonIdx + 2) : line.slice(colonIdx + 1)
 
       switch (field) {
-        case 'event':
+        case "event":
           frame.event = value
           break
-        case 'id':
+        case "id":
           frame.id = value
           break
-        case 'data':
+        case "data":
           // Per SSE spec, multiple data: lines are concatenated with \n
-          frame.data = frame.data ? frame.data + '\n' + value : value
+          frame.data = frame.data ? frame.data + "\n" + value : value
           break
         // Ignore other fields (retry:, etc.)
       }
@@ -119,12 +116,7 @@ export function parseSSEFrames(buffer: string): {
 // Types
 // ---------------------------------------------------------------------------
 
-type SSETransportState =
-  | 'idle'
-  | 'connected'
-  | 'reconnecting'
-  | 'closing'
-  | 'closed'
+type SSETransportState = "idle" | "connected" | "reconnecting" | "closing" | "closed"
 
 /**
  * Payload for `event: client_event` frames, matching the StreamClientEvent
@@ -160,7 +152,7 @@ export type StreamClientEvent = {
  * for resumption after disconnection.
  */
 export class SSETransport implements Transport {
-  private state: SSETransportState = 'idle'
+  private state: SSETransportState = "idle"
   private onData?: (data: string) => void
   private onCloseCallback?: (closeCode?: number) => void
   private onEventCallback?: (event: StreamClientEvent) => void
@@ -215,7 +207,7 @@ export class SSETransport implements Transport {
     }
     logForDebugging(`SSETransport: SSE URL = ${url.href}`)
     logForDebugging(`SSETransport: POST URL = ${this.postUrl}`)
-    logForDiagnosticsNoPII('info', 'cli_sse_transport_initialized')
+    logForDiagnosticsNoPII("info", "cli_sse_transport_initialized")
   }
 
   /**
@@ -229,22 +221,19 @@ export class SSETransport implements Transport {
   }
 
   async connect(): Promise<void> {
-    if (this.state !== 'idle' && this.state !== 'reconnecting') {
-      logForDebugging(
-        `SSETransport: Cannot connect, current state is ${this.state}`,
-        { level: 'error' },
-      )
-      logForDiagnosticsNoPII('error', 'cli_sse_connect_failed')
+    if (this.state !== "idle" && this.state !== "reconnecting") {
+      logForDebugging(`SSETransport: Cannot connect, current state is ${this.state}`, { level: "error" })
+      logForDiagnosticsNoPII("error", "cli_sse_connect_failed")
       return
     }
 
-    this.state = 'reconnecting'
+    this.state = "reconnecting"
     const connectStartTime = Date.now()
 
     // Build SSE URL with sequence number for resumption
     const sseUrl = new URL(this.url.href)
     if (this.lastSequenceNum > 0) {
-      sseUrl.searchParams.set('from_sequence_num', String(this.lastSequenceNum))
+      sseUrl.searchParams.set("from_sequence_num", String(this.lastSequenceNum))
     }
 
     // Build headers -- use fresh auth headers (supports Cookie for session keys).
@@ -254,19 +243,19 @@ export class SSETransport implements Transport {
     const headers: Record<string, string> = {
       ...this.headers,
       ...authHeaders,
-      Accept: 'text/event-stream',
-      'anthropic-version': '2023-06-01',
-      'User-Agent': getClaudeCodeUserAgent(),
+      Accept: "text/event-stream",
+      "anthropic-version": "2023-06-01",
+      "User-Agent": getClaudeCodeUserAgent(),
     }
-    if (authHeaders['Cookie']) {
-      delete headers['Authorization']
+    if (authHeaders["Cookie"]) {
+      delete headers["Authorization"]
     }
     if (this.lastSequenceNum > 0) {
-      headers['Last-Event-ID'] = String(this.lastSequenceNum)
+      headers["Last-Event-ID"] = String(this.lastSequenceNum)
     }
 
     logForDebugging(`SSETransport: Opening ${sseUrl.href}`)
-    logForDiagnosticsNoPII('info', 'cli_sse_connect_opening')
+    logForDiagnosticsNoPII("info", "cli_sse_connect_opening")
 
     this.abortController = new AbortController()
 
@@ -279,16 +268,13 @@ export class SSETransport implements Transport {
 
       if (!response.ok) {
         const isPermanent = PERMANENT_HTTP_CODES.has(response.status)
-        logForDebugging(
-          `SSETransport: HTTP ${response.status}${isPermanent ? ' (permanent)' : ''}`,
-          { level: 'error' },
-        )
-        logForDiagnosticsNoPII('error', 'cli_sse_connect_http_error', {
+        logForDebugging(`SSETransport: HTTP ${response.status}${isPermanent ? " (permanent)" : ""}`, { level: "error" })
+        logForDiagnosticsNoPII("error", "cli_sse_connect_http_error", {
           status: response.status,
         })
 
         if (isPermanent) {
-          this.state = 'closed'
+          this.state = "closed"
           this.onCloseCallback?.(response.status)
           return
         }
@@ -298,19 +284,19 @@ export class SSETransport implements Transport {
       }
 
       if (!response.body) {
-        logForDebugging('SSETransport: No response body')
+        logForDebugging("SSETransport: No response body")
         this.handleConnectionError()
         return
       }
 
       // Successfully connected
       const connectDuration = Date.now() - connectStartTime
-      logForDebugging('SSETransport: Connected')
-      logForDiagnosticsNoPII('info', 'cli_sse_connect_connected', {
+      logForDebugging("SSETransport: Connected")
+      logForDiagnosticsNoPII("info", "cli_sse_connect_connected", {
         duration_ms: connectDuration,
       })
 
-      this.state = 'connected'
+      this.state = "connected"
       this.reconnectAttempts = 0
       this.reconnectStartTime = null
       this.resetLivenessTimer()
@@ -323,11 +309,8 @@ export class SSETransport implements Transport {
         return
       }
 
-      logForDebugging(
-        `SSETransport: Connection error: ${errorMessage(error)}`,
-        { level: 'error' },
-      )
-      logForDiagnosticsNoPII('error', 'cli_sse_connect_error')
+      logForDebugging(`SSETransport: Connection error: ${errorMessage(error)}`, { level: "error" })
+      logForDiagnosticsNoPII("error", "cli_sse_connect_error")
       this.handleConnectionError()
     }
   }
@@ -339,7 +322,7 @@ export class SSETransport implements Transport {
   private async readStream(body: ReadableStream<Uint8Array>): Promise<void> {
     const reader = body.getReader()
     const decoder = new TextDecoder()
-    let buffer = ''
+    let buffer = ""
 
     try {
       while (true) {
@@ -360,9 +343,9 @@ export class SSETransport implements Transport {
               if (this.seenSequenceNums.has(seqNum)) {
                 logForDebugging(
                   `SSETransport: DUPLICATE frame seq=${seqNum} (lastSequenceNum=${this.lastSequenceNum}, seenCount=${this.seenSequenceNums.size})`,
-                  { level: 'warn' },
+                  { level: "warn" },
                 )
-                logForDiagnosticsNoPII('warn', 'cli_sse_duplicate_sequence')
+                logForDiagnosticsNoPII("warn", "cli_sse_duplicate_sequence")
               } else {
                 this.seenSequenceNums.add(seqNum)
                 // Prevent unbounded growth: once we have many entries, prune
@@ -388,28 +371,22 @@ export class SSETransport implements Transport {
           } else if (frame.data) {
             // data: without event: — server is emitting the old envelope format
             // or a bug. Log so incidents show as a signal instead of silent drops.
-            logForDebugging(
-              'SSETransport: Frame has data: but no event: field — dropped',
-              { level: 'warn' },
-            )
-            logForDiagnosticsNoPII('warn', 'cli_sse_frame_missing_event_field')
+            logForDebugging("SSETransport: Frame has data: but no event: field — dropped", { level: "warn" })
+            logForDiagnosticsNoPII("warn", "cli_sse_frame_missing_event_field")
           }
         }
       }
     } catch (error) {
       if (this.abortController?.signal.aborted) return
-      logForDebugging(
-        `SSETransport: Stream read error: ${errorMessage(error)}`,
-        { level: 'error' },
-      )
-      logForDiagnosticsNoPII('error', 'cli_sse_stream_read_error')
+      logForDebugging(`SSETransport: Stream read error: ${errorMessage(error)}`, { level: "error" })
+      logForDiagnosticsNoPII("error", "cli_sse_stream_read_error")
     } finally {
       reader.releaseLock()
     }
 
     // Stream ended — reconnect unless we're closing
-    if (this.state !== 'closing' && this.state !== 'closed') {
-      logForDebugging('SSETransport: Stream ended, reconnecting')
+    if (this.state !== "closing" && this.state !== "closed") {
+      logForDebugging("SSETransport: Stream ended, reconnecting")
       this.handleConnectionError()
     }
   }
@@ -423,12 +400,9 @@ export class SSETransport implements Transport {
    * understand. Log a diagnostic so we notice in telemetry.
    */
   private handleSSEFrame(eventType: string, data: string): void {
-    if (eventType !== 'client_event') {
-      logForDebugging(
-        `SSETransport: Unexpected SSE event type '${eventType}' on worker stream`,
-        { level: 'warn' },
-      )
-      logForDiagnosticsNoPII('warn', 'cli_sse_unexpected_event_type', {
+    if (eventType !== "client_event") {
+      logForDebugging(`SSETransport: Unexpected SSE event type '${eventType}' on worker stream`, { level: "warn" })
+      logForDiagnosticsNoPII("warn", "cli_sse_unexpected_event_type", {
         event_type: eventType,
       })
       return
@@ -438,27 +412,22 @@ export class SSETransport implements Transport {
     try {
       ev = jsonParse(data) as StreamClientEvent
     } catch (error) {
-      logForDebugging(
-        `SSETransport: Failed to parse client_event data: ${errorMessage(error)}`,
-        { level: 'error' },
-      )
+      logForDebugging(`SSETransport: Failed to parse client_event data: ${errorMessage(error)}`, { level: "error" })
       return
     }
 
     const payload = ev.payload
-    if (payload && typeof payload === 'object' && 'type' in payload) {
-      const sessionLabel = this.sessionId ? ` session=${this.sessionId}` : ''
+    if (payload && typeof payload === "object" && "type" in payload) {
+      const sessionLabel = this.sessionId ? ` session=${this.sessionId}` : ""
       logForDebugging(
         `SSETransport: Event seq=${ev.sequence_num} event_id=${ev.event_id} event_type=${ev.event_type} payload_type=${String(payload.type)}${sessionLabel}`,
       )
-      logForDiagnosticsNoPII('info', 'cli_sse_message_received')
+      logForDiagnosticsNoPII("info", "cli_sse_message_received")
       // Pass the unwrapped payload as newline-delimited JSON,
       // matching the format that StructuredIO/WebSocketTransport consumers expect
-      this.onData?.(jsonStringify(payload) + '\n')
+      this.onData?.(jsonStringify(payload) + "\n")
     } else {
-      logForDebugging(
-        `SSETransport: Ignoring client_event with no type in payload: event_id=${ev.event_id}`,
-      )
+      logForDebugging(`SSETransport: Ignoring client_event with no type in payload: event_id=${ev.event_id}`)
     }
 
     this.onEventCallback?.(ev)
@@ -470,7 +439,7 @@ export class SSETransport implements Transport {
   private handleConnectionError(): void {
     this.clearLivenessTimer()
 
-    if (this.state === 'closing' || this.state === 'closed') return
+    if (this.state === "closing" || this.state === "closed") return
 
     // Abort any in-flight SSE fetch
     this.abortController?.abort()
@@ -493,10 +462,10 @@ export class SSETransport implements Transport {
       if (this.refreshHeaders) {
         const freshHeaders = this.refreshHeaders()
         Object.assign(this.headers, freshHeaders)
-        logForDebugging('SSETransport: Refreshed headers for reconnect')
+        logForDebugging("SSETransport: Refreshed headers for reconnect")
       }
 
-      this.state = 'reconnecting'
+      this.state = "reconnecting"
       this.reconnectAttempts++
 
       const baseDelay = Math.min(
@@ -504,15 +473,12 @@ export class SSETransport implements Transport {
         RECONNECT_MAX_DELAY_MS,
       )
       // Add ±25% jitter
-      const delay = Math.max(
-        0,
-        baseDelay + baseDelay * 0.25 * (2 * Math.random() - 1),
-      )
+      const delay = Math.max(0, baseDelay + baseDelay * 0.25 * (2 * Math.random() - 1))
 
       logForDebugging(
         `SSETransport: Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}, ${Math.round(elapsed / 1000)}s elapsed)`,
       )
-      logForDiagnosticsNoPII('error', 'cli_sse_reconnect_attempt', {
+      logForDiagnosticsNoPII("error", "cli_sse_reconnect_attempt", {
         reconnectAttempts: this.reconnectAttempts,
       })
 
@@ -521,15 +487,14 @@ export class SSETransport implements Transport {
         void this.connect()
       }, delay)
     } else {
-      logForDebugging(
-        `SSETransport: Reconnection time budget exhausted after ${Math.round(elapsed / 1000)}s`,
-        { level: 'error' },
-      )
-      logForDiagnosticsNoPII('error', 'cli_sse_reconnect_exhausted', {
+      logForDebugging(`SSETransport: Reconnection time budget exhausted after ${Math.round(elapsed / 1000)}s`, {
+        level: "error",
+      })
+      logForDiagnosticsNoPII("error", "cli_sse_reconnect_exhausted", {
         reconnectAttempts: this.reconnectAttempts,
         elapsedMs: elapsed,
       })
-      this.state = 'closed'
+      this.state = "closed"
       this.onCloseCallback?.()
     }
   }
@@ -541,10 +506,10 @@ export class SSETransport implements Transport {
    */
   private readonly onLivenessTimeout = (): void => {
     this.livenessTimer = null
-    logForDebugging('SSETransport: Liveness timeout, reconnecting', {
-      level: 'error',
+    logForDebugging("SSETransport: Liveness timeout, reconnecting", {
+      level: "error",
     })
-    logForDiagnosticsNoPII('error', 'cli_sse_liveness_timeout')
+    logForDiagnosticsNoPII("error", "cli_sse_liveness_timeout")
     this.abortController?.abort()
     this.handleConnectionError()
   }
@@ -572,21 +537,19 @@ export class SSETransport implements Transport {
   async write(message: StdoutMessage): Promise<void> {
     const authHeaders = this.getAuthHeaders()
     if (Object.keys(authHeaders).length === 0) {
-      logForDebugging('SSETransport: No session token available for POST')
-      logForDiagnosticsNoPII('warn', 'cli_sse_post_no_token')
+      logForDebugging("SSETransport: No session token available for POST")
+      logForDiagnosticsNoPII("warn", "cli_sse_post_no_token")
       return
     }
 
     const headers: Record<string, string> = {
       ...authHeaders,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'User-Agent': getClaudeCodeUserAgent(),
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+      "User-Agent": getClaudeCodeUserAgent(),
     }
 
-    logForDebugging(
-      `SSETransport: POST body keys=${Object.keys(message as Record<string, unknown>).join(',')}`,
-    )
+    logForDebugging(`SSETransport: POST body keys=${Object.keys(message as Record<string, unknown>).join(",")}`)
 
     for (let attempt = 1; attempt <= POST_MAX_RETRIES; attempt++) {
       try {
@@ -600,54 +563,37 @@ export class SSETransport implements Transport {
           return
         }
 
-        logForDebugging(
-          `SSETransport: POST ${response.status} body=${jsonStringify(response.data).slice(0, 200)}`,
-        )
+        logForDebugging(`SSETransport: POST ${response.status} body=${jsonStringify(response.data).slice(0, 200)}`)
         // 4xx errors (except 429) are permanent - don't retry
-        if (
-          response.status >= 400 &&
-          response.status < 500 &&
-          response.status !== 429
-        ) {
-          logForDebugging(
-            `SSETransport: POST returned ${response.status} (client error), not retrying`,
-          )
-          logForDiagnosticsNoPII('warn', 'cli_sse_post_client_error', {
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          logForDebugging(`SSETransport: POST returned ${response.status} (client error), not retrying`)
+          logForDiagnosticsNoPII("warn", "cli_sse_post_client_error", {
             status: response.status,
           })
           return
         }
 
         // 429 or 5xx - retry
-        logForDebugging(
-          `SSETransport: POST returned ${response.status}, attempt ${attempt}/${POST_MAX_RETRIES}`,
-        )
-        logForDiagnosticsNoPII('warn', 'cli_sse_post_retryable_error', {
+        logForDebugging(`SSETransport: POST returned ${response.status}, attempt ${attempt}/${POST_MAX_RETRIES}`)
+        logForDiagnosticsNoPII("warn", "cli_sse_post_retryable_error", {
           status: response.status,
           attempt,
         })
       } catch (error) {
         const axiosError = error as AxiosError
-        logForDebugging(
-          `SSETransport: POST error: ${axiosError.message}, attempt ${attempt}/${POST_MAX_RETRIES}`,
-        )
-        logForDiagnosticsNoPII('warn', 'cli_sse_post_network_error', {
+        logForDebugging(`SSETransport: POST error: ${axiosError.message}, attempt ${attempt}/${POST_MAX_RETRIES}`)
+        logForDiagnosticsNoPII("warn", "cli_sse_post_network_error", {
           attempt,
         })
       }
 
       if (attempt === POST_MAX_RETRIES) {
-        logForDebugging(
-          `SSETransport: POST failed after ${POST_MAX_RETRIES} attempts, continuing`,
-        )
-        logForDiagnosticsNoPII('warn', 'cli_sse_post_retries_exhausted')
+        logForDebugging(`SSETransport: POST failed after ${POST_MAX_RETRIES} attempts, continuing`)
+        logForDiagnosticsNoPII("warn", "cli_sse_post_retries_exhausted")
         return
       }
 
-      const delayMs = Math.min(
-        POST_BASE_DELAY_MS * Math.pow(2, attempt - 1),
-        POST_MAX_DELAY_MS,
-      )
+      const delayMs = Math.min(POST_BASE_DELAY_MS * Math.pow(2, attempt - 1), POST_MAX_DELAY_MS)
       await sleep(delayMs)
     }
   }
@@ -657,11 +603,11 @@ export class SSETransport implements Transport {
   // -----------------------------------------------------------------------
 
   isConnectedStatus(): boolean {
-    return this.state === 'connected'
+    return this.state === "connected"
   }
 
   isClosedStatus(): boolean {
-    return this.state === 'closed'
+    return this.state === "closed"
   }
 
   setOnData(callback: (data: string) => void): void {
@@ -683,7 +629,7 @@ export class SSETransport implements Transport {
     }
     this.clearLivenessTimer()
 
-    this.state = 'closing'
+    this.state = "closing"
     this.abortController?.abort()
     this.abortController = null
   }
@@ -704,8 +650,8 @@ export class SSETransport implements Transport {
 function convertSSEUrlToPostUrl(sseUrl: URL): string {
   let pathname = sseUrl.pathname
   // Remove /stream suffix to get the POST events endpoint
-  if (pathname.endsWith('/stream')) {
-    pathname = pathname.slice(0, -'/stream'.length)
+  if (pathname.endsWith("/stream")) {
+    pathname = pathname.slice(0, -"/stream".length)
   }
   return `${sseUrl.protocol}//${sseUrl.host}${pathname}`
 }

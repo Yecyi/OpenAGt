@@ -325,8 +325,7 @@ export function detect(command: string, shell?: string, options?: DangerDetector
           ? detectBashDanger(command)
           : combineDetections(detectBashDanger(command), detectPowerShellDanger(command), detectCmdDanger(command))
 
-  const allowed =
-    detection.severity === "high" ? false : detection.severity === "medium" ? !options?.strictMode : true
+  const allowed = detection.severity === "high" ? false : detection.severity === "medium" ? !options?.strictMode : true
 
   return {
     allowed,

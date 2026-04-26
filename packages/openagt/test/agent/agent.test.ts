@@ -275,8 +275,8 @@ test("native subagents have finite default step budgets", async () => {
     fn: async () => {
       const general = await load(tmp.path, (svc) => svc.get("general"))
       const explore = await load(tmp.path, (svc) => svc.get("explore"))
-      expect(general?.steps).toBe(12)
-      expect(explore?.steps).toBe(6)
+      expect(general?.steps).toBe(24)
+      expect(explore?.steps).toBe(24)
     },
   })
 })

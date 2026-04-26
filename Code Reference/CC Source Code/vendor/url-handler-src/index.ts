@@ -1,6 +1,6 @@
-import { createRequire } from 'module'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { createRequire } from "module"
+import { fileURLToPath } from "url"
+import { dirname, join } from "path"
 
 type UrlHandlerNapi = {
   waitForUrlEvent(timeoutMs: number): string | null
@@ -14,7 +14,7 @@ function loadModule(): UrlHandlerNapi | null {
   }
 
   // Only works on macOS
-  if (process.platform !== 'darwin') {
+  if (process.platform !== "darwin") {
     return null
   }
 
@@ -27,10 +27,10 @@ function loadModule(): UrlHandlerNapi | null {
       // Dev mode - load from vendor directory
       const modulePath = join(
         dirname(fileURLToPath(import.meta.url)),
-        '..',
-        'url-handler',
+        "..",
+        "url-handler",
         `${process.arch}-darwin`,
-        'url-handler.node',
+        "url-handler.node",
       )
       cachedModule = createRequire(import.meta.url)(modulePath) as UrlHandlerNapi
     }

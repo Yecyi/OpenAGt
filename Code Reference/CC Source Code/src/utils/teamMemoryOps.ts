@@ -1,6 +1,6 @@
-import { isTeamMemFile } from '../memdir/teamMemPaths.js'
-import { FILE_EDIT_TOOL_NAME } from '../tools/FileEditTool/constants.js'
-import { FILE_WRITE_TOOL_NAME } from '../tools/FileWriteTool/prompt.js'
+import { isTeamMemFile } from "../memdir/teamMemPaths.js"
+import { FILE_EDIT_TOOL_NAME } from "../tools/FileEditTool/constants.js"
+import { FILE_WRITE_TOOL_NAME } from "../tools/FileWriteTool/prompt.js"
 
 export { isTeamMemFile }
 
@@ -8,9 +8,7 @@ export { isTeamMemFile }
  * Check if a search tool use targets team memory files by examining its path.
  */
 export function isTeamMemorySearch(toolInput: unknown): boolean {
-  const input = toolInput as
-    | { path?: string; pattern?: string; glob?: string }
-    | undefined
+  const input = toolInput as { path?: string; pattern?: string; glob?: string } | undefined
   if (!input) {
     return false
   }
@@ -23,10 +21,7 @@ export function isTeamMemorySearch(toolInput: unknown): boolean {
 /**
  * Check if a Write or Edit tool use targets a team memory file.
  */
-export function isTeamMemoryWriteOrEdit(
-  toolName: string,
-  toolInput: unknown,
-): boolean {
+export function isTeamMemoryWriteOrEdit(toolName: string, toolInput: unknown): boolean {
   if (toolName !== FILE_WRITE_TOOL_NAME && toolName !== FILE_EDIT_TOOL_NAME) {
     return false
   }
@@ -54,35 +49,25 @@ export function appendTeamMemorySummaryParts(
   if (teamReadCount > 0) {
     const verb = isActive
       ? parts.length === 0
-        ? 'Recalling'
-        : 'recalling'
+        ? "Recalling"
+        : "recalling"
       : parts.length === 0
-        ? 'Recalled'
-        : 'recalled'
-    parts.push(
-      `${verb} ${teamReadCount} team ${teamReadCount === 1 ? 'memory' : 'memories'}`,
-    )
+        ? "Recalled"
+        : "recalled"
+    parts.push(`${verb} ${teamReadCount} team ${teamReadCount === 1 ? "memory" : "memories"}`)
   }
   if (teamSearchCount > 0) {
     const verb = isActive
       ? parts.length === 0
-        ? 'Searching'
-        : 'searching'
+        ? "Searching"
+        : "searching"
       : parts.length === 0
-        ? 'Searched'
-        : 'searched'
+        ? "Searched"
+        : "searched"
     parts.push(`${verb} team memories`)
   }
   if (teamWriteCount > 0) {
-    const verb = isActive
-      ? parts.length === 0
-        ? 'Writing'
-        : 'writing'
-      : parts.length === 0
-        ? 'Wrote'
-        : 'wrote'
-    parts.push(
-      `${verb} ${teamWriteCount} team ${teamWriteCount === 1 ? 'memory' : 'memories'}`,
-    )
+    const verb = isActive ? (parts.length === 0 ? "Writing" : "writing") : parts.length === 0 ? "Wrote" : "wrote"
+    parts.push(`${verb} ${teamWriteCount} team ${teamWriteCount === 1 ? "memory" : "memories"}`)
   }
 }

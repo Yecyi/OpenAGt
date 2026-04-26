@@ -1,19 +1,13 @@
-import { isEnvTruthy } from '../../utils/envUtils.js'
-import { getMaxOutputLength } from '../../utils/shell/outputLimits.js'
-import {
-  getPowerShellEdition,
-  type PowerShellEdition,
-} from '../../utils/shell/powershellDetection.js'
-import {
-  getDefaultBashTimeoutMs,
-  getMaxBashTimeoutMs,
-} from '../../utils/timeouts.js'
-import { FILE_EDIT_TOOL_NAME } from '../FileEditTool/constants.js'
-import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
-import { FILE_WRITE_TOOL_NAME } from '../FileWriteTool/prompt.js'
-import { GLOB_TOOL_NAME } from '../GlobTool/prompt.js'
-import { GREP_TOOL_NAME } from '../GrepTool/prompt.js'
-import { POWERSHELL_TOOL_NAME } from './toolName.js'
+import { isEnvTruthy } from "../../utils/envUtils.js"
+import { getMaxOutputLength } from "../../utils/shell/outputLimits.js"
+import { getPowerShellEdition, type PowerShellEdition } from "../../utils/shell/powershellDetection.js"
+import { getDefaultBashTimeoutMs, getMaxBashTimeoutMs } from "../../utils/timeouts.js"
+import { FILE_EDIT_TOOL_NAME } from "../FileEditTool/constants.js"
+import { FILE_READ_TOOL_NAME } from "../FileReadTool/prompt.js"
+import { FILE_WRITE_TOOL_NAME } from "../FileWriteTool/prompt.js"
+import { GLOB_TOOL_NAME } from "../GlobTool/prompt.js"
+import { GREP_TOOL_NAME } from "../GrepTool/prompt.js"
+import { POWERSHELL_TOOL_NAME } from "./toolName.js"
 
 export function getDefaultTimeoutMs(): number {
   return getDefaultBashTimeoutMs()
@@ -49,7 +43,7 @@ function getSleepGuidance(): string | null {
  * pwsh-7 syntax on 5.1 (parser error → exit 1) or needlessly avoids && on 7.
  */
 function getEditionSection(edition: PowerShellEdition | null): string {
-  if (edition === 'desktop') {
+  if (edition === "desktop") {
     return `PowerShell edition: Windows PowerShell 5.1 (powershell.exe)
    - Pipeline chain operators \`&&\` and \`||\` are NOT available — they cause a parser error. To run B only if A succeeds: \`A; if ($?) { B }\`. To chain unconditionally: \`A; B\`.
    - Ternary (\`?:\`), null-coalescing (\`??\`), and null-conditional (\`?.\`) operators are NOT available. Use \`if/else\` and explicit \`$null -eq\` checks instead.
@@ -57,7 +51,7 @@ function getEditionSection(edition: PowerShellEdition | null): string {
    - Default file encoding is UTF-16 LE (with BOM). When writing files other tools will read, pass \`-Encoding utf8\` to \`Out-File\`/\`Set-Content\`.
    - \`ConvertFrom-Json\` returns a PSCustomObject, not a hashtable. \`-AsHashtable\` is not available.`
   }
-  if (edition === 'core') {
+  if (edition === "core") {
     return `PowerShell edition: PowerShell 7+ (pwsh)
    - Pipeline chain operators \`&&\` and \`||\` ARE available and work like bash. Prefer \`cmd1 && cmd2\` over \`cmd1; cmd2\` when cmd2 should only run if cmd1 succeeds.
    - Ternary (\`$cond ? $a : $b\`), null-coalescing (\`??\`), and null-conditional (\`?.\`) operators are available.
@@ -123,7 +117,7 @@ Usage notes:
   - You can specify an optional timeout in milliseconds (up to ${getMaxTimeoutMs()}ms / ${getMaxTimeoutMs() / 60000} minutes). If not specified, commands will timeout after ${getDefaultTimeoutMs()}ms (${getDefaultTimeoutMs() / 60000} minutes).
   - It is very helpful if you write a clear, concise description of what this command does.
   - If the output exceeds ${getMaxOutputLength()} characters, output will be truncated before being returned to you.
-${backgroundNote ? backgroundNote + '\n' : ''}\
+${backgroundNote ? backgroundNote + "\n" : ""}\
   - Avoid using PowerShell to run commands that have dedicated tools, unless explicitly instructed:
     - File search: Use ${GLOB_TOOL_NAME} (NOT Get-ChildItem -Recurse)
     - Content search: Use ${GREP_TOOL_NAME} (NOT Select-String)
@@ -137,7 +131,7 @@ ${backgroundNote ? backgroundNote + '\n' : ''}\
     - Use \`;\` only when you need to run commands sequentially but don't care if earlier commands fail.
     - DO NOT use newlines to separate commands (newlines are ok in quoted strings and here-strings)
   - Do NOT prefix commands with \`cd\` or \`Set-Location\` -- the working directory is already set to the correct project directory automatically.
-${sleepGuidance ? sleepGuidance + '\n' : ''}\
+${sleepGuidance ? sleepGuidance + "\n" : ""}\
   - For git commands:
     - Prefer to create a new commit rather than amending an existing commit.
     - Before running destructive operations (e.g., git reset --hard, git push --force, git checkout --), consider whether there is a safer alternative that achieves the same goal. Only use destructive operations when they are truly the best approach.

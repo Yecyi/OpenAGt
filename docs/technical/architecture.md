@@ -30,15 +30,15 @@ flowchart LR
   B --> B3["Coordinator + personal-agent backend"]
 ```
 
-| Topic | OpenCode | OpenAGt |
-| --- | --- | --- |
-| Architectural emphasis | TUI-first coding agent with explicit client/server architecture | Backend-first runtime where CLI, TUI, server, and SDK are clients of the same session engine |
-| Session model | Interactive coding agent loop with built-in agent modes | Persistent session runtime with prompt assembly, compaction, memory, and tool scheduling in one loop |
-| Tooling emphasis | Official docs emphasize LSP, agent modes, provider choice, and terminal workflows | Local runtime emphasizes tool mediation across file I/O, shell, MCP, LSP, tasking, and safety metadata |
-| Safety / approvals | Permission prompts are part of the user-facing agent flow | Safety is modeled as a first-class backend layer with approval kinds, policy sources, and boundary metadata |
-| Multi-step orchestration | Subagent support is part of the coding workflow | Coordinator Runtime v1 turns work into task graphs with dependency checks, write scopes, verify stages, and dispatch |
-| Long-running agent state | README emphasis is remote-driving and terminal workflows | Personal Agent Core adds durable profile/workspace/session memory, inbox items, scheduled wakeups, and synthesis |
-| Client surfaces | TUI-first, client/server, desktop beta | CLI/TUI, headless server, SSE, generated JS SDK, and deferred Flutter frontend |
+| Topic                    | OpenCode                                                                          | OpenAGt                                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Architectural emphasis   | TUI-first coding agent with explicit client/server architecture                   | Backend-first runtime where CLI, TUI, server, and SDK are clients of the same session engine                         |
+| Session model            | Interactive coding agent loop with built-in agent modes                           | Persistent session runtime with prompt assembly, compaction, memory, and tool scheduling in one loop                 |
+| Tooling emphasis         | Official docs emphasize LSP, agent modes, provider choice, and terminal workflows | Local runtime emphasizes tool mediation across file I/O, shell, MCP, LSP, tasking, and safety metadata               |
+| Safety / approvals       | Permission prompts are part of the user-facing agent flow                         | Safety is modeled as a first-class backend layer with approval kinds, policy sources, and boundary metadata          |
+| Multi-step orchestration | Subagent support is part of the coding workflow                                   | Coordinator Runtime v1 turns work into task graphs with dependency checks, write scopes, verify stages, and dispatch |
+| Long-running agent state | README emphasis is remote-driving and terminal workflows                          | Personal Agent Core adds durable profile/workspace/session memory, inbox items, scheduled wakeups, and synthesis     |
+| Client surfaces          | TUI-first, client/server, desktop beta                                            | CLI/TUI, headless server, SSE, generated JS SDK, and deferred Flutter frontend                                       |
 
 ## System Overview
 
@@ -210,12 +210,12 @@ flowchart TD
 
 Effort semantics:
 
-| Effort | Runtime behavior |
-| --- | --- |
-| `low` | Fast path with minimal review and no forced timeline |
-| `medium` | Standard path with critical review of key conclusions and final output |
-| `high` | Multi-round planning, multi-expert lanes, reducer/reviewer, and critical-path revise gates |
-| `deep` | Long-task mode with todo timeline, full artifact review, checkpoint synthesis, and larger adaptive ceilings |
+| Effort   | Runtime behavior                                                                                            |
+| -------- | ----------------------------------------------------------------------------------------------------------- |
+| `low`    | Fast path with minimal review and no forced timeline                                                        |
+| `medium` | Standard path with critical review of key conclusions and final output                                      |
+| `high`   | Multi-round planning, multi-expert lanes, reducer/reviewer, and critical-path revise gates                  |
+| `deep`   | Long-task mode with todo timeline, full artifact review, checkpoint synthesis, and larger adaptive ceilings |
 
 Long-task runs add these projection fields for UI, SDK, and future Flutter clients:
 
@@ -343,29 +343,29 @@ sequenceDiagram
 
 ## Verification Matrix
 
-| Capability | Status |
-| --- | --- |
-| Session runtime and tool loop | stable in v1.16 |
-| Approval and Safety Envelope with `shell_safety.version` | stable in v1.16 |
-| Windows signed-GA release policy | stable in v1.16 when signing secrets are configured |
-| Packaged binary smoke tests | stable in v1.16 |
-| `openagt debug doctor` and `debug bundle` | stable in v1.16 |
-| Coordinator Runtime projection and dispatch | stable in v1.16 for graph projection, duplicate-id rejection, retry, and cancellation |
-| Dynamic Expert Runtime `effort`, long-task timeline, adaptive budget, checkpoint projection | implemented for v1.2 backend contracts |
-| Personal Agent inbox and memory primitives | implemented; backend contracts stabilized in v1.16 |
-| SSE EventEnvelope | stable in v1.16 |
-| JavaScript SDK runtime helpers | stable in v1.16; extended for Dynamic Expert Runtime projection |
-| Flutter control panel | roadmap; backend contracts only in v1.16 |
+| Capability                                                                                  | Status                                                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Session runtime and tool loop                                                               | stable in v1.16                                                                       |
+| Approval and Safety Envelope with `shell_safety.version`                                    | stable in v1.16                                                                       |
+| Windows signed-GA release policy                                                            | stable in v1.16 when signing secrets are configured                                   |
+| Packaged binary smoke tests                                                                 | stable in v1.16                                                                       |
+| `openagt debug doctor` and `debug bundle`                                                   | stable in v1.16                                                                       |
+| Coordinator Runtime projection and dispatch                                                 | stable in v1.16 for graph projection, duplicate-id rejection, retry, and cancellation |
+| Dynamic Expert Runtime `effort`, long-task timeline, adaptive budget, checkpoint projection | implemented for v1.2 backend contracts                                                |
+| Personal Agent inbox and memory primitives                                                  | implemented; backend contracts stabilized in v1.16                                    |
+| SSE EventEnvelope                                                                           | stable in v1.16                                                                       |
+| JavaScript SDK runtime helpers                                                              | stable in v1.16; extended for Dynamic Expert Runtime projection                       |
+| Flutter control panel                                                                       | roadmap; backend contracts only in v1.16                                              |
 
 ## Repository Map
 
-| Path | Role |
-| --- | --- |
-| `packages/openagt` | Core runtime, tools, providers, CLI, server |
-| `packages/app` | Web client |
-| `packages/sdk/js` | Generated JavaScript SDK |
-| `packages/openagt_flutter` | Flutter MVP |
-| `packages/console/*` | Control-plane packages |
+| Path                       | Role                                        |
+| -------------------------- | ------------------------------------------- |
+| `packages/openagt`         | Core runtime, tools, providers, CLI, server |
+| `packages/app`             | Web client                                  |
+| `packages/sdk/js`          | Generated JavaScript SDK                    |
+| `packages/openagt_flutter` | Flutter MVP                                 |
+| `packages/console/*`       | Control-plane packages                      |
 
 ## Release Architecture
 

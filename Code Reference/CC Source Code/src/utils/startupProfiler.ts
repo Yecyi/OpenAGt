@@ -9,17 +9,17 @@
  * Uses Node.js built-in performance hooks API for standard timing measurement.
  */
 
-import { dirname, join } from 'path'
-import { getSessionId } from 'src/bootstrap/state.js'
+import { dirname, join } from "path"
+import { getSessionId } from "src/bootstrap/state.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import { logForDebugging } from './debug.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
-import { getFsImplementation } from './fsOperations.js'
-import { formatMs, formatTimelineLine, getPerformance } from './profilerBase.js'
-import { writeFileSync_DEPRECATED } from './slowOperations.js'
+} from "../services/analytics/index.js"
+import { logForDebugging } from "./debug.js"
+import { getClaudeConfigHomeDir, isEnvTruthy } from "./envUtils.js"
+import { getFsImplementation } from "./fsOperations.js"
+import { formatMs, formatTimelineLine, getPerformance } from "./profilerBase.js"
+import { writeFileSync_DEPRECATED } from "./slowOperations.js"
 
 // Module-level state - decided once at module load
 // eslint-disable-next-line custom-rules/no-process-env-top-level
@@ -29,8 +29,7 @@ const DETAILED_PROFILING = isEnvTruthy(process.env.CLAUDE_CODE_PROFILE_STARTUP)
 // Decision made once at startup - non-sampled users pay no profiling cost
 const STATSIG_SAMPLE_RATE = 0.005
 // eslint-disable-next-line custom-rules/no-process-env-top-level
-const STATSIG_LOGGING_SAMPLED =
-  process.env.USER_TYPE === 'ant' || Math.random() < STATSIG_SAMPLE_RATE
+const STATSIG_LOGGING_SAMPLED = process.env.USER_TYPE === "ant" || Math.random() < STATSIG_SAMPLE_RATE
 
 // Enable profiling if either detailed mode OR sampled for Statsig
 const SHOULD_PROFILE = DETAILED_PROFILING || STATSIG_LOGGING_SAMPLED
@@ -47,16 +46,16 @@ const memorySnapshots: NodeJS.MemoryUsage[] = []
 
 // Phase definitions for Statsig logging: [startCheckpoint, endCheckpoint]
 const PHASE_DEFINITIONS = {
-  import_time: ['cli_entry', 'main_tsx_imports_loaded'],
-  init_time: ['init_function_start', 'init_function_end'],
-  settings_time: ['eagerLoadSettings_start', 'eagerLoadSettings_end'],
-  total_time: ['cli_entry', 'main_after_run'],
+  import_time: ["cli_entry", "main_tsx_imports_loaded"],
+  init_time: ["init_function_start", "init_function_end"],
+  settings_time: ["eagerLoadSettings_start", "eagerLoadSettings_end"],
+  total_time: ["cli_entry", "main_after_run"],
 } as const
 
 // Record initial checkpoint if profiling is enabled
 if (SHOULD_PROFILE) {
   // eslint-disable-next-line custom-rules/no-top-level-side-effects
-  profileCheckpoint('profiler_initialized')
+  profileCheckpoint("profiler_initialized")
 }
 
 /**
@@ -80,42 +79,33 @@ export function profileCheckpoint(name: string): void {
  */
 function getReport(): string {
   if (!DETAILED_PROFILING) {
-    return 'Startup profiling not enabled'
+    return "Startup profiling not enabled"
   }
 
   const perf = getPerformance()
-  const marks = perf.getEntriesByType('mark')
+  const marks = perf.getEntriesByType("mark")
   if (marks.length === 0) {
-    return 'No profiling checkpoints recorded'
+    return "No profiling checkpoints recorded"
   }
 
   const lines: string[] = []
-  lines.push('='.repeat(80))
-  lines.push('STARTUP PROFILING REPORT')
-  lines.push('='.repeat(80))
-  lines.push('')
+  lines.push("=".repeat(80))
+  lines.push("STARTUP PROFILING REPORT")
+  lines.push("=".repeat(80))
+  lines.push("")
 
   let prevTime = 0
   for (const [i, mark] of marks.entries()) {
-    lines.push(
-      formatTimelineLine(
-        mark.startTime,
-        mark.startTime - prevTime,
-        mark.name,
-        memorySnapshots[i],
-        8,
-        7,
-      ),
-    )
+    lines.push(formatTimelineLine(mark.startTime, mark.startTime - prevTime, mark.name, memorySnapshots[i], 8, 7))
     prevTime = mark.startTime
   }
 
   const lastMark = marks[marks.length - 1]
-  lines.push('')
+  lines.push("")
   lines.push(`Total startup time: ${formatMs(lastMark?.startTime ?? 0)}ms`)
-  lines.push('='.repeat(80))
+  lines.push("=".repeat(80))
 
-  return lines.join('\n')
+  return lines.join("\n")
 }
 
 let reported = false
@@ -135,11 +125,11 @@ export function profileReport(): void {
     const fs = getFsImplementation()
     fs.mkdirSync(dir)
     writeFileSync_DEPRECATED(path, getReport(), {
-      encoding: 'utf8',
+      encoding: "utf8",
       flush: true,
     })
 
-    logForDebugging('Startup profiling report:')
+    logForDebugging("Startup profiling report:")
     logForDebugging(getReport())
   }
 }
@@ -149,7 +139,7 @@ export function isDetailedProfilingEnabled(): boolean {
 }
 
 export function getStartupPerfLogPath(): string {
-  return join(getClaudeConfigHomeDir(), 'startup-perf', `${getSessionId()}.txt`)
+  return join(getClaudeConfigHomeDir(), "startup-perf", `${getSessionId()}.txt`)
 }
 
 /**
@@ -161,7 +151,7 @@ export function logStartupPerf(): void {
   if (!STATSIG_LOGGING_SAMPLED) return
 
   const perf = getPerformance()
-  const marks = perf.getEntriesByType('mark')
+  const marks = perf.getEntriesByType("mark")
   if (marks.length === 0) return
 
   // Build checkpoint lookup
@@ -173,9 +163,7 @@ export function logStartupPerf(): void {
   // Compute phase durations
   const metadata: Record<string, number | undefined> = {}
 
-  for (const [phaseName, [startCheckpoint, endCheckpoint]] of Object.entries(
-    PHASE_DEFINITIONS,
-  )) {
+  for (const [phaseName, [startCheckpoint, endCheckpoint]] of Object.entries(PHASE_DEFINITIONS)) {
     const startTime = checkpointTimes.get(startCheckpoint)
     const endTime = checkpointTimes.get(endCheckpoint)
 
@@ -187,8 +175,5 @@ export function logStartupPerf(): void {
   // Add checkpoint count for debugging
   metadata.checkpoint_count = marks.length
 
-  logEvent(
-    'tengu_startup_perf',
-    metadata as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  )
+  logEvent("tengu_startup_perf", metadata as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
 }

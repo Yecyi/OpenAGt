@@ -1,14 +1,11 @@
-import type { ChildProcess } from 'child_process'
-import { stat } from 'fs/promises'
-import type { Readable } from 'stream'
-import treeKill from 'tree-kill'
-import { generateTaskId } from '../Task.js'
-import { formatDuration } from './format.js'
-import {
-  MAX_TASK_OUTPUT_BYTES,
-  MAX_TASK_OUTPUT_BYTES_DISPLAY,
-} from './task/diskOutput.js'
-import { TaskOutput } from './task/TaskOutput.js'
+import type { ChildProcess } from "child_process"
+import { stat } from "fs/promises"
+import type { Readable } from "stream"
+import treeKill from "tree-kill"
+import { generateTaskId } from "../Task.js"
+import { formatDuration } from "./format.js"
+import { MAX_TASK_OUTPUT_BYTES, MAX_TASK_OUTPUT_BYTES_DISPLAY } from "./task/diskOutput.js"
+import { TaskOutput } from "./task/TaskOutput.js"
 
 export type ExecResult = {
   stdout: string
@@ -33,15 +30,13 @@ export type ShellCommand = {
   background: (backgroundTaskId: string) => boolean
   result: Promise<ExecResult>
   kill: () => void
-  status: 'running' | 'backgrounded' | 'completed' | 'killed'
+  status: "running" | "backgrounded" | "completed" | "killed"
   /**
    * Cleans up stream resources (event listeners).
    * Should be called after the command completes or is killed to prevent memory leaks.
    */
   cleanup: () => void
-  onTimeout?: (
-    callback: (backgroundFn: (taskId: string) => boolean) => void,
-  ) => void
+  onTimeout?: (callback: (backgroundFn: (taskId: string) => boolean) => void) => void
   /** The TaskOutput instance that owns all stdout/stderr data and progress. */
   taskOutput: TaskOutput
 }
@@ -75,12 +70,12 @@ class StreamWrapper {
     this.#taskOutput = taskOutput
     this.#isStderr = isStderr
     // Emit strings instead of Buffers - avoids repeated .toString() calls
-    stream.setEncoding('utf-8')
-    stream.on('data', this.#onData)
+    stream.setEncoding("utf-8")
+    stream.on("data", this.#onData)
   }
 
   #dataHandler(data: Buffer | string): void {
-    const str = typeof data === 'string' ? data : data.toString()
+    const str = typeof data === "string" ? data : data.toString()
 
     if (this.#isStderr) {
       this.#taskOutput!.writeStderr(str)
@@ -94,7 +89,7 @@ class StreamWrapper {
       return
     }
     this.#isCleanedUp = true
-    this.#stream!.removeListener('data', this.#onData)
+    this.#stream!.removeListener("data", this.#onData)
     // Release references so the stream, its StringDecoder, and
     // the TaskOutput can be GC'd independently of this wrapper.
     this.#stream = null
@@ -112,7 +107,7 @@ class StreamWrapper {
  * For hooks: pipe mode with StreamWrappers for real-time detection.
  */
 class ShellCommandImpl implements ShellCommand {
-  #status: 'running' | 'backgrounded' | 'completed' | 'killed' = 'running'
+  #status: "running" | "backgrounded" | "completed" | "killed" = "running"
   #backgroundTaskId: string | undefined
   #stdoutWrapper: StreamWrapper | null
   #stderrWrapper: StreamWrapper | null
@@ -122,9 +117,7 @@ class ShellCommandImpl implements ShellCommand {
   #killedForSize = false
   #maxOutputBytes: number
   #abortSignal: AbortSignal
-  #onTimeoutCallback:
-    | ((backgroundFn: (taskId: string) => boolean) => void)
-    | undefined
+  #onTimeoutCallback: ((backgroundFn: (taskId: string) => boolean) => void) | undefined
   #timeout: number
   #shouldAutoBackground: boolean
   #resultResolver: ((result: ExecResult) => void) | null = null
@@ -141,9 +134,7 @@ class ShellCommandImpl implements ShellCommand {
   }
 
   readonly result: Promise<ExecResult>
-  readonly onTimeout?: (
-    callback: (backgroundFn: (taskId: string) => boolean) => void,
-  ) => void
+  readonly onTimeout?: (callback: (backgroundFn: (taskId: string) => boolean) => void) => void
 
   constructor(
     childProcess: ChildProcess,
@@ -163,12 +154,8 @@ class ShellCommandImpl implements ShellCommand {
     // In file mode (bash commands), both stdout and stderr go to the
     // output file fd — childProcess.stdout/.stderr are both null.
     // In pipe mode (hooks), wrap streams to funnel data into TaskOutput.
-    this.#stderrWrapper = childProcess.stderr
-      ? new StreamWrapper(childProcess.stderr, taskOutput, true)
-      : null
-    this.#stdoutWrapper = childProcess.stdout
-      ? new StreamWrapper(childProcess.stdout, taskOutput, false)
-      : null
+    this.#stderrWrapper = childProcess.stderr ? new StreamWrapper(childProcess.stderr, taskOutput, true) : null
+    this.#stdoutWrapper = childProcess.stdout ? new StreamWrapper(childProcess.stdout, taskOutput, false) : null
 
     if (shouldAutoBackground) {
       this.onTimeout = (callback): void => {
@@ -179,26 +166,21 @@ class ShellCommandImpl implements ShellCommand {
     this.result = this.#createResultPromise()
   }
 
-  get status(): 'running' | 'backgrounded' | 'completed' | 'killed' {
+  get status(): "running" | "backgrounded" | "completed" | "killed" {
     return this.#status
   }
 
   #abortHandler(): void {
     // On 'interrupt' (user submitted a new message), don't kill — let the
     // caller background the process so the model can see partial output.
-    if (this.#abortSignal.reason === 'interrupt') {
+    if (this.#abortSignal.reason === "interrupt") {
       return
     }
     this.kill()
   }
 
   #exitHandler(code: number | null, signal: NodeJS.Signals | null): void {
-    const exitCode =
-      code !== null && code !== undefined
-        ? code
-        : signal === 'SIGTERM'
-          ? 144
-          : 1
+    const exitCode = code !== null && code !== undefined ? code : signal === "SIGTERM" ? 144 : 1
     this.#resolveExitCode(exitCode)
   }
 
@@ -224,7 +206,7 @@ class ShellCommandImpl implements ShellCommand {
     }
     const boundAbortHandler = this.#boundAbortHandler
     if (boundAbortHandler) {
-      this.#abortSignal.removeEventListener('abort', boundAbortHandler)
+      this.#abortSignal.removeEventListener("abort", boundAbortHandler)
       this.#boundAbortHandler = null
     }
   }
@@ -239,14 +221,10 @@ class ShellCommandImpl implements ShellCommand {
   #startSizeWatchdog(): void {
     this.#sizeWatchdog = setInterval(() => {
       void stat(this.taskOutput.path).then(
-        s => {
+        (s) => {
           // Bail if the watchdog was cleared while this stat was in flight
           // (process exited on its own) — otherwise we'd mislabel stderr.
-          if (
-            s.size > this.#maxOutputBytes &&
-            this.#status === 'backgrounded' &&
-            this.#sizeWatchdog !== null
-          ) {
+          if (s.size > this.#maxOutputBytes && this.#status === "backgrounded" && this.#sizeWatchdog !== null) {
             this.#killedForSize = true
             this.#clearSizeWatchdog()
             this.#doKill(SIGKILL)
@@ -262,27 +240,23 @@ class ShellCommandImpl implements ShellCommand {
 
   #createResultPromise(): Promise<ExecResult> {
     this.#boundAbortHandler = this.#abortHandler.bind(this)
-    this.#abortSignal.addEventListener('abort', this.#boundAbortHandler, {
+    this.#abortSignal.addEventListener("abort", this.#boundAbortHandler, {
       once: true,
     })
 
     // Use 'exit' not 'close': 'close' waits for stdio to close, which includes
     // grandchild processes that inherit file descriptors (e.g. `sleep 30 &`).
     // 'exit' fires when the shell itself exits, returning control immediately.
-    this.#childProcess.once('exit', this.#exitHandler.bind(this))
-    this.#childProcess.once('error', this.#errorHandler.bind(this))
+    this.#childProcess.once("exit", this.#exitHandler.bind(this))
+    this.#childProcess.once("error", this.#errorHandler.bind(this))
 
-    this.#timeoutId = setTimeout(
-      ShellCommandImpl.#handleTimeout,
-      this.#timeout,
-      this,
-    ) as NodeJS.Timeout
+    this.#timeoutId = setTimeout(ShellCommandImpl.#handleTimeout, this.#timeout, this) as NodeJS.Timeout
 
-    const exitPromise = new Promise<number>(resolve => {
+    const exitPromise = new Promise<number>((resolve) => {
       this.#exitCodeResolver = resolve
     })
 
-    return new Promise<ExecResult>(resolve => {
+    return new Promise<ExecResult>((resolve) => {
       this.#resultResolver = resolve
       void exitPromise.then(this.#handleExit.bind(this))
     })
@@ -290,8 +264,8 @@ class ShellCommandImpl implements ShellCommand {
 
   async #handleExit(code: number): Promise<void> {
     this.#cleanupListeners()
-    if (this.#status === 'running' || this.#status === 'backgrounded') {
-      this.#status = 'completed'
+    if (this.#status === "running" || this.#status === "backgrounded") {
+      this.#status = "completed"
     }
 
     const stdout = await this.taskOutput.getStdout()
@@ -321,10 +295,7 @@ class ShellCommandImpl implements ShellCommand {
         result.stderr,
       )
     } else if (code === SIGTERM) {
-      result.stderr = prependStderr(
-        `Command timed out after ${formatDuration(this.#timeout)}`,
-        result.stderr,
-      )
+      result.stderr = prependStderr(`Command timed out after ${formatDuration(this.#timeout)}`, result.stderr)
     }
 
     const resultResolver = this.#resultResolver
@@ -335,9 +306,9 @@ class ShellCommandImpl implements ShellCommand {
   }
 
   #doKill(code?: number): void {
-    this.#status = 'killed'
+    this.#status = "killed"
     if (this.#childProcess.pid) {
-      treeKill(this.#childProcess.pid, 'SIGKILL')
+      treeKill(this.#childProcess.pid, "SIGKILL")
     }
     this.#resolveExitCode(code ?? SIGKILL)
   }
@@ -347,9 +318,9 @@ class ShellCommandImpl implements ShellCommand {
   }
 
   background(taskId: string): boolean {
-    if (this.#status === 'running') {
+    if (this.#status === "running") {
       this.#backgroundTaskId = taskId
-      this.#status = 'backgrounded'
+      this.#status = "backgrounded"
       this.#cleanupListeners()
       if (this.taskOutput.stdoutToFile) {
         // File mode: child writes directly to the fd with no JS involvement.
@@ -392,34 +363,23 @@ export function wrapSpawn(
   shouldAutoBackground = false,
   maxOutputBytes = MAX_TASK_OUTPUT_BYTES,
 ): ShellCommand {
-  return new ShellCommandImpl(
-    childProcess,
-    abortSignal,
-    timeout,
-    taskOutput,
-    shouldAutoBackground,
-    maxOutputBytes,
-  )
+  return new ShellCommandImpl(childProcess, abortSignal, timeout, taskOutput, shouldAutoBackground, maxOutputBytes)
 }
 
 /**
  * Static ShellCommand implementation for commands that were aborted before execution.
  */
 class AbortedShellCommand implements ShellCommand {
-  readonly status = 'killed' as const
+  readonly status = "killed" as const
   readonly result: Promise<ExecResult>
   readonly taskOutput: TaskOutput
 
-  constructor(opts?: {
-    backgroundTaskId?: string
-    stderr?: string
-    code?: number
-  }) {
-    this.taskOutput = new TaskOutput(generateTaskId('local_bash'), null)
+  constructor(opts?: { backgroundTaskId?: string; stderr?: string; code?: number }) {
+    this.taskOutput = new TaskOutput(generateTaskId("local_bash"), null)
     this.result = Promise.resolve({
       code: opts?.code ?? 145,
-      stdout: '',
-      stderr: opts?.stderr ?? 'Command aborted before execution',
+      stdout: "",
+      stderr: opts?.stderr ?? "Command aborted before execution",
       interrupted: true,
       backgroundTaskId: opts?.backgroundTaskId,
     })
@@ -445,12 +405,12 @@ export function createAbortedCommand(
 }
 
 export function createFailedCommand(preSpawnError: string): ShellCommand {
-  const taskOutput = new TaskOutput(generateTaskId('local_bash'), null)
+  const taskOutput = new TaskOutput(generateTaskId("local_bash"), null)
   return {
-    status: 'completed' as const,
+    status: "completed" as const,
     result: Promise.resolve({
       code: 1,
-      stdout: '',
+      stdout: "",
       stderr: preSpawnError,
       interrupted: false,
       preSpawnError,

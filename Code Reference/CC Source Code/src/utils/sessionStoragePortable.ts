@@ -6,12 +6,12 @@
  * extension (packages/claude-vscode/src/common-host/sessionStorage.ts).
  */
 
-import type { UUID } from 'crypto'
-import { open as fsOpen, readdir, realpath, stat } from 'fs/promises'
-import { join } from 'path'
-import { getClaudeConfigHomeDir } from './envUtils.js'
-import { getWorktreePathsPortable } from './getWorktreePathsPortable.js'
-import { djb2Hash } from './hash.js'
+import type { UUID } from "crypto"
+import { open as fsOpen, readdir, realpath, stat } from "fs/promises"
+import { join } from "path"
+import { getClaudeConfigHomeDir } from "./envUtils.js"
+import { getWorktreePathsPortable } from "./getWorktreePathsPortable.js"
+import { djb2Hash } from "./hash.js"
 
 /** Size of the head/tail buffer for lite metadata reads. */
 export const LITE_READ_BUF_SIZE = 65536
@@ -20,11 +20,10 @@ export const LITE_READ_BUF_SIZE = 65536
 // UUID validation
 // ---------------------------------------------------------------------------
 
-const uuidRegex =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function validateUuid(maybeUuid: unknown): UUID | null {
-  if (typeof maybeUuid !== 'string') return null
+  if (typeof maybeUuid !== "string") return null
   return uuidRegex.test(maybeUuid) ? (maybeUuid as UUID) : null
 }
 
@@ -37,7 +36,7 @@ export function validateUuid(maybeUuid: unknown): UUID | null {
  * Only allocates a new string when escape sequences are present.
  */
 export function unescapeJsonString(raw: string): string {
-  if (!raw.includes('\\')) return raw
+  if (!raw.includes("\\")) return raw
   try {
     return JSON.parse(`"${raw}"`)
   } catch {
@@ -50,10 +49,7 @@ export function unescapeJsonString(raw: string): string {
  * Looks for `"key":"value"` or `"key": "value"` patterns.
  * Returns the first match, or undefined if not found.
  */
-export function extractJsonStringField(
-  text: string,
-  key: string,
-): string | undefined {
+export function extractJsonStringField(text: string, key: string): string | undefined {
   const patterns = [`"${key}":"`, `"${key}": "`]
   for (const pattern of patterns) {
     const idx = text.indexOf(pattern)
@@ -62,7 +58,7 @@ export function extractJsonStringField(
     const valueStart = idx + pattern.length
     let i = valueStart
     while (i < text.length) {
-      if (text[i] === '\\') {
+      if (text[i] === "\\") {
         i += 2
         continue
       }
@@ -79,10 +75,7 @@ export function extractJsonStringField(
  * Like extractJsonStringField but finds the LAST occurrence.
  * Useful for fields that are appended (customTitle, tag, etc.).
  */
-export function extractLastJsonStringField(
-  text: string,
-  key: string,
-): string | undefined {
+export function extractLastJsonStringField(text: string, key: string): string | undefined {
   const patterns = [`"${key}":"`, `"${key}": "`]
   let lastValue: string | undefined
   for (const pattern of patterns) {
@@ -94,7 +87,7 @@ export function extractLastJsonStringField(
       const valueStart = idx + pattern.length
       let i = valueStart
       while (i < text.length) {
-        if (text[i] === '\\') {
+        if (text[i] === "\\") {
           i += 2
           continue
         }
@@ -120,8 +113,7 @@ export function extractLastJsonStringField(
  * starts with a lowercase XML-like tag (IDE context, hook output, task
  * notifications, channel messages, etc.) or a synthetic interrupt marker.
  */
-const SKIP_FIRST_PROMPT_PATTERN =
-  /^(?:\s*<[a-z][\w-]*[\s>]|\[Request interrupted by user[^\]]*\])/
+const SKIP_FIRST_PROMPT_PATTERN = /^(?:\s*<[a-z][\w-]*[\s>]|\[Request interrupted by user[^\]]*\])/
 
 const COMMAND_NAME_RE = /<command-name>(.*?)<\/command-name>/
 
@@ -134,45 +126,38 @@ const COMMAND_NAME_RE = /<command-name>(.*?)<\/command-name>/
  */
 export function extractFirstPromptFromHead(head: string): string {
   let start = 0
-  let commandFallback = ''
+  let commandFallback = ""
   while (start < head.length) {
-    const newlineIdx = head.indexOf('\n', start)
-    const line =
-      newlineIdx >= 0 ? head.slice(start, newlineIdx) : head.slice(start)
+    const newlineIdx = head.indexOf("\n", start)
+    const line = newlineIdx >= 0 ? head.slice(start, newlineIdx) : head.slice(start)
     start = newlineIdx >= 0 ? newlineIdx + 1 : head.length
 
-    if (!line.includes('"type":"user"') && !line.includes('"type": "user"'))
-      continue
+    if (!line.includes('"type":"user"') && !line.includes('"type": "user"')) continue
     if (line.includes('"tool_result"')) continue
-    if (line.includes('"isMeta":true') || line.includes('"isMeta": true'))
-      continue
-    if (
-      line.includes('"isCompactSummary":true') ||
-      line.includes('"isCompactSummary": true')
-    )
-      continue
+    if (line.includes('"isMeta":true') || line.includes('"isMeta": true')) continue
+    if (line.includes('"isCompactSummary":true') || line.includes('"isCompactSummary": true')) continue
 
     try {
       const entry = JSON.parse(line) as Record<string, unknown>
-      if (entry.type !== 'user') continue
+      if (entry.type !== "user") continue
 
       const message = entry.message as Record<string, unknown> | undefined
       if (!message) continue
 
       const content = message.content
       const texts: string[] = []
-      if (typeof content === 'string') {
+      if (typeof content === "string") {
         texts.push(content)
       } else if (Array.isArray(content)) {
         for (const block of content as Record<string, unknown>[]) {
-          if (block.type === 'text' && typeof block.text === 'string') {
+          if (block.type === "text" && typeof block.text === "string") {
             texts.push(block.text as string)
           }
         }
       }
 
       for (const raw of texts) {
-        let result = raw.replace(/\n/g, ' ').trim()
+        let result = raw.replace(/\n/g, " ").trim()
         if (!result) continue
 
         // Skip slash-command messages but remember first as fallback
@@ -189,7 +174,7 @@ export function extractFirstPromptFromHead(head: string): string {
         if (SKIP_FIRST_PROMPT_PATTERN.test(result)) continue
 
         if (result.length > 200) {
-          result = result.slice(0, 200).trim() + '\u2026'
+          result = result.slice(0, 200).trim() + "\u2026"
         }
         return result
       }
@@ -198,7 +183,7 @@ export function extractFirstPromptFromHead(head: string): string {
     }
   }
   if (commandFallback) return commandFallback
-  return ''
+  return ""
 }
 
 // ---------------------------------------------------------------------------
@@ -218,18 +203,18 @@ export async function readHeadAndTail(
   buf: Buffer,
 ): Promise<{ head: string; tail: string }> {
   try {
-    const fh = await fsOpen(filePath, 'r')
+    const fh = await fsOpen(filePath, "r")
     try {
       const headResult = await fh.read(buf, 0, LITE_READ_BUF_SIZE, 0)
-      if (headResult.bytesRead === 0) return { head: '', tail: '' }
+      if (headResult.bytesRead === 0) return { head: "", tail: "" }
 
-      const head = buf.toString('utf8', 0, headResult.bytesRead)
+      const head = buf.toString("utf8", 0, headResult.bytesRead)
 
       const tailOffset = Math.max(0, fileSize - LITE_READ_BUF_SIZE)
       let tail = head
       if (tailOffset > 0) {
         const tailResult = await fh.read(buf, 0, LITE_READ_BUF_SIZE, tailOffset)
-        tail = buf.toString('utf8', 0, tailResult.bytesRead)
+        tail = buf.toString("utf8", 0, tailResult.bytesRead)
       }
 
       return { head, tail }
@@ -237,7 +222,7 @@ export async function readHeadAndTail(
       await fh.close()
     }
   } catch {
-    return { head: '', tail: '' }
+    return { head: "", tail: "" }
   }
 }
 
@@ -253,23 +238,21 @@ export type LiteSessionFile = {
  * Allocates its own buffer — safe for concurrent use with Promise.all.
  * Returns null on any error.
  */
-export async function readSessionLite(
-  filePath: string,
-): Promise<LiteSessionFile | null> {
+export async function readSessionLite(filePath: string): Promise<LiteSessionFile | null> {
   try {
-    const fh = await fsOpen(filePath, 'r')
+    const fh = await fsOpen(filePath, "r")
     try {
       const stat = await fh.stat()
       const buf = Buffer.allocUnsafe(LITE_READ_BUF_SIZE)
       const headResult = await fh.read(buf, 0, LITE_READ_BUF_SIZE, 0)
       if (headResult.bytesRead === 0) return null
 
-      const head = buf.toString('utf8', 0, headResult.bytesRead)
+      const head = buf.toString("utf8", 0, headResult.bytesRead)
       const tailOffset = Math.max(0, stat.size - LITE_READ_BUF_SIZE)
       let tail = head
       if (tailOffset > 0) {
         const tailResult = await fh.read(buf, 0, LITE_READ_BUF_SIZE, tailOffset)
-        tail = buf.toString('utf8', 0, tailResult.bytesRead)
+        tail = buf.toString("utf8", 0, tailResult.bytesRead)
       }
 
       return { mtime: stat.mtime.getTime(), size: stat.size, head, tail }
@@ -309,12 +292,11 @@ function simpleHash(str: string): string {
  * @returns A safe name (e.g., '-Users-foo-my-project' or 'plugin-name-server')
  */
 export function sanitizePath(name: string): string {
-  const sanitized = name.replace(/[^a-zA-Z0-9]/g, '-')
+  const sanitized = name.replace(/[^a-zA-Z0-9]/g, "-")
   if (sanitized.length <= MAX_SANITIZED_LENGTH) {
     return sanitized
   }
-  const hash =
-    typeof Bun !== 'undefined' ? Bun.hash(name).toString(36) : simpleHash(name)
+  const hash = typeof Bun !== "undefined" ? Bun.hash(name).toString(36) : simpleHash(name)
   return `${sanitized.slice(0, MAX_SANITIZED_LENGTH)}-${hash}`
 }
 
@@ -323,7 +305,7 @@ export function sanitizePath(name: string): string {
 // ---------------------------------------------------------------------------
 
 export function getProjectsDir(): string {
-  return join(getClaudeConfigHomeDir(), 'projects')
+  return join(getClaudeConfigHomeDir(), "projects")
 }
 
 export function getProjectDir(projectDir: string): string {
@@ -338,9 +320,9 @@ export function getProjectDir(projectDir: string): string {
  */
 export async function canonicalizePath(dir: string): Promise<string> {
   try {
-    return (await realpath(dir)).normalize('NFC')
+    return (await realpath(dir)).normalize("NFC")
   } catch {
-    return dir.normalize('NFC')
+    return dir.normalize("NFC")
   }
 }
 
@@ -351,9 +333,7 @@ export async function canonicalizePath(dir: string): Promise<string> {
  * these produce different directory suffixes. This function falls back to
  * prefix-based scanning when the exact match doesn't exist.
  */
-export async function findProjectDir(
-  projectPath: string,
-): Promise<string | undefined> {
+export async function findProjectDir(projectPath: string): Promise<string | undefined> {
   const exact = getProjectDir(projectPath)
   try {
     await readdir(exact)
@@ -369,9 +349,7 @@ export async function findProjectDir(
     const projectsDir = getProjectsDir()
     try {
       const dirents = await readdir(projectsDir, { withFileTypes: true })
-      const match = dirents.find(
-        d => d.isDirectory() && d.name.startsWith(prefix + '-'),
-      )
+      const match = dirents.find((d) => d.isDirectory() && d.name.startsWith(prefix + "-"))
       return match ? join(projectsDir, match.name) : undefined
     } catch {
       return undefined
@@ -403,10 +381,7 @@ export async function findProjectDir(
 export async function resolveSessionFilePath(
   sessionId: string,
   dir?: string,
-): Promise<
-  | { filePath: string; projectPath: string | undefined; fileSize: number }
-  | undefined
-> {
+): Promise<{ filePath: string; projectPath: string | undefined; fileSize: number } | undefined> {
   const fileName = `${sessionId}.jsonl`
 
   if (dir) {
@@ -416,8 +391,7 @@ export async function resolveSessionFilePath(
       const filePath = join(projectDir, fileName)
       try {
         const s = await stat(filePath)
-        if (s.size > 0)
-          return { filePath, projectPath: canonical, fileSize: s.size }
+        if (s.size > 0) return { filePath, projectPath: canonical, fileSize: s.size }
       } catch {
         // ENOENT/EACCES — keep searching
       }
@@ -456,8 +430,7 @@ export async function resolveSessionFilePath(
     const filePath = join(projectsDir, name, fileName)
     try {
       const s = await stat(filePath)
-      if (s.size > 0)
-        return { filePath, projectPath: undefined, fileSize: s.size }
+      if (s.size > 0) return { filePath, projectPath: undefined, fileSize: s.size }
     } catch {
       // ENOENT/ENOTDIR — not in this project, keep scanning
     }
@@ -490,16 +463,14 @@ function compactBoundaryMarker(): Buffer {
  * Confirm a byte-matched line is a real compact_boundary (marker can appear
  * inside user content) and check for preservedSegment.
  */
-function parseBoundaryLine(
-  line: string,
-): { hasPreservedSegment: boolean } | null {
+function parseBoundaryLine(line: string): { hasPreservedSegment: boolean } | null {
   try {
     const parsed = JSON.parse(line) as {
       type?: string
       subtype?: string
       compactMetadata?: { preservedSegment?: unknown }
     }
-    if (parsed.type !== 'system' || parsed.subtype !== 'compact_boundary') {
+    if (parsed.type !== "system" || parsed.subtype !== "compact_boundary") {
       return null
     }
     return {
@@ -526,9 +497,7 @@ function sinkWrite(s: Sink, src: Buffer, start: number, end: number): void {
   const n = end - start
   if (n <= 0) return
   if (s.len + n > s.buf.length) {
-    const grown = Buffer.allocUnsafe(
-      Math.min(Math.max(s.buf.length * 2, s.len + n), s.cap),
-    )
+    const grown = Buffer.allocUnsafe(Math.min(Math.max(s.buf.length * 2, s.len + n), s.cap))
     s.buf.copy(grown, 0, 0, s.len)
     s.buf = grown
   }
@@ -536,16 +505,8 @@ function sinkWrite(s: Sink, src: Buffer, start: number, end: number): void {
   s.len += n
 }
 
-function hasPrefix(
-  src: Buffer,
-  prefix: Buffer,
-  at: number,
-  end: number,
-): boolean {
-  return (
-    end - at >= prefix.length &&
-    src.compare(prefix, 0, prefix.length, at, at + prefix.length) === 0
-  )
+function hasPrefix(src: Buffer, prefix: Buffer, at: number, end: number): boolean {
+  return end - at >= prefix.length && src.compare(prefix, 0, prefix.length, at, at + prefix.length) === 0
 }
 
 const ATTR_SNAP_PREFIX = Buffer.from('{"type":"attribution-snapshot"')
@@ -569,11 +530,7 @@ type LoadState = {
 }
 
 // Line spanning the chunk seam. 0 = fall through to concat.
-function processStraddle(
-  s: LoadState,
-  chunk: Buffer,
-  bytesRead: number,
-): number {
+function processStraddle(s: LoadState, chunk: Buffer, bytesRead: number): number {
   s.straddleSnapCarryLen = 0
   s.straddleSnapTailEnd = 0
   if (s.carryLen === 0) return 0
@@ -589,10 +546,7 @@ function processStraddle(
     return 0 // too short to rule out attr-snap
   } else {
     if (hasPrefix(cb, SYSTEM_PREFIX, 0, s.carryLen)) {
-      const hit = parseBoundaryLine(
-        cb.toString('utf-8', 0, s.carryLen) +
-          chunk.toString('utf-8', 0, firstNl),
-      )
+      const hit = parseBoundaryLine(cb.toString("utf-8", 0, s.carryLen) + chunk.toString("utf-8", 0, firstNl))
       if (hit?.hasPreservedSegment) {
         s.hasPreservedSegment = true
       } else if (hit) {
@@ -632,11 +586,8 @@ function scanChunkLines(
       lastSnapStart = lineStart
       lastSnapEnd = lineEnd
       runStart = lineEnd
-    } else if (
-      boundaryAt >= lineStart &&
-      boundaryAt < Math.min(lineStart + BOUNDARY_SEARCH_BOUND, lineEnd)
-    ) {
-      const hit = parseBoundaryLine(buf.toString('utf-8', lineStart, nl))
+    } else if (boundaryAt >= lineStart && boundaryAt < Math.min(lineStart + BOUNDARY_SEARCH_BOUND, lineEnd)) {
+      const hit = parseBoundaryLine(buf.toString("utf-8", lineStart, nl))
       if (hit?.hasPreservedSegment) {
         s.hasPreservedSegment = true // don't truncate; preserved msgs already in output
       } else if (hit) {
@@ -648,10 +599,7 @@ function scanChunkLines(
         s.straddleSnapCarryLen = 0
         runStart = lineStart
       }
-      boundaryAt = buf.indexOf(
-        boundaryMarker,
-        boundaryAt + boundaryMarker.length,
-      )
+      boundaryAt = buf.indexOf(boundaryMarker, boundaryAt + boundaryMarker.length)
     }
     lineStart = lineEnd
     nl = buf.indexOf(LF, lineStart)
@@ -661,13 +609,7 @@ function scanChunkLines(
 }
 
 // In-buf snap wins over straddle (later in file). carryBuf still valid here.
-function captureSnap(
-  s: LoadState,
-  buf: Buffer,
-  chunk: Buffer,
-  lastSnapStart: number,
-  lastSnapEnd: number,
-): void {
+function captureSnap(s: LoadState, buf: Buffer, chunk: Buffer, lastSnapStart: number, lastSnapEnd: number): void {
   if (lastSnapStart !== -1) {
     s.lastSnapLen = lastSnapEnd - lastSnapStart
     if (s.lastSnapBuf === undefined || s.lastSnapLen > s.lastSnapBuf.length) {
@@ -750,16 +692,11 @@ export async function readTranscriptForLoad(
   }
 
   const chunk = Buffer.allocUnsafe(CHUNK_SIZE)
-  const fd = await fsOpen(filePath, 'r')
+  const fd = await fsOpen(filePath, "r")
   try {
     let filePos = 0
     while (filePos < fileSize) {
-      const { bytesRead } = await fd.read(
-        chunk,
-        0,
-        Math.min(CHUNK_SIZE, fileSize - filePos),
-        filePos,
-      )
+      const { bytesRead } = await fd.read(chunk, 0, Math.min(CHUNK_SIZE, fileSize - filePos), filePos)
       if (bytesRead === 0) break
       filePos += bytesRead
 

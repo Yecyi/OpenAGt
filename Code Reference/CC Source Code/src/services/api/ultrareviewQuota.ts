@@ -1,8 +1,8 @@
-import axios from 'axios'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { isClaudeAISubscriber } from '../../utils/auth.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getOAuthHeaders, prepareApiRequest } from '../../utils/teleport/api.js'
+import axios from "axios"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { isClaudeAISubscriber } from "../../utils/auth.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { getOAuthHeaders, prepareApiRequest } from "../../utils/teleport/api.js"
 
 export type UltrareviewQuotaResponse = {
   reviews_used: number
@@ -25,7 +25,7 @@ export async function fetchUltrareviewQuota(): Promise<UltrareviewQuotaResponse 
       {
         headers: {
           ...getOAuthHeaders(accessToken),
-          'x-organization-uuid': orgUUID,
+          "x-organization-uuid": orgUUID,
         },
         timeout: 5000,
       },

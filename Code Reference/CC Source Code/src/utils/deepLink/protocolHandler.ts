@@ -11,17 +11,14 @@
  * directly — there is no terminal attached.
  */
 
-import { homedir } from 'os'
-import { logForDebugging } from '../debug.js'
-import {
-  filterExistingPaths,
-  getKnownPathsForRepo,
-} from '../githubRepoPathMapping.js'
-import { jsonStringify } from '../slowOperations.js'
-import { readLastFetchTime } from './banner.js'
-import { parseDeepLink } from './parseDeepLink.js'
-import { MACOS_BUNDLE_ID } from './registerProtocol.js'
-import { launchInTerminal } from './terminalLauncher.js'
+import { homedir } from "os"
+import { logForDebugging } from "../debug.js"
+import { filterExistingPaths, getKnownPathsForRepo } from "../githubRepoPathMapping.js"
+import { jsonStringify } from "../slowOperations.js"
+import { readLastFetchTime } from "./banner.js"
+import { parseDeepLink } from "./parseDeepLink.js"
+import { MACOS_BUNDLE_ID } from "./registerProtocol.js"
+import { launchInTerminal } from "./terminalLauncher.js"
 
 /**
  * Handle an incoming deep link URI.
@@ -65,9 +62,7 @@ export async function handleDeepLinkUri(uri: string): Promise<number> {
   })
   if (!launched) {
     // biome-ignore lint/suspicious/noConsole: intentional error output
-    console.error(
-      'Failed to open a terminal. Make sure a supported terminal emulator is installed.',
-    )
+    console.error("Failed to open a terminal. Make sure a supported terminal emulator is installed.")
     return 1
   }
 
@@ -92,7 +87,7 @@ export async function handleUrlSchemeLaunch(): Promise<number | null> {
   }
 
   try {
-    const { waitForUrlEvent } = await import('url-handler-napi')
+    const { waitForUrlEvent } = await import("url-handler-napi")
     const url = waitForUrlEvent(5000)
     if (!url) {
       return null
@@ -114,10 +109,7 @@ export async function handleUrlSchemeLaunch(): Promise<number | null> {
  * lookup hit — so the launched instance can show which clone was selected
  * and its git freshness.
  */
-async function resolveCwd(action: {
-  cwd?: string
-  repo?: string
-}): Promise<{ cwd: string; resolvedRepo?: string }> {
+async function resolveCwd(action: { cwd?: string; repo?: string }): Promise<{ cwd: string; resolvedRepo?: string }> {
   if (action.cwd) {
     return { cwd: action.cwd }
   }
@@ -128,9 +120,7 @@ async function resolveCwd(action: {
       logForDebugging(`Resolved repo ${action.repo} → ${existing[0]}`)
       return { cwd: existing[0], resolvedRepo: action.repo }
     }
-    logForDebugging(
-      `No local clone found for repo ${action.repo}, falling back to home`,
-    )
+    logForDebugging(`No local clone found for repo ${action.repo}, falling back to home`)
   }
   return { cwd: homedir() }
 }

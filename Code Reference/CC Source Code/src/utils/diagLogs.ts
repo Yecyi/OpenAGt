@@ -1,8 +1,8 @@
-import { dirname } from 'path'
-import { getFsImplementation } from './fsOperations.js'
-import { jsonStringify } from './slowOperations.js'
+import { dirname } from "path"
+import { getFsImplementation } from "./fsOperations.js"
+import { jsonStringify } from "./slowOperations.js"
 
-type DiagnosticLogLevel = 'debug' | 'info' | 'warn' | 'error'
+type DiagnosticLogLevel = "debug" | "info" | "warn" | "error"
 
 type DiagnosticLogEntry = {
   timestamp: string
@@ -24,11 +24,7 @@ type DiagnosticLogEntry = {
  * @param data     Optional additional data to log
  */
 // sync IO: called from sync context
-export function logForDiagnosticsNoPII(
-  level: DiagnosticLogLevel,
-  event: string,
-  data?: Record<string, unknown>,
-): void {
+export function logForDiagnosticsNoPII(level: DiagnosticLogLevel, event: string, data?: Record<string, unknown>): void {
   const logFile = getDiagnosticLogFile()
   if (!logFile) {
     return
@@ -42,7 +38,7 @@ export function logForDiagnosticsNoPII(
   }
 
   const fs = getFsImplementation()
-  const line = jsonStringify(entry) + '\n'
+  const line = jsonStringify(entry) + "\n"
   try {
     fs.appendFileSync(logFile, line)
   } catch {
@@ -75,18 +71,18 @@ export async function withDiagnosticsTiming<T>(
   getData?: (result: T) => Record<string, unknown>,
 ): Promise<T> {
   const startTime = Date.now()
-  logForDiagnosticsNoPII('info', `${event}_started`)
+  logForDiagnosticsNoPII("info", `${event}_started`)
 
   try {
     const result = await fn()
     const additionalData = getData ? getData(result) : {}
-    logForDiagnosticsNoPII('info', `${event}_completed`, {
+    logForDiagnosticsNoPII("info", `${event}_completed`, {
       duration_ms: Date.now() - startTime,
       ...additionalData,
     })
     return result
   } catch (error) {
-    logForDiagnosticsNoPII('error', `${event}_failed`, {
+    logForDiagnosticsNoPII("error", `${event}_failed`, {
       duration_ms: Date.now() - startTime,
     })
     throw error

@@ -5,16 +5,16 @@
  * (axios, crypto, auth utils) remains tree-shakeable from non-bridge builds.
  */
 
-import { feature } from 'bun:bundle'
-import { stat } from 'fs/promises'
+import { feature } from "bun:bundle"
+import { stat } from "fs/promises"
 
-import type { ValidationResult } from '../../Tool.js'
+import type { ValidationResult } from "../../Tool.js"
 
-import { getCwd } from '../../utils/cwd.js'
-import { isEnvTruthy } from '../../utils/envUtils.js'
-import { getErrnoCode } from '../../utils/errors.js'
-import { IMAGE_EXTENSION_REGEX } from '../../utils/imagePaste.js'
-import { expandPath } from '../../utils/path.js'
+import { getCwd } from "../../utils/cwd.js"
+import { isEnvTruthy } from "../../utils/envUtils.js"
+import { getErrnoCode } from "../../utils/errors.js"
+import { IMAGE_EXTENSION_REGEX } from "../../utils/imagePaste.js"
+import { expandPath } from "../../utils/path.js"
 
 export type ResolvedAttachment = {
   path: string
@@ -23,9 +23,7 @@ export type ResolvedAttachment = {
   file_uuid?: string
 }
 
-export async function validateAttachmentPaths(
-  rawPaths: string[],
-): Promise<ValidationResult> {
+export async function validateAttachmentPaths(rawPaths: string[]): Promise<ValidationResult> {
   const cwd = getCwd()
   for (const rawPath of rawPaths) {
     const fullPath = expandPath(rawPath)
@@ -40,14 +38,14 @@ export async function validateAttachmentPaths(
       }
     } catch (e) {
       const code = getErrnoCode(e)
-      if (code === 'ENOENT') {
+      if (code === "ENOENT") {
         return {
           result: false,
           message: `Attachment "${rawPath}" does not exist. Current working directory: ${cwd}.`,
           errorCode: 1,
         }
       }
-      if (code === 'EACCES' || code === 'EPERM') {
+      if (code === "EACCES" || code === "EPERM") {
         return {
           result: false,
           message: `Attachment "${rawPath}" is not accessible (permission denied).`,
@@ -85,26 +83,22 @@ export async function resolveAttachments(
   // builds. A static import would force module-scope evaluation regardless
   // of the guard inside uploadBriefAttachment — CLAUDE.md: "helpers defined
   // outside remain in the build even if never called".
-  if (feature('BRIDGE_MODE')) {
+  if (feature("BRIDGE_MODE")) {
     // Headless/SDK callers never set appState.replBridgeEnabled (only the TTY
     // REPL does, at main.tsx init). CLAUDE_CODE_BRIEF_UPLOAD lets a host that
     // runs the CLI as a subprocess opt in — e.g. the cowork desktop bridge,
     // which already passes CLAUDE_CODE_OAUTH_TOKEN for auth.
-    const shouldUpload =
-      uploadCtx.replBridgeEnabled ||
-      isEnvTruthy(process.env.CLAUDE_CODE_BRIEF_UPLOAD)
-    const { uploadBriefAttachment } = await import('./upload.js')
+    const shouldUpload = uploadCtx.replBridgeEnabled || isEnvTruthy(process.env.CLAUDE_CODE_BRIEF_UPLOAD)
+    const { uploadBriefAttachment } = await import("./upload.js")
     const uuids = await Promise.all(
-      stated.map(a =>
+      stated.map((a) =>
         uploadBriefAttachment(a.path, a.size, {
           replBridgeEnabled: shouldUpload,
           signal: uploadCtx.signal,
         }),
       ),
     )
-    return stated.map((a, i) =>
-      uuids[i] === undefined ? a : { ...a, file_uuid: uuids[i] },
-    )
+    return stated.map((a, i) => (uuids[i] === undefined ? a : { ...a, file_uuid: uuids[i] }))
   }
   return stated
 }

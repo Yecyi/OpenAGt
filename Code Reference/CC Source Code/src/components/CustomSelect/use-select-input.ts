@@ -1,14 +1,11 @@
-import { useMemo } from 'react'
-import { useRegisterOverlay } from '../../context/overlayContext.js'
-import type { InputEvent } from '../../ink/events/input-event.js'
-import { useInput } from '../../ink.js'
-import { useKeybindings } from '../../keybindings/useKeybinding.js'
-import {
-  normalizeFullWidthDigits,
-  normalizeFullWidthSpace,
-} from '../../utils/stringUtils.js'
-import type { OptionWithDescription } from './select.js'
-import type { SelectState } from './use-select-state.js'
+import { useMemo } from "react"
+import { useRegisterOverlay } from "../../context/overlayContext.js"
+import type { InputEvent } from "../../ink/events/input-event.js"
+import { useInput } from "../../ink.js"
+import { useKeybindings } from "../../keybindings/useKeybinding.js"
+import { normalizeFullWidthDigits, normalizeFullWidthSpace } from "../../utils/stringUtils.js"
+import type { OptionWithDescription } from "./select.js"
+import type { SelectState } from "./use-select-state.js"
 
 export type UseSelectProps<T> = {
   /**
@@ -26,7 +23,7 @@ export type UseSelectProps<T> = {
    *
    * @default false
    */
-  readonly disableSelection?: boolean | 'numeric'
+  readonly disableSelection?: boolean | "numeric"
 
   /**
    * Select state.
@@ -98,12 +95,12 @@ export const useSelectInput = <T>({
 }: UseSelectProps<T>) => {
   // Automatically register as an overlay when onCancel is provided.
   // This ensures CancelRequestHandler won't intercept Escape when the select is active.
-  useRegisterOverlay('select', !!state.onCancel)
+  useRegisterOverlay("select", !!state.onCancel)
 
   // Determine if the focused option is an input type
   const isInInput = useMemo(() => {
-    const focusedOption = options.find(opt => opt.value === state.focusedValue)
-    return focusedOption?.type === 'input'
+    const focusedOption = options.find((opt) => opt.value === state.focusedValue)
+    return focusedOption?.type === "input"
   }, [options, state.focusedValue])
 
   // Core navigation via keybindings (up/down/enter/escape)
@@ -113,7 +110,7 @@ export const useSelectInput = <T>({
     const handlers: Record<string, () => void> = {}
 
     if (!isInInput) {
-      handlers['select:next'] = () => {
+      handlers["select:next"] = () => {
         if (onDownFromLastItem) {
           const lastOption = options[options.length - 1]
           if (lastOption && state.focusedValue === lastOption.value) {
@@ -123,7 +120,7 @@ export const useSelectInput = <T>({
         }
         state.focusNextOption()
       }
-      handlers['select:previous'] = () => {
+      handlers["select:previous"] = () => {
         if (onUpFromFirstItem && state.visibleFromIndex === 0) {
           const firstOption = options[0]
           if (firstOption && state.focusedValue === firstOption.value) {
@@ -133,13 +130,11 @@ export const useSelectInput = <T>({
         }
         state.focusPreviousOption()
       }
-      handlers['select:accept'] = () => {
+      handlers["select:accept"] = () => {
         if (disableSelection === true) return
         if (state.focusedValue === undefined) return
 
-        const focusedOption = options.find(
-          opt => opt.value === state.focusedValue,
-        )
+        const focusedOption = options.find((opt) => opt.value === state.focusedValue)
         if (focusedOption?.disabled === true) return
 
         state.selectFocusedOption?.()
@@ -148,23 +143,16 @@ export const useSelectInput = <T>({
     }
 
     if (state.onCancel) {
-      handlers['select:cancel'] = () => {
+      handlers["select:cancel"] = () => {
         state.onCancel!()
       }
     }
 
     return handlers
-  }, [
-    options,
-    state,
-    onDownFromLastItem,
-    onUpFromFirstItem,
-    isInInput,
-    disableSelection,
-  ])
+  }, [options, state, onDownFromLastItem, onUpFromFirstItem, isInInput, disableSelection])
 
   useKeybindings(keybindingHandlers, {
-    context: 'Select',
+    context: "Select",
     isActive: !isDisabled,
   })
 
@@ -173,10 +161,8 @@ export const useSelectInput = <T>({
   useInput(
     (input, key, event: InputEvent) => {
       const normalizedInput = normalizeFullWidthDigits(input)
-      const focusedOption = options.find(
-        opt => opt.value === state.focusedValue,
-      )
-      const currentIsInInput = focusedOption?.type === 'input'
+      const focusedOption = options.find((opt) => opt.value === state.focusedValue)
+      const currentIsInInput = focusedOption?.type === "input"
 
       // Handle Tab key for input mode toggling
       if (key.tab && onInputModeToggle && state.focusedValue !== undefined) {
@@ -196,7 +182,7 @@ export const useSelectInput = <T>({
         }
 
         // Arrow keys still navigate the select even while in input mode
-        if (key.downArrow || (key.ctrl && input === 'n')) {
+        if (key.downArrow || (key.ctrl && input === "n")) {
           if (onDownFromLastItem) {
             const lastOption = options[options.length - 1]
             if (lastOption && state.focusedValue === lastOption.value) {
@@ -209,7 +195,7 @@ export const useSelectInput = <T>({
           event.stopImmediatePropagation()
           return
         }
-        if (key.upArrow || (key.ctrl && input === 'p')) {
+        if (key.upArrow || (key.ctrl && input === "p")) {
           if (onUpFromFirstItem && state.visibleFromIndex === 0) {
             const firstOption = options[0]
             if (firstOption && state.focusedValue === firstOption.value) {
@@ -240,11 +226,7 @@ export const useSelectInput = <T>({
 
       if (disableSelection !== true) {
         // Space for multi-select toggle
-        if (
-          isMultiSelect &&
-          normalizeFullWidthSpace(input) === ' ' &&
-          state.focusedValue !== undefined
-        ) {
+        if (isMultiSelect && normalizeFullWidthSpace(input) === " " && state.focusedValue !== undefined) {
           const isFocusedOptionDisabled = focusedOption?.disabled === true
           if (!isFocusedOptionDisabled) {
             state.selectFocusedOption?.()
@@ -252,18 +234,15 @@ export const useSelectInput = <T>({
           }
         }
 
-        if (
-          disableSelection !== 'numeric' &&
-          /^[0-9]+$/.test(normalizedInput)
-        ) {
+        if (disableSelection !== "numeric" && /^[0-9]+$/.test(normalizedInput)) {
           const index = parseInt(normalizedInput) - 1
           if (index >= 0 && index < state.options.length) {
             const selectedOption = state.options[index]!
             if (selectedOption.disabled === true) {
               return
             }
-            if (selectedOption.type === 'input') {
-              const currentValue = inputValues?.get(selectedOption.value) ?? ''
+            if (selectedOption.type === "input") {
+              const currentValue = inputValues?.get(selectedOption.value) ?? ""
               if (currentValue.trim()) {
                 // Pre-filled input: auto-submit (user can Tab to edit instead)
                 state.onChange?.(selectedOption.value)

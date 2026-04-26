@@ -55,6 +55,7 @@ import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
+import { isBroadAgentTask } from "@/agent/task-classifier"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -64,7 +65,10 @@ async function computeSHA256(text: string): Promise<string> {
   const data = encoder.encode(text)
   const hashBuffer = await crypto.subtle.digest("SHA-256", data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16)
+  return hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 16)
 }
 
 export function parseFilePartRange(url: URL): {} | { start: number; end?: number } | { error: string } {
@@ -389,7 +393,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     })
 
     const normalizeToolInput = (value: unknown): Record<string, unknown> =>
-      typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
+      typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 
     const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
       agent: Agent.Info
@@ -404,7 +408,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const tools: Record<string, AITool> = {}
       const run = yield* runner()
       const promptOps = yield* ops()
-      const scheduler = createToolScheduler()
+      const lastUserRuntime = input.messages.findLast(
+        (message): message is MessageV2.WithParts & { info: MessageV2.User } => message.info.role === "user",
+      )?.info.runtime
+      const scheduler = createToolScheduler({ maxParallelSafeTasks: lastUserRuntime?.maxParallelSubagents })
 
       const context = (args: any, options: ToolExecutionOptions): Tool.Context => ({
         sessionID: input.session.id,
@@ -684,10 +691,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           messages: msgs,
           metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
             Effect.gen(function* () {
-              const baseMetadata =
-                "metadata" in part.state && part.state.metadata
-                  ? part.state.metadata
-                  : {}
+              const baseMetadata = "metadata" in part.state && part.state.metadata ? part.state.metadata : {}
               const nextState =
                 part.state.status === "pending"
                   ? {
@@ -1046,7 +1050,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same
-          ? yield* provider.getModel(model.providerID, model.modelID).pipe(Effect.option).pipe(Effect.map(Option.getOrUndefined))
+          ? yield* provider
+              .getModel(model.providerID, model.modelID)
+              .pipe(Effect.option)
+              .pipe(Effect.map(Option.getOrUndefined))
           : undefined
       const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
 
@@ -1064,6 +1071,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         },
         system: input.system,
         format: input.format,
+        runtime: input.runtime,
       }
 
       yield* Effect.addFinalizer(() => instruction.clear(info.id))
@@ -1461,6 +1469,28 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       throw new Error("Impossible")
     })
 
+    const userText = (message: MessageV2.WithParts | undefined) =>
+      message?.parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join("\n")
+        .toLowerCase() ?? ""
+
+    const effectiveMaxSteps = (
+      agent: Agent.Info,
+      lastUser: MessageV2.User,
+      lastUserMsg: MessageV2.WithParts | undefined,
+    ) => {
+      const configured = agent.steps ?? Number.POSITIVE_INFINITY
+      const explicit = lastUser.runtime?.stepBudget
+      if (explicit) return Math.max(configured, explicit)
+      if (!Number.isFinite(configured)) return configured
+      const text = [lastUser.system ?? "", userText(lastUserMsg)].join("\n")
+      const broad = isBroadAgentTask(text)
+      if (agent.name === "explore" && broad) return Math.max(configured, 48)
+      if (agent.mode === "subagent" && broad) return Math.max(configured, 36)
+      return configured
+    }
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1560,7 +1590,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
           }
-          const maxSteps = agent.steps ?? Infinity
+          const lastUserMsg = msgs.find((msg) => msg.info.id === lastUser.id)
+          const maxSteps = effectiveMaxSteps(agent, lastUser, lastUserMsg)
           const isLastStep = step >= maxSteps
           msgs = yield* insertReminders({ messages: msgs, agent, session })
 
@@ -1652,9 +1683,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               const staticHash = yield* Effect.promise(() => computeSHA256(envResult.static.join("")))
               promptCacheMetrics.recordStaticHash(staticHash)
 
-              const memorySection = sessionMemory
-                ? [`\n## Session Memory\n${sessionMemory}\n`]
-                : []
+              const memorySection = sessionMemory ? [`\n## Session Memory\n${sessionMemory}\n`] : []
 
               const system = [
                 ...envResult.static,
@@ -1683,6 +1712,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 handle.message.finish = handle.message.finish ?? "stop"
                 yield* sessions.updateMessage(handle.message)
                 return "break" as const
+              }
+
+              if (isLastStep && handle.message.finish && !handle.message.error) {
+                handle.message.finish = "step-budget"
+                yield* sessions.updateMessage(handle.message)
               }
 
               const finished = handle.message.finish && !["tool-calls", "unknown"].includes(handle.message.finish)
@@ -1932,6 +1966,7 @@ export const PromptInput = z.object({
     .describe("@deprecated tools and permissions have been merged, you can set permissions on the session itself now"),
   format: MessageV2.Format.optional(),
   system: z.string().optional(),
+  runtime: MessageV2.Runtime.optional(),
   variant: z.string().optional(),
   parts: z.array(
     z.discriminatedUnion("type", [

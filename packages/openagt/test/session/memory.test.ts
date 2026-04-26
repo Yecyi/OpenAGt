@@ -261,37 +261,24 @@ describe("shouldUpdateMemory", () => {
 
 describe("estimateMessageTokens", () => {
   test("sums input and output tokens", () => {
-    const messages = [
-      { tokens: { input: 100, output: 50 } },
-      { tokens: { input: 200, output: 75 } },
-    ]
+    const messages = [{ tokens: { input: 100, output: 50 } }, { tokens: { input: 200, output: 75 } }]
     expect(estimateMessageTokens(messages)).toBe(425)
   })
 
   test("handles missing tokens", () => {
-    const messages = [
-      { tokens: { input: 100 } },
-      { tokens: {} },
-      {},
-    ]
+    const messages = [{ tokens: { input: 100 } }, { tokens: {} }, {}]
     expect(estimateMessageTokens(messages)).toBe(100)
   })
 })
 
 describe("countToolCalls", () => {
   test("counts tool parts in messages", () => {
-    const messages = [
-      { parts: [{ type: "tool" }, { type: "text" }] },
-      { parts: [{ type: "tool" }, { type: "tool" }] },
-    ]
+    const messages = [{ parts: [{ type: "tool" }, { type: "text" }] }, { parts: [{ type: "tool" }, { type: "tool" }] }]
     expect(countToolCalls(messages)).toBe(3)
   })
 
   test("handles missing parts", () => {
-    const messages = [
-      { parts: [] },
-      {},
-    ]
+    const messages = [{ parts: [] }, {}]
     expect(countToolCalls(messages)).toBe(0)
   })
 })
@@ -365,12 +352,15 @@ describe("updateMemory", () => {
   })
 
   test("preserves unchanged sections", async () => {
-    await saveMemory(testSessionID, `# Session Title
+    await saveMemory(
+      testSessionID,
+      `# Session Title
 Original Title
 
 # Learnings
 Keep it simple
-`)
+`,
+    )
 
     const result = await updateMemory(testSessionID, {
       currentState: "New State",

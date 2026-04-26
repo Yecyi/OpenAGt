@@ -1,39 +1,32 @@
-import { feature } from 'bun:bundle'
-import mergeWith from 'lodash-es/mergeWith.js'
-import { dirname, join, resolve } from 'path'
-import { z } from 'zod/v4'
+import { feature } from "bun:bundle"
+import mergeWith from "lodash-es/mergeWith.js"
+import { dirname, join, resolve } from "path"
+import { z } from "zod/v4"
 import {
   getFlagSettingsInline,
   getFlagSettingsPath,
   getOriginalCwd,
   getUseCoworkPlugins,
-} from '../../bootstrap/state.js'
-import { getRemoteManagedSettingsSyncFromCache } from '../../services/remoteManagedSettings/syncCacheState.js'
-import { uniq } from '../array.js'
-import { logForDebugging } from '../debug.js'
-import { logForDiagnosticsNoPII } from '../diagLogs.js'
-import { getClaudeConfigHomeDir, isEnvTruthy } from '../envUtils.js'
-import { getErrnoCode, isENOENT } from '../errors.js'
-import { writeFileSyncAndFlush_DEPRECATED } from '../file.js'
-import { readFileSync } from '../fileRead.js'
-import { getFsImplementation, safeResolvePath } from '../fsOperations.js'
-import { addFileGlobRuleToGitignore } from '../git/gitignore.js'
-import { safeParseJSON } from '../json.js'
-import { logError } from '../log.js'
-import { getPlatform } from '../platform.js'
-import { clone, jsonStringify } from '../slowOperations.js'
-import { profileCheckpoint } from '../startupProfiler.js'
-import {
-  type EditableSettingSource,
-  getEnabledSettingSources,
-  type SettingSource,
-} from './constants.js'
-import { markInternalWrite } from './internalWrites.js'
-import {
-  getManagedFilePath,
-  getManagedSettingsDropInDir,
-} from './managedPath.js'
-import { getHkcuSettings, getMdmSettings } from './mdm/settings.js'
+} from "../../bootstrap/state.js"
+import { getRemoteManagedSettingsSyncFromCache } from "../../services/remoteManagedSettings/syncCacheState.js"
+import { uniq } from "../array.js"
+import { logForDebugging } from "../debug.js"
+import { logForDiagnosticsNoPII } from "../diagLogs.js"
+import { getClaudeConfigHomeDir, isEnvTruthy } from "../envUtils.js"
+import { getErrnoCode, isENOENT } from "../errors.js"
+import { writeFileSyncAndFlush_DEPRECATED } from "../file.js"
+import { readFileSync } from "../fileRead.js"
+import { getFsImplementation, safeResolvePath } from "../fsOperations.js"
+import { addFileGlobRuleToGitignore } from "../git/gitignore.js"
+import { safeParseJSON } from "../json.js"
+import { logError } from "../log.js"
+import { getPlatform } from "../platform.js"
+import { clone, jsonStringify } from "../slowOperations.js"
+import { profileCheckpoint } from "../startupProfiler.js"
+import { type EditableSettingSource, getEnabledSettingSources, type SettingSource } from "./constants.js"
+import { markInternalWrite } from "./internalWrites.js"
+import { getManagedFilePath, getManagedSettingsDropInDir } from "./managedPath.js"
+import { getHkcuSettings, getMdmSettings } from "./mdm/settings.js"
 import {
   getCachedParsedFile,
   getCachedSettingsForSource,
@@ -43,20 +36,20 @@ import {
   setCachedParsedFile,
   setCachedSettingsForSource,
   setSessionSettingsCache,
-} from './settingsCache.js'
-import { type SettingsJson, SettingsSchema } from './types.js'
+} from "./settingsCache.js"
+import { type SettingsJson, SettingsSchema } from "./types.js"
 import {
   filterInvalidPermissionRules,
   formatZodError,
   type SettingsWithErrors,
   type ValidationError,
-} from './validation.js'
+} from "./validation.js"
 
 /**
  * Get the path to the managed settings file based on the current platform
  */
 function getManagedSettingsFilePath(): string {
-  return join(getManagedFilePath(), 'managed-settings.json')
+  return join(getManagedFilePath(), "managed-settings.json")
 }
 
 /**
@@ -79,9 +72,7 @@ export function loadManagedFileSettings(): {
   let merged: SettingsJson = {}
   let found = false
 
-  const { settings, errors: baseErrors } = parseSettingsFile(
-    getManagedSettingsFilePath(),
-  )
+  const { settings, errors: baseErrors } = parseSettingsFile(getManagedSettingsFilePath())
   errors.push(...baseErrors)
   if (settings && Object.keys(settings).length > 0) {
     merged = mergeWith(merged, settings, settingsMergeCustomizer)
@@ -92,18 +83,11 @@ export function loadManagedFileSettings(): {
   try {
     const entries = getFsImplementation()
       .readdirSync(dropInDir)
-      .filter(
-        d =>
-          (d.isFile() || d.isSymbolicLink()) &&
-          d.name.endsWith('.json') &&
-          !d.name.startsWith('.'),
-      )
-      .map(d => d.name)
+      .filter((d) => (d.isFile() || d.isSymbolicLink()) && d.name.endsWith(".json") && !d.name.startsWith("."))
+      .map((d) => d.name)
       .sort()
     for (const name of entries) {
-      const { settings, errors: fileErrors } = parseSettingsFile(
-        join(dropInDir, name),
-      )
+      const { settings, errors: fileErrors } = parseSettingsFile(join(dropInDir, name))
       errors.push(...fileErrors)
       if (settings && Object.keys(settings).length > 0) {
         merged = mergeWith(merged, settings, settingsMergeCustomizer)
@@ -112,7 +96,7 @@ export function loadManagedFileSettings(): {
     }
   } catch (e) {
     const code = getErrnoCode(e)
-    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+    if (code !== "ENOENT" && code !== "ENOTDIR") {
       logError(e)
     }
   }
@@ -136,12 +120,7 @@ export function getManagedFileSettingsPresence(): {
   try {
     hasDropIns = getFsImplementation()
       .readdirSync(dropInDir)
-      .some(
-        d =>
-          (d.isFile() || d.isSymbolicLink()) &&
-          d.name.endsWith('.json') &&
-          !d.name.startsWith('.'),
-      )
+      .some((d) => (d.isFile() || d.isSymbolicLink()) && d.name.endsWith(".json") && !d.name.startsWith("."))
   } catch {
     // dir doesn't exist
   }
@@ -155,15 +134,8 @@ export function getManagedFileSettingsPresence(): {
  * @param path The file path that caused the error
  */
 function handleFileSystemError(error: unknown, path: string): void {
-  if (
-    typeof error === 'object' &&
-    error &&
-    'code' in error &&
-    error.code === 'ENOENT'
-  ) {
-    logForDebugging(
-      `Broken symlink or missing file encountered for settings.json at path: ${path}`,
-    )
+  if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") {
+    logForDebugging(`Broken symlink or missing file encountered for settings.json at path: ${path}`)
   } else {
     logError(error)
   }
@@ -206,7 +178,7 @@ function parseSettingsFileUncached(path: string): {
     const { resolvedPath } = safeResolvePath(getFsImplementation(), path)
     const content = readFileSync(resolvedPath)
 
-    if (content.trim() === '') {
+    if (content.trim() === "") {
       return { settings: {}, errors: [] }
     }
 
@@ -238,14 +210,14 @@ function parseSettingsFileUncached(path: string): {
  */
 export function getSettingsRootPathForSource(source: SettingSource): string {
   switch (source) {
-    case 'userSettings':
+    case "userSettings":
       return resolve(getClaudeConfigHomeDir())
-    case 'policySettings':
-    case 'projectSettings':
-    case 'localSettings': {
+    case "policySettings":
+    case "projectSettings":
+    case "localSettings": {
       return resolve(getOriginalCwd())
     }
-    case 'flagSettings': {
+    case "flagSettings": {
       const path = getFlagSettingsPath()
       return path ? dirname(resolve(path)) : resolve(getOriginalCwd())
     }
@@ -262,53 +234,38 @@ export function getSettingsRootPathForSource(source: SettingSource): string {
  * 3. Default: 'settings.json'
  */
 function getUserSettingsFilePath(): string {
-  if (
-    getUseCoworkPlugins() ||
-    isEnvTruthy(process.env.CLAUDE_CODE_USE_COWORK_PLUGINS)
-  ) {
-    return 'cowork_settings.json'
+  if (getUseCoworkPlugins() || isEnvTruthy(process.env.CLAUDE_CODE_USE_COWORK_PLUGINS)) {
+    return "cowork_settings.json"
   }
-  return 'settings.json'
+  return "settings.json"
 }
 
-export function getSettingsFilePathForSource(
-  source: SettingSource,
-): string | undefined {
+export function getSettingsFilePathForSource(source: SettingSource): string | undefined {
   switch (source) {
-    case 'userSettings':
-      return join(
-        getSettingsRootPathForSource(source),
-        getUserSettingsFilePath(),
-      )
-    case 'projectSettings':
-    case 'localSettings': {
-      return join(
-        getSettingsRootPathForSource(source),
-        getRelativeSettingsFilePathForSource(source),
-      )
+    case "userSettings":
+      return join(getSettingsRootPathForSource(source), getUserSettingsFilePath())
+    case "projectSettings":
+    case "localSettings": {
+      return join(getSettingsRootPathForSource(source), getRelativeSettingsFilePathForSource(source))
     }
-    case 'policySettings':
+    case "policySettings":
       return getManagedSettingsFilePath()
-    case 'flagSettings': {
+    case "flagSettings": {
       return getFlagSettingsPath()
     }
   }
 }
 
-export function getRelativeSettingsFilePathForSource(
-  source: 'projectSettings' | 'localSettings',
-): string {
+export function getRelativeSettingsFilePathForSource(source: "projectSettings" | "localSettings"): string {
   switch (source) {
-    case 'projectSettings':
-      return join('.claude', 'settings.json')
-    case 'localSettings':
-      return join('.claude', 'settings.local.json')
+    case "projectSettings":
+      return join(".claude", "settings.json")
+    case "localSettings":
+      return join(".claude", "settings.local.json")
   }
 }
 
-export function getSettingsForSource(
-  source: SettingSource,
-): SettingsJson | null {
+export function getSettingsForSource(source: SettingSource): SettingsJson | null {
   const cached = getCachedSettingsForSource(source)
   if (cached !== undefined) return cached
   const result = getSettingsForSourceUncached(source)
@@ -316,11 +273,9 @@ export function getSettingsForSource(
   return result
 }
 
-function getSettingsForSourceUncached(
-  source: SettingSource,
-): SettingsJson | null {
+function getSettingsForSourceUncached(source: SettingSource): SettingsJson | null {
   // For policySettings: first source wins (remote > HKLM/plist > file > HKCU)
-  if (source === 'policySettings') {
+  if (source === "policySettings") {
     const remoteSettings = getRemoteManagedSettingsSyncFromCache()
     if (remoteSettings && Object.keys(remoteSettings).length > 0) {
       return remoteSettings
@@ -345,21 +300,15 @@ function getSettingsForSourceUncached(
   }
 
   const settingsFilePath = getSettingsFilePathForSource(source)
-  const { settings: fileSettings } = settingsFilePath
-    ? parseSettingsFile(settingsFilePath)
-    : { settings: null }
+  const { settings: fileSettings } = settingsFilePath ? parseSettingsFile(settingsFilePath) : { settings: null }
 
   // For flagSettings, merge in any inline settings set via the SDK
-  if (source === 'flagSettings') {
+  if (source === "flagSettings") {
     const inlineSettings = getFlagSettingsInline()
     if (inlineSettings) {
       const parsed = SettingsSchema().safeParse(inlineSettings)
       if (parsed.success) {
-        return mergeWith(
-          fileSettings || {},
-          parsed.data,
-          settingsMergeCustomizer,
-        ) as SettingsJson
+        return mergeWith(fileSettings || {}, parsed.data, settingsMergeCustomizer) as SettingsJson
       }
     }
   }
@@ -372,35 +321,29 @@ function getSettingsForSourceUncached(
  * Uses "first source wins" — returns the first source that has content.
  * Priority: remote > plist/hklm > file (managed-settings.json) > hkcu
  */
-export function getPolicySettingsOrigin():
-  | 'remote'
-  | 'plist'
-  | 'hklm'
-  | 'file'
-  | 'hkcu'
-  | null {
+export function getPolicySettingsOrigin(): "remote" | "plist" | "hklm" | "file" | "hkcu" | null {
   // 1. Remote (highest)
   const remoteSettings = getRemoteManagedSettingsSyncFromCache()
   if (remoteSettings && Object.keys(remoteSettings).length > 0) {
-    return 'remote'
+    return "remote"
   }
 
   // 2. Admin-only MDM (HKLM / macOS plist)
   const mdmResult = getMdmSettings()
   if (Object.keys(mdmResult.settings).length > 0) {
-    return getPlatform() === 'macos' ? 'plist' : 'hklm'
+    return getPlatform() === "macos" ? "plist" : "hklm"
   }
 
   // 3. managed-settings.json + managed-settings.d/ (file-based, requires admin)
   const { settings: fileSettings } = loadManagedFileSettings()
   if (fileSettings) {
-    return 'file'
+    return "file"
   }
 
   // 4. HKCU (lowest — user-writable)
   const hkcu = getHkcuSettings()
   if (Object.keys(hkcu.settings).length > 0) {
-    return 'hkcu'
+    return "hkcu"
   }
 
   return null
@@ -417,10 +360,7 @@ export function updateSettingsForSource(
   source: EditableSettingSource,
   settings: SettingsJson,
 ): { error: Error | null } {
-  if (
-    (source as unknown) === 'policySettings' ||
-    (source as unknown) === 'flagSettings'
-  ) {
+  if ((source as unknown) === "policySettings" || (source as unknown) === "flagSettings") {
     return { error: null }
   }
 
@@ -456,16 +396,12 @@ export function updateSettingsForSource(
           // JSON syntax error - return validation error instead of overwriting
           // safeParseJSON will already log the error, so we'll just return the error here
           return {
-            error: new Error(
-              `Invalid JSON syntax in settings file at ${filePath}`,
-            ),
+            error: new Error(`Invalid JSON syntax in settings file at ${filePath}`),
           }
         }
-        if (rawData && typeof rawData === 'object') {
+        if (rawData && typeof rawData === "object") {
           existingSettings = rawData as SettingsJson
-          logForDebugging(
-            `Using raw settings from ${filePath} due to validation failure`,
-          )
+          logForDebugging(`Using raw settings from ${filePath} due to validation failure`)
         }
       }
     }
@@ -480,7 +416,7 @@ export function updateSettingsForSource(
         object: Record<string | number | symbol, unknown>,
       ) => {
         // Handle undefined as deletion
-        if (srcValue === undefined && object && typeof key === 'string') {
+        if (srcValue === undefined && object && typeof key === "string") {
           delete object[key]
           return undefined
         }
@@ -497,25 +433,17 @@ export function updateSettingsForSource(
     // Mark this as an internal write before writing the file
     markInternalWrite(filePath)
 
-    writeFileSyncAndFlush_DEPRECATED(
-      filePath,
-      jsonStringify(updatedSettings, null, 2) + '\n',
-    )
+    writeFileSyncAndFlush_DEPRECATED(filePath, jsonStringify(updatedSettings, null, 2) + "\n")
 
     // Invalidate the session cache since settings have been updated
     resetSettingsCache()
 
-    if (source === 'localSettings') {
+    if (source === "localSettings") {
       // Okay to add to gitignore async without awaiting
-      void addFileGlobRuleToGitignore(
-        getRelativeSettingsFilePathForSource('localSettings'),
-        getOriginalCwd(),
-      )
+      void addFileGlobRuleToGitignore(getRelativeSettingsFilePathForSource("localSettings"), getOriginalCwd())
     }
   } catch (e) {
-    const error = new Error(
-      `Failed to read raw settings from ${filePath}: ${e}`,
-    )
+    const error = new Error(`Failed to read raw settings from ${filePath}: ${e}`)
     logError(error)
     return { error }
   }
@@ -535,10 +463,7 @@ function mergeArrays<T>(targetArray: T[], sourceArray: T[]): T[] {
  * Arrays are concatenated and deduplicated; other values use default lodash merge behavior.
  * Exported for testing.
  */
-export function settingsMergeCustomizer(
-  objValue: unknown,
-  srcValue: unknown,
-): unknown {
+export function settingsMergeCustomizer(objValue: unknown, srcValue: unknown): unknown {
   if (Array.isArray(objValue) && Array.isArray(srcValue)) {
     return mergeArrays(objValue, srcValue)
   }
@@ -555,65 +480,56 @@ export function settingsMergeCustomizer(
  * @param settings The settings object to extract keys from
  * @returns Sorted array of key paths
  */
-export function getManagedSettingsKeysForLogging(
-  settings: SettingsJson,
-): string[] {
+export function getManagedSettingsKeysForLogging(settings: SettingsJson): string[] {
   // Use .strip() to get only valid schema keys
-  const validSettings = SettingsSchema().strip().parse(settings) as Record<
-    string,
-    unknown
-  >
-  const keysToExpand = ['permissions', 'sandbox', 'hooks']
+  const validSettings = SettingsSchema().strip().parse(settings) as Record<string, unknown>
+  const keysToExpand = ["permissions", "sandbox", "hooks"]
   const allKeys: string[] = []
 
   // Define valid nested keys for each nested setting we expand
   const validNestedKeys: Record<string, Set<string>> = {
     permissions: new Set([
-      'allow',
-      'deny',
-      'ask',
-      'defaultMode',
-      'disableBypassPermissionsMode',
-      ...(feature('TRANSCRIPT_CLASSIFIER') ? ['disableAutoMode'] : []),
-      'additionalDirectories',
+      "allow",
+      "deny",
+      "ask",
+      "defaultMode",
+      "disableBypassPermissionsMode",
+      ...(feature("TRANSCRIPT_CLASSIFIER") ? ["disableAutoMode"] : []),
+      "additionalDirectories",
     ]),
     sandbox: new Set([
-      'enabled',
-      'failIfUnavailable',
-      'allowUnsandboxedCommands',
-      'network',
-      'filesystem',
-      'ignoreViolations',
-      'excludedCommands',
-      'autoAllowBashIfSandboxed',
-      'enableWeakerNestedSandbox',
-      'enableWeakerNetworkIsolation',
-      'ripgrep',
+      "enabled",
+      "failIfUnavailable",
+      "allowUnsandboxedCommands",
+      "network",
+      "filesystem",
+      "ignoreViolations",
+      "excludedCommands",
+      "autoAllowBashIfSandboxed",
+      "enableWeakerNestedSandbox",
+      "enableWeakerNetworkIsolation",
+      "ripgrep",
     ]),
     // For hooks, we use z.record with enum keys, so we validate separately
     hooks: new Set([
-      'PreToolUse',
-      'PostToolUse',
-      'Notification',
-      'UserPromptSubmit',
-      'SessionStart',
-      'SessionEnd',
-      'Stop',
-      'SubagentStop',
-      'PreCompact',
-      'PostCompact',
-      'TeammateIdle',
-      'TaskCreated',
-      'TaskCompleted',
+      "PreToolUse",
+      "PostToolUse",
+      "Notification",
+      "UserPromptSubmit",
+      "SessionStart",
+      "SessionEnd",
+      "Stop",
+      "SubagentStop",
+      "PreCompact",
+      "PostCompact",
+      "TeammateIdle",
+      "TaskCreated",
+      "TaskCompleted",
     ]),
   }
 
   for (const key of Object.keys(validSettings)) {
-    if (
-      keysToExpand.includes(key) &&
-      validSettings[key] &&
-      typeof validSettings[key] === 'object'
-    ) {
+    if (keysToExpand.includes(key) && validSettings[key] && typeof validSettings[key] === "object") {
       // Expand nested keys for these special settings (one level deep only)
       const nestedObj = validSettings[key] as Record<string, unknown>
       const validKeys = validNestedKeys[key]
@@ -649,8 +565,8 @@ function loadSettingsFromDisk(): SettingsWithErrors {
   }
 
   const startTime = Date.now()
-  profileCheckpoint('loadSettingsFromDisk_start')
-  logForDiagnosticsNoPII('info', 'settings_load_started')
+  profileCheckpoint("loadSettingsFromDisk_start")
+  logForDiagnosticsNoPII("info", "settings_load_started")
 
   isLoadingSettings = true
   try {
@@ -660,11 +576,7 @@ function loadSettingsFromDisk(): SettingsWithErrors {
     const pluginSettings = getPluginSettingsBase()
     let mergedSettings: SettingsJson = {}
     if (pluginSettings) {
-      mergedSettings = mergeWith(
-        mergedSettings,
-        pluginSettings,
-        settingsMergeCustomizer,
-      )
+      mergedSettings = mergeWith(mergedSettings, pluginSettings, settingsMergeCustomizer)
     }
     const allErrors: ValidationError[] = []
     const seenErrors = new Set<string>()
@@ -674,7 +586,7 @@ function loadSettingsFromDisk(): SettingsWithErrors {
     for (const source of getEnabledSettingSources()) {
       // policySettings: "first source wins" — use the highest-priority source
       // that has content. Priority: remote > HKLM/plist > managed-settings.json > HKCU
-      if (source === 'policySettings') {
+      if (source === "policySettings") {
         let policySettings: SettingsJson | null = null
         const policyErrors: ValidationError[] = []
 
@@ -686,9 +598,7 @@ function loadSettingsFromDisk(): SettingsWithErrors {
             policySettings = result.data
           } else {
             // Remote exists but is invalid — surface errors even as we fall through
-            policyErrors.push(
-              ...formatZodError(result.error, 'remote managed settings'),
-            )
+            policyErrors.push(...formatZodError(result.error, "remote managed settings"))
           }
         }
 
@@ -721,11 +631,7 @@ function loadSettingsFromDisk(): SettingsWithErrors {
 
         // Merge the winning policy source into the settings chain
         if (policySettings) {
-          mergedSettings = mergeWith(
-            mergedSettings,
-            policySettings,
-            settingsMergeCustomizer,
-          )
+          mergedSettings = mergeWith(mergedSettings, policySettings, settingsMergeCustomizer)
         }
         for (const error of policyErrors) {
           const errorKey = `${error.file}:${error.path}:${error.message}`
@@ -758,32 +664,24 @@ function loadSettingsFromDisk(): SettingsWithErrors {
           }
 
           if (settings) {
-            mergedSettings = mergeWith(
-              mergedSettings,
-              settings,
-              settingsMergeCustomizer,
-            )
+            mergedSettings = mergeWith(mergedSettings, settings, settingsMergeCustomizer)
           }
         }
       }
 
       // For flagSettings, also merge any inline settings set via the SDK
-      if (source === 'flagSettings') {
+      if (source === "flagSettings") {
         const inlineSettings = getFlagSettingsInline()
         if (inlineSettings) {
           const parsed = SettingsSchema().safeParse(inlineSettings)
           if (parsed.success) {
-            mergedSettings = mergeWith(
-              mergedSettings,
-              parsed.data,
-              settingsMergeCustomizer,
-            )
+            mergedSettings = mergeWith(mergedSettings, parsed.data, settingsMergeCustomizer)
           }
         }
       }
     }
 
-    logForDiagnosticsNoPII('info', 'settings_load_completed', {
+    logForDiagnosticsNoPII("info", "settings_load_completed", {
       duration_ms: Date.now() - startTime,
       source_count: seenFiles.size,
       error_count: allErrors.length,
@@ -837,7 +735,7 @@ export function getSettingsWithSources(): SettingsWithSources {
   // Reset both caches so getSettingsForSource (per-source cache) and
   // getInitialSettings (session cache) agree on the current disk state.
   resetSettingsCache()
-  const sources: SettingsWithSources['sources'] = []
+  const sources: SettingsWithSources["sources"] = []
   for (const source of getEnabledSettingSources()) {
     const settings = getSettingsForSource(source)
     if (settings && Object.keys(settings).length > 0) {
@@ -862,7 +760,7 @@ export function getSettingsWithErrors(): SettingsWithErrors {
 
   // Load from disk and cache the result
   const result = loadSettingsFromDisk()
-  profileCheckpoint('loadSettingsFromDisk_end')
+  profileCheckpoint("loadSettingsFromDisk_end")
   setSessionSettingsCache(result)
   return result
 }
@@ -881,10 +779,10 @@ export function getSettingsWithErrors(): SettingsWithErrors {
  */
 export function hasSkipDangerousModePermissionPrompt(): boolean {
   return !!(
-    getSettingsForSource('userSettings')?.skipDangerousModePermissionPrompt ||
-    getSettingsForSource('localSettings')?.skipDangerousModePermissionPrompt ||
-    getSettingsForSource('flagSettings')?.skipDangerousModePermissionPrompt ||
-    getSettingsForSource('policySettings')?.skipDangerousModePermissionPrompt
+    getSettingsForSource("userSettings")?.skipDangerousModePermissionPrompt ||
+    getSettingsForSource("localSettings")?.skipDangerousModePermissionPrompt ||
+    getSettingsForSource("flagSettings")?.skipDangerousModePermissionPrompt ||
+    getSettingsForSource("policySettings")?.skipDangerousModePermissionPrompt
   )
 }
 
@@ -894,13 +792,11 @@ export function hasSkipDangerousModePermissionPrompt(): boolean {
  * a malicious project could otherwise auto-bypass the dialog (RCE risk).
  */
 export function hasAutoModeOptIn(): boolean {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
-    const user = getSettingsForSource('userSettings')?.skipAutoPermissionPrompt
-    const local =
-      getSettingsForSource('localSettings')?.skipAutoPermissionPrompt
-    const flag = getSettingsForSource('flagSettings')?.skipAutoPermissionPrompt
-    const policy =
-      getSettingsForSource('policySettings')?.skipAutoPermissionPrompt
+  if (feature("TRANSCRIPT_CLASSIFIER")) {
+    const user = getSettingsForSource("userSettings")?.skipAutoPermissionPrompt
+    const local = getSettingsForSource("localSettings")?.skipAutoPermissionPrompt
+    const flag = getSettingsForSource("flagSettings")?.skipAutoPermissionPrompt
+    const policy = getSettingsForSource("policySettings")?.skipAutoPermissionPrompt
     const result = !!(user || local || flag || policy)
     logForDebugging(
       `[auto-mode] hasAutoModeOptIn=${result} skipAutoPermissionPrompt: user=${user} local=${local} flag=${flag} policy=${policy}`,
@@ -916,12 +812,12 @@ export function hasAutoModeOptIn(): boolean {
  * projectSettings is excluded so a malicious project can't control this.
  */
 export function getUseAutoModeDuringPlan(): boolean {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+  if (feature("TRANSCRIPT_CLASSIFIER")) {
     return (
-      getSettingsForSource('policySettings')?.useAutoModeDuringPlan !== false &&
-      getSettingsForSource('flagSettings')?.useAutoModeDuringPlan !== false &&
-      getSettingsForSource('userSettings')?.useAutoModeDuringPlan !== false &&
-      getSettingsForSource('localSettings')?.useAutoModeDuringPlan !== false
+      getSettingsForSource("policySettings")?.useAutoModeDuringPlan !== false &&
+      getSettingsForSource("flagSettings")?.useAutoModeDuringPlan !== false &&
+      getSettingsForSource("userSettings")?.useAutoModeDuringPlan !== false &&
+      getSettingsForSource("localSettings")?.useAutoModeDuringPlan !== false
     )
   }
   return true
@@ -933,10 +829,8 @@ export function getUseAutoModeDuringPlan(): boolean {
  * projectSettings is intentionally excluded — a malicious project could
  * otherwise inject classifier allow/deny rules (RCE risk).
  */
-export function getAutoModeConfig():
-  | { allow?: string[]; soft_deny?: string[]; environment?: string[] }
-  | undefined {
-  if (feature('TRANSCRIPT_CLASSIFIER')) {
+export function getAutoModeConfig(): { allow?: string[]; soft_deny?: string[]; environment?: string[] } | undefined {
+  if (feature("TRANSCRIPT_CLASSIFIER")) {
     const schema = z.object({
       allow: z.array(z.string()).optional(),
       soft_deny: z.array(z.string()).optional(),
@@ -948,25 +842,17 @@ export function getAutoModeConfig():
     const soft_deny: string[] = []
     const environment: string[] = []
 
-    for (const source of [
-      'userSettings',
-      'localSettings',
-      'flagSettings',
-      'policySettings',
-    ] as const) {
+    for (const source of ["userSettings", "localSettings", "flagSettings", "policySettings"] as const) {
       const settings = getSettingsForSource(source)
       if (!settings) continue
-      const result = schema.safeParse(
-        (settings as Record<string, unknown>).autoMode,
-      )
+      const result = schema.safeParse((settings as Record<string, unknown>).autoMode)
       if (result.success) {
         if (result.data.allow) allow.push(...result.data.allow)
         if (result.data.soft_deny) soft_deny.push(...result.data.soft_deny)
-        if (process.env.USER_TYPE === 'ant') {
+        if (process.env.USER_TYPE === "ant") {
           if (result.data.deny) soft_deny.push(...result.data.deny)
         }
-        if (result.data.environment)
-          environment.push(...result.data.environment)
+        if (result.data.environment) environment.push(...result.data.environment)
       }
     }
 
@@ -984,7 +870,7 @@ export function getAutoModeConfig():
 export function rawSettingsContainsKey(key: string): boolean {
   for (const source of getEnabledSettingSources()) {
     // Skip policySettings - we only care about user-configured settings
-    if (source === 'policySettings') {
+    if (source === "policySettings") {
       continue
     }
 
@@ -1001,7 +887,7 @@ export function rawSettingsContainsKey(key: string): boolean {
       }
 
       const rawData = safeParseJSON(content, false)
-      if (rawData && typeof rawData === 'object' && key in rawData) {
+      if (rawData && typeof rawData === "object" && key in rawData) {
         return true
       }
     } catch (error) {

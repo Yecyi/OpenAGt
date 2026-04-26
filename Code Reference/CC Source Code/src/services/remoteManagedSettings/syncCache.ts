@@ -7,20 +7,11 @@
  * mirror alongside the leaf's state.
  */
 
-import { CLAUDE_AI_INFERENCE_SCOPE } from '../../constants/oauth.js'
-import {
-  getAnthropicApiKeyWithSource,
-  getClaudeAIOAuthTokens,
-} from '../../utils/auth.js'
-import {
-  getAPIProvider,
-  isFirstPartyAnthropicBaseUrl,
-} from '../../utils/model/providers.js'
+import { CLAUDE_AI_INFERENCE_SCOPE } from "../../constants/oauth.js"
+import { getAnthropicApiKeyWithSource, getClaudeAIOAuthTokens } from "../../utils/auth.js"
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from "../../utils/model/providers.js"
 
-import {
-  resetSyncCache as resetLeafCache,
-  setEligibility,
-} from './syncCacheState.js'
+import { resetSyncCache as resetLeafCache, setEligibility } from "./syncCacheState.js"
 
 let cached: boolean | undefined
 
@@ -50,7 +41,7 @@ export function isRemoteManagedSettingsEligible(): boolean {
   if (cached !== undefined) return cached
 
   // 3p provider users should not hit the settings endpoint
-  if (getAPIProvider() !== 'firstParty') {
+  if (getAPIProvider() !== "firstParty") {
     return (cached = setEligibility(false))
   }
 
@@ -63,7 +54,7 @@ export function isRemoteManagedSettingsEligible(): boolean {
   // (designed for CLI/CCD) don't apply there, and per-surface settings don't
   // exist yet. MDM/file-based managed settings still apply via settings.ts —
   // those require physical deployment and a different IT intent.
-  if (process.env.CLAUDE_CODE_ENTRYPOINT === 'local-agent') {
+  if (process.env.CLAUDE_CODE_ENTRYPOINT === "local-agent") {
     return (cached = setEligibility(false))
   }
 
@@ -87,8 +78,7 @@ export function isRemoteManagedSettingsEligible(): boolean {
   if (
     tokens?.accessToken &&
     tokens.scopes?.includes(CLAUDE_AI_INFERENCE_SCOPE) &&
-    (tokens.subscriptionType === 'enterprise' ||
-      tokens.subscriptionType === 'team')
+    (tokens.subscriptionType === "enterprise" || tokens.subscriptionType === "team")
   ) {
     return (cached = setEligibility(true))
   }

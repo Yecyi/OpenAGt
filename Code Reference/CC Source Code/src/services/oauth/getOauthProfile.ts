@@ -1,12 +1,10 @@
-import axios from 'axios'
-import { getOauthConfig, OAUTH_BETA_HEADER } from 'src/constants/oauth.js'
-import type { OAuthProfileResponse } from 'src/services/oauth/types.js'
-import { getAnthropicApiKey } from 'src/utils/auth.js'
-import { getGlobalConfig } from 'src/utils/config.js'
-import { logError } from 'src/utils/log.js'
-export async function getOauthProfileFromApiKey(): Promise<
-  OAuthProfileResponse | undefined
-> {
+import axios from "axios"
+import { getOauthConfig, OAUTH_BETA_HEADER } from "src/constants/oauth.js"
+import type { OAuthProfileResponse } from "src/services/oauth/types.js"
+import { getAnthropicApiKey } from "src/utils/auth.js"
+import { getGlobalConfig } from "src/utils/config.js"
+import { logError } from "src/utils/log.js"
+export async function getOauthProfileFromApiKey(): Promise<OAuthProfileResponse | undefined> {
   // Assumes interactive session
   const config = getGlobalConfig()
   const accountUuid = config.oauthAccount?.accountUuid
@@ -20,8 +18,8 @@ export async function getOauthProfileFromApiKey(): Promise<
   try {
     const response = await axios.get<OAuthProfileResponse>(endpoint, {
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-beta': OAUTH_BETA_HEADER,
+        "x-api-key": apiKey,
+        "anthropic-beta": OAUTH_BETA_HEADER,
       },
       params: {
         account_uuid: accountUuid,
@@ -34,15 +32,13 @@ export async function getOauthProfileFromApiKey(): Promise<
   }
 }
 
-export async function getOauthProfileFromOauthToken(
-  accessToken: string,
-): Promise<OAuthProfileResponse | undefined> {
+export async function getOauthProfileFromOauthToken(accessToken: string): Promise<OAuthProfileResponse | undefined> {
   const endpoint = `${getOauthConfig().BASE_API_URL}/api/oauth/profile`
   try {
     const response = await axios.get<OAuthProfileResponse>(endpoint, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       timeout: 10000,
     })

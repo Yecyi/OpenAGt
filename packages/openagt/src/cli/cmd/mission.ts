@@ -9,7 +9,7 @@ import { createOpencodeClient, type OpencodeClient } from "@openagt/sdk/v2"
 
 type MissionMode = "manual" | "assisted" | "autonomous"
 type MissionFormat = "text" | "json"
-type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection"
+type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection" | "continue"
 type ParallelMode = "off" | "safe" | "aggressive"
 type MissionEffort = "low" | "medium" | "high" | "deep"
 type MissionBudget = "small" | "normal" | "large" | "max"
@@ -47,6 +47,25 @@ function parseDurationMs(input?: string | number) {
   if (normalized.endsWith("m")) return Math.round(value * 60 * 1000)
   if (normalized.endsWith("h")) return Math.round(value * 60 * 60 * 1000)
   return Math.round(value)
+}
+
+function budgetDelta(input: {
+  rounds?: number
+  modelCalls?: number
+  toolCalls?: number
+  subagents?: number
+  wallclockMs?: number
+  estimatedTokens?: number
+}) {
+  const result = {
+    max_rounds: input.rounds,
+    max_model_calls: input.modelCalls,
+    max_tool_calls: input.toolCalls,
+    max_subagents: input.subagents,
+    max_wallclock_ms: input.wallclockMs,
+    max_estimated_tokens: input.estimatedTokens,
+  }
+  return Object.values(result).some((item) => item !== undefined) ? result : undefined
 }
 
 function emit(format: MissionFormat, type: string, data: Record<string, unknown>) {
@@ -320,6 +339,8 @@ async function controlMission(
     nodeID?: string
     taskID?: string
     showGroups?: boolean
+    autoContinue?: MissionAutoContinue
+    budgetDelta?: ReturnType<typeof budgetDelta>
   },
 ) {
   const result =
@@ -334,7 +355,12 @@ async function controlMission(
                 { runID: input.runID, task_id: input.taskID, node_id: input.nodeID },
                 { throwOnError: true },
               )
-            : undefined
+            : input.action === "continue"
+              ? await sdk.coordinator.continue(
+                  { runID: input.runID, budget_delta: input.budgetDelta, autoContinue: input.autoContinue },
+                  { throwOnError: true },
+                )
+              : undefined
   if (input.action === "projection") {
     const projection = (await sdk.coordinator.projection({ runID: input.runID }, { throwOnError: true })).data
     emit(input.format, "projection", { projection, showGroups: input.showGroups })
@@ -397,7 +423,6 @@ export const MissionCommand = cmd({
       .option("auto-continue", {
         type: "string",
         choices: ["never", "checkpoint", "safe"] as const,
-        default: "checkpoint",
         describe: "automatic continuation policy after budget checkpoints",
       })
       .option("max-rounds", {
@@ -411,6 +436,30 @@ export const MissionCommand = cmd({
       .option("max-wallclock", {
         type: "string",
         describe: "override mission absolute wallclock ceiling, e.g. 30m or 2h",
+      })
+      .option("budget-delta-rounds", {
+        type: "number",
+        describe: "additional continuation round budget for --action continue",
+      })
+      .option("budget-delta-model-calls", {
+        type: "number",
+        describe: "additional continuation model-call budget for --action continue",
+      })
+      .option("budget-delta-tool-calls", {
+        type: "number",
+        describe: "additional continuation tool-call budget for --action continue",
+      })
+      .option("budget-delta-subagents", {
+        type: "number",
+        describe: "additional continuation subagent budget for --action continue",
+      })
+      .option("budget-delta-wallclock", {
+        type: "string",
+        describe: "additional continuation wallclock budget, e.g. 30m or 2h",
+      })
+      .option("budget-delta-tokens", {
+        type: "number",
+        describe: "additional continuation estimated-token budget for --action continue",
       })
       .option("approve", {
         type: "boolean",
@@ -454,7 +503,7 @@ export const MissionCommand = cmd({
       })
       .option("action", {
         type: "string",
-        choices: ["approve", "cancel", "resume", "retry", "projection"] as const,
+        choices: ["approve", "cancel", "resume", "retry", "projection", "continue"] as const,
         describe: "action for an existing run",
       })
       .option("node", {
@@ -486,6 +535,15 @@ export const MissionCommand = cmd({
           nodeID: args.node,
           taskID: args.task,
           showGroups: args["show-groups"],
+          autoContinue: args["auto-continue"] as MissionAutoContinue | undefined,
+          budgetDelta: budgetDelta({
+            rounds: args["budget-delta-rounds"],
+            modelCalls: args["budget-delta-model-calls"],
+            toolCalls: args["budget-delta-tool-calls"],
+            subagents: args["budget-delta-subagents"],
+            wallclockMs: parseDurationMs(args["budget-delta-wallclock"]),
+            estimatedTokens: args["budget-delta-tokens"],
+          }),
         })
         return
       }
@@ -508,7 +566,7 @@ export const MissionCommand = cmd({
         effort: args.effort as MissionEffort,
         workflow: args.workflow as MissionWorkflow | undefined,
         budget: args.budget as MissionBudget,
-        autoContinue: args["auto-continue"] as MissionAutoContinue,
+        autoContinue: args["auto-continue"] as MissionAutoContinue | undefined,
         maxRounds: args["max-rounds"],
         maxSubagents: args["max-subagents"],
         maxWallclockMs: parseDurationMs(args["max-wallclock"]),

@@ -24,10 +24,10 @@
  *     queryGuard.getSnapshot,
  *   )
  */
-import { createSignal } from './signal.js'
+import { createSignal } from "./signal.js"
 
 export class QueryGuard {
-  private _status: 'idle' | 'dispatching' | 'running' = 'idle'
+  private _status: "idle" | "dispatching" | "running" = "idle"
   private _generation = 0
   private _changed = createSignal()
 
@@ -36,8 +36,8 @@ export class QueryGuard {
    * Returns false if not idle (another query or dispatch in progress).
    */
   reserve(): boolean {
-    if (this._status !== 'idle') return false
-    this._status = 'dispatching'
+    if (this._status !== "idle") return false
+    this._status = "dispatching"
     this._notify()
     return true
   }
@@ -47,8 +47,8 @@ export class QueryGuard {
    * Transitions dispatching → idle.
    */
   cancelReservation(): void {
-    if (this._status !== 'dispatching') return
-    this._status = 'idle'
+    if (this._status !== "dispatching") return
+    this._status = "idle"
     this._notify()
   }
 
@@ -59,8 +59,8 @@ export class QueryGuard {
    * and dispatching (queue processor path).
    */
   tryStart(): number | null {
-    if (this._status === 'running') return null
-    this._status = 'running'
+    if (this._status === "running") return null
+    this._status = "running"
     ++this._generation
     this._notify()
     return this._generation
@@ -73,8 +73,8 @@ export class QueryGuard {
    */
   end(generation: number): boolean {
     if (this._generation !== generation) return false
-    if (this._status !== 'running') return false
-    this._status = 'idle'
+    if (this._status !== "running") return false
+    this._status = "idle"
     this._notify()
     return true
   }
@@ -86,8 +86,8 @@ export class QueryGuard {
    * query's promise rejection will see a mismatch and skip cleanup.
    */
   forceEnd(): void {
-    if (this._status === 'idle') return
-    this._status = 'idle'
+    if (this._status === "idle") return
+    this._status = "idle"
     ++this._generation
     this._notify()
   }
@@ -97,7 +97,7 @@ export class QueryGuard {
    * Always synchronous — not subject to React state batching delays.
    */
   get isActive(): boolean {
-    return this._status !== 'idle'
+    return this._status !== "idle"
   }
 
   get generation(): number {
@@ -112,7 +112,7 @@ export class QueryGuard {
 
   /** Snapshot for useSyncExternalStore. Returns `isActive`. */
   getSnapshot = (): boolean => {
-    return this._status !== 'idle'
+    return this._status !== "idle"
   }
 
   private _notify(): void {

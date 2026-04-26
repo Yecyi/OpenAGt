@@ -4,12 +4,8 @@
  * Functions for finding text object boundaries (iw, aw, i", a(, etc.)
  */
 
-import {
-  isVimPunctuation,
-  isVimWhitespace,
-  isVimWordChar,
-} from '../utils/Cursor.js'
-import { getGraphemeSegmenter } from '../utils/intl.js'
+import { isVimPunctuation, isVimWhitespace, isVimWordChar } from "../utils/Cursor.js"
+import { getGraphemeSegmenter } from "../utils/intl.js"
 
 export type TextObjectRange = { start: number; end: number } | null
 
@@ -17,34 +13,27 @@ export type TextObjectRange = { start: number; end: number } | null
  * Delimiter pairs for text objects.
  */
 const PAIRS: Record<string, [string, string]> = {
-  '(': ['(', ')'],
-  ')': ['(', ')'],
-  b: ['(', ')'],
-  '[': ['[', ']'],
-  ']': ['[', ']'],
-  '{': ['{', '}'],
-  '}': ['{', '}'],
-  B: ['{', '}'],
-  '<': ['<', '>'],
-  '>': ['<', '>'],
+  "(": ["(", ")"],
+  ")": ["(", ")"],
+  b: ["(", ")"],
+  "[": ["[", "]"],
+  "]": ["[", "]"],
+  "{": ["{", "}"],
+  "}": ["{", "}"],
+  B: ["{", "}"],
+  "<": ["<", ">"],
+  ">": ["<", ">"],
   '"': ['"', '"'],
   "'": ["'", "'"],
-  '`': ['`', '`'],
+  "`": ["`", "`"],
 }
 
 /**
  * Find a text object at the given position.
  */
-export function findTextObject(
-  text: string,
-  offset: number,
-  objectType: string,
-  isInner: boolean,
-): TextObjectRange {
-  if (objectType === 'w')
-    return findWordObject(text, offset, isInner, isVimWordChar)
-  if (objectType === 'W')
-    return findWordObject(text, offset, isInner, ch => !isVimWhitespace(ch))
+export function findTextObject(text: string, offset: number, objectType: string, isInner: boolean): TextObjectRange {
+  if (objectType === "w") return findWordObject(text, offset, isInner, isVimWordChar)
+  if (objectType === "W") return findWordObject(text, offset, isInner, (ch) => !isVimWhitespace(ch))
 
   const pair = PAIRS[objectType]
   if (pair) {
@@ -73,17 +62,15 @@ function findWordObject(
   let graphemeIdx = graphemes.length - 1
   for (let i = 0; i < graphemes.length; i++) {
     const g = graphemes[i]!
-    const nextStart =
-      i + 1 < graphemes.length ? graphemes[i + 1]!.index : text.length
+    const nextStart = i + 1 < graphemes.length ? graphemes[i + 1]!.index : text.length
     if (offset >= g.index && offset < nextStart) {
       graphemeIdx = i
       break
     }
   }
 
-  const graphemeAt = (idx: number): string => graphemes[idx]?.segment ?? ''
-  const offsetAt = (idx: number): number =>
-    idx < graphemes.length ? graphemes[idx]!.index : text.length
+  const graphemeAt = (idx: number): string => graphemes[idx]?.segment ?? ""
+  const offsetAt = (idx: number): number => (idx < graphemes.length ? graphemes[idx]!.index : text.length)
   const isWs = (idx: number): boolean => isVimWhitespace(graphemeAt(idx))
   const isWord = (idx: number): boolean => isWordChar(graphemeAt(idx))
   const isPunct = (idx: number): boolean => isVimPunctuation(graphemeAt(idx))
@@ -115,14 +102,9 @@ function findWordObject(
   return { start: offsetAt(startIdx), end: offsetAt(endIdx) }
 }
 
-function findQuoteObject(
-  text: string,
-  offset: number,
-  quote: string,
-  isInner: boolean,
-): TextObjectRange {
-  const lineStart = text.lastIndexOf('\n', offset - 1) + 1
-  const lineEnd = text.indexOf('\n', offset)
+function findQuoteObject(text: string, offset: number, quote: string, isInner: boolean): TextObjectRange {
+  const lineStart = text.lastIndexOf("\n", offset - 1) + 1
+  const lineEnd = text.indexOf("\n", offset)
   const effectiveEnd = lineEnd === -1 ? text.length : lineEnd
   const line = text.slice(lineStart, effectiveEnd)
   const posInLine = offset - lineStart

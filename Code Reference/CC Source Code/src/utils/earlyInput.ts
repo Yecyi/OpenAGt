@@ -11,10 +11,10 @@
  * 3. stopCapturingEarlyInput() is called automatically when input is consumed
  */
 
-import { lastGrapheme } from './intl.js'
+import { lastGrapheme } from "./intl.js"
 
 // Buffer for early input characters
-let earlyInputBuffer = ''
+let earlyInputBuffer = ""
 // Flag to track if we're currently capturing
 let isCapturing = false
 // Reference to the readable handler so we can remove it later
@@ -30,36 +30,31 @@ export function startCapturingEarlyInput(): void {
   // Only capture in interactive mode: stdin must be a TTY, and we must not
   // be in print mode. Raw mode disables ISIG (terminal Ctrl+C → SIGINT),
   // which would make -p uninterruptible.
-  if (
-    !process.stdin.isTTY ||
-    isCapturing ||
-    process.argv.includes('-p') ||
-    process.argv.includes('--print')
-  ) {
+  if (!process.stdin.isTTY || isCapturing || process.argv.includes("-p") || process.argv.includes("--print")) {
     return
   }
 
   isCapturing = true
-  earlyInputBuffer = ''
+  earlyInputBuffer = ""
 
   // Set stdin to raw mode and use 'readable' event like Ink does
   // This ensures compatibility with how the REPL will handle stdin later
   try {
-    process.stdin.setEncoding('utf8')
+    process.stdin.setEncoding("utf8")
     process.stdin.setRawMode(true)
     process.stdin.ref()
 
     readableHandler = () => {
       let chunk = process.stdin.read()
       while (chunk !== null) {
-        if (typeof chunk === 'string') {
+        if (typeof chunk === "string") {
           processChunk(chunk)
         }
         chunk = process.stdin.read()
       }
     }
 
-    process.stdin.on('readable', readableHandler)
+    process.stdin.on("readable", readableHandler)
   } catch {
     // If we can't set raw mode, just silently continue without early capture
     isCapturing = false
@@ -106,10 +101,7 @@ function processChunk(str: string): void {
     if (code === 27) {
       i++ // Skip the ESC character
       // Skip until the terminating byte (@ to ~) or end of string
-      while (
-        i < str.length &&
-        !(str.charCodeAt(i) >= 64 && str.charCodeAt(i) <= 126)
-      ) {
+      while (i < str.length && !(str.charCodeAt(i) >= 64 && str.charCodeAt(i) <= 126)) {
         i++
       }
       if (i < str.length) i++ // Skip the terminating byte
@@ -124,7 +116,7 @@ function processChunk(str: string): void {
 
     // Convert carriage return to newline
     if (code === 13) {
-      earlyInputBuffer += '\n'
+      earlyInputBuffer += "\n"
       i++
       continue
     }
@@ -147,7 +139,7 @@ export function stopCapturingEarlyInput(): void {
   isCapturing = false
 
   if (readableHandler) {
-    process.stdin.removeListener('readable', readableHandler)
+    process.stdin.removeListener("readable", readableHandler)
     readableHandler = null
   }
 
@@ -164,7 +156,7 @@ export function stopCapturingEarlyInput(): void {
 export function consumeEarlyInput(): string {
   stopCapturingEarlyInput()
   const input = earlyInputBuffer.trim()
-  earlyInputBuffer = ''
+  earlyInputBuffer = ""
   return input
 }
 

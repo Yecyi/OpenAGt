@@ -1,39 +1,30 @@
-import { feature } from 'bun:bundle'
-import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
-import type { QuerySource } from '../../constants/querySource.js'
-import type { ToolUseContext } from '../../Tool.js'
-import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
-import { FILE_READ_TOOL_NAME } from '../../tools/FileReadTool/prompt.js'
-import { FILE_WRITE_TOOL_NAME } from '../../tools/FileWriteTool/prompt.js'
-import { GLOB_TOOL_NAME } from '../../tools/GlobTool/prompt.js'
-import { GREP_TOOL_NAME } from '../../tools/GrepTool/prompt.js'
-import { WEB_FETCH_TOOL_NAME } from '../../tools/WebFetchTool/prompt.js'
-import { WEB_SEARCH_TOOL_NAME } from '../../tools/WebSearchTool/prompt.js'
-import type { Message } from '../../types/message.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { getMainLoopModel } from '../../utils/model/model.js'
-import { SHELL_TOOL_NAMES } from '../../utils/shell/shellToolUtils.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import {
-  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-  logEvent,
-} from '../analytics/index.js'
-import { notifyCacheDeletion } from '../api/promptCacheBreakDetection.js'
-import { roughTokenCountEstimation } from '../tokenEstimation.js'
-import {
-  clearCompactWarningSuppression,
-  suppressCompactWarning,
-} from './compactWarningState.js'
-import {
-  getTimeBasedMCConfig,
-  type TimeBasedMCConfig,
-} from './timeBasedMCConfig.js'
+import { feature } from "bun:bundle"
+import type { ToolResultBlockParam } from "@anthropic-ai/sdk/resources/index.mjs"
+import type { QuerySource } from "../../constants/querySource.js"
+import type { ToolUseContext } from "../../Tool.js"
+import { FILE_EDIT_TOOL_NAME } from "../../tools/FileEditTool/constants.js"
+import { FILE_READ_TOOL_NAME } from "../../tools/FileReadTool/prompt.js"
+import { FILE_WRITE_TOOL_NAME } from "../../tools/FileWriteTool/prompt.js"
+import { GLOB_TOOL_NAME } from "../../tools/GlobTool/prompt.js"
+import { GREP_TOOL_NAME } from "../../tools/GrepTool/prompt.js"
+import { WEB_FETCH_TOOL_NAME } from "../../tools/WebFetchTool/prompt.js"
+import { WEB_SEARCH_TOOL_NAME } from "../../tools/WebSearchTool/prompt.js"
+import type { Message } from "../../types/message.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { getMainLoopModel } from "../../utils/model/model.js"
+import { SHELL_TOOL_NAMES } from "../../utils/shell/shellToolUtils.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from "../analytics/index.js"
+import { notifyCacheDeletion } from "../api/promptCacheBreakDetection.js"
+import { roughTokenCountEstimation } from "../tokenEstimation.js"
+import { clearCompactWarningSuppression, suppressCompactWarning } from "./compactWarningState.js"
+import { getTimeBasedMCConfig, type TimeBasedMCConfig } from "./timeBasedMCConfig.js"
 
 // Inline from utils/toolResultStorage.ts — importing that file pulls in
 // sessionStorage → utils/messages → services/api/errors, completing a
 // circular-deps loop back through this file via promptCacheBreakDetection.
 // Drift is caught by a test asserting equality with the source-of-truth.
-export const TIME_BASED_MC_CLEARED_MESSAGE = '[Old tool result content cleared]'
+export const TIME_BASED_MC_CLEARED_MESSAGE = "[Old tool result content cleared]"
 
 const IMAGE_MAX_TOKEN_SIZE = 2000
 
@@ -53,29 +44,23 @@ const COMPACTABLE_TOOLS = new Set<string>([
 
 // Lazy-initialized cached MC module and state to avoid importing in external builds.
 // The imports and state live inside feature() checks for dead code elimination.
-let cachedMCModule: typeof import('./cachedMicrocompact.js') | null = null
-let cachedMCState: import('./cachedMicrocompact.js').CachedMCState | null = null
-let pendingCacheEdits:
-  | import('./cachedMicrocompact.js').CacheEditsBlock
-  | null = null
+let cachedMCModule: typeof import("./cachedMicrocompact.js") | null = null
+let cachedMCState: import("./cachedMicrocompact.js").CachedMCState | null = null
+let pendingCacheEdits: import("./cachedMicrocompact.js").CacheEditsBlock | null = null
 
-async function getCachedMCModule(): Promise<
-  typeof import('./cachedMicrocompact.js')
-> {
+async function getCachedMCModule(): Promise<typeof import("./cachedMicrocompact.js")> {
   if (!cachedMCModule) {
-    cachedMCModule = await import('./cachedMicrocompact.js')
+    cachedMCModule = await import("./cachedMicrocompact.js")
   }
   return cachedMCModule
 }
 
-function ensureCachedMCState(): import('./cachedMicrocompact.js').CachedMCState {
+function ensureCachedMCState(): import("./cachedMicrocompact.js").CachedMCState {
   if (!cachedMCState && cachedMCModule) {
     cachedMCState = cachedMCModule.createCachedMCState()
   }
   if (!cachedMCState) {
-    throw new Error(
-      'cachedMCState not initialized — getCachedMCModule() must be called first',
-    )
+    throw new Error("cachedMCState not initialized — getCachedMCModule() must be called first")
   }
   return cachedMCState
 }
@@ -85,9 +70,7 @@ function ensureCachedMCState(): import('./cachedMicrocompact.js').CachedMCState 
  * Returns null if there are no new pending edits.
  * Clears the pending state (caller must pin them after insertion).
  */
-export function consumePendingCacheEdits():
-  | import('./cachedMicrocompact.js').CacheEditsBlock
-  | null {
+export function consumePendingCacheEdits(): import("./cachedMicrocompact.js").CacheEditsBlock | null {
   const edits = pendingCacheEdits
   pendingCacheEdits = null
   return edits
@@ -97,7 +80,7 @@ export function consumePendingCacheEdits():
  * Get all previously-pinned cache edits that must be re-sent at their
  * original positions for cache hits.
  */
-export function getPinnedCacheEdits(): import('./cachedMicrocompact.js').PinnedCacheEdits[] {
+export function getPinnedCacheEdits(): import("./cachedMicrocompact.js").PinnedCacheEdits[] {
   if (!cachedMCState) {
     return []
   }
@@ -110,7 +93,7 @@ export function getPinnedCacheEdits(): import('./cachedMicrocompact.js').PinnedC
  */
 export function pinCacheEdits(
   userMessageIndex: number,
-  block: import('./cachedMicrocompact.js').CacheEditsBlock,
+  block: import("./cachedMicrocompact.js").CacheEditsBlock,
 ): void {
   if (cachedMCState) {
     cachedMCState.pinnedEdits.push({ userMessageIndex, block })
@@ -140,15 +123,15 @@ function calculateToolResultTokens(block: ToolResultBlockParam): number {
     return 0
   }
 
-  if (typeof block.content === 'string') {
+  if (typeof block.content === "string") {
     return roughTokenCountEstimation(block.content)
   }
 
   // Array of TextBlockParam | ImageBlockParam | DocumentBlockParam
   return block.content.reduce((sum, item) => {
-    if (item.type === 'text') {
+    if (item.type === "text") {
       return sum + roughTokenCountEstimation(item.text)
-    } else if (item.type === 'image' || item.type === 'document') {
+    } else if (item.type === "image" || item.type === "document") {
       // Images/documents are approximately 2000 tokens regardless of format
       return sum + IMAGE_MAX_TOKEN_SIZE
     }
@@ -165,7 +148,7 @@ export function estimateMessageTokens(messages: Message[]): number {
   let totalTokens = 0
 
   for (const message of messages) {
-    if (message.type !== 'user' && message.type !== 'assistant') {
+    if (message.type !== "user" && message.type !== "assistant") {
       continue
     }
 
@@ -174,25 +157,23 @@ export function estimateMessageTokens(messages: Message[]): number {
     }
 
     for (const block of message.message.content) {
-      if (block.type === 'text') {
+      if (block.type === "text") {
         totalTokens += roughTokenCountEstimation(block.text)
-      } else if (block.type === 'tool_result') {
+      } else if (block.type === "tool_result") {
         totalTokens += calculateToolResultTokens(block)
-      } else if (block.type === 'image' || block.type === 'document') {
+      } else if (block.type === "image" || block.type === "document") {
         totalTokens += IMAGE_MAX_TOKEN_SIZE
-      } else if (block.type === 'thinking') {
+      } else if (block.type === "thinking") {
         // Match roughTokenCountEstimationForBlock: count only the thinking
         // text, not the JSON wrapper or signature (signature is metadata,
         // not model-tokenized content).
         totalTokens += roughTokenCountEstimation(block.thinking)
-      } else if (block.type === 'redacted_thinking') {
+      } else if (block.type === "redacted_thinking") {
         totalTokens += roughTokenCountEstimation(block.data)
-      } else if (block.type === 'tool_use') {
+      } else if (block.type === "tool_use") {
         // Match roughTokenCountEstimationForBlock: count name + input,
         // not the JSON wrapper or id field.
-        totalTokens += roughTokenCountEstimation(
-          block.name + jsonStringify(block.input ?? {}),
-        )
+        totalTokens += roughTokenCountEstimation(block.name + jsonStringify(block.input ?? {}))
       } else {
         // server_tool_use, web_search_tool_result, etc.
         totalTokens += roughTokenCountEstimation(jsonStringify(block))
@@ -205,7 +186,7 @@ export function estimateMessageTokens(messages: Message[]): number {
 }
 
 export type PendingCacheEdits = {
-  trigger: 'auto'
+  trigger: "auto"
   deletedToolIds: string[]
   // Baseline cumulative cache_deleted_input_tokens from the previous API response,
   // used to compute the per-operation delta (the API value is sticky/cumulative)
@@ -226,12 +207,9 @@ export type MicrocompactResult = {
 function collectCompactableToolIds(messages: Message[]): string[] {
   const ids: string[] = []
   for (const message of messages) {
-    if (
-      message.type === 'assistant' &&
-      Array.isArray(message.message.content)
-    ) {
+    if (message.type === "assistant" && Array.isArray(message.message.content)) {
       for (const block of message.message.content) {
-        if (block.type === 'tool_use' && COMPACTABLE_TOOLS.has(block.name)) {
+        if (block.type === "tool_use" && COMPACTABLE_TOOLS.has(block.name)) {
           ids.push(block.id)
         }
       }
@@ -247,7 +225,7 @@ function collectCompactableToolIds(messages: Message[]): string[] {
 // cached-MC `=== 'repl_main_thread'` check was a latent bug — users with a
 // non-default output style were silently excluded from cached MC.
 function isMainThreadSource(querySource: QuerySource | undefined): boolean {
-  return !querySource || querySource.startsWith('repl_main_thread')
+  return !querySource || querySource.startsWith("repl_main_thread")
 }
 
 export async function microcompactMessages(
@@ -273,7 +251,7 @@ export async function microcompactMessages(
   // (session_memory, prompt_suggestion, etc.) from registering their
   // tool_results in the global cachedMCState, which would cause the main
   // thread to try deleting tools that don't exist in its own conversation.
-  if (feature('CACHED_MICROCOMPACT')) {
+  if (feature("CACHED_MICROCOMPACT")) {
     const mod = await getCachedMCModule()
     const model = toolUseContext?.options.mainLoopModel ?? getMainLoopModel()
     if (
@@ -313,11 +291,11 @@ async function cachedMicrocompactPath(
   const compactableToolIds = new Set(collectCompactableToolIds(messages))
   // Second pass: register tool results grouped by user message
   for (const message of messages) {
-    if (message.type === 'user' && Array.isArray(message.message.content)) {
+    if (message.type === "user" && Array.isArray(message.message.content)) {
       const groupIds: string[] = []
       for (const block of message.message.content) {
         if (
-          block.type === 'tool_result' &&
+          block.type === "tool_result" &&
           compactableToolIds.has(block.tool_use_id) &&
           !state.registeredTools.has(block.tool_use_id)
         ) {
@@ -338,19 +316,14 @@ async function cachedMicrocompactPath(
       pendingCacheEdits = cacheEdits
     }
 
-    logForDebugging(
-      `Cached MC deleting ${toolsToDelete.length} tool(s): ${toolsToDelete.join(', ')}`,
-    )
+    logForDebugging(`Cached MC deleting ${toolsToDelete.length} tool(s): ${toolsToDelete.join(", ")}`)
 
     // Log the event
-    logEvent('tengu_cached_microcompact', {
+    logEvent("tengu_cached_microcompact", {
       toolsDeleted: toolsToDelete.length,
-      deletedToolIds: toolsToDelete.join(
-        ',',
-      ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      deletedToolIds: toolsToDelete.join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       activeToolCount: state.toolOrder.length - state.deletedRefs.size,
-      triggerType:
-        'auto' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      triggerType: "auto" as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       threshold: config.triggerThreshold,
       keepRecent: config.keepRecent,
     })
@@ -359,11 +332,11 @@ async function cachedMicrocompactPath(
     suppressCompactWarning()
 
     // Notify cache break detection that cache reads will legitimately drop
-    if (feature('PROMPT_CACHE_BREAK_DETECTION')) {
+    if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
       // Pass the actual querySource — isMainThreadSource now prefix-matches
       // so output-style variants enter here, and getTrackingKey keys on the
       // full source string, not the 'repl_main_thread' prefix.
-      notifyCacheDeletion(querySource ?? 'repl_main_thread')
+      notifyCacheDeletion(querySource ?? "repl_main_thread")
     }
 
     // Return messages unchanged - cache_reference and cache_edits are added at API layer
@@ -371,22 +344,17 @@ async function cachedMicrocompactPath(
     // actual cache_deleted_input_tokens from the API instead of client-side estimates
     // Capture the baseline cumulative cache_deleted_input_tokens from the last
     // assistant message so we can compute a per-operation delta after the API call
-    const lastAsst = messages.findLast(m => m.type === 'assistant')
+    const lastAsst = messages.findLast((m) => m.type === "assistant")
     const baseline =
-      lastAsst?.type === 'assistant'
-        ? ((
-            lastAsst.message.usage as unknown as Record<
-              string,
-              number | undefined
-            >
-          )?.cache_deleted_input_tokens ?? 0)
+      lastAsst?.type === "assistant"
+        ? ((lastAsst.message.usage as unknown as Record<string, number | undefined>)?.cache_deleted_input_tokens ?? 0)
         : 0
 
     return {
       messages,
       compactionInfo: {
         pendingCacheEdits: {
-          trigger: 'auto',
+          trigger: "auto",
           deletedToolIds: toolsToDelete,
           baselineCacheDeletedTokens: baseline,
         },
@@ -431,12 +399,11 @@ export function evaluateTimeBasedTrigger(
   if (!config.enabled || !querySource || !isMainThreadSource(querySource)) {
     return null
   }
-  const lastAssistant = messages.findLast(m => m.type === 'assistant')
+  const lastAssistant = messages.findLast((m) => m.type === "assistant")
   if (!lastAssistant) {
     return null
   }
-  const gapMinutes =
-    (Date.now() - new Date(lastAssistant.timestamp).getTime()) / 60_000
+  const gapMinutes = (Date.now() - new Date(lastAssistant.timestamp).getTime()) / 60_000
   if (!Number.isFinite(gapMinutes) || gapMinutes < config.gapThresholdMinutes) {
     return null
   }
@@ -460,21 +427,21 @@ function maybeTimeBasedMicrocompact(
   // context. Neither degenerate is sensible — always keep at least the last.
   const keepRecent = Math.max(1, config.keepRecent)
   const keepSet = new Set(compactableIds.slice(-keepRecent))
-  const clearSet = new Set(compactableIds.filter(id => !keepSet.has(id)))
+  const clearSet = new Set(compactableIds.filter((id) => !keepSet.has(id)))
 
   if (clearSet.size === 0) {
     return null
   }
 
   let tokensSaved = 0
-  const result: Message[] = messages.map(message => {
-    if (message.type !== 'user' || !Array.isArray(message.message.content)) {
+  const result: Message[] = messages.map((message) => {
+    if (message.type !== "user" || !Array.isArray(message.message.content)) {
       return message
     }
     let touched = false
-    const newContent = message.message.content.map(block => {
+    const newContent = message.message.content.map((block) => {
       if (
-        block.type === 'tool_result' &&
+        block.type === "tool_result" &&
         clearSet.has(block.tool_use_id) &&
         block.content !== TIME_BASED_MC_CLEARED_MESSAGE
       ) {
@@ -495,7 +462,7 @@ function maybeTimeBasedMicrocompact(
     return null
   }
 
-  logEvent('tengu_time_based_microcompact', {
+  logEvent("tengu_time_based_microcompact", {
     gapMinutes: Math.round(gapMinutes),
     gapThresholdMinutes: config.gapThresholdMinutes,
     toolsCleared: clearSet.size,
@@ -522,7 +489,7 @@ function maybeTimeBasedMicrocompact(
   // symbol to the import was flagged by the circular-deps check.
   // Pass the actual querySource: getTrackingKey returns the full source string
   // (e.g. 'repl_main_thread:outputStyle:custom'), not just the prefix.
-  if (feature('PROMPT_CACHE_BREAK_DETECTION') && querySource) {
+  if (feature("PROMPT_CACHE_BREAK_DETECTION") && querySource) {
     notifyCacheDeletion(querySource)
   }
 

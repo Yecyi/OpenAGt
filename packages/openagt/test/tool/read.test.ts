@@ -434,7 +434,10 @@ describe("tool.read truncation", () => {
   it.live("rejects image attachments over the inline size limit", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()
-      yield* put(path.join(dir, "huge.png"), Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(5 * 1024 * 1024)]))
+      yield* put(
+        path.join(dir, "huge.png"),
+        Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(5 * 1024 * 1024)]),
+      )
 
       const err = yield* fail(dir, { filePath: path.join(dir, "huge.png") })
       expect(err.message).toContain("Cannot read image file larger than 5 MiB")

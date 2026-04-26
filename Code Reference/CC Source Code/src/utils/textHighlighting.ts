@@ -5,8 +5,8 @@ import {
   type Token,
   tokenize,
   undoAnsiCodes,
-} from '@alcalzone/ansi-tokenize'
-import type { Theme } from './theme.js'
+} from "@alcalzone/ansi-tokenize"
+import type { Theme } from "./theme.js"
 
 export type TextHighlight = {
   start: number
@@ -24,10 +24,7 @@ export type TextSegment = {
   highlight?: TextHighlight
 }
 
-export function segmentTextByHighlights(
-  text: string,
-  highlights: TextHighlight[],
-): TextSegment[] {
+export function segmentTextByHighlights(text: string, highlights: TextHighlight[]): TextSegment[] {
   if (highlights.length === 0) {
     return [{ text, start: 0 }]
   }
@@ -44,7 +41,7 @@ export function segmentTextByHighlights(
     if (highlight.start === highlight.end) continue
 
     const overlaps = usedRanges.some(
-      range =>
+      (range) =>
         (highlight.start >= range.start && highlight.start < range.end) ||
         (highlight.end > range.start && highlight.end <= range.end) ||
         (highlight.start <= range.start && highlight.end >= range.end),
@@ -94,10 +91,7 @@ class HighlightSegmenter {
   }
 
   private segmentTo(targetVisiblePos: number): TextSegment | null {
-    if (
-      this.tokenIdx >= this.tokens.length ||
-      targetVisiblePos <= this.visiblePos
-    ) {
+    if (this.tokenIdx >= this.tokens.length || targetVisiblePos <= this.visiblePos) {
       return null
     }
 
@@ -106,7 +100,7 @@ class HighlightSegmenter {
     // Consume leading ANSI codes before first visible char
     while (this.tokenIdx < this.tokens.length) {
       const token = this.tokens[this.tokenIdx]!
-      if (token.type !== 'ansi') break
+      if (token.type !== "ansi") break
       this.codes.push(token)
       this.stringPos += token.code.length
       this.tokenIdx++
@@ -116,13 +110,10 @@ class HighlightSegmenter {
     const codesStart = [...this.codes]
 
     // Advance through tokens until we reach target
-    while (
-      this.visiblePos < targetVisiblePos &&
-      this.tokenIdx < this.tokens.length
-    ) {
+    while (this.visiblePos < targetVisiblePos && this.tokenIdx < this.tokens.length) {
       const token = this.tokens[this.tokenIdx]!
 
-      if (token.type === 'ansi') {
+      if (token.type === "ansi") {
         this.codes.push(token)
         this.stringPos += token.code.length
         this.tokenIdx++
@@ -162,5 +153,5 @@ class HighlightSegmenter {
 }
 
 function reduceCodes(codes: AnsiCode[]): AnsiCode[] {
-  return reduceAnsiCodes(codes).filter(c => c.code !== c.endCode)
+  return reduceAnsiCodes(codes).filter((c) => c.code !== c.endCode)
 }

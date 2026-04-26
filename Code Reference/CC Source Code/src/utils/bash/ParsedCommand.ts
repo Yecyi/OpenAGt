@@ -1,17 +1,11 @@
-import memoize from 'lodash-es/memoize.js'
-import {
-  extractOutputRedirections,
-  splitCommandWithOperators,
-} from './commands.js'
-import type { Node } from './parser.js'
-import {
-  analyzeCommand,
-  type TreeSitterAnalysis,
-} from './treeSitterAnalysis.js'
+import memoize from "lodash-es/memoize.js"
+import { extractOutputRedirections, splitCommandWithOperators } from "./commands.js"
+import type { Node } from "./parser.js"
+import { analyzeCommand, type TreeSitterAnalysis } from "./treeSitterAnalysis.js"
 
 export type OutputRedirection = {
   target: string
-  operator: '>' | '>>'
+  operator: ">" | ">>"
 }
 
 /**
@@ -57,9 +51,9 @@ export class RegexParsedCommand_DEPRECATED implements IParsedCommand {
       let currentSegment: string[] = []
 
       for (const part of parts) {
-        if (part === '|') {
+        if (part === "|") {
           if (currentSegment.length > 0) {
-            segments.push(currentSegment.join(' '))
+            segments.push(currentSegment.join(" "))
             currentSegment = []
           }
         } else {
@@ -68,7 +62,7 @@ export class RegexParsedCommand_DEPRECATED implements IParsedCommand {
       }
 
       if (currentSegment.length > 0) {
-        segments.push(currentSegment.join(' '))
+        segments.push(currentSegment.join(" "))
       }
 
       return segments.length > 0 ? segments : [this.originalCommand]
@@ -78,14 +72,11 @@ export class RegexParsedCommand_DEPRECATED implements IParsedCommand {
   }
 
   withoutOutputRedirections(): string {
-    if (!this.originalCommand.includes('>')) {
+    if (!this.originalCommand.includes(">")) {
       return this.originalCommand
     }
-    const { commandWithoutRedirections, redirections } =
-      extractOutputRedirections(this.originalCommand)
-    return redirections.length > 0
-      ? commandWithoutRedirections
-      : this.originalCommand
+    const { commandWithoutRedirections, redirections } = extractOutputRedirections(this.originalCommand)
+    return redirections.length > 0 ? commandWithoutRedirections : this.originalCommand
   }
 
   getOutputRedirections(): OutputRedirection[] {
@@ -112,10 +103,10 @@ function visitNodes(node: Node, visitor: (node: Node) => void): void {
 
 function extractPipePositions(rootNode: Node): number[] {
   const pipePositions: number[] = []
-  visitNodes(rootNode, node => {
-    if (node.type === 'pipeline') {
+  visitNodes(rootNode, (node) => {
+    if (node.type === "pipeline") {
       for (const child of node.children) {
-        if (child.type === '|') {
+        if (child.type === "|") {
           pipePositions.push(child.startIndex)
         }
       }
@@ -130,17 +121,17 @@ function extractPipePositions(rootNode: Node): number[] {
 
 function extractRedirectionNodes(rootNode: Node): RedirectionNode[] {
   const redirections: RedirectionNode[] = []
-  visitNodes(rootNode, node => {
-    if (node.type === 'file_redirect') {
+  visitNodes(rootNode, (node) => {
+    if (node.type === "file_redirect") {
       const children = node.children
-      const op = children.find(c => c.type === '>' || c.type === '>>')
-      const target = children.find(c => c.type === 'word')
+      const op = children.find((c) => c.type === ">" || c.type === ">>")
+      const target = children.find((c) => c.type === "word")
       if (op && target) {
         redirections.push({
           startIndex: node.startIndex,
           endIndex: node.endIndex,
           target: target.text,
-          operator: op.type as '>' | '>>',
+          operator: op.type as ">" | ">>",
         })
       }
     }
@@ -168,7 +159,7 @@ class TreeSitterParsedCommand implements IParsedCommand {
     treeSitterAnalysis: TreeSitterAnalysis,
   ) {
     this.originalCommand = command
-    this.commandBytes = Buffer.from(command, 'utf8')
+    this.commandBytes = Buffer.from(command, "utf8")
     this.pipePositions = pipePositions
     this.redirectionNodes = redirectionNodes
     this.treeSitterAnalysis = treeSitterAnalysis
@@ -187,20 +178,14 @@ class TreeSitterParsedCommand implements IParsedCommand {
     let currentStart = 0
 
     for (const pipePos of this.pipePositions) {
-      const segment = this.commandBytes
-        .subarray(currentStart, pipePos)
-        .toString('utf8')
-        .trim()
+      const segment = this.commandBytes.subarray(currentStart, pipePos).toString("utf8").trim()
       if (segment) {
         segments.push(segment)
       }
       currentStart = pipePos + 1
     }
 
-    const lastSegment = this.commandBytes
-      .subarray(currentStart)
-      .toString('utf8')
-      .trim()
+    const lastSegment = this.commandBytes.subarray(currentStart).toString("utf8").trim()
     if (lastSegment) {
       segments.push(lastSegment)
     }
@@ -211,18 +196,13 @@ class TreeSitterParsedCommand implements IParsedCommand {
   withoutOutputRedirections(): string {
     if (this.redirectionNodes.length === 0) return this.originalCommand
 
-    const sorted = [...this.redirectionNodes].sort(
-      (a, b) => b.startIndex - a.startIndex,
-    )
+    const sorted = [...this.redirectionNodes].sort((a, b) => b.startIndex - a.startIndex)
 
     let result = this.commandBytes
     for (const redir of sorted) {
-      result = Buffer.concat([
-        result.subarray(0, redir.startIndex),
-        result.subarray(redir.endIndex),
-      ])
+      result = Buffer.concat([result.subarray(0, redir.startIndex), result.subarray(redir.endIndex)])
     }
-    return result.toString('utf8').trim().replace(/\s+/g, ' ')
+    return result.toString("utf8").trim().replace(/\s+/g, " ")
   }
 
   getOutputRedirections(): OutputRedirection[] {
@@ -239,8 +219,8 @@ class TreeSitterParsedCommand implements IParsedCommand {
 
 const getTreeSitterAvailable = memoize(async (): Promise<boolean> => {
   try {
-    const { parseCommand } = await import('./parser.js')
-    const testResult = await parseCommand('echo test')
+    const { parseCommand } = await import("./parser.js")
+    const testResult = await parseCommand("echo test")
     return testResult !== null
   } catch {
     return false
@@ -252,19 +232,11 @@ const getTreeSitterAvailable = memoize(async (): Promise<boolean> => {
  * that already have the tree skip the redundant native.parse that
  * ParsedCommand.parse would do.
  */
-export function buildParsedCommandFromRoot(
-  command: string,
-  root: Node,
-): IParsedCommand {
+export function buildParsedCommandFromRoot(command: string, root: Node): IParsedCommand {
   const pipePositions = extractPipePositions(root)
   const redirectionNodes = extractRedirectionNodes(root)
   const analysis = analyzeCommand(root, command)
-  return new TreeSitterParsedCommand(
-    command,
-    pipePositions,
-    redirectionNodes,
-    analysis,
-  )
+  return new TreeSitterParsedCommand(command, pipePositions, redirectionNodes, analysis)
 }
 
 async function doParse(command: string): Promise<IParsedCommand | null> {
@@ -273,7 +245,7 @@ async function doParse(command: string): Promise<IParsedCommand | null> {
   const treeSitterAvailable = await getTreeSitterAvailable()
   if (treeSitterAvailable) {
     try {
-      const { parseCommand } = await import('./parser.js')
+      const { parseCommand } = await import("./parser.js")
       const data = await parseCommand(command)
       if (data) {
         // Native NAPI parser returns plain JS objects (no WASM handles);

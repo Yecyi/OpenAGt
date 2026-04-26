@@ -1,11 +1,11 @@
-import memoize from 'lodash-es/memoize.js'
-import * as path from 'path'
-import * as pathWin32 from 'path/win32'
-import { getCwd } from './cwd.js'
-import { logForDebugging } from './debug.js'
-import { execSync_DEPRECATED } from './execSyncWrapper.js'
-import { memoizeWithLRU } from './memoize.js'
-import { getPlatform } from './platform.js'
+import memoize from "lodash-es/memoize.js"
+import * as path from "path"
+import * as pathWin32 from "path/win32"
+import { getCwd } from "./cwd.js"
+import { logForDebugging } from "./debug.js"
+import { execSync_DEPRECATED } from "./execSyncWrapper.js"
+import { memoizeWithLRU } from "./memoize.js"
+import { getPlatform } from "./platform.js"
 
 /**
  * Check if a file or directory exists on Windows using the dir command
@@ -14,7 +14,7 @@ import { getPlatform } from './platform.js'
  */
 function checkPathExists(path: string): boolean {
   try {
-    execSync_DEPRECATED(`dir "${path}"`, { stdio: 'pipe' })
+    execSync_DEPRECATED(`dir "${path}"`, { stdio: "pipe" })
     return true
   } catch {
     return false
@@ -28,11 +28,11 @@ function checkPathExists(path: string): boolean {
  */
 function findExecutable(executable: string): string | null {
   // For git, check common installation locations first
-  if (executable === 'git') {
+  if (executable === "git") {
     const defaultLocations = [
       // check 64 bit before 32 bit
-      'C:\\Program Files\\Git\\cmd\\git.exe',
-      'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+      "C:\\Program Files\\Git\\cmd\\git.exe",
+      "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
       // intentionally don't look for C:\Program Files\Git\mingw64\bin\git.exe
       // because that directory is the "raw" tools with no environment setup
     ]
@@ -47,13 +47,13 @@ function findExecutable(executable: string): string | null {
   // Fall back to where.exe
   try {
     const result = execSync_DEPRECATED(`where.exe ${executable}`, {
-      stdio: 'pipe',
-      encoding: 'utf8',
+      stdio: "pipe",
+      encoding: "utf8",
     }).trim()
 
     // SECURITY: Filter out any results from the current directory
     // to prevent executing malicious git.bat/cmd/exe files
-    const paths = result.split('\r\n').filter(Boolean)
+    const paths = result.split("\r\n").filter(Boolean)
     const cwd = getCwd().toLowerCase()
 
     for (const candidatePath of paths) {
@@ -63,9 +63,7 @@ function findExecutable(executable: string): string | null {
 
       // Skip if the executable is in the current working directory
       if (pathDir === cwd || normalizedPath.startsWith(cwd + path.sep)) {
-        logForDebugging(
-          `Skipping potentially malicious executable in current directory: ${candidatePath}`,
-        )
+        logForDebugging(`Skipping potentially malicious executable in current directory: ${candidatePath}`)
         continue
       }
 
@@ -85,7 +83,7 @@ function findExecutable(executable: string): string | null {
  * COMSPEC is left unchanged for system process execution.
  */
 export function setShellIfWindows(): void {
-  if (getPlatform() === 'windows') {
+  if (getPlatform() === "windows") {
     const gitBashPath = findGitBashPath()
     process.env.SHELL = gitBashPath
     logForDebugging(`Using bash path: "${gitBashPath}"`)
@@ -108,9 +106,9 @@ export const findGitBashPath = memoize((): string => {
     process.exit(1)
   }
 
-  const gitPath = findExecutable('git')
+  const gitPath = findExecutable("git")
   if (gitPath) {
-    const bashPath = pathWin32.join(gitPath, '..', '..', 'bin', 'bash.exe')
+    const bashPath = pathWin32.join(gitPath, "..", "..", "bin", "bash.exe")
     if (checkPathExists(bashPath)) {
       return bashPath
     }
@@ -118,7 +116,7 @@ export const findGitBashPath = memoize((): string => {
 
   // biome-ignore lint/suspicious/noConsole:: intentional console output
   console.error(
-    'Claude Code on Windows requires git-bash (https://git-scm.com/downloads/win). If installed but not in PATH, set environment variable pointing to your bash.exe, similar to: CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe',
+    "Claude Code on Windows requires git-bash (https://git-scm.com/downloads/win). If installed but not in PATH, set environment variable pointing to your bash.exe, similar to: CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe",
   )
   // eslint-disable-next-line custom-rules/no-process-exit
   process.exit(1)
@@ -128,17 +126,17 @@ export const findGitBashPath = memoize((): string => {
 export const windowsPathToPosixPath = memoizeWithLRU(
   (windowsPath: string): string => {
     // Handle UNC paths: \\server\share -> //server/share
-    if (windowsPath.startsWith('\\\\')) {
-      return windowsPath.replace(/\\/g, '/')
+    if (windowsPath.startsWith("\\\\")) {
+      return windowsPath.replace(/\\/g, "/")
     }
     // Handle drive letter paths: C:\Users\foo -> /c/Users/foo
     const match = windowsPath.match(/^([A-Za-z]):[/\\]/)
     if (match) {
       const driveLetter = match[1]!.toLowerCase()
-      return '/' + driveLetter + windowsPath.slice(2).replace(/\\/g, '/')
+      return "/" + driveLetter + windowsPath.slice(2).replace(/\\/g, "/")
     }
     // Already POSIX or relative — just flip slashes
-    return windowsPath.replace(/\\/g, '/')
+    return windowsPath.replace(/\\/g, "/")
   },
   (p: string) => p,
   500,
@@ -148,25 +146,25 @@ export const windowsPathToPosixPath = memoizeWithLRU(
 export const posixPathToWindowsPath = memoizeWithLRU(
   (posixPath: string): string => {
     // Handle UNC paths: //server/share -> \\server\share
-    if (posixPath.startsWith('//')) {
-      return posixPath.replace(/\//g, '\\')
+    if (posixPath.startsWith("//")) {
+      return posixPath.replace(/\//g, "\\")
     }
     // Handle /cygdrive/c/... format
     const cygdriveMatch = posixPath.match(/^\/cygdrive\/([A-Za-z])(\/|$)/)
     if (cygdriveMatch) {
       const driveLetter = cygdriveMatch[1]!.toUpperCase()
-      const rest = posixPath.slice(('/cygdrive/' + cygdriveMatch[1]).length)
-      return driveLetter + ':' + (rest || '\\').replace(/\//g, '\\')
+      const rest = posixPath.slice(("/cygdrive/" + cygdriveMatch[1]).length)
+      return driveLetter + ":" + (rest || "\\").replace(/\//g, "\\")
     }
     // Handle /c/... format (MSYS2/Git Bash)
     const driveMatch = posixPath.match(/^\/([A-Za-z])(\/|$)/)
     if (driveMatch) {
       const driveLetter = driveMatch[1]!.toUpperCase()
       const rest = posixPath.slice(2)
-      return driveLetter + ':' + (rest || '\\').replace(/\//g, '\\')
+      return driveLetter + ":" + (rest || "\\").replace(/\//g, "\\")
     }
     // Already Windows or relative — just flip slashes
-    return posixPath.replace(/\//g, '\\')
+    return posixPath.replace(/\//g, "\\")
   },
   (p: string) => p,
   500,

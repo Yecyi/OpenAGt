@@ -12,15 +12,15 @@
  * Set CLAUDE_CODE_PROFILE_STARTUP=1 for detailed logging output.
  */
 
-import { getIsNonInteractiveSession } from '../bootstrap/state.js'
+import { getIsNonInteractiveSession } from "../bootstrap/state.js"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from '../services/analytics/index.js'
-import { logForDebugging } from './debug.js'
-import { isEnvTruthy } from './envUtils.js'
-import { getPerformance } from './profilerBase.js'
-import { jsonStringify } from './slowOperations.js'
+} from "../services/analytics/index.js"
+import { logForDebugging } from "./debug.js"
+import { isEnvTruthy } from "./envUtils.js"
+import { getPerformance } from "./profilerBase.js"
+import { jsonStringify } from "./slowOperations.js"
 
 // Detailed profiling mode - same env var as startupProfiler
 // eslint-disable-next-line custom-rules/no-process-env-top-level
@@ -30,14 +30,13 @@ const DETAILED_PROFILING = isEnvTruthy(process.env.CLAUDE_CODE_PROFILE_STARTUP)
 // Decision made once at module load - non-sampled users pay no profiling cost
 const STATSIG_SAMPLE_RATE = 0.05
 // eslint-disable-next-line custom-rules/no-process-env-top-level
-const STATSIG_LOGGING_SAMPLED =
-  process.env.USER_TYPE === 'ant' || Math.random() < STATSIG_SAMPLE_RATE
+const STATSIG_LOGGING_SAMPLED = process.env.USER_TYPE === "ant" || Math.random() < STATSIG_SAMPLE_RATE
 
 // Enable profiling if either detailed mode OR sampled for Statsig
 const SHOULD_PROFILE = DETAILED_PROFILING || STATSIG_LOGGING_SAMPLED
 
 // Use a unique prefix to avoid conflicts with other profiler marks
-const MARK_PREFIX = 'headless_'
+const MARK_PREFIX = "headless_"
 
 // Track current turn number (auto-incremented by headlessProfilerStartTurn)
 let currentTurnNumber = -1
@@ -47,7 +46,7 @@ let currentTurnNumber = -1
  */
 function clearHeadlessMarks(): void {
   const perf = getPerformance()
-  const allMarks = perf.getEntriesByType('mark')
+  const allMarks = perf.getEntriesByType("mark")
   for (const mark of allMarks) {
     if (mark.name.startsWith(MARK_PREFIX)) {
       perf.clearMarks(mark.name)
@@ -90,9 +89,7 @@ export function headlessProfilerCheckpoint(name: string): void {
   perf.mark(`${MARK_PREFIX}${name}`)
 
   if (DETAILED_PROFILING) {
-    logForDebugging(
-      `[headlessProfiler] Checkpoint: ${name} at ${perf.now().toFixed(1)}ms`,
-    )
+    logForDebugging(`[headlessProfiler] Checkpoint: ${name} at ${perf.now().toFixed(1)}ms`)
   }
 }
 
@@ -107,10 +104,10 @@ export function logHeadlessProfilerTurn(): void {
   if (!SHOULD_PROFILE) return
 
   const perf = getPerformance()
-  const allMarks = perf.getEntriesByType('mark')
+  const allMarks = perf.getEntriesByType("mark")
 
   // Filter to only our headless marks
-  const marks = allMarks.filter(mark => mark.name.startsWith(MARK_PREFIX))
+  const marks = allMarks.filter((mark) => mark.name.startsWith(MARK_PREFIX))
   if (marks.length === 0) return
 
   // Build checkpoint lookup (strip prefix for easier access)
@@ -120,7 +117,7 @@ export function logHeadlessProfilerTurn(): void {
     checkpointTimes.set(name, mark.startTime)
   }
 
-  const turnStart = checkpointTimes.get('turn_start')
+  const turnStart = checkpointTimes.get("turn_start")
   if (turnStart === undefined) return
 
   // Compute phase durations relative to turn_start
@@ -130,25 +127,25 @@ export function logHeadlessProfilerTurn(): void {
 
   // Time to system message from process start (only meaningful for turn 0)
   // Use absolute time since perf_hooks startTime is relative to process start
-  const systemMessageTime = checkpointTimes.get('system_message_yielded')
+  const systemMessageTime = checkpointTimes.get("system_message_yielded")
   if (systemMessageTime !== undefined && currentTurnNumber === 0) {
     metadata.time_to_system_message_ms = Math.round(systemMessageTime)
   }
 
   // Time to query start
-  const queryStartTime = checkpointTimes.get('query_started')
+  const queryStartTime = checkpointTimes.get("query_started")
   if (queryStartTime !== undefined) {
     metadata.time_to_query_start_ms = Math.round(queryStartTime - turnStart)
   }
 
   // Time to first response (first chunk from API)
-  const firstChunkTime = checkpointTimes.get('first_chunk')
+  const firstChunkTime = checkpointTimes.get("first_chunk")
   if (firstChunkTime !== undefined) {
     metadata.time_to_first_response_ms = Math.round(firstChunkTime - turnStart)
   }
 
   // Query overhead (time between query start and API request sent)
-  const apiRequestTime = checkpointTimes.get('api_request_sent')
+  const apiRequestTime = checkpointTimes.get("api_request_sent")
   if (queryStartTime !== undefined && apiRequestTime !== undefined) {
     metadata.query_overhead_ms = Math.round(apiRequestTime - queryStartTime)
   }
@@ -163,16 +160,11 @@ export function logHeadlessProfilerTurn(): void {
 
   // Log to Statsig if sampled
   if (STATSIG_LOGGING_SAMPLED) {
-    logEvent(
-      'tengu_headless_latency',
-      metadata as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    )
+    logEvent("tengu_headless_latency", metadata as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS)
   }
 
   // Log detailed output if CLAUDE_CODE_PROFILE_STARTUP=1
   if (DETAILED_PROFILING) {
-    logForDebugging(
-      `[headlessProfiler] Turn ${currentTurnNumber} metrics: ${jsonStringify(metadata)}`,
-    )
+    logForDebugging(`[headlessProfiler] Turn ${currentTurnNumber} metrics: ${jsonStringify(metadata)}`)
   }
 }

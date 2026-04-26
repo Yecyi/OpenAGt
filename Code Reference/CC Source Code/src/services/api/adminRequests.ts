@@ -1,10 +1,10 @@
-import axios from 'axios'
-import { getOauthConfig } from '../../constants/oauth.js'
-import { getOAuthHeaders, prepareApiRequest } from '../../utils/teleport/api.js'
+import axios from "axios"
+import { getOauthConfig } from "../../constants/oauth.js"
+import { getOAuthHeaders, prepareApiRequest } from "../../utils/teleport/api.js"
 
-export type AdminRequestType = 'limit_increase' | 'seat_upgrade'
+export type AdminRequestType = "limit_increase" | "seat_upgrade"
 
-export type AdminRequestStatus = 'pending' | 'approved' | 'dismissed'
+export type AdminRequestStatus = "pending" | "approved" | "dismissed"
 
 export type AdminRequestSeatUpgradeDetails = {
   message?: string | null
@@ -13,11 +13,11 @@ export type AdminRequestSeatUpgradeDetails = {
 
 export type AdminRequestCreateParams =
   | {
-      request_type: 'limit_increase'
+      request_type: "limit_increase"
       details: null
     }
   | {
-      request_type: 'seat_upgrade'
+      request_type: "seat_upgrade"
       details: AdminRequestSeatUpgradeDetails
     }
 
@@ -28,11 +28,11 @@ export type AdminRequest = {
   created_at: string
 } & (
   | {
-      request_type: 'limit_increase'
+      request_type: "limit_increase"
       details: null
     }
   | {
-      request_type: 'seat_upgrade'
+      request_type: "seat_upgrade"
       details: AdminRequestSeatUpgradeDetails
     }
 )
@@ -46,14 +46,12 @@ export type AdminRequest = {
  * If a pending request of the same type already exists for this user,
  * returns the existing request instead of creating a new one.
  */
-export async function createAdminRequest(
-  params: AdminRequestCreateParams,
-): Promise<AdminRequest> {
+export async function createAdminRequest(params: AdminRequestCreateParams): Promise<AdminRequest> {
   const { accessToken, orgUUID } = await prepareApiRequest()
 
   const headers = {
     ...getOAuthHeaders(accessToken),
-    'x-organization-uuid': orgUUID,
+    "x-organization-uuid": orgUUID,
   }
 
   const url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/admin_requests`
@@ -76,7 +74,7 @@ export async function getMyAdminRequests(
 
   const headers = {
     ...getOAuthHeaders(accessToken),
-    'x-organization-uuid': orgUUID,
+    "x-organization-uuid": orgUUID,
   }
 
   let url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/admin_requests/me?request_type=${requestType}`
@@ -106,7 +104,7 @@ export async function checkAdminRequestEligibility(
 
   const headers = {
     ...getOAuthHeaders(accessToken),
-    'x-organization-uuid': orgUUID,
+    "x-organization-uuid": orgUUID,
   }
 
   const url = `${getOauthConfig().BASE_API_URL}/api/oauth/organizations/${orgUUID}/admin_requests/eligibility?request_type=${requestType}`

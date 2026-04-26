@@ -1,7 +1,7 @@
-import type { AgentColorName } from '../../tools/AgentTool/agentColorManager.js'
-import { AGENT_COLORS } from '../../tools/AgentTool/agentColorManager.js'
-import { detectAndGetBackend } from './backends/registry.js'
-import type { PaneBackend } from './backends/types.js'
+import type { AgentColorName } from "../../tools/AgentTool/agentColorManager.js"
+import { AGENT_COLORS } from "../../tools/AgentTool/agentColorManager.js"
+import { detectAndGetBackend } from "./backends/registry.js"
+import type { PaneBackend } from "./backends/types.js"
 
 // Track color assignments for teammates (persisted per session)
 const teammateColorAssignments = new Map<string, AgentColorName>()
@@ -35,9 +35,7 @@ export function assignTeammateColor(teammateId: string): AgentColorName {
 /**
  * Gets the assigned color for a teammate, if any.
  */
-export function getTeammateColor(
-  teammateId: string,
-): AgentColorName | undefined {
+export function getTeammateColor(teammateId: string): AgentColorName | undefined {
   return teammateColorAssignments.get(teammateId)
 }
 
@@ -55,7 +53,7 @@ export function clearTeammateColors(): void {
  * Uses the detection module directly for this check.
  */
 export async function isInsideTmux(): Promise<boolean> {
-  const { isInsideTmux: checkTmux } = await import('./backends/detection.js')
+  const { isInsideTmux: checkTmux } = await import("./backends/detection.js")
   return checkTmux()
 }
 
@@ -85,10 +83,7 @@ export async function createTeammatePaneInSwarmView(
  * Enables pane border status for a window (shows pane titles).
  * Delegates to the detected backend.
  */
-export async function enablePaneBorderStatus(
-  windowTarget?: string,
-  useSwarmSocket = false,
-): Promise<void> {
+export async function enablePaneBorderStatus(windowTarget?: string, useSwarmSocket = false): Promise<void> {
   const backend = await getBackend()
   return backend.enablePaneBorderStatus(windowTarget, useSwarmSocket)
 }
@@ -97,11 +92,7 @@ export async function enablePaneBorderStatus(
  * Sends a command to a specific pane.
  * Delegates to the detected backend.
  */
-export async function sendCommandToPane(
-  paneId: string,
-  command: string,
-  useSwarmSocket = false,
-): Promise<void> {
+export async function sendCommandToPane(paneId: string, command: string, useSwarmSocket = false): Promise<void> {
   const backend = await getBackend()
   return backend.sendCommandToPane(paneId, command, useSwarmSocket)
 }

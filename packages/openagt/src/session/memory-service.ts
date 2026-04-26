@@ -145,12 +145,7 @@ export const layer = Layer.effect(
       const currentTokenCount = estimateMessageTokens(ctx.messages)
       const currentToolCallCount = countToolCalls(ctx.messages)
 
-      return shouldUpdateMemory(
-        currentTokenCount,
-        currentToolCallCount,
-        state.lastTokenCount,
-        state.lastToolCallCount,
-      )
+      return shouldUpdateMemory(currentTokenCount, currentToolCallCount, state.lastTokenCount, state.lastToolCallCount)
     })
 
     const save = Effect.fn("SessionMemory.save")(function* (ctx: SessionContext, updates: MemoryUpdate) {

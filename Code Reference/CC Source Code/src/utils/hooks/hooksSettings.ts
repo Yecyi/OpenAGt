@@ -1,23 +1,15 @@
-import { resolve } from 'path'
-import type { HookEvent } from 'src/entrypoints/agentSdkTypes.js'
-import { getSessionId } from '../../bootstrap/state.js'
-import type { AppState } from '../../state/AppState.js'
-import type { EditableSettingSource } from '../settings/constants.js'
-import { SOURCES } from '../settings/constants.js'
-import {
-  getSettingsFilePathForSource,
-  getSettingsForSource,
-} from '../settings/settings.js'
-import type { HookCommand, HookMatcher } from '../settings/types.js'
-import { DEFAULT_HOOK_SHELL } from '../shell/shellProvider.js'
-import { getSessionHooks } from './sessionHooks.js'
+import { resolve } from "path"
+import type { HookEvent } from "src/entrypoints/agentSdkTypes.js"
+import { getSessionId } from "../../bootstrap/state.js"
+import type { AppState } from "../../state/AppState.js"
+import type { EditableSettingSource } from "../settings/constants.js"
+import { SOURCES } from "../settings/constants.js"
+import { getSettingsFilePathForSource, getSettingsForSource } from "../settings/settings.js"
+import type { HookCommand, HookMatcher } from "../settings/types.js"
+import { DEFAULT_HOOK_SHELL } from "../shell/shellProvider.js"
+import { getSessionHooks } from "./sessionHooks.js"
 
-export type HookSource =
-  | EditableSettingSource
-  | 'policySettings'
-  | 'pluginHook'
-  | 'sessionHook'
-  | 'builtinHook'
+export type HookSource = EditableSettingSource | "policySettings" | "pluginHook" | "sessionHook" | "builtinHook"
 
 export interface IndividualHookConfig {
   event: HookEvent
@@ -31,8 +23,8 @@ export interface IndividualHookConfig {
  * Check if two hooks are equal (comparing only command/prompt content, not timeout)
  */
 export function isHookEqual(
-  a: HookCommand | { type: 'function'; timeout?: number },
-  b: HookCommand | { type: 'function'; timeout?: number },
+  a: HookCommand | { type: "function"; timeout?: number },
+  b: HookCommand | { type: "function"; timeout?: number },
 ): boolean {
   if (a.type !== b.type) return false
 
@@ -40,25 +32,24 @@ export function isHookEqual(
   // Note: We only compare command/prompt content, not timeout
   // `if` is part of identity: same command with different `if` conditions
   // are distinct hooks (e.g., setup.sh if=Bash(git *) vs if=Bash(npm *)).
-  const sameIf = (x: { if?: string }, y: { if?: string }) =>
-    (x.if ?? '') === (y.if ?? '')
+  const sameIf = (x: { if?: string }, y: { if?: string }) => (x.if ?? "") === (y.if ?? "")
   switch (a.type) {
-    case 'command':
+    case "command":
       // shell is part of identity: same command string with different
       // shells are distinct hooks. Default 'bash' so undefined === 'bash'.
       return (
-        b.type === 'command' &&
+        b.type === "command" &&
         a.command === b.command &&
         (a.shell ?? DEFAULT_HOOK_SHELL) === (b.shell ?? DEFAULT_HOOK_SHELL) &&
         sameIf(a, b)
       )
-    case 'prompt':
-      return b.type === 'prompt' && a.prompt === b.prompt && sameIf(a, b)
-    case 'agent':
-      return b.type === 'agent' && a.prompt === b.prompt && sameIf(a, b)
-    case 'http':
-      return b.type === 'http' && a.url === b.url && sameIf(a, b)
-    case 'function':
+    case "prompt":
+      return b.type === "prompt" && a.prompt === b.prompt && sameIf(a, b)
+    case "agent":
+      return b.type === "agent" && a.prompt === b.prompt && sameIf(a, b)
+    case "http":
+      return b.type === "http" && a.url === b.url && sameIf(a, b)
+    case "function":
       // Function hooks can't be compared (no stable identifier)
       return false
   }
@@ -66,26 +57,26 @@ export function isHookEqual(
 
 /** Get the display text for a hook */
 export function getHookDisplayText(
-  hook: HookCommand | { type: 'callback' | 'function'; statusMessage?: string },
+  hook: HookCommand | { type: "callback" | "function"; statusMessage?: string },
 ): string {
   // Return custom status message if provided
-  if ('statusMessage' in hook && hook.statusMessage) {
+  if ("statusMessage" in hook && hook.statusMessage) {
     return hook.statusMessage
   }
 
   switch (hook.type) {
-    case 'command':
+    case "command":
       return hook.command
-    case 'prompt':
+    case "prompt":
       return hook.prompt
-    case 'agent':
+    case "agent":
       return hook.prompt
-    case 'http':
+    case "http":
       return hook.url
-    case 'callback':
-      return 'callback'
-    case 'function':
-      return 'function'
+    case "callback":
+      return "callback"
+    case "function":
+      return "function"
   }
 }
 
@@ -93,18 +84,14 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
   const hooks: IndividualHookConfig[] = []
 
   // Check if restricted to managed hooks only
-  const policySettings = getSettingsForSource('policySettings')
+  const policySettings = getSettingsForSource("policySettings")
   const restrictedToManagedOnly = policySettings?.allowManagedHooksOnly === true
 
   // If allowManagedHooksOnly is set, don't show any hooks in the UI
   // (user/project/local are blocked, and managed hooks are intentionally hidden)
   if (!restrictedToManagedOnly) {
     // Get hooks from all editable sources
-    const sources = [
-      'userSettings',
-      'projectSettings',
-      'localSettings',
-    ] as EditableSettingSource[]
+    const sources = ["userSettings", "projectSettings", "localSettings"] as EditableSettingSource[]
 
     // Track which settings files we've already processed to avoid duplicates
     // (e.g., when running from home directory, userSettings and projectSettings
@@ -151,7 +138,7 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
           event,
           config: hookCommand,
           matcher: matcher.matcher,
-          source: 'sessionHook',
+          source: "sessionHook",
         })
       }
     }
@@ -160,30 +147,27 @@ export function getAllHooks(appState: AppState): IndividualHookConfig[] {
   return hooks
 }
 
-export function getHooksForEvent(
-  appState: AppState,
-  event: HookEvent,
-): IndividualHookConfig[] {
-  return getAllHooks(appState).filter(hook => hook.event === event)
+export function getHooksForEvent(appState: AppState, event: HookEvent): IndividualHookConfig[] {
+  return getAllHooks(appState).filter((hook) => hook.event === event)
 }
 
 export function hookSourceDescriptionDisplayString(source: HookSource): string {
   switch (source) {
-    case 'userSettings':
-      return 'User settings (~/.claude/settings.json)'
-    case 'projectSettings':
-      return 'Project settings (.claude/settings.json)'
-    case 'localSettings':
-      return 'Local settings (.claude/settings.local.json)'
-    case 'pluginHook':
+    case "userSettings":
+      return "User settings (~/.claude/settings.json)"
+    case "projectSettings":
+      return "Project settings (.claude/settings.json)"
+    case "localSettings":
+      return "Local settings (.claude/settings.local.json)"
+    case "pluginHook":
       // TODO: Get the actual plugin hook file paths instead of using glob pattern
       // We should capture the specific plugin paths during hook registration and display them here
       // e.g., "Plugin hooks (~/.claude/plugins/repos/source/example-plugin/example-plugin/hooks/hooks.json)"
-      return 'Plugin hooks (~/.claude/plugins/*/hooks/hooks.json)'
-    case 'sessionHook':
-      return 'Session hooks (in-memory, temporary)'
-    case 'builtinHook':
-      return 'Built-in hooks (registered internally by Claude Code)'
+      return "Plugin hooks (~/.claude/plugins/*/hooks/hooks.json)"
+    case "sessionHook":
+      return "Session hooks (in-memory, temporary)"
+    case "builtinHook":
+      return "Built-in hooks (registered internally by Claude Code)"
     default:
       return source as string
   }
@@ -191,18 +175,18 @@ export function hookSourceDescriptionDisplayString(source: HookSource): string {
 
 export function hookSourceHeaderDisplayString(source: HookSource): string {
   switch (source) {
-    case 'userSettings':
-      return 'User Settings'
-    case 'projectSettings':
-      return 'Project Settings'
-    case 'localSettings':
-      return 'Local Settings'
-    case 'pluginHook':
-      return 'Plugin Hooks'
-    case 'sessionHook':
-      return 'Session Hooks'
-    case 'builtinHook':
-      return 'Built-in Hooks'
+    case "userSettings":
+      return "User Settings"
+    case "projectSettings":
+      return "Project Settings"
+    case "localSettings":
+      return "Local Settings"
+    case "pluginHook":
+      return "Plugin Hooks"
+    case "sessionHook":
+      return "Session Hooks"
+    case "builtinHook":
+      return "Built-in Hooks"
     default:
       return source as string
   }
@@ -210,18 +194,18 @@ export function hookSourceHeaderDisplayString(source: HookSource): string {
 
 export function hookSourceInlineDisplayString(source: HookSource): string {
   switch (source) {
-    case 'userSettings':
-      return 'User'
-    case 'projectSettings':
-      return 'Project'
-    case 'localSettings':
-      return 'Local'
-    case 'pluginHook':
-      return 'Plugin'
-    case 'sessionHook':
-      return 'Session'
-    case 'builtinHook':
-      return 'Built-in'
+    case "userSettings":
+      return "User"
+    case "projectSettings":
+      return "Project"
+    case "localSettings":
+      return "Local"
+    case "pluginHook":
+      return "Plugin"
+    case "sessionHook":
+      return "Session"
+    case "builtinHook":
+      return "Built-in"
     default:
       return source as string
   }
@@ -229,10 +213,7 @@ export function hookSourceInlineDisplayString(source: HookSource): string {
 
 export function sortMatchersByPriority(
   matchers: string[],
-  hooksByEventAndMatcher: Record<
-    string,
-    Record<string, IndividualHookConfig[]>
-  >,
+  hooksByEventAndMatcher: Record<string, Record<string, IndividualHookConfig[]>>,
   selectedEvent: HookEvent,
 ): string[] {
   // Create a priority map based on SOURCES order (lower index = higher priority)
@@ -248,15 +229,13 @@ export function sortMatchersByPriority(
     const aHooks = hooksByEventAndMatcher[selectedEvent]?.[a] || []
     const bHooks = hooksByEventAndMatcher[selectedEvent]?.[b] || []
 
-    const aSources = Array.from(new Set(aHooks.map(h => h.source)))
-    const bSources = Array.from(new Set(bHooks.map(h => h.source)))
+    const aSources = Array.from(new Set(aHooks.map((h) => h.source)))
+    const bSources = Array.from(new Set(bHooks.map((h) => h.source)))
 
     // Sort by highest priority source first (lowest priority number)
     // Plugin hooks get lowest priority (highest number)
     const getSourcePriority = (source: HookSource) =>
-      source === 'pluginHook' || source === 'builtinHook'
-        ? 999
-        : sourcePriority[source as EditableSettingSource]
+      source === "pluginHook" || source === "builtinHook" ? 999 : sourcePriority[source as EditableSettingSource]
 
     const aHighestPriority = Math.min(...aSources.map(getSourcePriority))
     const bHighestPriority = Math.min(...bSources.map(getSourcePriority))

@@ -3,11 +3,13 @@ import { Effect, Layer } from "effect"
 import { Config } from "../../src/config"
 import { ExecPolicy } from "../../src/security/exec-policy"
 
-const config = (rules?: Array<{
-  pattern: Array<string | string[]>
-  decision?: "allow" | "confirm" | "block"
-  justification?: string
-}>) =>
+const config = (
+  rules?: Array<{
+    pattern: Array<string | string[]>
+    decision?: "allow" | "confirm" | "block"
+    justification?: string
+  }>,
+) =>
   Layer.succeed(
     Config.Service,
     Config.Service.of({

@@ -1,28 +1,22 @@
-import { z } from 'zod/v4'
-import { buildTool, type ToolDef } from '../../Tool.js'
-import { lazySchema } from '../../utils/lazySchema.js'
-import type { PermissionResult } from '../../utils/permissions/PermissionResult.js'
-import { isOutputLineTruncated } from '../../utils/terminal.js'
-import { DESCRIPTION, PROMPT } from './prompt.js'
-import {
-  renderToolResultMessage,
-  renderToolUseMessage,
-  renderToolUseProgressMessage,
-} from './UI.js'
+import { z } from "zod/v4"
+import { buildTool, type ToolDef } from "../../Tool.js"
+import { lazySchema } from "../../utils/lazySchema.js"
+import type { PermissionResult } from "../../utils/permissions/PermissionResult.js"
+import { isOutputLineTruncated } from "../../utils/terminal.js"
+import { DESCRIPTION, PROMPT } from "./prompt.js"
+import { renderToolResultMessage, renderToolUseMessage, renderToolUseProgressMessage } from "./UI.js"
 
 // Allow any input object since MCP tools define their own schemas
 export const inputSchema = lazySchema(() => z.object({}).passthrough())
 type InputSchema = ReturnType<typeof inputSchema>
 
-export const outputSchema = lazySchema(() =>
-  z.string().describe('MCP tool execution result'),
-)
+export const outputSchema = lazySchema(() => z.string().describe("MCP tool execution result"))
 type OutputSchema = ReturnType<typeof outputSchema>
 
 export type Output = z.infer<OutputSchema>
 
 // Re-export MCPProgress from centralized types to break import cycles
-export type { MCPProgress } from '../../types/tools.js'
+export type { MCPProgress } from "../../types/tools.js"
 
 export const MCPTool = buildTool({
   isMcp: true,
@@ -31,7 +25,7 @@ export const MCPTool = buildTool({
     return false
   },
   // Overridden in mcpClient.ts
-  name: 'mcp',
+  name: "mcp",
   maxResultSizeChars: 100_000,
   // Overridden in mcpClient.ts
   async description() {
@@ -50,18 +44,18 @@ export const MCPTool = buildTool({
   // Overridden in mcpClient.ts
   async call() {
     return {
-      data: '',
+      data: "",
     }
   },
   async checkPermissions(): Promise<PermissionResult> {
     return {
-      behavior: 'passthrough',
-      message: 'MCPTool requires permission.',
+      behavior: "passthrough",
+      message: "MCPTool requires permission.",
     }
   },
   renderToolUseMessage,
   // Overridden in mcpClient.ts
-  userFacingName: () => 'mcp',
+  userFacingName: () => "mcp",
   renderToolUseProgressMessage,
   renderToolResultMessage,
   isResultTruncated(output: Output): boolean {
@@ -70,7 +64,7 @@ export const MCPTool = buildTool({
   mapToolResultToToolResultBlockParam(content, toolUseID) {
     return {
       tool_use_id: toolUseID,
-      type: 'tool_result',
+      type: "tool_result",
       content,
     }
   },

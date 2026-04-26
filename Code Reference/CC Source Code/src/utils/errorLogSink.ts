@@ -10,16 +10,16 @@
  * log.ts has NO heavy dependencies - events are queued until this sink is attached.
  */
 
-import axios from 'axios'
-import { dirname, join } from 'path'
-import { getSessionId } from '../bootstrap/state.js'
-import { createBufferedWriter } from './bufferedWriter.js'
-import { CACHE_PATHS } from './cachePaths.js'
-import { registerCleanup } from './cleanupRegistry.js'
-import { logForDebugging } from './debug.js'
-import { getFsImplementation } from './fsOperations.js'
-import { attachErrorLogSink, dateToFilename } from './log.js'
-import { jsonStringify } from './slowOperations.js'
+import axios from "axios"
+import { dirname, join } from "path"
+import { getSessionId } from "../bootstrap/state.js"
+import { createBufferedWriter } from "./bufferedWriter.js"
+import { CACHE_PATHS } from "./cachePaths.js"
+import { registerCleanup } from "./cleanupRegistry.js"
+import { logForDebugging } from "./debug.js"
+import { getFsImplementation } from "./fsOperations.js"
+import { attachErrorLogSink, dateToFilename } from "./log.js"
+import { jsonStringify } from "./slowOperations.js"
 
 const DATE = dateToFilename(new Date())
 
@@ -27,14 +27,14 @@ const DATE = dateToFilename(new Date())
  * Gets the path to the errors log file.
  */
 export function getErrorsPath(): string {
-  return join(CACHE_PATHS.errors(), DATE + '.jsonl')
+  return join(CACHE_PATHS.errors(), DATE + ".jsonl")
 }
 
 /**
  * Gets the path to MCP logs for a server.
  */
 export function getMCPLogsPath(serverName: string): string {
-  return join(CACHE_PATHS.mcpLogs(serverName), DATE + '.jsonl')
+  return join(CACHE_PATHS.mcpLogs(serverName), DATE + ".jsonl")
 }
 
 type JsonlWriter = {
@@ -51,7 +51,7 @@ function createJsonlWriter(options: {
   const writer = createBufferedWriter(options)
   return {
     write(obj: object): void {
-      writer.write(jsonStringify(obj) + '\n')
+      writer.write(jsonStringify(obj) + "\n")
     },
     flush: writer.flush,
     dispose: writer.dispose,
@@ -109,7 +109,7 @@ function getLogWriter(path: string): JsonlWriter {
 }
 
 function appendToLog(path: string, message: object): void {
-  if (process.env.USER_TYPE !== 'ant') {
+  if (process.env.USER_TYPE !== "ant") {
     return
   }
 
@@ -126,19 +126,19 @@ function appendToLog(path: string, message: object): void {
 }
 
 function extractServerMessage(data: unknown): string | undefined {
-  if (typeof data === 'string') {
+  if (typeof data === "string") {
     return data
   }
-  if (data && typeof data === 'object') {
+  if (data && typeof data === "object") {
     const obj = data as Record<string, unknown>
-    if (typeof obj.message === 'string') {
+    if (typeof obj.message === "string") {
       return obj.message
     }
     if (
-      typeof obj.error === 'object' &&
+      typeof obj.error === "object" &&
       obj.error &&
-      'message' in obj.error &&
-      typeof (obj.error as Record<string, unknown>).message === 'string'
+      "message" in obj.error &&
+      typeof (obj.error as Record<string, unknown>).message === "string"
     ) {
       return (obj.error as Record<string, unknown>).message as string
     }
@@ -153,7 +153,7 @@ function logErrorImpl(error: Error): void {
   const errorStr = error.stack || error.message
 
   // Enrich axios errors with request URL, status, and server message for debugging
-  let context = ''
+  let context = ""
   if (axios.isAxiosError(error) && error.config?.url) {
     const parts = [`url=${error.config.url}`]
     if (error.response?.status !== undefined) {
@@ -163,10 +163,10 @@ function logErrorImpl(error: Error): void {
     if (serverMessage) {
       parts.push(`body=${serverMessage}`)
     }
-    context = `[${parts.join(',')}] `
+    context = `[${parts.join(",")}] `
   }
 
-  logForDebugging(`${error.name}: ${context}${errorStr}`, { level: 'error' })
+  logForDebugging(`${error.name}: ${context}${errorStr}`, { level: "error" })
 
   appendToLog(getErrorsPath(), {
     error: `${context}${errorStr}`,
@@ -178,11 +178,10 @@ function logErrorImpl(error: Error): void {
  */
 function logMCPErrorImpl(serverName: string, error: unknown): void {
   // Not themed, to avoid having to pipe theme all the way down
-  logForDebugging(`MCP server "${serverName}" ${error}`, { level: 'error' })
+  logForDebugging(`MCP server "${serverName}" ${error}`, { level: "error" })
 
   const logFile = getMCPLogsPath(serverName)
-  const errorStr =
-    error instanceof Error ? error.stack || error.message : String(error)
+  const errorStr = error instanceof Error ? error.stack || error.message : String(error)
 
   const errorInfo = {
     error: errorStr,
@@ -231,5 +230,5 @@ export function initializeErrorLogSink(): void {
     getMCPLogsPath,
   })
 
-  logForDebugging('Error log sink initialized')
+  logForDebugging("Error log sink initialized")
 }

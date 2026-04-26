@@ -8,12 +8,12 @@ Anthropic uses **animal names** as internal model codenames. These are aggressiv
 
 ### Known Codenames
 
-| Codename | Role | Evidence |
-|----------|------|----------|
-| **Tengu** (天狗) | Product/telemetry prefix, possibly a model | Used as `tengu_*` prefix for all 250+ analytics events and feature flags |
-| **Capybara** | Sonnet-series model, currently at v8 | `capybara-v2-fast[1m]`, prompt patches for v8 behavior issues |
-| **Fennec** (耳廓狐) | Predecessor to Opus 4.6 | Migration: `fennec-latest` → `opus` |
-| **Numbat** (袋食蚁兽) | Next model launch | Comment: "Remove this section when we launch numbat" |
+| Codename              | Role                                       | Evidence                                                                 |
+| --------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| **Tengu** (天狗)      | Product/telemetry prefix, possibly a model | Used as `tengu_*` prefix for all 250+ analytics events and feature flags |
+| **Capybara**          | Sonnet-series model, currently at v8       | `capybara-v2-fast[1m]`, prompt patches for v8 behavior issues            |
+| **Fennec** (耳廓狐)   | Predecessor to Opus 4.6                    | Migration: `fennec-latest` → `opus`                                      |
+| **Numbat** (袋食蚁兽) | Next model launch                          | Comment: "Remove this section when we launch numbat"                     |
 
 ### Codename Protection
 
@@ -60,19 +60,19 @@ Source code reveals specific behavioral problems with Capybara v8:
 
 All feature flags use the `tengu_` prefix with **random word pairs** to obscure their purpose:
 
-| Flag | Purpose |
-|------|---------|
-| `tengu_onyx_plover` | Auto Dream (background memory consolidation) |
-| `tengu_coral_fern` | memdir feature |
-| `tengu_moth_copse` | Another memdir switch |
-| `tengu_herring_clock` | Team memory |
-| `tengu_passport_quail` | Path feature |
-| `tengu_slate_thimble` | Another memdir switch |
-| `tengu_sedge_lantern` | Away Summary |
-| `tengu_frond_boric` | Analytics kill switch |
-| `tengu_amber_quartz_disabled` | Voice mode kill switch |
-| `tengu_amber_flint` | Agent teams |
-| `tengu_hive_evidence` | Verification agent |
+| Flag                          | Purpose                                      |
+| ----------------------------- | -------------------------------------------- |
+| `tengu_onyx_plover`           | Auto Dream (background memory consolidation) |
+| `tengu_coral_fern`            | memdir feature                               |
+| `tengu_moth_copse`            | Another memdir switch                        |
+| `tengu_herring_clock`         | Team memory                                  |
+| `tengu_passport_quail`        | Path feature                                 |
+| `tengu_slate_thimble`         | Another memdir switch                        |
+| `tengu_sedge_lantern`         | Away Summary                                 |
+| `tengu_frond_boric`           | Analytics kill switch                        |
+| `tengu_amber_quartz_disabled` | Voice mode kill switch                       |
+| `tengu_amber_flint`           | Agent teams                                  |
+| `tengu_hive_evidence`         | Verification agent                           |
 
 The random word pattern (adjective/material + nature/object) prevents external observers from inferring feature purpose from flag names alone.
 
@@ -82,18 +82,19 @@ Anthropic employees (`USER_TYPE === 'ant'`) receive significantly better treatme
 
 ### Prompt Differences (`src/constants/prompts.ts`)
 
-| Dimension | External Users | Internal (ant) |
-|-----------|---------------|----------------|
-| Output style | "Be extra concise" | "Err on the side of more explanation" |
-| False-claims mitigation | None | Dedicated Capybara v8 patches |
-| Numeric length anchors | None | "≤25 words between tools, ≤100 words final" |
-| Verification agent | None | Required for non-trivial changes |
-| Comment guidance | Generic | Dedicated anti-over-commenting prompt |
-| Proactive correction | None | "If user has misconception, say so" |
+| Dimension               | External Users     | Internal (ant)                              |
+| ----------------------- | ------------------ | ------------------------------------------- |
+| Output style            | "Be extra concise" | "Err on the side of more explanation"       |
+| False-claims mitigation | None               | Dedicated Capybara v8 patches               |
+| Numeric length anchors  | None               | "≤25 words between tools, ≤100 words final" |
+| Verification agent      | None               | Required for non-trivial changes            |
+| Comment guidance        | Generic            | Dedicated anti-over-commenting prompt       |
+| Proactive correction    | None               | "If user has misconception, say so"         |
 
 ### Tool Access
 
 Internal users have access to tools not available externally:
+
 - `REPLTool` — REPL mode
 - `SuggestBackgroundPRTool` — background PR suggestions
 - `TungstenTool` — performance monitoring panel
@@ -102,11 +103,11 @@ Internal users have access to tools not available externally:
 
 ## Hidden Commands
 
-| Command | Status | Description |
-|---------|--------|-------------|
-| `/btw` | Active | Ask side questions without interrupting |
-| `/stickers` | Active | Order Claude Code stickers (opens browser) |
-| `/thinkback` | Active | 2025 Year in Review |
-| `/effort` | Active | Set model effort level |
-| `/good-claude` | Stub | Hidden placeholder |
-| `/bughunter` | Stub | Hidden placeholder |
+| Command        | Status | Description                                |
+| -------------- | ------ | ------------------------------------------ |
+| `/btw`         | Active | Ask side questions without interrupting    |
+| `/stickers`    | Active | Order Claude Code stickers (opens browser) |
+| `/thinkback`   | Active | 2025 Year in Review                        |
+| `/effort`      | Active | Set model effort level                     |
+| `/good-claude` | Stub   | Hidden placeholder                         |
+| `/bughunter`   | Stub   | Hidden placeholder                         |

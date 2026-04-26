@@ -1,9 +1,9 @@
-import envPaths from 'env-paths'
-import { join } from 'path'
-import { getFsImplementation } from './fsOperations.js'
-import { djb2Hash } from './hash.js'
+import envPaths from "env-paths"
+import { join } from "path"
+import { getFsImplementation } from "./fsOperations.js"
+import { djb2Hash } from "./hash.js"
 
-const paths = envPaths('claude-cli')
+const paths = envPaths("claude-cli")
 
 // Local sanitizePath using djb2Hash — NOT the shared version from
 // sessionStoragePortable.ts which uses Bun.hash (wyhash) when available.
@@ -11,7 +11,7 @@ const paths = envPaths('claude-cli')
 // data (error logs, MCP logs) is not orphaned.
 const MAX_SANITIZED_LENGTH = 200
 function sanitizePath(name: string): string {
-  const sanitized = name.replace(/[^a-zA-Z0-9]/g, '-')
+  const sanitized = name.replace(/[^a-zA-Z0-9]/g, "-")
   if (sanitized.length <= MAX_SANITIZED_LENGTH) {
     return sanitized
   }
@@ -24,10 +24,8 @@ function getProjectDir(cwd: string): string {
 
 export const CACHE_PATHS = {
   baseLogs: () => join(paths.cache, getProjectDir(getFsImplementation().cwd())),
-  errors: () =>
-    join(paths.cache, getProjectDir(getFsImplementation().cwd()), 'errors'),
-  messages: () =>
-    join(paths.cache, getProjectDir(getFsImplementation().cwd()), 'messages'),
+  errors: () => join(paths.cache, getProjectDir(getFsImplementation().cwd()), "errors"),
+  messages: () => join(paths.cache, getProjectDir(getFsImplementation().cwd()), "messages"),
   mcpLogs: (serverName: string) =>
     join(
       paths.cache,

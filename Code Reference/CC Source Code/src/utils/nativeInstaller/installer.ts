@@ -10,7 +10,7 @@
  * - Support for both JS and native builds
  */
 
-import { constants as fsConstants, type Stats } from 'fs'
+import { constants as fsConstants, type Stats } from "fs"
 import {
   access,
   chmod,
@@ -27,41 +27,31 @@ import {
   symlink,
   unlink,
   writeFile,
-} from 'fs/promises'
-import { homedir } from 'os'
-import { basename, delimiter, dirname, join, resolve } from 'path'
+} from "fs/promises"
+import { homedir } from "os"
+import { basename, delimiter, dirname, join, resolve } from "path"
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
-} from 'src/services/analytics/index.js'
-import { getMaxVersion, shouldSkipVersion } from '../autoUpdater.js'
-import { registerCleanup } from '../cleanupRegistry.js'
-import { getGlobalConfig, saveGlobalConfig } from '../config.js'
-import { logForDebugging } from '../debug.js'
-import { getCurrentInstallationType } from '../doctorDiagnostic.js'
-import { env } from '../env.js'
-import { envDynamic } from '../envDynamic.js'
-import { isEnvTruthy } from '../envUtils.js'
-import { errorMessage, getErrnoCode, isENOENT, toError } from '../errors.js'
-import { execFileNoThrowWithCwd } from '../execFileNoThrow.js'
-import { getShellType } from '../localInstaller.js'
-import * as lockfile from '../lockfile.js'
-import { logError } from '../log.js'
-import { gt, gte } from '../semver.js'
-import {
-  filterClaudeAliases,
-  getShellConfigPaths,
-  readFileLines,
-  writeFileLines,
-} from '../shellConfig.js'
-import { sleep } from '../sleep.js'
-import {
-  getUserBinDir,
-  getXDGCacheHome,
-  getXDGDataHome,
-  getXDGStateHome,
-} from '../xdg.js'
-import { downloadVersion, getLatestVersion } from './download.js'
+} from "src/services/analytics/index.js"
+import { getMaxVersion, shouldSkipVersion } from "../autoUpdater.js"
+import { registerCleanup } from "../cleanupRegistry.js"
+import { getGlobalConfig, saveGlobalConfig } from "../config.js"
+import { logForDebugging } from "../debug.js"
+import { getCurrentInstallationType } from "../doctorDiagnostic.js"
+import { env } from "../env.js"
+import { envDynamic } from "../envDynamic.js"
+import { isEnvTruthy } from "../envUtils.js"
+import { errorMessage, getErrnoCode, isENOENT, toError } from "../errors.js"
+import { execFileNoThrowWithCwd } from "../execFileNoThrow.js"
+import { getShellType } from "../localInstaller.js"
+import * as lockfile from "../lockfile.js"
+import { logError } from "../log.js"
+import { gt, gte } from "../semver.js"
+import { filterClaudeAliases, getShellConfigPaths, readFileLines, writeFileLines } from "../shellConfig.js"
+import { sleep } from "../sleep.js"
+import { getUserBinDir, getXDGCacheHome, getXDGDataHome, getXDGStateHome } from "../xdg.js"
+import { downloadVersion, getLatestVersion } from "./download.js"
 import {
   acquireProcessLifetimeLock,
   cleanupStaleLocks,
@@ -69,7 +59,7 @@ import {
   isPidBasedLockingEnabled,
   readLockContent,
   withLock,
-} from './pidLock.js'
+} from "./pidLock.js"
 
 export const VERSION_RETENTION_COUNT = 2
 
@@ -81,27 +71,23 @@ const LOCK_STALE_MS = 7 * 24 * 60 * 60 * 1000
 export type SetupMessage = {
   message: string
   userActionRequired: boolean
-  type: 'path' | 'alias' | 'info' | 'error'
+  type: "path" | "alias" | "info" | "error"
 }
 
 export function getPlatform(): string {
   // Use env.platform which already handles platform detection and defaults to 'linux'
   const os = env.platform
 
-  const arch =
-    process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : null
+  const arch = process.arch === "x64" ? "x64" : process.arch === "arm64" ? "arm64" : null
 
   if (!arch) {
     const error = new Error(`Unsupported architecture: ${process.arch}`)
-    logForDebugging(
-      `Native installer does not support architecture: ${process.arch}`,
-      { level: 'error' },
-    )
+    logForDebugging(`Native installer does not support architecture: ${process.arch}`, { level: "error" })
     throw error
   }
 
   // Check for musl on Linux and adjust platform accordingly
-  if (os === 'linux' && envDynamic.isMuslEnvironment()) {
+  if (os === "linux" && envDynamic.isMuslEnvironment()) {
     return `linux-${arch}-musl`
   }
 
@@ -109,7 +95,7 @@ export function getPlatform(): string {
 }
 
 export function getBinaryName(platform: string): string {
-  return platform.startsWith('win32') ? 'claude.exe' : 'claude'
+  return platform.startsWith("win32") ? "claude.exe" : "claude"
 }
 
 function getBaseDirectories() {
@@ -118,13 +104,13 @@ function getBaseDirectories() {
 
   return {
     // Data directories (permanent storage)
-    versions: join(getXDGDataHome(), 'claude', 'versions'),
+    versions: join(getXDGDataHome(), "claude", "versions"),
 
     // Cache directories (can be deleted)
-    staging: join(getXDGCacheHome(), 'claude', 'staging'),
+    staging: join(getXDGCacheHome(), "claude", "staging"),
 
     // State directories
-    locks: join(getXDGStateHome(), 'claude', 'locks'),
+    locks: join(getXDGStateHome(), "claude", "locks"),
 
     // User bin
     executable: join(getUserBinDir(), executableName),
@@ -155,7 +141,7 @@ async function getVersionPaths(version: string) {
 
   // Create directories, but not the executable path (which is a file)
   const dirsToCreate = [dirs.versions, dirs.staging, dirs.locks]
-  await Promise.all(dirsToCreate.map(dir => mkdir(dir, { recursive: true })))
+  await Promise.all(dirsToCreate.map((dir) => mkdir(dir, { recursive: true })))
 
   // Ensure parent directory of executable exists
   const executableParentDir = dirname(dirs.executable)
@@ -167,7 +153,7 @@ async function getVersionPaths(version: string) {
   try {
     await stat(installPath)
   } catch {
-    await writeFile(installPath, '', { encoding: 'utf8' })
+    await writeFile(installPath, "", { encoding: "utf8" })
   }
 
   return {
@@ -198,21 +184,17 @@ async function tryWithVersionLock(
     const maxTimeout = retries > 0 ? 5000 : 500
 
     while (attempts < maxAttempts) {
-      const success = await withLock(
-        versionFilePath,
-        lockfilePath,
-        async () => {
-          try {
-            await callback()
-          } catch (error) {
-            logError(error)
-            throw error
-          }
-        },
-      )
+      const success = await withLock(versionFilePath, lockfilePath, async () => {
+        try {
+          await callback()
+        } catch (error) {
+          logError(error)
+          throw error
+        }
+      })
 
       if (success) {
-        logEvent('tengu_version_lock_acquired', {
+        logEvent("tengu_version_lock_acquired", {
           is_pid_based: true,
           is_lifetime_lock: false,
           attempts: attempts + 1,
@@ -223,23 +205,17 @@ async function tryWithVersionLock(
       attempts++
       if (attempts < maxAttempts) {
         // Wait before retrying with exponential backoff
-        const timeout = Math.min(
-          minTimeout * Math.pow(2, attempts - 1),
-          maxTimeout,
-        )
+        const timeout = Math.min(minTimeout * Math.pow(2, attempts - 1), maxTimeout)
         await sleep(timeout)
       }
     }
 
-    logEvent('tengu_version_lock_failed', {
+    logEvent("tengu_version_lock_failed", {
       is_pid_based: true,
       is_lifetime_lock: false,
       attempts: maxAttempts,
     })
-    logLockAcquisitionError(
-      versionFilePath,
-      new Error('Lock held by another process'),
-    )
+    logLockAcquisitionError(versionFilePath, new Error("Lock held by another process"))
     return false
   }
 
@@ -263,14 +239,11 @@ async function tryWithVersionLock(
         // Handle lock compromise gracefully to prevent unhandled rejections
         // This can happen if another process deletes the lock directory while we hold it
         onCompromised: (err: Error) => {
-          logForDebugging(
-            `NON-FATAL: Version lock was compromised during operation: ${err.message}`,
-            { level: 'info' },
-          )
+          logForDebugging(`NON-FATAL: Version lock was compromised during operation: ${err.message}`, { level: "info" })
         },
       })
     } catch (lockError) {
-      logEvent('tengu_version_lock_failed', {
+      logEvent("tengu_version_lock_failed", {
         is_pid_based: false,
         is_lifetime_lock: false,
       })
@@ -281,7 +254,7 @@ async function tryWithVersionLock(
     // Operation phase - log errors but let them propagate
     try {
       await callback()
-      logEvent('tengu_version_lock_acquired', {
+      logEvent("tengu_version_lock_acquired", {
         is_pid_based: false,
         is_lifetime_lock: false,
       })
@@ -297,10 +270,7 @@ async function tryWithVersionLock(
   }
 }
 
-async function atomicMoveToInstallPath(
-  stagedBinaryPath: string,
-  installPath: string,
-) {
+async function atomicMoveToInstallPath(stagedBinaryPath: string, installPath: string) {
   // Create installation directory if it doesn't exist
   await mkdir(dirname(installPath), { recursive: true })
 
@@ -325,37 +295,32 @@ async function atomicMoveToInstallPath(
   }
 }
 
-async function installVersionFromPackage(
-  stagingPath: string,
-  installPath: string,
-) {
+async function installVersionFromPackage(stagingPath: string, installPath: string) {
   try {
     // Extract binary from npm package structure in staging
-    const nodeModulesDir = join(stagingPath, 'node_modules', '@anthropic-ai')
+    const nodeModulesDir = join(stagingPath, "node_modules", "@anthropic-ai")
     const entries = await readdir(nodeModulesDir)
-    const nativePackage = entries.find((entry: string) =>
-      entry.startsWith('claude-cli-native-'),
-    )
+    const nativePackage = entries.find((entry: string) => entry.startsWith("claude-cli-native-"))
 
     if (!nativePackage) {
-      logEvent('tengu_native_install_package_failure', {
+      logEvent("tengu_native_install_package_failure", {
         stage_find_package: true,
         error_package_not_found: true,
       })
-      const error = new Error('Could not find platform-specific native package')
+      const error = new Error("Could not find platform-specific native package")
       throw error
     }
 
-    const stagedBinaryPath = join(nodeModulesDir, nativePackage, 'cli')
+    const stagedBinaryPath = join(nodeModulesDir, nativePackage, "cli")
 
     try {
       await stat(stagedBinaryPath)
     } catch {
-      logEvent('tengu_native_install_package_failure', {
+      logEvent("tengu_native_install_package_failure", {
         stage_binary_exists: true,
         error_binary_not_found: true,
       })
-      const error = new Error('Native binary not found in staged package')
+      const error = new Error("Native binary not found in staged package")
       throw error
     }
 
@@ -364,15 +329,12 @@ async function installVersionFromPackage(
     // Clean up staging directory
     await rm(stagingPath, { recursive: true, force: true })
 
-    logEvent('tengu_native_install_package_success', {})
+    logEvent("tengu_native_install_package_success", {})
   } catch (error) {
     // Log if not already logged above
     const msg = errorMessage(error)
-    if (
-      !msg.includes('Could not find platform-specific') &&
-      !msg.includes('Native binary not found')
-    ) {
-      logEvent('tengu_native_install_package_failure', {
+    if (!msg.includes("Could not find platform-specific") && !msg.includes("Native binary not found")) {
+      logEvent("tengu_native_install_package_failure", {
         stage_atomic_move: true,
         error_move_failed: true,
       })
@@ -382,10 +344,7 @@ async function installVersionFromPackage(
   }
 }
 
-async function installVersionFromBinary(
-  stagingPath: string,
-  installPath: string,
-) {
+async function installVersionFromBinary(stagingPath: string, installPath: string) {
   try {
     // For direct binary downloads (GCS, generic bucket), the binary is directly in staging
     const platform = getPlatform()
@@ -395,11 +354,11 @@ async function installVersionFromBinary(
     try {
       await stat(stagedBinaryPath)
     } catch {
-      logEvent('tengu_native_install_binary_failure', {
+      logEvent("tengu_native_install_binary_failure", {
         stage_binary_exists: true,
         error_binary_not_found: true,
       })
-      const error = new Error('Staged binary not found')
+      const error = new Error("Staged binary not found")
       throw error
     }
 
@@ -408,10 +367,10 @@ async function installVersionFromBinary(
     // Clean up staging directory
     await rm(stagingPath, { recursive: true, force: true })
 
-    logEvent('tengu_native_install_binary_success', {})
+    logEvent("tengu_native_install_binary_success", {})
   } catch (error) {
-    if (!errorMessage(error).includes('Staged binary not found')) {
-      logEvent('tengu_native_install_binary_failure', {
+    if (!errorMessage(error).includes("Staged binary not found")) {
+      logEvent("tengu_native_install_binary_failure", {
         stage_atomic_move: true,
         error_move_failed: true,
       })
@@ -421,13 +380,9 @@ async function installVersionFromBinary(
   }
 }
 
-async function installVersion(
-  stagingPath: string,
-  installPath: string,
-  downloadType: 'npm' | 'binary',
-) {
+async function installVersion(stagingPath: string, installPath: string, downloadType: "npm" | "binary") {
   // Use the explicit download type instead of guessing
-  if (downloadType === 'npm') {
+  if (downloadType === "npm") {
     await installVersionFromPackage(stagingPath, installPath)
   } else {
     await installVersionFromBinary(stagingPath, installPath)
@@ -438,12 +393,8 @@ async function installVersion(
  * Performs the core update operation: download (if needed), install, and update symlink.
  * Returns whether a new install was performed (vs just updating symlink).
  */
-async function performVersionUpdate(
-  version: string,
-  forceReinstall: boolean,
-): Promise<boolean> {
-  const { stagingPath: baseStagingPath, installPath } =
-    await getVersionPaths(version)
+async function performVersionUpdate(version: string, forceReinstall: boolean): Promise<boolean> {
+  const { stagingPath: baseStagingPath, installPath } = await getVersionPaths(version)
   const { executable: executablePath } = getBaseDirectories()
 
   // For lockless updates, use a unique staging path to avoid conflicts between concurrent downloads
@@ -519,12 +470,10 @@ async function updateLatest(
         logForDebugging(
           `Native installer: current version ${MACRO.VERSION} is already at or above maxVersion ${maxVersion}, skipping update`,
         )
-        logEvent('tengu_native_update_skipped_max_version', {
+        logEvent("tengu_native_update_skipped_max_version", {
           latency_ms: Date.now() - startTime,
-          max_version:
-            maxVersion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-          available_version:
-            version as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          max_version: maxVersion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+          available_version: version as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         })
         return { success: true, latestVersion: version }
       }
@@ -542,7 +491,7 @@ async function updateLatest(
     (await isPossibleClaudeBinary(executablePath))
   ) {
     logForDebugging(`Found ${version} at ${executablePath}, skipping install`)
-    logEvent('tengu_native_update_complete', {
+    logEvent("tengu_native_update_complete", {
       latency_ms: Date.now() - startTime,
       was_new_install: false,
       was_force_reinstall: false,
@@ -553,10 +502,9 @@ async function updateLatest(
 
   // Check if this version should be skipped due to minimumVersion setting
   if (!forceReinstall && shouldSkipVersion(version)) {
-    logEvent('tengu_native_update_skipped_minimum_version', {
+    logEvent("tengu_native_update_skipped_minimum_version", {
       latency_ms: Date.now() - startTime,
-      target_version:
-        version as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      target_version: version as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
     return { success: true, latestVersion: version }
   }
@@ -597,7 +545,7 @@ async function updateLatest(
           lockHolderPid = readLockContent(lockfilePath)?.pid
         }
       }
-      logEvent('tengu_native_update_lock_failed', {
+      logEvent("tengu_native_update_lock_failed", {
         latency_ms: latencyMs,
         lock_holder_pid: lockHolderPid,
       })
@@ -610,7 +558,7 @@ async function updateLatest(
     }
   }
 
-  logEvent('tengu_native_update_complete', {
+  logEvent("tengu_native_update_complete", {
     latency_ms: latencyMs,
     was_new_install: wasNewInstall,
     was_force_reinstall: forceReinstall,
@@ -630,18 +578,15 @@ export async function removeDirectoryIfEmpty(path: string): Promise<void> {
     const code = getErrnoCode(error)
     // Expected cases (not-a-dir, missing, not-empty) — silently skip.
     // ENOTDIR is the normal path: executablePath is typically a symlink.
-    if (code !== 'ENOTDIR' && code !== 'ENOENT' && code !== 'ENOTEMPTY') {
+    if (code !== "ENOTDIR" && code !== "ENOENT" && code !== "ENOTEMPTY") {
       logForDebugging(`Could not remove directory at ${path}: ${error}`)
     }
   }
 }
 
-async function updateSymlink(
-  symlinkPath: string,
-  targetPath: string,
-): Promise<boolean> {
+async function updateSymlink(symlinkPath: string, targetPath: string): Promise<boolean> {
   const platform = getPlatform()
-  const isWindows = platform.startsWith('win32')
+  const isWindows = platform.startsWith("win32")
 
   // On Windows, directly copy the executable instead of creating a symlink
   if (isWindows) {
@@ -688,10 +633,7 @@ async function updateSymlink(
             await rename(oldFileName, symlinkPath)
           } catch (restoreError) {
             // Critical: User left without working executable - prioritize restore error
-            const errorWithCause = new Error(
-              `Failed to restore old executable: ${restoreError}`,
-              { cause: copyError },
-            )
+            const errorWithCause = new Error(`Failed to restore old executable: ${restoreError}`, { cause: copyError })
             logError(errorWithCause)
             throw errorWithCause
           }
@@ -713,11 +655,7 @@ async function updateSymlink(
       // chmod is not needed on Windows - executability is determined by .exe extension
       return true
     } catch (error) {
-      logError(
-        new Error(
-          `Failed to copy executable from ${targetPath} to ${symlinkPath}: ${error}`,
-        ),
-      )
+      logError(new Error(`Failed to copy executable from ${targetPath} to ${symlinkPath}: ${error}`))
       return false
     }
   }
@@ -729,9 +667,7 @@ async function updateSymlink(
     await mkdir(parentDir, { recursive: true })
     logForDebugging(`Created directory ${parentDir} for symlink`)
   } catch (mkdirError) {
-    logError(
-      new Error(`Failed to create directory ${parentDir}: ${mkdirError}`),
-    )
+    logError(new Error(`Failed to create directory ${parentDir}: ${mkdirError}`))
     return false
   }
 
@@ -748,10 +684,7 @@ async function updateSymlink(
     if (symlinkExists) {
       try {
         const currentTarget = await readlink(symlinkPath)
-        const resolvedCurrentTarget = resolve(
-          dirname(symlinkPath),
-          currentTarget,
-        )
+        const resolvedCurrentTarget = resolve(dirname(symlinkPath), currentTarget)
         const resolvedTargetPath = resolve(targetPath)
 
         if (resolvedCurrentTarget === resolvedTargetPath) {
@@ -777,9 +710,7 @@ async function updateSymlink(
 
     // Atomically rename to final name (replaces existing)
     await rename(tempSymlink, symlinkPath)
-    logForDebugging(
-      `Atomically updated symlink ${symlinkPath} -> ${targetPath}`,
-    )
+    logForDebugging(`Atomically updated symlink ${symlinkPath} -> ${targetPath}`)
     return true
   } catch (error) {
     // Clean up temp symlink if it exists
@@ -788,18 +719,12 @@ async function updateSymlink(
     } catch {
       // Ignore cleanup errors
     }
-    logError(
-      new Error(
-        `Failed to create symlink from ${symlinkPath} to ${targetPath}: ${error}`,
-      ),
-    )
+    logError(new Error(`Failed to create symlink from ${symlinkPath} to ${targetPath}: ${error}`))
     return false
   }
 }
 
-export async function checkInstall(
-  force: boolean = false,
-): Promise<SetupMessage[]> {
+export async function checkInstall(force: boolean = false): Promise<SetupMessage[]> {
   // Skip all installation checks if disabled via environment variable
   if (isEnvTruthy(process.env.DISABLE_INSTALLATION_CHECKS)) {
     return []
@@ -810,7 +735,7 @@ export async function checkInstall(
 
   // Skip checks for development builds - config.installMethod from a previous
   // native installation shouldn't trigger warnings when running dev builds
-  if (installationType === 'development') {
+  if (installationType === "development") {
     return []
   }
 
@@ -820,8 +745,7 @@ export async function checkInstall(
   // 1. User is actually running from native installation, OR
   // 2. User has explicitly set installMethod to 'native' in config (they're trying to use native)
   // 3. force is true (used during installation process)
-  const shouldCheckNative =
-    force || installationType === 'native' || config.installMethod === 'native'
+  const shouldCheckNative = force || installationType === "native" || config.installMethod === "native"
 
   if (!shouldCheckNative) {
     return []
@@ -832,7 +756,7 @@ export async function checkInstall(
   const localBinDir = dirname(dirs.executable)
   const resolvedLocalBinPath = resolve(localBinDir)
   const platform = getPlatform()
-  const isWindows = platform.startsWith('win32')
+  const isWindows = platform.startsWith("win32")
 
   // Check if bin directory exists
   try {
@@ -841,7 +765,7 @@ export async function checkInstall(
     messages.push({
       message: `installMethod is native, but directory ${localBinDir} does not exist`,
       userActionRequired: true,
-      type: 'error',
+      type: "error",
     })
   }
 
@@ -858,7 +782,7 @@ export async function checkInstall(
       messages.push({
         message: `installMethod is native, but claude command is missing or invalid at ${dirs.executable}`,
         userActionRequired: true,
-        type: 'error',
+        type: "error",
       })
     }
   } else {
@@ -869,7 +793,7 @@ export async function checkInstall(
         messages.push({
           message: `Claude symlink points to missing or invalid binary: ${target}`,
           userActionRequired: true,
-          type: 'error',
+          type: "error",
         })
       }
     } catch (e) {
@@ -877,7 +801,7 @@ export async function checkInstall(
         messages.push({
           message: `installMethod is native, but claude command not found at ${dirs.executable}`,
           userActionRequired: true,
-          type: 'error',
+          type: "error",
         })
       } else {
         // EINVAL (not a symlink) or other — check as regular binary
@@ -885,7 +809,7 @@ export async function checkInstall(
           messages.push({
             message: `${dirs.executable} exists but is not a valid Claude binary`,
             userActionRequired: true,
-            type: 'error',
+            type: "error",
           })
         }
       }
@@ -893,45 +817,39 @@ export async function checkInstall(
   }
 
   // Check if bin directory is in PATH
-  const isInCurrentPath = (process.env.PATH || '')
-    .split(delimiter)
-    .some(entry => {
-      try {
-        const resolvedEntry = resolve(entry)
-        // On Windows, perform case-insensitive comparison for paths
-        if (isWindows) {
-          return (
-            resolvedEntry.toLowerCase() === resolvedLocalBinPath.toLowerCase()
-          )
-        }
-        return resolvedEntry === resolvedLocalBinPath
-      } catch {
-        return false
+  const isInCurrentPath = (process.env.PATH || "").split(delimiter).some((entry) => {
+    try {
+      const resolvedEntry = resolve(entry)
+      // On Windows, perform case-insensitive comparison for paths
+      if (isWindows) {
+        return resolvedEntry.toLowerCase() === resolvedLocalBinPath.toLowerCase()
       }
-    })
+      return resolvedEntry === resolvedLocalBinPath
+    } catch {
+      return false
+    }
+  })
 
   if (!isInCurrentPath) {
     if (isWindows) {
       // Windows-specific PATH instructions
-      const windowsBinPath = localBinDir.replace(/\//g, '\\')
+      const windowsBinPath = localBinDir.replace(/\//g, "\\")
       messages.push({
         message: `Native installation exists but ${windowsBinPath} is not in your PATH. Add it by opening: System Properties → Environment Variables → Edit User PATH → New → Add the path above. Then restart your terminal.`,
         userActionRequired: true,
-        type: 'path',
+        type: "path",
       })
     } else {
       // Unix-style PATH instructions
       const shellType = getShellType()
       const configPaths = getShellConfigPaths()
       const configFile = configPaths[shellType as keyof typeof configPaths]
-      const displayPath = configFile
-        ? configFile.replace(homedir(), '~')
-        : 'your shell config file'
+      const displayPath = configFile ? configFile.replace(homedir(), "~") : "your shell config file"
 
       messages.push({
         message: `Native installation exists but ~/.local/bin is not in your PATH. Run:\n\necho 'export PATH="$HOME/.local/bin:$PATH"' >> ${displayPath} && source ${displayPath}`,
         userActionRequired: true,
-        type: 'path',
+        type: "path",
       })
     }
   }
@@ -953,15 +871,12 @@ type InstallLatestResult = {
 // Telemetry: session 42fed33f saw arrayBuffers climb to 91GB at ~650MB/s.
 let inFlightInstall: Promise<InstallLatestResult> | null = null
 
-export function installLatest(
-  channelOrVersion: string,
-  forceReinstall: boolean = false,
-): Promise<InstallLatestResult> {
+export function installLatest(channelOrVersion: string, forceReinstall: boolean = false): Promise<InstallLatestResult> {
   if (forceReinstall) {
     return installLatestImpl(channelOrVersion, forceReinstall)
   }
   if (inFlightInstall) {
-    logForDebugging('installLatest: joining in-flight call')
+    logForDebugging("installLatest: joining in-flight call")
     return inFlightInstall
   }
   const promise = installLatestImpl(channelOrVersion, forceReinstall)
@@ -991,19 +906,17 @@ async function installLatestImpl(
   // Installation succeeded (early return above covers failure). Mark as native
   // and disable legacy auto-updater to protect symlinks.
   const config = getGlobalConfig()
-  if (config.installMethod !== 'native') {
-    saveGlobalConfig(current => ({
+  if (config.installMethod !== "native") {
+    saveGlobalConfig((current) => ({
       ...current,
-      installMethod: 'native',
+      installMethod: "native",
       // Disable legacy auto-updater to prevent npm sessions from deleting native symlinks.
       // Native installations use NativeAutoUpdater instead, which respects native installation.
       autoUpdates: false,
       // Mark this as protection-based, not user preference
       autoUpdatesProtectedForNative: true,
     }))
-    logForDebugging(
-      'Native installer: Set installMethod to "native" and disabled legacy auto-updater for protection',
-    )
+    logForDebugging('Native installer: Set installMethod to "native" and disabled legacy auto-updater for protection')
   }
 
   void cleanupOldVersions()
@@ -1015,9 +928,7 @@ async function installLatestImpl(
   }
 }
 
-async function getVersionFromSymlink(
-  symlinkPath: string,
-): Promise<string | null> {
+async function getVersionFromSymlink(symlinkPath: string): Promise<string | null> {
   try {
     const target = await readlink(symlinkPath)
     const absoluteTarget = resolve(dirname(symlinkPath), target)
@@ -1030,10 +941,7 @@ async function getVersionFromSymlink(
   return null
 }
 
-function getLockFilePathFromVersionPath(
-  dirs: ReturnType<typeof getBaseDirectories>,
-  versionPath: string,
-) {
+function getLockFilePathFromVersionPath(dirs: ReturnType<typeof getBaseDirectories>, versionPath: string) {
   const versionName = basename(versionPath)
   return join(dirs.locks, `${versionName}.lock`)
 }
@@ -1064,24 +972,18 @@ export async function lockCurrentVersion(): Promise<void> {
       // Acquire PID-based lock and hold it for the process lifetime
       // PID-based locking allows immediate detection of crashed processes
       // while still surviving laptop sleep (process is suspended but PID exists)
-      const acquired = await acquireProcessLifetimeLock(
-        versionPath,
-        lockfilePath,
-      )
+      const acquired = await acquireProcessLifetimeLock(versionPath, lockfilePath)
 
       if (!acquired) {
-        logEvent('tengu_version_lock_failed', {
+        logEvent("tengu_version_lock_failed", {
           is_pid_based: true,
           is_lifetime_lock: true,
         })
-        logLockAcquisitionError(
-          versionPath,
-          new Error('Lock already held by another process'),
-        )
+        logLockAcquisitionError(versionPath, new Error("Lock already held by another process"))
         return
       }
 
-      logEvent('tengu_version_lock_acquired', {
+      logEvent("tengu_version_lock_acquired", {
         is_pid_based: true,
         is_lifetime_lock: true,
       })
@@ -1100,19 +1002,14 @@ export async function lockCurrentVersion(): Promise<void> {
           lockfilePath,
           // Handle lock compromise gracefully (e.g., if another process deletes the lock directory)
           onCompromised: (err: Error) => {
-            logForDebugging(
-              `NON-FATAL: Lock on running version was compromised: ${err.message}`,
-              { level: 'info' },
-            )
+            logForDebugging(`NON-FATAL: Lock on running version was compromised: ${err.message}`, { level: "info" })
           },
         })
-        logEvent('tengu_version_lock_acquired', {
+        logEvent("tengu_version_lock_acquired", {
           is_pid_based: false,
           is_lifetime_lock: true,
         })
-        logForDebugging(
-          `Acquired mtime-based lock on running version: ${versionPath}`,
-        )
+        logForDebugging(`Acquired mtime-based lock on running version: ${versionPath}`)
 
         // Release lock explicitly; proper-lockfile's cleanup is unreliable with signal-exit v3+v4
         registerCleanup(async () => {
@@ -1124,13 +1021,10 @@ export async function lockCurrentVersion(): Promise<void> {
         })
       } catch (lockError) {
         if (isENOENT(lockError)) {
-          logForDebugging(
-            `Cannot lock current version - file does not exist: ${versionPath}`,
-            { level: 'info' },
-          )
+          logForDebugging(`Cannot lock current version - file does not exist: ${versionPath}`, { level: "info" })
           return
         }
-        logEvent('tengu_version_lock_failed', {
+        logEvent("tengu_version_lock_failed", {
           is_pid_based: false,
           is_lifetime_lock: true,
         })
@@ -1140,27 +1034,22 @@ export async function lockCurrentVersion(): Promise<void> {
     }
   } catch (error) {
     if (isENOENT(error)) {
-      logForDebugging(
-        `Cannot lock current version - file does not exist: ${versionPath}`,
-        { level: 'info' },
-      )
+      logForDebugging(`Cannot lock current version - file does not exist: ${versionPath}`, { level: "info" })
       return
     }
     // We fallback to previous behavior where we don't acquire a lock on a running version
     // This ~mostly works but using native binaries like ripgrep will fail
-    logForDebugging(
-      `NON-FATAL: Failed to lock current version during execution ${errorMessage(error)}`,
-      { level: 'info' },
-    )
+    logForDebugging(`NON-FATAL: Failed to lock current version during execution ${errorMessage(error)}`, {
+      level: "info",
+    })
   }
 }
 
 function logLockAcquisitionError(versionPath: string, lockError: unknown) {
   logError(
-    new Error(
-      `NON-FATAL: Lock acquisition failed for ${versionPath} (expected in multi-process scenarios)`,
-      { cause: lockError },
-    ),
+    new Error(`NON-FATAL: Lock acquisition failed for ${versionPath} (expected in multi-process scenarios)`, {
+      cause: lockError,
+    }),
   )
 }
 
@@ -1189,7 +1078,7 @@ export async function cleanupOldVersions(): Promise<void> {
   const oneHourAgo = Date.now() - 3600000
 
   // Clean up old renamed executables on Windows (no longer running at startup)
-  if (getPlatform().startsWith('win32')) {
+  if (getPlatform().startsWith("win32")) {
     const executableDir = dirname(dirs.executable)
     try {
       const files = await readdir(executableDir)
@@ -1204,9 +1093,7 @@ export async function cleanupOldVersions(): Promise<void> {
         }
       }
       if (cleanedCount > 0) {
-        logForDebugging(
-          `Cleaned up ${cleanedCount} old Windows executables on startup`,
-        )
+        logForDebugging(`Cleaned up ${cleanedCount} old Windows executables on startup`)
       }
     } catch (error) {
       if (!isENOENT(error)) {
@@ -1238,10 +1125,8 @@ export async function cleanupOldVersions(): Promise<void> {
       }
     }
     if (stagingCleanedCount > 0) {
-      logForDebugging(
-        `Cleaned up ${stagingCleanedCount} orphaned staging directories`,
-      )
-      logEvent('tengu_native_staging_cleanup', {
+      logForDebugging(`Cleaned up ${stagingCleanedCount} orphaned staging directories`)
+      logEvent("tengu_native_staging_cleanup", {
         cleaned_count: stagingCleanedCount,
       })
     }
@@ -1256,7 +1141,7 @@ export async function cleanupOldVersions(): Promise<void> {
     const staleLocksCleaned = cleanupStaleLocks(dirs.locks)
     if (staleLocksCleaned > 0) {
       logForDebugging(`Cleaned up ${staleLocksCleaned} stale version locks`)
-      logEvent('tengu_native_stale_locks_cleanup', {
+      logEvent("tengu_native_stale_locks_cleanup", {
         cleaned_count: staleLocksCleaned,
       })
     }
@@ -1303,11 +1188,7 @@ export async function cleanupOldVersions(): Promise<void> {
     try {
       const stats = await stat(entryPath)
       if (!stats.isFile()) continue
-      if (
-        process.platform !== 'win32' &&
-        stats.size > 0 &&
-        (stats.mode & 0o111) === 0
-      ) {
+      if (process.platform !== "win32" && stats.size > 0 && (stats.mode & 0o111) === 0) {
         // Check executability via mode bits from the existing stat result —
         // avoids a second syscall (access(X_OK)) and the TOCTOU window between
         // stat and access. Skip on Windows: libuv only sets execute bits for
@@ -1328,10 +1209,8 @@ export async function cleanupOldVersions(): Promise<void> {
   }
 
   if (tempFilesCleanedCount > 0) {
-    logForDebugging(
-      `Cleaned up ${tempFilesCleanedCount} orphaned temp install files`,
-    )
-    logEvent('tengu_native_temp_files_cleanup', {
+    logForDebugging(`Cleaned up ${tempFilesCleanedCount} orphaned temp install files`)
+    logEvent("tengu_native_temp_files_cleanup", {
       cleaned_count: tempFilesCleanedCount,
     })
   }
@@ -1379,13 +1258,13 @@ export async function cleanupOldVersions(): Promise<void> {
 
     // Eligible versions: not protected, sorted newest first (reuse cached mtime)
     const eligibleVersions = versionFiles
-      .filter(v => !protectedVersions.has(v.resolvedPath))
+      .filter((v) => !protectedVersions.has(v.resolvedPath))
       .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
 
     const versionsToDelete = eligibleVersions.slice(VERSION_RETENTION_COUNT)
 
     if (versionsToDelete.length === 0) {
-      logEvent('tengu_native_version_cleanup', {
+      logEvent("tengu_native_version_cleanup", {
         total_count: versionFiles.length,
         deleted_count: 0,
         protected_count: protectedVersions.size,
@@ -1401,7 +1280,7 @@ export async function cleanupOldVersions(): Promise<void> {
     let errorCount = 0
 
     await Promise.all(
-      versionsToDelete.map(async version => {
+      versionsToDelete.map(async (version) => {
         try {
           const deleted = await tryWithVersionLock(version.path, async () => {
             await unlink(version.path)
@@ -1410,20 +1289,16 @@ export async function cleanupOldVersions(): Promise<void> {
             deletedCount++
           } else {
             lockFailedCount++
-            logForDebugging(
-              `Skipping deletion of ${version.name} - locked by another process`,
-            )
+            logForDebugging(`Skipping deletion of ${version.name} - locked by another process`)
           }
         } catch (error) {
           errorCount++
-          logError(
-            new Error(`Failed to delete version ${version.name}: ${error}`),
-          )
+          logError(new Error(`Failed to delete version ${version.name}: ${error}`))
         }
       }),
     )
 
-    logEvent('tengu_native_version_cleanup', {
+    logEvent("tengu_native_version_cleanup", {
       total_count: versionFiles.length,
       deleted_count: deletedCount,
       protected_count: protectedVersions.size,
@@ -1454,7 +1329,7 @@ async function isNpmSymlink(executablePath: string): Promise<boolean> {
   // checking npm prefix isn't guaranteed to work, as prefix can change
   // and users may set --prefix manually when installing
   // thus we use this heuristic:
-  return targetPath.endsWith('.js') || targetPath.includes('node_modules')
+  return targetPath.endsWith(".js") || targetPath.includes("node_modules")
 }
 
 /**
@@ -1468,9 +1343,7 @@ export async function removeInstalledSymlink(): Promise<void> {
   try {
     // Check if this is an npm-managed installation
     if (await isNpmSymlink(dirs.executable)) {
-      logForDebugging(
-        `Skipping removal of ${dirs.executable} - appears to be npm-managed`,
-      )
+      logForDebugging(`Skipping removal of ${dirs.executable} - appears to be npm-managed`)
       return
     }
 
@@ -1505,7 +1378,7 @@ export async function cleanupShellAliases(): Promise<SetupMessage[]> {
         messages.push({
           message: `Removed claude alias from ${configFile}. Run: unalias claude`,
           userActionRequired: true,
-          type: 'alias',
+          type: "alias",
         })
         logForDebugging(`Cleaned up claude alias from ${shellType} config`)
       }
@@ -1514,7 +1387,7 @@ export async function cleanupShellAliases(): Promise<SetupMessage[]> {
       messages.push({
         message: `Failed to clean up ${configFile}: ${error}`,
         userActionRequired: false,
-        type: 'error',
+        type: "error",
       })
     }
   }
@@ -1527,15 +1400,11 @@ async function manualRemoveNpmPackage(
 ): Promise<{ success: boolean; error?: string; warning?: string }> {
   try {
     // Get npm global prefix
-    const prefixResult = await execFileNoThrowWithCwd('npm', [
-      'config',
-      'get',
-      'prefix',
-    ])
+    const prefixResult = await execFileNoThrowWithCwd("npm", ["config", "get", "prefix"])
     if (prefixResult.code !== 0 || !prefixResult.stdout) {
       return {
         success: false,
-        error: 'Failed to get npm global prefix',
+        error: "Failed to get npm global prefix",
       }
     }
 
@@ -1556,37 +1425,37 @@ async function manualRemoveNpmPackage(
       }
     }
 
-    if (getPlatform().startsWith('win32')) {
+    if (getPlatform().startsWith("win32")) {
       // Windows - only remove executables, not the package directory
-      const binCmd = join(globalPrefix, 'claude.cmd')
-      const binPs1 = join(globalPrefix, 'claude.ps1')
-      const binExe = join(globalPrefix, 'claude')
+      const binCmd = join(globalPrefix, "claude.cmd")
+      const binPs1 = join(globalPrefix, "claude.ps1")
+      const binExe = join(globalPrefix, "claude")
 
-      if (await tryRemove(binCmd, 'bin script')) {
+      if (await tryRemove(binCmd, "bin script")) {
         manuallyRemoved = true
       }
 
-      if (await tryRemove(binPs1, 'PowerShell script')) {
+      if (await tryRemove(binPs1, "PowerShell script")) {
         manuallyRemoved = true
       }
 
-      if (await tryRemove(binExe, 'bin executable')) {
+      if (await tryRemove(binExe, "bin executable")) {
         manuallyRemoved = true
       }
     } else {
       // Unix/Mac - only remove symlink, not the package directory
-      const binSymlink = join(globalPrefix, 'bin', 'claude')
+      const binSymlink = join(globalPrefix, "bin", "claude")
 
-      if (await tryRemove(binSymlink, 'bin symlink')) {
+      if (await tryRemove(binSymlink, "bin symlink")) {
         manuallyRemoved = true
       }
     }
 
     if (manuallyRemoved) {
       logForDebugging(`Successfully removed ${packageName} manually`)
-      const nodeModulesPath = getPlatform().startsWith('win32')
-        ? join(globalPrefix, 'node_modules', packageName)
-        : join(globalPrefix, 'lib', 'node_modules', packageName)
+      const nodeModulesPath = getPlatform().startsWith("win32")
+        ? join(globalPrefix, "node_modules", packageName)
+        : join(globalPrefix, "lib", "node_modules", packageName)
 
       return {
         success: true,
@@ -1597,7 +1466,7 @@ async function manualRemoveNpmPackage(
     }
   } catch (manualError) {
     logForDebugging(`Manual removal failed: ${manualError}`, {
-      level: 'error',
+      level: "error",
     })
     return {
       success: false,
@@ -1610,8 +1479,8 @@ async function attemptNpmUninstall(
   packageName: string,
 ): Promise<{ success: boolean; error?: string; warning?: string }> {
   const { code, stderr } = await execFileNoThrowWithCwd(
-    'npm',
-    ['uninstall', '-g', packageName],
+    "npm",
+    ["uninstall", "-g", packageName],
     // eslint-disable-next-line custom-rules/no-process-cwd -- matches original behavior
     { cwd: process.cwd() },
   )
@@ -1619,13 +1488,10 @@ async function attemptNpmUninstall(
   if (code === 0) {
     logForDebugging(`Removed global npm installation of ${packageName}`)
     return { success: true }
-  } else if (stderr && !stderr.includes('npm ERR! code E404')) {
+  } else if (stderr && !stderr.includes("npm ERR! code E404")) {
     // Check for ENOTEMPTY error and try manual removal
-    if (stderr.includes('npm error code ENOTEMPTY')) {
-      logForDebugging(
-        `Failed to uninstall global npm package ${packageName}: ${stderr}`,
-        { level: 'error' },
-      )
+    if (stderr.includes("npm error code ENOTEMPTY")) {
+      logForDebugging(`Failed to uninstall global npm package ${packageName}: ${stderr}`, { level: "error" })
       logForDebugging(`Attempting manual removal due to ENOTEMPTY error`)
 
       const manualResult = await manualRemoveNpmPackage(packageName)
@@ -1640,10 +1506,7 @@ async function attemptNpmUninstall(
     }
 
     // Only report as error if it's not a "package not found" error
-    logForDebugging(
-      `Failed to uninstall global npm package ${packageName}: ${stderr}`,
-      { level: 'error' },
-    )
+    logForDebugging(`Failed to uninstall global npm package ${packageName}: ${stderr}`, { level: "error" })
     return {
       success: false,
       error: `Failed to remove global npm installation of ${packageName}: ${stderr}`,
@@ -1663,9 +1526,7 @@ export async function cleanupNpmInstallations(): Promise<{
   let removed = 0
 
   // Always attempt to remove @anthropic-ai/claude-code
-  const codePackageResult = await attemptNpmUninstall(
-    '@anthropic-ai/claude-code',
-  )
+  const codePackageResult = await attemptNpmUninstall("@anthropic-ai/claude-code")
   if (codePackageResult.success) {
     removed++
     if (codePackageResult.warning) {
@@ -1676,7 +1537,7 @@ export async function cleanupNpmInstallations(): Promise<{
   }
 
   // Also attempt to remove MACRO.PACKAGE_URL if it's defined and different
-  if (MACRO.PACKAGE_URL && MACRO.PACKAGE_URL !== '@anthropic-ai/claude-code') {
+  if (MACRO.PACKAGE_URL && MACRO.PACKAGE_URL !== "@anthropic-ai/claude-code") {
     const macroPackageResult = await attemptNpmUninstall(MACRO.PACKAGE_URL)
     if (macroPackageResult.success) {
       removed++
@@ -1689,7 +1550,7 @@ export async function cleanupNpmInstallations(): Promise<{
   }
 
   // Check for local installation at ~/.claude/local
-  const localInstallDir = join(homedir(), '.claude', 'local')
+  const localInstallDir = join(homedir(), ".claude", "local")
 
   try {
     await rm(localInstallDir, { recursive: true })
@@ -1699,7 +1560,7 @@ export async function cleanupNpmInstallations(): Promise<{
     if (!isENOENT(error)) {
       errors.push(`Failed to remove ${localInstallDir}: ${error}`)
       logForDebugging(`Failed to remove local installation: ${error}`, {
-        level: 'error',
+        level: "error",
       })
     }
   }

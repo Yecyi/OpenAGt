@@ -1,6 +1,6 @@
-import { createSignal } from './signal.js'
+import { createSignal } from "./signal.js"
 
-export type MessageSource = 'user' | 'teammate' | 'system' | 'tick' | 'task'
+export type MessageSource = "user" | "teammate" | "system" | "tick" | "task"
 
 export type Message = {
   id: string
@@ -32,7 +32,7 @@ export class Mailbox {
 
   send(msg: Message): void {
     this._revision++
-    const idx = this.waiters.findIndex(w => w.fn(msg))
+    const idx = this.waiters.findIndex((w) => w.fn(msg))
     if (idx !== -1) {
       const waiter = this.waiters.splice(idx, 1)[0]
       if (waiter) {
@@ -60,7 +60,7 @@ export class Mailbox {
         return Promise.resolve(msg)
       }
     }
-    return new Promise<Message>(resolve => {
+    return new Promise<Message>((resolve) => {
       this.waiters.push({ fn, resolve })
     })
   }

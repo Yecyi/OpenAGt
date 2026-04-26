@@ -1,9 +1,9 @@
-import type { TaskStateBase } from '../../Task.js'
-import type { AgentToolResult } from '../../tools/AgentTool/agentToolUtils.js'
-import type { AgentDefinition } from '../../tools/AgentTool/loadAgentsDir.js'
-import type { Message } from '../../types/message.js'
-import type { PermissionMode } from '../../utils/permissions/PermissionMode.js'
-import type { AgentProgress } from '../LocalAgentTask/LocalAgentTask.js'
+import type { TaskStateBase } from "../../Task.js"
+import type { AgentToolResult } from "../../tools/AgentTool/agentToolUtils.js"
+import type { AgentDefinition } from "../../tools/AgentTool/loadAgentsDir.js"
+import type { Message } from "../../types/message.js"
+import type { PermissionMode } from "../../utils/permissions/PermissionMode.js"
+import type { AgentProgress } from "../LocalAgentTask/LocalAgentTask.js"
 
 /**
  * Teammate identity stored in task state.
@@ -20,7 +20,7 @@ export type TeammateIdentity = {
 }
 
 export type InProcessTeammateTaskState = TaskStateBase & {
-  type: 'in_process_teammate'
+  type: "in_process_teammate"
 
   // Identity as sub-object (matches TeammateContext shape for consistency)
   // Stored as plain data in AppState, NOT a reference to AsyncLocalStorage
@@ -75,15 +75,8 @@ export type InProcessTeammateTaskState = TaskStateBase & {
   lastReportedTokenCount: number
 }
 
-export function isInProcessTeammateTask(
-  task: unknown,
-): task is InProcessTeammateTaskState {
-  return (
-    typeof task === 'object' &&
-    task !== null &&
-    'type' in task &&
-    task.type === 'in_process_teammate'
-  )
+export function isInProcessTeammateTask(task: unknown): task is InProcessTeammateTaskState {
+  return typeof task === "object" && task !== null && "type" in task && task.type === "in_process_teammate"
 }
 
 /**
@@ -105,10 +98,7 @@ export const TEAMMATE_MESSAGES_UI_CAP = 50
  * TEAMMATE_MESSAGES_UI_CAP entries by dropping the oldest. Always returns
  * a new array (AppState immutability).
  */
-export function appendCappedMessage<T>(
-  prev: readonly T[] | undefined,
-  item: T,
-): T[] {
+export function appendCappedMessage<T>(prev: readonly T[] | undefined, item: T): T[] {
   if (prev === undefined || prev.length === 0) {
     return [item]
   }

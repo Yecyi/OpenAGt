@@ -24,40 +24,30 @@
  *   This avoids module-level mutable state and gives tests natural isolation.
  */
 
-import axios from 'axios'
-import { createHash } from 'crypto'
-import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
-import { join, relative, sep } from 'path'
+import axios from "axios"
+import { createHash } from "crypto"
+import { mkdir, readdir, readFile, stat, writeFile } from "fs/promises"
+import { join, relative, sep } from "path"
 import {
   CLAUDE_AI_INFERENCE_SCOPE,
   CLAUDE_AI_PROFILE_SCOPE,
   getOauthConfig,
   OAUTH_BETA_HEADER,
-} from '../../constants/oauth.js'
-import {
-  getTeamMemPath,
-  PathTraversalError,
-  validateTeamMemKey,
-} from '../../memdir/teamMemPaths.js'
-import { count } from '../../utils/array.js'
-import {
-  checkAndRefreshOAuthTokenIfNeeded,
-  getClaudeAIOAuthTokens,
-} from '../../utils/auth.js'
-import { logForDebugging } from '../../utils/debug.js'
-import { classifyAxiosError } from '../../utils/errors.js'
-import { getGithubRepo } from '../../utils/git.js'
-import {
-  getAPIProvider,
-  isFirstPartyAnthropicBaseUrl,
-} from '../../utils/model/providers.js'
-import { sleep } from '../../utils/sleep.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { getClaudeCodeUserAgent } from '../../utils/userAgent.js'
-import { logEvent } from '../analytics/index.js'
-import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from '../analytics/metadata.js'
-import { getRetryDelay } from '../api/withRetry.js'
-import { scanForSecrets } from './secretScanner.js'
+} from "../../constants/oauth.js"
+import { getTeamMemPath, PathTraversalError, validateTeamMemKey } from "../../memdir/teamMemPaths.js"
+import { count } from "../../utils/array.js"
+import { checkAndRefreshOAuthTokenIfNeeded, getClaudeAIOAuthTokens } from "../../utils/auth.js"
+import { logForDebugging } from "../../utils/debug.js"
+import { classifyAxiosError } from "../../utils/errors.js"
+import { getGithubRepo } from "../../utils/git.js"
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from "../../utils/model/providers.js"
+import { sleep } from "../../utils/sleep.js"
+import { jsonStringify } from "../../utils/slowOperations.js"
+import { getClaudeCodeUserAgent } from "../../utils/userAgent.js"
+import { logEvent } from "../analytics/index.js"
+import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from "../analytics/metadata.js"
+import { getRetryDelay } from "../api/withRetry.js"
+import { scanForSecrets } from "./secretScanner.js"
 import {
   type SkippedSecretFile,
   TeamMemoryDataSchema,
@@ -66,7 +56,7 @@ import {
   type TeamMemorySyncPushResult,
   type TeamMemorySyncUploadResult,
   TeamMemoryTooManyEntriesSchema,
-} from './types.js'
+} from "./types.js"
 
 const TEAM_MEMORY_SYNC_TIMEOUT_MS = 30_000
 // Per-entry size cap — server default from anthropic/anthropic#293258.
@@ -132,7 +122,7 @@ export function createSyncState(): SyncState {
  * so local-vs-server comparison works by direct string equality.
  */
 export function hashContent(content: string): string {
-  return 'sha256:' + createHash('sha256').update(content, 'utf8').digest('hex')
+  return "sha256:" + createHash("sha256").update(content, "utf8").digest("hex")
 }
 
 /**
@@ -140,7 +130,7 @@ export function hashContent(content: string): string {
  * Uses `in` narrowing so no `as` cast is needed at call sites.
  */
 function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
-  return e instanceof Error && 'code' in e && typeof e.code === 'string'
+  return e instanceof Error && "code" in e && typeof e.code === "string"
 }
 
 // ─── Auth & endpoint ─────────────────────────────────────────
@@ -149,7 +139,7 @@ function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
  * Check if user is authenticated with first-party OAuth (required for team memory sync).
  */
 function isUsingOAuth(): boolean {
-  if (getAPIProvider() !== 'firstParty' || !isFirstPartyAnthropicBaseUrl()) {
+  if (getAPIProvider() !== "firstParty" || !isFirstPartyAnthropicBaseUrl()) {
     return false
   }
   const tokens = getClaudeAIOAuthTokens()
@@ -161,8 +151,7 @@ function isUsingOAuth(): boolean {
 }
 
 function getTeamMemorySyncEndpoint(repoSlug: string): string {
-  const baseUrl =
-    process.env.TEAM_MEMORY_SYNC_URL || getOauthConfig().BASE_API_URL
+  const baseUrl = process.env.TEAM_MEMORY_SYNC_URL || getOauthConfig().BASE_API_URL
   return `${baseUrl}/api/claude_code/team_memory?repo=${encodeURIComponent(repoSlug)}`
 }
 
@@ -175,12 +164,12 @@ function getAuthHeaders(): {
     return {
       headers: {
         Authorization: `Bearer ${oauthTokens.accessToken}`,
-        'anthropic-beta': OAUTH_BETA_HEADER,
-        'User-Agent': getClaudeCodeUserAgent(),
+        "anthropic-beta": OAUTH_BETA_HEADER,
+        "User-Agent": getClaudeCodeUserAgent(),
       },
     }
   }
-  return { error: 'No OAuth token available for team memory sync' }
+  return { error: "No OAuth token available for team memory sync" }
 }
 
 // ─── Fetch (pull) ────────────────────────────────────────────
@@ -199,33 +188,32 @@ async function fetchTeamMemoryOnce(
         success: false,
         error: auth.error,
         skipRetry: true,
-        errorType: 'auth',
+        errorType: "auth",
       }
     }
 
     const headers: Record<string, string> = { ...auth.headers }
     if (etag) {
-      headers['If-None-Match'] = `"${etag.replace(/"/g, '')}"`
+      headers["If-None-Match"] = `"${etag.replace(/"/g, "")}"`
     }
 
     const endpoint = getTeamMemorySyncEndpoint(repoSlug)
     const response = await axios.get(endpoint, {
       headers,
       timeout: TEAM_MEMORY_SYNC_TIMEOUT_MS,
-      validateStatus: status =>
-        status === 200 || status === 304 || status === 404,
+      validateStatus: (status) => status === 200 || status === 304 || status === 404,
     })
 
     if (response.status === 304) {
-      logForDebugging('team-memory-sync: not modified (304)', {
-        level: 'debug',
+      logForDebugging("team-memory-sync: not modified (304)", {
+        level: "debug",
       })
       return { success: true, notModified: true, checksum: etag ?? undefined }
     }
 
     if (response.status === 404) {
-      logForDebugging('team-memory-sync: no remote data (404)', {
-        level: 'debug',
+      logForDebugging("team-memory-sync: no remote data (404)", {
+        level: "debug",
       })
       state.lastKnownChecksum = null
       return { success: true, isEmpty: true }
@@ -233,30 +221,26 @@ async function fetchTeamMemoryOnce(
 
     const parsed = TeamMemoryDataSchema().safeParse(response.data)
     if (!parsed.success) {
-      logForDebugging('team-memory-sync: invalid response format', {
-        level: 'warn',
+      logForDebugging("team-memory-sync: invalid response format", {
+        level: "warn",
       })
       return {
         success: false,
-        error: 'Invalid team memory response format',
+        error: "Invalid team memory response format",
         skipRetry: true,
-        errorType: 'parse',
+        errorType: "parse",
       }
     }
 
     // Extract checksum from response data or ETag header
-    const responseChecksum =
-      parsed.data.checksum ||
-      response.headers['etag']?.replace(/^"|"$/g, '') ||
-      undefined
+    const responseChecksum = parsed.data.checksum || response.headers["etag"]?.replace(/^"|"$/g, "") || undefined
     if (responseChecksum) {
       state.lastKnownChecksum = responseChecksum
     }
 
-    logForDebugging(
-      `team-memory-sync: fetched successfully (checksum: ${responseChecksum ?? 'none'})`,
-      { level: 'debug' },
-    )
+    logForDebugging(`team-memory-sync: fetched successfully (checksum: ${responseChecksum ?? "none"})`, {
+      level: "debug",
+    })
     return {
       success: true,
       data: parsed.data,
@@ -265,40 +249,38 @@ async function fetchTeamMemoryOnce(
     }
   } catch (error) {
     const { kind, status, message } = classifyAxiosError(error)
-    const body = axios.isAxiosError(error)
-      ? JSON.stringify(error.response?.data ?? '')
-      : ''
-    if (kind !== 'other') {
+    const body = axios.isAxiosError(error) ? JSON.stringify(error.response?.data ?? "") : ""
+    if (kind !== "other") {
       logForDebugging(`team-memory-sync: fetch error ${status}: ${body}`, {
-        level: 'warn',
+        level: "warn",
       })
     }
     switch (kind) {
-      case 'auth':
+      case "auth":
         return {
           success: false,
           error: `Not authorized for team memory sync: ${body}`,
           skipRetry: true,
-          errorType: 'auth',
+          errorType: "auth",
           httpStatus: status,
         }
-      case 'timeout':
+      case "timeout":
         return {
           success: false,
-          error: 'Team memory sync request timeout',
-          errorType: 'timeout',
+          error: "Team memory sync request timeout",
+          errorType: "timeout",
         }
-      case 'network':
+      case "network":
         return {
           success: false,
-          error: 'Cannot connect to server',
-          errorType: 'network',
+          error: "Cannot connect to server",
+          errorType: "network",
         }
       default:
         return {
           success: false,
           error: message,
-          errorType: 'unknown',
+          errorType: "unknown",
           httpStatus: status,
         }
     }
@@ -312,22 +294,19 @@ async function fetchTeamMemoryOnce(
  * Requires anthropic/anthropic#283027 deployed; on failure the caller fails the
  * push and the watcher retries on the next edit.
  */
-async function fetchTeamMemoryHashes(
-  state: SyncState,
-  repoSlug: string,
-): Promise<TeamMemoryHashesResult> {
+async function fetchTeamMemoryHashes(state: SyncState, repoSlug: string): Promise<TeamMemoryHashesResult> {
   try {
     await checkAndRefreshOAuthTokenIfNeeded()
     const auth = getAuthHeaders()
     if (auth.error) {
-      return { success: false, error: auth.error, errorType: 'auth' }
+      return { success: false, error: auth.error, errorType: "auth" }
     }
 
-    const endpoint = getTeamMemorySyncEndpoint(repoSlug) + '&view=hashes'
+    const endpoint = getTeamMemorySyncEndpoint(repoSlug) + "&view=hashes"
     const response = await axios.get(endpoint, {
       headers: auth.headers,
       timeout: TEAM_MEMORY_SYNC_TIMEOUT_MS,
-      validateStatus: status => status === 200 || status === 404,
+      validateStatus: (status) => status === 200 || status === 404,
     })
 
     if (response.status === 404) {
@@ -335,18 +314,16 @@ async function fetchTeamMemoryHashes(
       return { success: true, entryChecksums: {} }
     }
 
-    const checksum =
-      response.data?.checksum || response.headers['etag']?.replace(/^"|"$/g, '')
+    const checksum = response.data?.checksum || response.headers["etag"]?.replace(/^"|"$/g, "")
     const entryChecksums = response.data?.entryChecksums
 
     // Requires anthropic/anthropic#283027. If entryChecksums is missing,
     // treat as a probe failure — caller fails the push; watcher retries.
-    if (!entryChecksums || typeof entryChecksums !== 'object') {
+    if (!entryChecksums || typeof entryChecksums !== "object") {
       return {
         success: false,
-        error:
-          'Server did not return entryChecksums (?view=hashes unsupported)',
-        errorType: 'parse',
+        error: "Server did not return entryChecksums (?view=hashes unsupported)",
+        errorType: "parse",
       }
     }
 
@@ -362,22 +339,22 @@ async function fetchTeamMemoryHashes(
   } catch (error) {
     const { kind, status, message } = classifyAxiosError(error)
     switch (kind) {
-      case 'auth':
+      case "auth":
         return {
           success: false,
-          error: 'Not authorized',
-          errorType: 'auth',
+          error: "Not authorized",
+          errorType: "auth",
           httpStatus: status,
         }
-      case 'timeout':
-        return { success: false, error: 'Timeout', errorType: 'timeout' }
-      case 'network':
-        return { success: false, error: 'Network error', errorType: 'network' }
+      case "timeout":
+        return { success: false, error: "Timeout", errorType: "timeout" }
+      case "network":
+        return { success: false, error: "Network error", errorType: "network" }
       default:
         return {
           success: false,
           error: message,
-          errorType: 'unknown',
+          errorType: "unknown",
           httpStatus: status,
         }
     }
@@ -401,7 +378,7 @@ async function fetchTeamMemory(
     }
     const delayMs = getRetryDelay(attempt)
     logForDebugging(`team-memory-sync: retry ${attempt}/${MAX_RETRIES}`, {
-      level: 'debug',
+      level: "debug",
     })
     await sleep(delayMs)
   }
@@ -423,20 +400,16 @@ async function fetchTeamMemory(
  * (MAX_FILE_SIZE_BYTES=250K already caps individual files; a ~250K solo body
  * is above our soft cap but below the gateway's observed real threshold).
  */
-export function batchDeltaByBytes(
-  delta: Record<string, string>,
-): Array<Record<string, string>> {
+export function batchDeltaByBytes(delta: Record<string, string>): Array<Record<string, string>> {
   const keys = Object.keys(delta).sort()
   if (keys.length === 0) return []
 
   // Fixed overhead for `{"entries":{}}` — each entry then adds its marginal
   // bytes.  jsonStringify (≡ JSON.stringify under the hood) on the raw
   // strings handles escaping so the count matches what axios serializes.
-  const EMPTY_BODY_BYTES = Buffer.byteLength('{"entries":{}}', 'utf8')
+  const EMPTY_BODY_BYTES = Buffer.byteLength('{"entries":{}}', "utf8")
   const entryBytes = (k: string, v: string): number =>
-    Buffer.byteLength(jsonStringify(k), 'utf8') +
-    Buffer.byteLength(jsonStringify(v), 'utf8') +
-    2 // colon + comma (comma over-counts by 1 on the last entry; harmless slack)
+    Buffer.byteLength(jsonStringify(k), "utf8") + Buffer.byteLength(jsonStringify(v), "utf8") + 2 // colon + comma (comma over-counts by 1 on the last entry; harmless slack)
 
   const batches: Array<Record<string, string>> = []
   let current: Record<string, string> = {}
@@ -444,10 +417,7 @@ export function batchDeltaByBytes(
 
   for (const key of keys) {
     const added = entryBytes(key, delta[key]!)
-    if (
-      currentBytes + added > MAX_PUT_BODY_BYTES &&
-      Object.keys(current).length > 0
-    ) {
+    if (currentBytes + added > MAX_PUT_BODY_BYTES && Object.keys(current).length > 0) {
       batches.push(current)
       current = {}
       currentBytes = EMPTY_BODY_BYTES
@@ -470,15 +440,15 @@ async function uploadTeamMemory(
 
     const auth = getAuthHeaders()
     if (auth.error) {
-      return { success: false, error: auth.error, errorType: 'auth' }
+      return { success: false, error: auth.error, errorType: "auth" }
     }
 
     const headers: Record<string, string> = {
       ...auth.headers,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     }
     if (ifMatchChecksum) {
-      headers['If-Match'] = `"${ifMatchChecksum.replace(/"/g, '')}"`
+      headers["If-Match"] = `"${ifMatchChecksum.replace(/"/g, "")}"`
     }
 
     const endpoint = getTeamMemorySyncEndpoint(repoSlug)
@@ -488,15 +458,15 @@ async function uploadTeamMemory(
       {
         headers,
         timeout: TEAM_MEMORY_SYNC_TIMEOUT_MS,
-        validateStatus: status => status === 200 || status === 412,
+        validateStatus: (status) => status === 200 || status === 412,
       },
     )
 
     if (response.status === 412) {
-      logForDebugging('team-memory-sync: conflict (412 Precondition Failed)', {
-        level: 'info',
+      logForDebugging("team-memory-sync: conflict (412 Precondition Failed)", {
+        level: "info",
       })
-      return { success: false, conflict: true, error: 'ETag mismatch' }
+      return { success: false, conflict: true, error: "ETag mismatch" }
     }
 
     const responseChecksum = response.data?.checksum
@@ -505,8 +475,8 @@ async function uploadTeamMemory(
     }
 
     logForDebugging(
-      `team-memory-sync: uploaded ${Object.keys(entries).length} entries (checksum: ${responseChecksum ?? 'none'})`,
-      { level: 'debug' },
+      `team-memory-sync: uploaded ${Object.keys(entries).length} entries (checksum: ${responseChecksum ?? "none"})`,
+      { level: "debug" },
     )
     return {
       success: true,
@@ -514,16 +484,13 @@ async function uploadTeamMemory(
       lastModified: response.data?.lastModified,
     }
   } catch (error) {
-    const body = axios.isAxiosError(error)
-      ? JSON.stringify(error.response?.data ?? '')
-      : ''
-    logForDebugging(
-      `team-memory-sync: upload failed: ${error instanceof Error ? error.message : ''} ${body}`,
-      { level: 'warn' },
-    )
+    const body = axios.isAxiosError(error) ? JSON.stringify(error.response?.data ?? "") : ""
+    logForDebugging(`team-memory-sync: upload failed: ${error instanceof Error ? error.message : ""} ${body}`, {
+      level: "warn",
+    })
     const { kind, status: httpStatus, message } = classifyAxiosError(error)
-    const errorType = kind === 'http' || kind === 'other' ? 'unknown' : kind
-    let serverErrorCode: 'team_memory_too_many_entries' | undefined
+    const errorType = kind === "http" || kind === "other" ? "unknown" : kind
+    let serverErrorCode: "team_memory_too_many_entries" | undefined
     let serverMaxEntries: number | undefined
     let serverReceivedEntries: number | undefined
     // Parse structured 413 (anthropic/anthropic#293258). The server's
@@ -531,9 +498,7 @@ async function uploadTeamMemory(
     // the effective max_entries (may be GB-tuned per-org). Cache it so
     // the next push trims to the right value.
     if (httpStatus === 413 && axios.isAxiosError(error)) {
-      const parsed = TeamMemoryTooManyEntriesSchema().safeParse(
-        error.response?.data,
-      )
+      const parsed = TeamMemoryTooManyEntriesSchema().safeParse(error.response?.data)
       if (parsed.success) {
         serverErrorCode = parsed.data.error.details.error_code
         serverMaxEntries = parsed.data.error.details.max_entries
@@ -576,7 +541,7 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
     try {
       const dirEntries = await readdir(dir, { withFileTypes: true })
       await Promise.all(
-        dirEntries.map(async entry => {
+        dirEntries.map(async (entry) => {
           const fullPath = join(dir, entry.name)
           if (entry.isDirectory()) {
             await walkDir(fullPath)
@@ -586,12 +551,12 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
               if (stats.size > MAX_FILE_SIZE_BYTES) {
                 logForDebugging(
                   `team-memory-sync: skipping oversized file ${entry.name} (${stats.size} > ${MAX_FILE_SIZE_BYTES} bytes)`,
-                  { level: 'info' },
+                  { level: "info" },
                 )
                 return
               }
-              const content = await readFile(fullPath, 'utf8')
-              const relPath = relative(teamDir, fullPath).replaceAll('\\', '/')
+              const content = await readFile(fullPath, "utf8")
+              const relPath = relative(teamDir, fullPath).replaceAll("\\", "/")
 
               // PSR M22174: scan for secrets BEFORE adding to the upload
               // payload. If a secret is detected, skip this file entirely
@@ -607,10 +572,9 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
                   ruleId: firstMatch.ruleId,
                   label: firstMatch.label,
                 })
-                logForDebugging(
-                  `team-memory-sync: skipping "${relPath}" — detected ${firstMatch.label}`,
-                  { level: 'warn' },
-                )
+                logForDebugging(`team-memory-sync: skipping "${relPath}" — detected ${firstMatch.label}`, {
+                  level: "warn",
+                })
                 return
               }
 
@@ -623,7 +587,7 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
       )
     } catch (e) {
       if (isErrnoException(e)) {
-        if (e.code !== 'ENOENT' && e.code !== 'EACCES' && e.code !== 'EPERM') {
+        if (e.code !== "ENOENT" && e.code !== "EACCES" && e.code !== "EPERM") {
           throw e
         }
       } else {
@@ -655,10 +619,10 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
   if (maxEntries !== null && keys.length > maxEntries) {
     const dropped = keys.slice(maxEntries)
     logForDebugging(
-      `team-memory-sync: ${keys.length} local entries exceeds server cap of ${maxEntries}; ${dropped.length} file(s) will NOT sync: ${dropped.join(', ')}. Consider consolidating or removing some team memory files.`,
-      { level: 'warn' },
+      `team-memory-sync: ${keys.length} local entries exceeds server cap of ${maxEntries}; ${dropped.length} file(s) will NOT sync: ${dropped.join(", ")}. Consider consolidating or removing some team memory files.`,
+      { level: "warn" },
     )
-    logEvent('tengu_team_mem_entries_capped', {
+    logEvent("tengu_team_mem_entries_capped", {
       total_entries: keys.length,
       dropped_count: dropped.length,
       max_entries: maxEntries,
@@ -686,9 +650,7 @@ async function readLocalTeamMemory(maxEntries: number | null): Promise<{
  *
  * Returns the number of files actually written.
  */
-async function writeRemoteEntriesToLocal(
-  entries: Record<string, string>,
-): Promise<number> {
+async function writeRemoteEntriesToLocal(entries: Record<string, string>): Promise<number> {
   const results = await Promise.all(
     Object.entries(entries).map(async ([relPath, content]) => {
       let validatedPath: string
@@ -696,18 +658,15 @@ async function writeRemoteEntriesToLocal(
         validatedPath = await validateTeamMemKey(relPath)
       } catch (e) {
         if (e instanceof PathTraversalError) {
-          logForDebugging(`team-memory-sync: ${e.message}`, { level: 'warn' })
+          logForDebugging(`team-memory-sync: ${e.message}`, { level: "warn" })
           return false
         }
         throw e
       }
 
-      const sizeBytes = Buffer.byteLength(content, 'utf8')
+      const sizeBytes = Buffer.byteLength(content, "utf8")
       if (sizeBytes > MAX_FILE_SIZE_BYTES) {
-        logForDebugging(
-          `team-memory-sync: skipping oversized remote entry "${relPath}"`,
-          { level: 'info' },
-        )
+        logForDebugging(`team-memory-sync: skipping oversized remote entry "${relPath}"`, { level: "info" })
         return false
       }
 
@@ -715,37 +674,24 @@ async function writeRemoteEntriesToLocal(
       // where pull returns unchanged entries (skipEtagCache path, first
       // pull of a session with warm disk state from prior session).
       try {
-        const existing = await readFile(validatedPath, 'utf8')
+        const existing = await readFile(validatedPath, "utf8")
         if (existing === content) {
           return false
         }
       } catch (e) {
-        if (
-          isErrnoException(e) &&
-          e.code !== 'ENOENT' &&
-          e.code !== 'ENOTDIR'
-        ) {
-          logForDebugging(
-            `team-memory-sync: unexpected read error for "${relPath}": ${e.code}`,
-            { level: 'debug' },
-          )
+        if (isErrnoException(e) && e.code !== "ENOENT" && e.code !== "ENOTDIR") {
+          logForDebugging(`team-memory-sync: unexpected read error for "${relPath}": ${e.code}`, { level: "debug" })
         }
         // Fall through to write for ENOENT/ENOTDIR (file doesn't exist yet)
       }
 
       try {
-        const parentDir = validatedPath.substring(
-          0,
-          validatedPath.lastIndexOf(sep),
-        )
+        const parentDir = validatedPath.substring(0, validatedPath.lastIndexOf(sep))
         await mkdir(parentDir, { recursive: true })
-        await writeFile(validatedPath, content, 'utf8')
+        await writeFile(validatedPath, content, "utf8")
         return true
       } catch (e) {
-        logForDebugging(
-          `team-memory-sync: failed to write "${relPath}": ${e}`,
-          { level: 'warn' },
-        )
+        logForDebugging(`team-memory-sync: failed to write "${relPath}": ${e}`, { level: "warn" })
         return false
       }
     }),
@@ -782,23 +728,23 @@ export async function pullTeamMemory(
   const startTime = Date.now()
 
   if (!isUsingOAuth()) {
-    logPull(startTime, { success: false, errorType: 'no_oauth' })
+    logPull(startTime, { success: false, errorType: "no_oauth" })
     return {
       success: false,
       filesWritten: 0,
       entryCount: 0,
-      error: 'OAuth not available',
+      error: "OAuth not available",
     }
   }
 
   const repoSlug = await getGithubRepo()
   if (!repoSlug) {
-    logPull(startTime, { success: false, errorType: 'no_repo' })
+    logPull(startTime, { success: false, errorType: "no_repo" })
     return {
       success: false,
       filesWritten: 0,
       entryCount: 0,
-      error: 'No git remote found',
+      error: "No git remote found",
     }
   }
 
@@ -843,18 +789,18 @@ export async function pullTeamMemory(
     }
   } else {
     logForDebugging(
-      'team-memory-sync: server response missing entryChecksums (pre-#283027 deploy) — next push will be full, not delta',
-      { level: 'debug' },
+      "team-memory-sync: server response missing entryChecksums (pre-#283027 deploy) — next push will be full, not delta",
+      { level: "debug" },
     )
   }
 
   const filesWritten = await writeRemoteEntriesToLocal(entries)
   if (filesWritten > 0) {
-    const { clearMemoryFileCaches } = await import('../../utils/claudemd.js')
+    const { clearMemoryFileCaches } = await import("../../utils/claudemd.js")
     clearMemoryFileCaches()
   }
   logForDebugging(`team-memory-sync: pulled ${filesWritten} files`, {
-    level: 'info',
+    level: "info",
   })
 
   logPull(startTime, { success: true, filesWritten })
@@ -886,30 +832,28 @@ export async function pullTeamMemory(
  * changes, whereas silently discarding the local edit loses work the user
  * just did with no recourse.
  */
-export async function pushTeamMemory(
-  state: SyncState,
-): Promise<TeamMemorySyncPushResult> {
+export async function pushTeamMemory(state: SyncState): Promise<TeamMemorySyncPushResult> {
   const startTime = Date.now()
   let conflictRetries = 0
 
   if (!isUsingOAuth()) {
-    logPush(startTime, { success: false, errorType: 'no_oauth' })
+    logPush(startTime, { success: false, errorType: "no_oauth" })
     return {
       success: false,
       filesUploaded: 0,
-      error: 'OAuth not available',
-      errorType: 'no_oauth',
+      error: "OAuth not available",
+      errorType: "no_oauth",
     }
   }
 
   const repoSlug = await getGithubRepo()
   if (!repoSlug) {
-    logPush(startTime, { success: false, errorType: 'no_repo' })
+    logPush(startTime, { success: false, errorType: "no_repo" })
     return {
       success: false,
       filesUploaded: 0,
-      error: 'No git remote found',
-      errorType: 'no_repo',
+      error: "No git remote found",
+      errorType: "no_repo",
     }
   }
 
@@ -925,22 +869,18 @@ export async function pushTeamMemory(
     // Log a user-visible warning listing which files were skipped and why.
     // Don't block the push — just exclude those files. The secret VALUE is
     // never logged, only the type label.
-    const summary = skippedSecrets
-      .map(s => `"${s.path}" (${s.label})`)
-      .join(', ')
+    const summary = skippedSecrets.map((s) => `"${s.path}" (${s.label})`).join(", ")
     logForDebugging(
       `team-memory-sync: ${skippedSecrets.length} file(s) skipped due to detected secrets: ${summary}. Remove the secret(s) to enable sync for these files.`,
-      { level: 'warn' },
+      { level: "warn" },
     )
-    logEvent('tengu_team_mem_secret_skipped', {
+    logEvent("tengu_team_mem_secret_skipped", {
       file_count: skippedSecrets.length,
       // Only log gitleaks rule IDs (not values, not paths — paths could
       // leak repo structure). Comma-joined for compact single-field analytics.
       rule_ids: skippedSecrets
-        .map(s => s.ruleId)
-        .join(
-          ',',
-        ) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        .map((s) => s.ruleId)
+        .join(",") as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   }
 
@@ -953,11 +893,7 @@ export async function pushTeamMemory(
 
   let sawConflict = false
 
-  for (
-    let conflictAttempt = 0;
-    conflictAttempt <= MAX_CONFLICT_RETRIES;
-    conflictAttempt++
-  ) {
+  for (let conflictAttempt = 0; conflictAttempt <= MAX_CONFLICT_RETRIES; conflictAttempt++) {
     // Delta: only upload keys whose content hash differs from what we believe
     // the server holds. On first push after a fresh pull, this is exactly the
     // user's local edits. After a 412 probe, matching hashes are excluded —
@@ -1001,12 +937,7 @@ export async function pushTeamMemory(
     let result: TeamMemorySyncUploadResult | undefined
 
     for (const batch of batches) {
-      result = await uploadTeamMemory(
-        state,
-        repoSlug,
-        batch,
-        state.lastKnownChecksum,
-      )
+      result = await uploadTeamMemory(state, repoSlug, batch, state.lastKnownChecksum)
       if (!result.success) break
 
       for (const key of Object.keys(batch)) {
@@ -1026,7 +957,7 @@ export async function pushTeamMemory(
         batches.length > 1
           ? `team-memory-sync: pushed ${filesUploaded} of ${localHashes.size} files in ${batches.length} batches`
           : `team-memory-sync: pushed ${filesUploaded} of ${localHashes.size} files (delta)`,
-        { level: 'info' },
+        { level: "info" },
       )
       logPush(startTime, {
         success: true,
@@ -1054,7 +985,7 @@ export async function pushTeamMemory(
         state.serverMaxEntries = result.serverMaxEntries
         logForDebugging(
           `team-memory-sync: learned server max_entries=${result.serverMaxEntries} from 413; next push will truncate to this`,
-          { level: 'warn' },
+          { level: "warn" },
         )
       }
       // filesUploaded may be nonzero if earlier batches committed before this
@@ -1086,21 +1017,18 @@ export async function pushTeamMemory(
     // 412 conflict — refresh serverChecksums and retry with a tighter delta.
     sawConflict = true
     if (conflictAttempt >= MAX_CONFLICT_RETRIES) {
-      logForDebugging(
-        `team-memory-sync: giving up after ${MAX_CONFLICT_RETRIES} conflict retries`,
-        { level: 'warn' },
-      )
+      logForDebugging(`team-memory-sync: giving up after ${MAX_CONFLICT_RETRIES} conflict retries`, { level: "warn" })
       logPush(startTime, {
         success: false,
         conflict: true,
         conflictRetries,
-        errorType: 'conflict',
+        errorType: "conflict",
       })
       return {
         success: false,
         filesUploaded: 0,
         conflict: true,
-        error: 'Conflict resolution failed after retries',
+        error: "Conflict resolution failed after retries",
       }
     }
 
@@ -1108,7 +1036,7 @@ export async function pushTeamMemory(
 
     logForDebugging(
       `team-memory-sync: conflict (412), probing server hashes (attempt ${conflictAttempt + 1}/${MAX_CONFLICT_RETRIES})`,
-      { level: 'info' },
+      { level: "info" },
     )
 
     // Cheap probe: fetch only per-key checksums, no entry bodies. Refreshes
@@ -1122,7 +1050,7 @@ export async function pushTeamMemory(
         success: false,
         conflict: true,
         conflictRetries,
-        errorType: 'conflict',
+        errorType: "conflict",
       })
       return {
         success: false,
@@ -1141,7 +1069,7 @@ export async function pushTeamMemory(
   return {
     success: false,
     filesUploaded: 0,
-    error: 'Unexpected end of conflict resolution loop',
+    error: "Unexpected end of conflict resolution loop",
   }
 }
 
@@ -1178,10 +1106,9 @@ export async function syncTeamMemory(state: SyncState): Promise<{
     }
   }
 
-  logForDebugging(
-    `team-memory-sync: synced (pulled ${pullResult.filesWritten}, pushed ${pushResult.filesUploaded})`,
-    { level: 'info' },
-  )
+  logForDebugging(`team-memory-sync: synced (pulled ${pullResult.filesWritten}, pushed ${pushResult.filesUploaded})`, {
+    level: "info",
+  })
 
   return {
     success: true,
@@ -1202,14 +1129,13 @@ function logPull(
     status?: number
   },
 ): void {
-  logEvent('tengu_team_mem_sync_pull', {
+  logEvent("tengu_team_mem_sync_pull", {
     success: outcome.success,
     files_written: outcome.filesWritten ?? 0,
     not_modified: outcome.notModified ?? false,
     duration_ms: Date.now() - startTime,
     ...(outcome.errorType && {
-      errorType:
-        outcome.errorType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      errorType: outcome.errorType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...(outcome.status && { status: outcome.status }),
   })
@@ -1230,21 +1156,19 @@ function logPush(
     serverReceivedEntries?: number
   },
 ): void {
-  logEvent('tengu_team_mem_sync_push', {
+  logEvent("tengu_team_mem_sync_push", {
     success: outcome.success,
     files_uploaded: outcome.filesUploaded ?? 0,
     conflict: outcome.conflict ?? false,
     conflict_retries: outcome.conflictRetries ?? 0,
     duration_ms: Date.now() - startTime,
     ...(outcome.errorType && {
-      errorType:
-        outcome.errorType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      errorType: outcome.errorType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...(outcome.status && { status: outcome.status }),
     ...(outcome.putBatches && { put_batches: outcome.putBatches }),
     ...(outcome.errorCode && {
-      error_code:
-        outcome.errorCode as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      error_code: outcome.errorCode as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...(outcome.serverMaxEntries !== undefined && {
       server_max_entries: outcome.serverMaxEntries,
