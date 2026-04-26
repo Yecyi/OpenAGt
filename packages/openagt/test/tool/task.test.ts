@@ -510,6 +510,8 @@ describe("tool.task", () => {
           },
         )
         expect(got.output).toContain("completed")
+        expect(got.output).toContain('<task_result status="completed">')
+        expect(got.output).toContain("researched")
 
         const waited = yield* taskWait.execute(
           { task_ids: [taskID], mode: "all", timeout_ms: 1000 },

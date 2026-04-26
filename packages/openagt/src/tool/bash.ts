@@ -131,7 +131,7 @@ const Parameters = z.object({
   description: z
     .string()
     .describe(
-      "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
+      "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'. Do not use Bash for repository inventory or file reading; use Glob, Grep, and Read instead.",
     ),
 })
 

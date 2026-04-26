@@ -116,7 +116,7 @@ function groupKey(parentSessionID: SessionID, groupID: string) {
 function summarizeMessage(text: string | undefined) {
   if (!text) return ""
   const line = text
-    .replace(/<task_result>|<\/task_result>/g, "")
+    .replace(/<\/?task_result(?:\s[^>]*)?>/g, "")
     .split("\n")
     .map((item) => item.trim())
     .find(Boolean)
@@ -125,7 +125,7 @@ function summarizeMessage(text: string | undefined) {
 
 function fullMessageText(text: string | undefined) {
   if (!text) return ""
-  return text.replace(/<task_result>|<\/task_result>/g, "").trim().slice(0, 8_000)
+  return text.replace(/<\/?task_result(?:\s[^>]*)?>/g, "").trim().slice(0, 8_000)
 }
 
 function promptHash(prompt: string) {
@@ -414,6 +414,10 @@ export const layer = Layer.effect(
         draft.finished_at = Date.now()
         draft.result_summary = summarizeMessage(text)
         draft.error_summary = undefined
+        draft.metadata = {
+          ...(draft.metadata ?? {}),
+          result_text: fullMessageText(text),
+        }
         if (draft.metadata?.output_schema === "revise" || draft.metadata?.role === "reviser") {
           draft.metadata = {
             ...draft.metadata,
@@ -520,6 +524,7 @@ export const layer = Layer.effect(
             retryable: undefined,
             limit_reason: undefined,
             partial_summary: undefined,
+            result_text: undefined,
           }
         }
       })

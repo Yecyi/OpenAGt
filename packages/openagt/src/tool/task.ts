@@ -9,7 +9,7 @@ import { Provider } from "../provider"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Cause, Effect, Exit, Option } from "effect"
-import { TaskKind, TaskRuntime } from "../session/task-runtime"
+import { TaskKind, TaskRuntime, type TaskRecord } from "../session/task-runtime"
 import { effortFromMetadata, isBroadAgentTask, numericMetadata } from "../agent/task-classifier"
 
 export interface TaskPromptOps {
@@ -138,6 +138,18 @@ function assistantText(message: MessageV2.WithParts) {
     .flatMap((part) => (part.type === "text" ? [part.text] : []))
     .join("\n")
     .trim()
+}
+
+function storedTaskResult(record: TaskRecord) {
+  const resultText =
+    typeof record.metadata?.result_text === "string" && record.metadata.result_text.trim()
+      ? record.metadata.result_text
+      : undefined
+  const partialSummary =
+    typeof record.metadata?.partial_summary === "string" && record.metadata.partial_summary.trim()
+      ? record.metadata.partial_summary
+      : undefined
+  return resultText ?? partialSummary ?? record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`
 }
 
 function limitReason(message: MessageV2.WithParts) {
@@ -290,9 +302,12 @@ export const TaskTool = Tool.define(
           output: [
             `task_id: ${nextSession.id} (${record.status})`,
             "",
-            "<task_result>",
-            record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`,
+            `<task_result status="${record.status}">`,
+            storedTaskResult(record),
             "</task_result>",
+            ...(record.status === "partial"
+              ? ["", "Task is partial and retryable; retry only the missing scope if more evidence is required."]
+              : []),
           ].join("\n"),
         }
       }
@@ -482,13 +497,13 @@ export const TaskTool = Tool.define(
               output:
                 (params.return_mode ?? "id") === "summary"
                   ? [
-                      `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
+                      `task_id: ${nextSession.id} (completed; use task_get for full result if needed)`,
                       "",
-                      "<task_result>",
+                      '<task_result status="completed">',
                       summary,
                       "</task_result>",
                     ].join("\n")
-                  : `task_id: ${nextSession.id} (for resuming to continue this task if needed)`,
+                  : `task_id: ${nextSession.id} (completed; use task_get for full result if needed)`,
             }
           }),
         (unregister) =>

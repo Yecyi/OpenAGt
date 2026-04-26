@@ -335,6 +335,7 @@ Goal: Gain a comprehensive understanding of the user's request by reading throug
  - Use multiple agents when: the scope is uncertain, multiple areas of the codebase are involved, or you need to understand existing patterns before planning.
  - For broad project/codebase deep dives, architecture outlines, technical details, or algorithm analysis, use 3-4 explore agents by default rather than one broad explorer.
  - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: structure/entrypoints, agent runtime/tools/coordinator, data/memory/safety/events, tests/release/docs.
+ - When you need to inspect files directly, use Glob/Grep/Read. Do not use Bash for directory listings or file reading during repository exploration.
 
 3. After exploring the code, use the question tool to clarify ambiguities in the user request up front.
 

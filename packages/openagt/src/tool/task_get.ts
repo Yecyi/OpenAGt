@@ -1,7 +1,7 @@
 import z from "zod"
 import { Effect, Option } from "effect"
 import * as Tool from "./tool"
-import { TaskRuntime } from "@/session/task-runtime"
+import { TaskRuntime, type TaskRecord } from "@/session/task-runtime"
 import { SessionID } from "@/session/schema"
 
 const parameters = z.object({
@@ -17,6 +17,18 @@ type TaskGetMetadata =
       found: true
       task: Tool.Metadata
     }
+
+function storedResult(record: TaskRecord) {
+  const resultText =
+    typeof record.metadata?.result_text === "string" && record.metadata.result_text.trim()
+      ? record.metadata.result_text
+      : undefined
+  const partialSummary =
+    typeof record.metadata?.partial_summary === "string" && record.metadata.partial_summary.trim()
+      ? record.metadata.partial_summary
+      : undefined
+  return resultText ?? partialSummary ?? record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`
+}
 
 export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskRuntime.Service>(
   "task_get",
@@ -42,10 +54,23 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
             }
           }
 
+          const result = storedResult(record.value)
+
           return {
             title: "Task Status",
-            output:
-              `${record.value.task_id} ${record.value.status}\n${record.value.result_summary ?? record.value.error_summary ?? ""}`.trim(),
+            output: [
+              `task_id: ${record.value.task_id}`,
+              `status: ${record.value.status}`,
+              `kind: ${record.value.task_kind}`,
+              `description: ${record.value.description}`,
+              "",
+              `<task_result status="${record.value.status}">`,
+              result,
+              "</task_result>",
+              ...(record.value.status === "partial"
+                ? ["", "Task is partial and retryable; retry only the missing scope if more evidence is required."]
+                : []),
+            ].join("\n"),
             metadata: {
               found: true as const,
               task: Tool.toMetadata(record.value),

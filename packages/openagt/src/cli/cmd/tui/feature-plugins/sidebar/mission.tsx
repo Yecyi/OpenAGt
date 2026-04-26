@@ -15,6 +15,9 @@ type ChildSession = SessionChildrenResponse[number]
 type CoordinatorNode = CoordinatorProjection["run"]["plan"]["nodes"][number]
 type CoordinatorTask = CoordinatorProjection["tasks"][number]
 type CoordinatorLane = CoordinatorProjection["expert_lanes"][number]
+type TimelineTodo = NonNullable<NonNullable<CoordinatorProjection["todo_timeline"]>["todos"]>[number]
+type TimelinePhase = NonNullable<NonNullable<CoordinatorProjection["todo_timeline"]>["phases"]>[number]
+type SessionTodo = ReturnType<TuiPluginApi["state"]["session"]["todo"]>[number]
 type TaskStatus = CoordinatorTask["status"]
 type SessionStageStatus = "idle" | "busy" | "retry" | "unknown"
 
@@ -60,6 +63,32 @@ function statusColor(theme: TuiPluginApi["theme"]["current"], status: TaskStatus
   if (status === "failed") return theme.error
   if (status === "cancelled") return theme.warning
   return theme.textMuted
+}
+
+function todoStatusMark(status: string) {
+  if (status === "done" || status === "completed") return "+"
+  if (status === "active" || status === "in_progress") return ">"
+  if (status === "blocked" || status === "failed") return "x"
+  if (status === "partial") return "~"
+  if (status === "skipped" || status === "cancelled") return "!"
+  return "-"
+}
+
+function todoStatusColor(theme: TuiPluginApi["theme"]["current"], status: string) {
+  if (status === "done" || status === "completed") return theme.success
+  if (status === "active" || status === "in_progress") return theme.info
+  if (status === "blocked" || status === "failed") return theme.error
+  if (status === "partial" || status === "skipped" || status === "cancelled") return theme.warning
+  return theme.textMuted
+}
+
+function timelineTodoLabel(todo: TimelineTodo) {
+  if (!todo.assigned_stage) return todo.title
+  return `${todo.assigned_stage}: ${todo.title}`
+}
+
+function sessionTodoLabel(todo: SessionTodo) {
+  return todo.content
 }
 
 function sessionStatusColor(theme: TuiPluginApi["theme"]["current"], status: SessionStageStatus) {
@@ -284,6 +313,7 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
   const currentChild = createMemo(() => sortedChildSessions().find((session) => session.id === props.session_id))
   const currentSessionStatus = createMemo(() => sessionStatus(props.api, props.session_id))
   const currentSessionMessages = createMemo(() => props.api.state.session.messages(props.session_id))
+  const sessionTodos = createMemo(() => props.api.state.session.todo(props.session_id))
   const currentStageLabel = createMemo(() => {
     if (currentSessionStatus() === "busy") return "agent responding"
     if (currentSessionStatus() === "retry") return "retrying"
@@ -329,6 +359,8 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
     }
   })
   const todoItems = createMemo(() => projection()?.todo_timeline?.todos ?? [])
+  const timelinePhases = createMemo(() => projection()?.todo_timeline?.phases ?? [])
+  const timelineTodoByID = createMemo(() => new Map(todoItems().map((todo) => [todo.id, todo] as const)))
   const continuationSummary = createMemo(() => {
     const request = projection()?.continuation_request
     if (!request) return undefined
@@ -378,6 +410,22 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             <text fg={theme().text}>
               <b>Stages</b>
             </text>
+            <Show when={sessionTodos().length > 0}>
+              <text fg={theme().textMuted}>planned todos</text>
+              <For each={sessionTodos().slice(0, 6)}>
+                {(todo) => (
+                  <box flexDirection="row" gap={1}>
+                    <text fg={todoStatusColor(theme(), todo.status)}>{todoStatusMark(todo.status)}</text>
+                    <text fg={todoStatusColor(theme(), todo.status)} wrapMode="word">
+                      {sessionTodoLabel(todo)}
+                    </text>
+                  </box>
+                )}
+              </For>
+              <Show when={sessionTodos().length > 6}>
+                <text fg={theme().textMuted}>+{sessionTodos().length - 6} more todos</text>
+              </Show>
+            </Show>
             <For each={sessionStages()}>
               {(stage) => (
                 <box flexDirection="row" gap={1}>
@@ -511,42 +559,6 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             </Show>
           </box>
 
-          <Show when={todoItems().length}>
-            <box>
-              <text fg={theme().text}>
-                <b>Todo Timeline</b>
-              </text>
-              <For each={todoItems().slice(0, 5)}>
-                {(todo) => (
-                  <text
-                    fg={
-                      todo.status === "done"
-                        ? theme().success
-                        : todo.status === "blocked"
-                          ? theme().error
-                          : todo.status === "active"
-                            ? theme().info
-                            : theme().textMuted
-                    }
-                    wrapMode="word"
-                  >
-                    {todo.status === "done"
-                      ? "+"
-                      : todo.status === "blocked"
-                        ? "x"
-                        : todo.status === "active"
-                          ? ">"
-                          : "-"}{" "}
-                    {todo.title}
-                  </text>
-                )}
-              </For>
-              <Show when={todoItems().length > 5}>
-                <text fg={theme().textMuted}>+{todoItems().length - 5} more todos</text>
-              </Show>
-            </box>
-          </Show>
-
           <Show when={continuationSummary()}>
             <box>
               <text fg={theme().warning}>
@@ -581,6 +593,59 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             <text fg={theme().text}>
               <b>Stages</b>
             </text>
+            <Show when={todoItems().length > 0}>
+              <text fg={theme().textMuted}>planned timeline</text>
+              <Show
+                when={timelinePhases().length > 0}
+                fallback={
+                  <For each={todoItems().slice(0, 8)}>
+                    {(todo) => (
+                      <box flexDirection="row" gap={1}>
+                        <text fg={todoStatusColor(theme(), todo.status ?? "pending")}>
+                          {todoStatusMark(todo.status ?? "pending")}
+                        </text>
+                        <text fg={todoStatusColor(theme(), todo.status ?? "pending")} wrapMode="word">
+                          {timelineTodoLabel(todo)}
+                        </text>
+                      </box>
+                    )}
+                  </For>
+                }
+              >
+                <For each={timelinePhases().slice(0, 4)}>
+                  {(phase: TimelinePhase) => (
+                    <box>
+                      <text fg={theme().textMuted} wrapMode="word">
+                        {phase.title}
+                      </text>
+                      <For
+                        each={(phase.todo_ids ?? [])
+                          .map((todoID) => timelineTodoByID().get(todoID))
+                          .filter((todo): todo is TimelineTodo => Boolean(todo))
+                          .slice(0, 3)}
+                      >
+                        {(todo) => (
+                          <box flexDirection="row" gap={1}>
+                            <text fg={todoStatusColor(theme(), todo.status ?? "pending")}>
+                              {todoStatusMark(todo.status ?? "pending")}
+                            </text>
+                            <text fg={todoStatusColor(theme(), todo.status ?? "pending")} wrapMode="word">
+                              {todo.title}
+                            </text>
+                          </box>
+                        )}
+                      </For>
+                    </box>
+                  )}
+                </For>
+              </Show>
+              <Show when={todoItems().length > 8}>
+                <text fg={theme().textMuted}>+{todoItems().length - 8} more todos</text>
+              </Show>
+              <Show when={nodes().length > 0}>
+                <text fg={theme().textMuted}>execution graph</text>
+              </Show>
+            </Show>
             <For each={visibleStages()}>
               {(node) => {
                 const task = () => tasksByNode().get(node.id)
