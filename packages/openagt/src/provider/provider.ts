@@ -245,22 +245,23 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const providerConfig = (yield* dep.config()).provider?.["amazon-bedrock"]
       const auth = yield* dep.auth("amazon-bedrock")
       const env = yield* dep.env()
+      const envValue = (key: string) => env[key] || undefined
 
       // Region precedence: 1) config file, 2) env var, 3) default
       const configRegion = providerConfig?.options?.region
-      const envRegion = env["AWS_REGION"]
+      const envRegion = envValue("AWS_REGION")
       const defaultRegion = configRegion ?? envRegion ?? "us-east-1"
 
       // Profile: config file takes precedence over env var
       const configProfile = providerConfig?.options?.profile
-      const envProfile = env["AWS_PROFILE"]
+      const envProfile = envValue("AWS_PROFILE")
       const profile = configProfile ?? envProfile
 
-      const awsAccessKeyId = env["AWS_ACCESS_KEY_ID"]
+      const awsAccessKeyId = envValue("AWS_ACCESS_KEY_ID")
 
-      const awsBearerToken = env["AWS_BEARER_TOKEN_BEDROCK"] ?? (auth?.type === "api" ? auth.key : undefined)
+      const awsBearerToken = envValue("AWS_BEARER_TOKEN_BEDROCK") ?? (auth?.type === "api" ? auth.key : undefined)
 
-      const awsWebIdentityTokenFile = env["AWS_WEB_IDENTITY_TOKEN_FILE"]
+      const awsWebIdentityTokenFile = envValue("AWS_WEB_IDENTITY_TOKEN_FILE")
 
       const containerCreds = Boolean(
         env["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"] || env["AWS_CONTAINER_CREDENTIALS_FULL_URI"],

@@ -292,9 +292,9 @@ function applyCaching(msgs: ModelMessage[], model: Provider.Model): ModelMessage
     }
   }
 
-  if (messagesToCache.length === 0) {
-    const final = msgs.filter((msg) => msg.role !== "system").slice(-2)
-    messagesToCache.push(...final.slice(0, 2))
+  if (messagesToCache.length < 4) {
+    const final = msgs.filter((msg) => msg.role !== "system").slice(-Math.min(2, 4 - messagesToCache.length))
+    messagesToCache.push(...final)
   }
 
   for (const msg of unique(messagesToCache)) {

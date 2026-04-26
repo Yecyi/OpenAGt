@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import os from "os"
 import path from "path"
@@ -52,7 +52,7 @@ const config = Layer.succeed(
   }),
 )
 
-function createRuntime(configLayer = config) {
+function makeRuntime(configLayer = config) {
   return ManagedRuntime.make(
     Layer.mergeAll(
       CrossSpawnSpawner.defaultLayer,
@@ -70,10 +70,23 @@ function createRuntime(configLayer = config) {
   )
 }
 
+const runtimes: Array<ReturnType<typeof makeRuntime>> = []
+function createRuntime(configLayer = config) {
+  const rt = makeRuntime(configLayer)
+  runtimes.push(rt)
+  return rt
+}
+
 const runtime = createRuntime()
 
+afterAll(async () => {
+  await Promise.all(runtimes.splice(0).map((item) => item.dispose()))
+})
+
 function initBash(configLayer = config) {
-  return createRuntime(configLayer).runPromise(BashTool.pipe(Effect.flatMap((info) => info.init())))
+  return (configLayer === config ? runtime : createRuntime(configLayer)).runPromise(
+    BashTool.pipe(Effect.flatMap((info) => info.init())),
+  )
 }
 
 const ctx = {

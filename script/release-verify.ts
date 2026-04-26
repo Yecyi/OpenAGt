@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { mkdtemp, rm } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 
 const typecheckPackages = [
   "packages/openagt",
@@ -22,6 +25,26 @@ const runtimeTests = [
   "test/security/shell-security.test.ts",
 ]
 
+async function assertGeneratedFileCurrent(label: string, current: string, generated: string) {
+  const currentText = await Bun.file(current).text()
+  const generatedText = await Bun.file(generated).text()
+  if (currentText === generatedText) return
+  throw new Error(`${label} is out of date. Run bun run script/schema.ts in packages/openagt and commit the result.`)
+}
+
+async function verifyConfigSchemas() {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openagt-schema-"))
+  try {
+    const configFile = path.join(dir, "config.json")
+    const tuiFile = path.join(dir, "tui.json")
+    await $`bun run script/schema.ts ${configFile} ${tuiFile}`.cwd("packages/openagt")
+    await assertGeneratedFileCurrent("packages/openagt/schema/config.json", "packages/openagt/schema/config.json", configFile)
+    await assertGeneratedFileCurrent("packages/openagt/schema/tui.json", "packages/openagt/schema/tui.json", tuiFile)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -32,8 +55,8 @@ const steps = [
     run: () => $`bun run check:integrity`,
   },
   {
-    title: "Build config schemas",
-    run: () => $`bun run script/schema.ts`.cwd("packages/openagt"),
+    title: "Verify config schemas",
+    run: verifyConfigSchemas,
   },
   {
     title: "Check audit policy",

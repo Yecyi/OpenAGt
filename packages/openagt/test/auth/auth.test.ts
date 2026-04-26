@@ -58,7 +58,7 @@ describe("Auth", () => {
                 yield* auth.all()
               }).pipe(Effect.provide(Auth.defaultLayer)),
             ),
-          ).rejects.toThrow("Failed to parse auth content")
+          ).rejects.toThrow("Failed to parse auth data from environment")
         }),
       ),
     ),
@@ -81,7 +81,7 @@ describe("Auth", () => {
                   yield* auth.all()
                 }).pipe(Effect.provide(Auth.defaultLayer)),
               ),
-            ).rejects.toThrow("Invalid auth content")
+            ).rejects.toThrow("Invalid auth data")
           },
         ),
       ),

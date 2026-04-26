@@ -278,7 +278,7 @@ describe("tool.read truncation", () => {
 
       const result = yield* exec(dir, { filePath: path.join(dir, "many-lines.txt"), limit: 10 })
       expect(result.metadata.truncated).toBe(true)
-      expect(result.output).toContain("Showing lines 1-10; file has at least 11 lines")
+      expect(result.output).toContain("Showing lines 1-10 of 100")
       expect(result.output).toContain("Use offset=11")
       expect(result.output).toContain("line0")
       expect(result.output).toContain("line9")
