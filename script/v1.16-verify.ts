@@ -5,7 +5,10 @@ import { mkdir } from "node:fs/promises"
 import path from "node:path"
 
 const root = path.resolve(import.meta.dir, "..")
-const artifactDir = path.join(root, ".artifacts", "v1.16")
+const pkg = await Bun.file(path.join(root, "packages", "openagt", "package.json")).json()
+const verifyVersion = process.env.OPENAGT_VERSION ?? pkg.version
+const verifyLine = `v${verifyVersion.split(".").slice(0, 2).join(".")}`
+const artifactDir = path.join(root, ".artifacts", verifyLine)
 
 type Step = {
   name: string
@@ -123,7 +126,7 @@ const report = {
 }
 
 const markdown = [
-  "# OpenAGt v1.16 Verification Report",
+  `# OpenAGt ${verifyLine} Verification Report`,
   "",
   `- Status: ${report.status}`,
   `- Commit: ${report.commit}`,

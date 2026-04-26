@@ -12,7 +12,7 @@ const { values } = parseArgs({
   },
 })
 
-const version = values.version ?? "1.16.0"
+const version = values.version ?? "1.17.0"
 const input = path.join(process.cwd(), "docs", "releases", `v${version}.md`)
 const output = values.output ?? path.join(process.cwd(), "dist", `release-notes-v${version}.md`)
 const kindLabel = values.kind === "rc" ? "Release Candidate" : "Stable Release"

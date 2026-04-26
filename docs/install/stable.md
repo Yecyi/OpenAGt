@@ -8,6 +8,8 @@ OpenAGt `v1.16.0` stable covers:
 
 Flutter is not part of this release line.
 
+The current candidate line is `v1.17.0-rc.1`, which contains task/subagent visibility and release automation hardening. Treat it as an RC until it is promoted to GA.
+
 ## Release Assets
 
 - `openagt-windows-x64.zip`
@@ -74,8 +76,8 @@ openagt debug doctor
 openagt debug bundle --session <id>
 ```
 
-Release maintainers can run the local v1.16 gate with:
+Release maintainers can run the current local release gate with:
 
 ```bash
-bun run verify:v1.16
+bun run verify:v1.17
 ```

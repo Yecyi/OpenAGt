@@ -49,6 +49,10 @@ Current stable release:
 
 - [v1.16.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.16.0)
 
+Current release candidate:
+
+- [v1.17.0-rc.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.1)
+
 Published assets:
 
 - `OpenAGt-Setup-x64.msi`
@@ -76,12 +80,12 @@ The current stable runtime is centered around these backend capabilities:
 
 | Capability                      | Status                                                                  |
 | ------------------------------- | ----------------------------------------------------------------------- |
-| Session runtime and tool loop   | stable in v1.16                                                         |
+| Session runtime and tool loop   | stable in v1.16; hardened in v1.17 RC                                   |
 | Approval and Safety Envelope    | stable in v1.16 with versioned `shell_safety`                           |
-| Coordinator Runtime             | stable in v1.16 for graph projection, dispatch, retry, and cancellation |
+| Coordinator Runtime             | stable in v1.16; expanded task/subagent visibility in v1.17 RC          |
 | Personal Agent Core             | implemented; backend contracts stabilized in v1.16                      |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                     |
-| Release verification automation | `bun run verify:v1.16`                                                  |
+| Release verification automation | `bun run verify:v1.17`                                                  |
 | Flutter frontend                | roadmap; backend contracts first                                        |
 
 ## Key Features
@@ -313,7 +317,7 @@ bun test
 v1.16 release verification:
 
 ```bash
-bun run verify:v1.16
+bun run verify:v1.17
 ```
 
 ## Configuration and Environment
