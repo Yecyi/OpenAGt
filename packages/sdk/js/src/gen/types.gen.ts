@@ -897,6 +897,153 @@ export type EventCoordinatorCreated = {
         expert_tags?: Array<string>
         note_ids?: Array<string>
       }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
+      }
       budget_limited?: boolean
       specialization_fallback?: boolean
     }
@@ -1251,6 +1398,153 @@ export type EventCoordinatorUpdated = {
         expert_tags?: Array<string>
         note_ids?: Array<string>
       }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
+      }
       budget_limited?: boolean
       specialization_fallback?: boolean
     }
@@ -1604,6 +1898,153 @@ export type EventCoordinatorCompleted = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean
@@ -6213,6 +6654,11 @@ export type CoordinatorPlanGenerateData = {
       merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
       conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
     }
+    budget?: "small" | "normal" | "large" | "max"
+    autoContinue?: "never" | "checkpoint" | "safe"
+    maxRounds?: number
+    maxSubagents?: number
+    maxWallclockMs?: number
   }
   path?: never
   query?: {
@@ -6478,6 +6924,153 @@ export type CoordinatorPlanGenerateResponses = {
       expert_tags?: Array<string>
       note_ids?: Array<string>
     }
+    long_task?: {
+      is_long_task?: boolean
+      task_size?: "small" | "medium" | "large" | "huge"
+      timeline_required?: boolean
+      reasons?: Array<string>
+    }
+    todo_timeline?: {
+      required?: boolean
+      todos?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      phases?: Array<{
+        id: string
+        title: string
+        todo_ids?: Array<string>
+        expected_outputs?: Array<string>
+        checkpoint_after?: boolean
+      }>
+    }
+    budget_profile?: {
+      scale?: "small" | "normal" | "large" | "max"
+      auto_continue?: "never" | "checkpoint" | "safe"
+      mission_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      phase_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      todo_budget?: {
+        [key: string]: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+      }
+      checkpoint_reserve?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      absolute_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      single_checkpoint_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      no_progress_stop?: {
+        checkpoint_window?: number
+        min_new_completed_todo_weight?: number
+        min_new_evidence_items?: number
+        min_quality_delta?: number
+      }
+    }
+    budget_state?: {
+      soft_budget_used?: number
+      absolute_ceiling_used?: number
+      checkpoint_count?: number
+      budget_limited?: boolean
+      ceiling_hit?: boolean
+    }
+    progress_snapshot?: {
+      done?: number
+      partial?: number
+      blocked?: number
+      pending?: number
+      progress_score?: number
+      evidence_coverage?: number
+      verifier_quality?: number
+      tool_success_rate?: number
+      remaining_work_score?: number
+      failure_penalty?: number
+      confidence?: "low" | "medium" | "high"
+    }
+    checkpoint_memory?: {
+      run_id?: string
+      checkpoint_id?: string
+      todo_state?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      completed_artifacts?: Array<string>
+      evidence_index?: Array<string>
+      unresolved_claims?: Array<string>
+      blocked_reasons?: Array<string>
+      quality_scores?: {
+        [key: string]: number
+      }
+      next_recommended_todos?: Array<string>
+      compressed_context?: string
+    }
+    continuation_request?: {
+      reason: string
+      requested_budget_delta: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      next_todos?: Array<string>
+      expected_value: string
+      requires_user_approval?: boolean
+    }
     budget_limited?: boolean
     specialization_fallback?: boolean
   }
@@ -6671,6 +7264,11 @@ export type CoordinatorPlanData = {
       merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
       conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
     }
+    budget?: "small" | "normal" | "large" | "max"
+    autoContinue?: "never" | "checkpoint" | "safe"
+    maxRounds?: number
+    maxSubagents?: number
+    maxWallclockMs?: number
   }
   path?: never
   query?: {
@@ -6936,6 +7534,153 @@ export type CoordinatorPlanResponses = {
       expert_tags?: Array<string>
       note_ids?: Array<string>
     }
+    long_task?: {
+      is_long_task?: boolean
+      task_size?: "small" | "medium" | "large" | "huge"
+      timeline_required?: boolean
+      reasons?: Array<string>
+    }
+    todo_timeline?: {
+      required?: boolean
+      todos?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      phases?: Array<{
+        id: string
+        title: string
+        todo_ids?: Array<string>
+        expected_outputs?: Array<string>
+        checkpoint_after?: boolean
+      }>
+    }
+    budget_profile?: {
+      scale?: "small" | "normal" | "large" | "max"
+      auto_continue?: "never" | "checkpoint" | "safe"
+      mission_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      phase_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      todo_budget?: {
+        [key: string]: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+      }
+      checkpoint_reserve?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      absolute_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      single_checkpoint_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      no_progress_stop?: {
+        checkpoint_window?: number
+        min_new_completed_todo_weight?: number
+        min_new_evidence_items?: number
+        min_quality_delta?: number
+      }
+    }
+    budget_state?: {
+      soft_budget_used?: number
+      absolute_ceiling_used?: number
+      checkpoint_count?: number
+      budget_limited?: boolean
+      ceiling_hit?: boolean
+    }
+    progress_snapshot?: {
+      done?: number
+      partial?: number
+      blocked?: number
+      pending?: number
+      progress_score?: number
+      evidence_coverage?: number
+      verifier_quality?: number
+      tool_success_rate?: number
+      remaining_work_score?: number
+      failure_penalty?: number
+      confidence?: "low" | "medium" | "high"
+    }
+    checkpoint_memory?: {
+      run_id?: string
+      checkpoint_id?: string
+      todo_state?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      completed_artifacts?: Array<string>
+      evidence_index?: Array<string>
+      unresolved_claims?: Array<string>
+      blocked_reasons?: Array<string>
+      quality_scores?: {
+        [key: string]: number
+      }
+      next_recommended_todos?: Array<string>
+      compressed_context?: string
+    }
+    continuation_request?: {
+      reason: string
+      requested_budget_delta: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      next_todos?: Array<string>
+      expected_value: string
+      requires_user_approval?: boolean
+    }
     budget_limited?: boolean
     specialization_fallback?: boolean
   }
@@ -7129,6 +7874,11 @@ export type CoordinatorRunData = {
       merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
       conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
     }
+    budget?: "small" | "normal" | "large" | "max"
+    autoContinue?: "never" | "checkpoint" | "safe"
+    maxRounds?: number
+    maxSubagents?: number
+    maxWallclockMs?: number
   }
   path: {
     sessionID: string
@@ -7491,6 +8241,153 @@ export type CoordinatorRunResponses = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean
@@ -7862,6 +8759,153 @@ export type CoordinatorGetResponses = {
         expert_tags?: Array<string>
         note_ids?: Array<string>
       }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
+      }
       budget_limited?: boolean
       specialization_fallback?: boolean
     }
@@ -8231,6 +9275,153 @@ export type CoordinatorListResponses = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean
@@ -8602,6 +9793,153 @@ export type CoordinatorApproveResponses = {
         expert_tags?: Array<string>
         note_ids?: Array<string>
       }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
+      }
       budget_limited?: boolean
       specialization_fallback?: boolean
     }
@@ -8971,6 +10309,153 @@ export type CoordinatorCancelResponses = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean
@@ -9353,6 +10838,153 @@ export type CoordinatorRetryResponses = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean
@@ -9748,6 +11380,153 @@ export type CoordinatorDispatchResponses = {
           expert_tags?: Array<string>
           note_ids?: Array<string>
         }
+        long_task?: {
+          is_long_task?: boolean
+          task_size?: "small" | "medium" | "large" | "huge"
+          timeline_required?: boolean
+          reasons?: Array<string>
+        }
+        todo_timeline?: {
+          required?: boolean
+          todos?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+            priority?: "high" | "normal" | "low"
+            budget_weight?: number
+            acceptance_hint?: string
+            depends_on?: Array<string>
+            assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+            node_ids?: Array<string>
+            expert_lane_ids?: Array<string>
+          }>
+          phases?: Array<{
+            id: string
+            title: string
+            todo_ids?: Array<string>
+            expected_outputs?: Array<string>
+            checkpoint_after?: boolean
+          }>
+        }
+        budget_profile?: {
+          scale?: "small" | "normal" | "large" | "max"
+          auto_continue?: "never" | "checkpoint" | "safe"
+          mission_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          phase_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          todo_budget?: {
+            [key: string]: {
+              max_rounds: number
+              max_model_calls: number
+              max_tool_calls: number
+              max_subagents: number
+              max_wallclock_ms: number
+              max_estimated_tokens: number
+            }
+          }
+          checkpoint_reserve?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          absolute_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          single_checkpoint_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          no_progress_stop?: {
+            checkpoint_window?: number
+            min_new_completed_todo_weight?: number
+            min_new_evidence_items?: number
+            min_quality_delta?: number
+          }
+        }
+        budget_state?: {
+          soft_budget_used?: number
+          absolute_ceiling_used?: number
+          checkpoint_count?: number
+          budget_limited?: boolean
+          ceiling_hit?: boolean
+        }
+        progress_snapshot?: {
+          done?: number
+          partial?: number
+          blocked?: number
+          pending?: number
+          progress_score?: number
+          evidence_coverage?: number
+          verifier_quality?: number
+          tool_success_rate?: number
+          remaining_work_score?: number
+          failure_penalty?: number
+          confidence?: "low" | "medium" | "high"
+        }
+        checkpoint_memory?: {
+          run_id?: string
+          checkpoint_id?: string
+          todo_state?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+            priority?: "high" | "normal" | "low"
+            budget_weight?: number
+            acceptance_hint?: string
+            depends_on?: Array<string>
+            assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+            node_ids?: Array<string>
+            expert_lane_ids?: Array<string>
+          }>
+          completed_artifacts?: Array<string>
+          evidence_index?: Array<string>
+          unresolved_claims?: Array<string>
+          blocked_reasons?: Array<string>
+          quality_scores?: {
+            [key: string]: number
+          }
+          next_recommended_todos?: Array<string>
+          compressed_context?: string
+        }
+        continuation_request?: {
+          reason: string
+          requested_budget_delta: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          next_todos?: Array<string>
+          expected_value: string
+          requires_user_approval?: boolean
+        }
         budget_limited?: boolean
         specialization_fallback?: boolean
       }
@@ -10121,6 +11900,153 @@ export type CoordinatorProjectionResponses = {
           expert_tags?: Array<string>
           note_ids?: Array<string>
         }
+        long_task?: {
+          is_long_task?: boolean
+          task_size?: "small" | "medium" | "large" | "huge"
+          timeline_required?: boolean
+          reasons?: Array<string>
+        }
+        todo_timeline?: {
+          required?: boolean
+          todos?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+            priority?: "high" | "normal" | "low"
+            budget_weight?: number
+            acceptance_hint?: string
+            depends_on?: Array<string>
+            assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+            node_ids?: Array<string>
+            expert_lane_ids?: Array<string>
+          }>
+          phases?: Array<{
+            id: string
+            title: string
+            todo_ids?: Array<string>
+            expected_outputs?: Array<string>
+            checkpoint_after?: boolean
+          }>
+        }
+        budget_profile?: {
+          scale?: "small" | "normal" | "large" | "max"
+          auto_continue?: "never" | "checkpoint" | "safe"
+          mission_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          phase_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          todo_budget?: {
+            [key: string]: {
+              max_rounds: number
+              max_model_calls: number
+              max_tool_calls: number
+              max_subagents: number
+              max_wallclock_ms: number
+              max_estimated_tokens: number
+            }
+          }
+          checkpoint_reserve?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          absolute_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          single_checkpoint_ceiling?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          no_progress_stop?: {
+            checkpoint_window?: number
+            min_new_completed_todo_weight?: number
+            min_new_evidence_items?: number
+            min_quality_delta?: number
+          }
+        }
+        budget_state?: {
+          soft_budget_used?: number
+          absolute_ceiling_used?: number
+          checkpoint_count?: number
+          budget_limited?: boolean
+          ceiling_hit?: boolean
+        }
+        progress_snapshot?: {
+          done?: number
+          partial?: number
+          blocked?: number
+          pending?: number
+          progress_score?: number
+          evidence_coverage?: number
+          verifier_quality?: number
+          tool_success_rate?: number
+          remaining_work_score?: number
+          failure_penalty?: number
+          confidence?: "low" | "medium" | "high"
+        }
+        checkpoint_memory?: {
+          run_id?: string
+          checkpoint_id?: string
+          todo_state?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+            priority?: "high" | "normal" | "low"
+            budget_weight?: number
+            acceptance_hint?: string
+            depends_on?: Array<string>
+            assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+            node_ids?: Array<string>
+            expert_lane_ids?: Array<string>
+          }>
+          completed_artifacts?: Array<string>
+          evidence_index?: Array<string>
+          unresolved_claims?: Array<string>
+          blocked_reasons?: Array<string>
+          quality_scores?: {
+            [key: string]: number
+          }
+          next_recommended_todos?: Array<string>
+          compressed_context?: string
+        }
+        continuation_request?: {
+          reason: string
+          requested_budget_delta: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          next_todos?: Array<string>
+          expected_value: string
+          requires_user_approval?: boolean
+        }
         budget_limited?: boolean
         specialization_fallback?: boolean
       }
@@ -10296,6 +12222,153 @@ export type CoordinatorProjectionResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+    }
+    long_task: {
+      is_long_task?: boolean
+      task_size?: "small" | "medium" | "large" | "huge"
+      timeline_required?: boolean
+      reasons?: Array<string>
+    }
+    todo_timeline: {
+      required?: boolean
+      todos?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      phases?: Array<{
+        id: string
+        title: string
+        todo_ids?: Array<string>
+        expected_outputs?: Array<string>
+        checkpoint_after?: boolean
+      }>
+    }
+    budget_profile: {
+      scale?: "small" | "normal" | "large" | "max"
+      auto_continue?: "never" | "checkpoint" | "safe"
+      mission_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      phase_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      todo_budget?: {
+        [key: string]: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+      }
+      checkpoint_reserve?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      absolute_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      single_checkpoint_ceiling?: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      no_progress_stop?: {
+        checkpoint_window?: number
+        min_new_completed_todo_weight?: number
+        min_new_evidence_items?: number
+        min_quality_delta?: number
+      }
+    }
+    budget_state: {
+      soft_budget_used?: number
+      absolute_ceiling_used?: number
+      checkpoint_count?: number
+      budget_limited?: boolean
+      ceiling_hit?: boolean
+    }
+    progress_snapshot: {
+      done?: number
+      partial?: number
+      blocked?: number
+      pending?: number
+      progress_score?: number
+      evidence_coverage?: number
+      verifier_quality?: number
+      tool_success_rate?: number
+      remaining_work_score?: number
+      failure_penalty?: number
+      confidence?: "low" | "medium" | "high"
+    }
+    checkpoint_memory: {
+      run_id?: string
+      checkpoint_id?: string
+      todo_state?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+        priority?: "high" | "normal" | "low"
+        budget_weight?: number
+        acceptance_hint?: string
+        depends_on?: Array<string>
+        assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+        node_ids?: Array<string>
+        expert_lane_ids?: Array<string>
+      }>
+      completed_artifacts?: Array<string>
+      evidence_index?: Array<string>
+      unresolved_claims?: Array<string>
+      blocked_reasons?: Array<string>
+      quality_scores?: {
+        [key: string]: number
+      }
+      next_recommended_todos?: Array<string>
+      compressed_context?: string
+    }
+    continuation_request?: {
+      reason: string
+      requested_budget_delta: {
+        max_rounds: number
+        max_model_calls: number
+        max_tool_calls: number
+        max_subagents: number
+        max_wallclock_ms: number
+        max_estimated_tokens: number
+      }
+      next_todos?: Array<string>
+      expected_value: string
+      requires_user_approval?: boolean
     }
     budget_limited: boolean
     specialization_fallback: boolean
@@ -10658,6 +12731,153 @@ export type CoordinatorResumeResponses = {
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
+      }
+      long_task?: {
+        is_long_task?: boolean
+        task_size?: "small" | "medium" | "large" | "huge"
+        timeline_required?: boolean
+        reasons?: Array<string>
+      }
+      todo_timeline?: {
+        required?: boolean
+        todos?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        phases?: Array<{
+          id: string
+          title: string
+          todo_ids?: Array<string>
+          expected_outputs?: Array<string>
+          checkpoint_after?: boolean
+        }>
+      }
+      budget_profile?: {
+        scale?: "small" | "normal" | "large" | "max"
+        auto_continue?: "never" | "checkpoint" | "safe"
+        mission_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        phase_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        todo_budget?: {
+          [key: string]: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+        }
+        checkpoint_reserve?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        absolute_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        single_checkpoint_ceiling?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        no_progress_stop?: {
+          checkpoint_window?: number
+          min_new_completed_todo_weight?: number
+          min_new_evidence_items?: number
+          min_quality_delta?: number
+        }
+      }
+      budget_state?: {
+        soft_budget_used?: number
+        absolute_ceiling_used?: number
+        checkpoint_count?: number
+        budget_limited?: boolean
+        ceiling_hit?: boolean
+      }
+      progress_snapshot?: {
+        done?: number
+        partial?: number
+        blocked?: number
+        pending?: number
+        progress_score?: number
+        evidence_coverage?: number
+        verifier_quality?: number
+        tool_success_rate?: number
+        remaining_work_score?: number
+        failure_penalty?: number
+        confidence?: "low" | "medium" | "high"
+      }
+      checkpoint_memory?: {
+        run_id?: string
+        checkpoint_id?: string
+        todo_state?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "done" | "partial" | "blocked" | "skipped"
+          priority?: "high" | "normal" | "low"
+          budget_weight?: number
+          acceptance_hint?: string
+          depends_on?: Array<string>
+          assigned_stage?: "plan" | "research" | "expert" | "reduce" | "verify" | "final"
+          node_ids?: Array<string>
+          expert_lane_ids?: Array<string>
+        }>
+        completed_artifacts?: Array<string>
+        evidence_index?: Array<string>
+        unresolved_claims?: Array<string>
+        blocked_reasons?: Array<string>
+        quality_scores?: {
+          [key: string]: number
+        }
+        next_recommended_todos?: Array<string>
+        compressed_context?: string
+      }
+      continuation_request?: {
+        reason: string
+        requested_budget_delta: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        next_todos?: Array<string>
+        expected_value: string
+        requires_user_approval?: boolean
       }
       budget_limited?: boolean
       specialization_fallback?: boolean

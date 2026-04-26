@@ -12,6 +12,8 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
+import { existsSync, readdirSync, statSync } from "fs"
+import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import {
@@ -23,22 +25,40 @@ import {
   EffortLevel,
   EffortProfile,
   ExpertLane,
+  LongTaskProfile,
   QualityGate,
   ParallelExecutionPolicy,
   RevisePoint,
   IntentProfile,
   TaskType,
+  TodoTimeline,
+  BudgetProfile,
+  BudgetState,
+  ProgressSnapshot,
+  CheckpointMemorySummary,
+  ContinuationRequest,
+  CriticalReviewVerdict,
+  ResourceLimit,
   type CoordinatorNode as CoordinatorNodeType,
   type CoordinatorNodeInput,
+  type AutoContinuePolicy as AutoContinuePolicyType,
+  type BudgetScale as BudgetScaleType,
+  type BudgetProfile as BudgetProfileType,
+  type CheckpointMemorySummary as CheckpointMemorySummaryType,
   type EffortLevel as EffortLevelType,
   type EffortProfile as EffortProfileType,
+  type LongTaskProfile as LongTaskProfileType,
+  type ProgressSnapshot as ProgressSnapshotType,
   type CoordinatorMode as CoordinatorModeType,
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
   type CoordinatorRunID as CoordinatorRunIDType,
+  type CriticalReviewVerdict as CriticalReviewVerdictType,
   type IntentProfile as IntentProfileType,
   type ParallelExecutionPolicy as ParallelExecutionPolicyType,
+  type ResourceLimit as ResourceLimitType,
   type TaskType as TaskTypeType,
+  type TodoTimeline as TodoTimelineType,
 } from "./schema"
 
 function now() {
@@ -49,87 +69,224 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
 function isProjectDeepDiveGoal(goal: string) {
   const normalized = goal.toLowerCase()
-  return hasAny(normalized, [
-    "deep dive",
-    "dive deeper",
-    "codebase overview",
-    "project overview",
-    "project architecture",
-    "technical detail",
-    "technological detail",
-    "key technology",
-    "key technological",
-    "algorithm",
-    "algorith",
-    "algor",
-    "internals",
-    "how this project works",
-    "how the project works",
-  ]) && hasAny(normalized, ["project", "codebase", "repo", "repository", "architecture", "runtime", "algorithm", "algor"])
+  return (
+    hasAny(normalized, [
+      "deep dive",
+      "dive deeper",
+      "codebase overview",
+      "project overview",
+      "project architecture",
+      "technical detail",
+      "technological detail",
+      "key technology",
+      "key technological",
+      "algorithm",
+      "algorith",
+      "algor",
+      "internals",
+      "how this project works",
+      "how the project works",
+    ]) &&
+    hasAny(normalized, ["project", "codebase", "repo", "repository", "architecture", "runtime", "algorithm", "algor"])
+  )
 }
 
 export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
-  return EffortProfile.parse(effort === "low"
-    ? {
-        planning_rounds: 1,
-        expert_count_min: 1,
-        expert_count_max: 1,
-        verifier_count_min: 0,
-        reducer_enabled: false,
-        reviewer_enabled: false,
-        debugger_enabled: false,
-        revise_policy: "none",
-        max_revise_nodes: 0,
-        max_revision_per_artifact: 0,
-        reasoning_effort: "low",
-        timeout_multiplier: 0.75,
-      }
-    : effort === "high"
+  return EffortProfile.parse(
+    effort === "low"
       ? {
-          planning_rounds: 2,
-          expert_count_min: 2,
-          expert_count_max: 4,
-          verifier_count_min: 1,
-          reducer_enabled: true,
-          reviewer_enabled: true,
+          planning_rounds: 1,
+          expert_count_min: 1,
+          expert_count_max: 1,
+          verifier_count_min: 0,
+          reducer_enabled: false,
+          reviewer_enabled: false,
           debugger_enabled: false,
-          revise_policy: "critical_only",
-          max_revise_nodes: 6,
-          max_revision_per_artifact: 1,
-          reasoning_effort: "high",
-          timeout_multiplier: 1.5,
+          revise_policy: "none",
+          max_revise_nodes: 0,
+          max_revision_per_artifact: 0,
+          reasoning_effort: "low",
+          timeout_multiplier: 0.75,
         }
-      : effort === "deep"
+      : effort === "high"
         ? {
-            planning_rounds: 3,
-            expert_count_min: 3,
-            expert_count_max: 6,
-            verifier_count_min: 2,
+            planning_rounds: 2,
+            expert_count_min: 2,
+            expert_count_max: 4,
+            verifier_count_min: 1,
             reducer_enabled: true,
             reviewer_enabled: true,
-            debugger_enabled: true,
-            revise_policy: "all_artifacts",
-            max_revise_nodes: 24,
-            max_revision_per_artifact: 2,
-            reasoning_effort: "high",
-            timeout_multiplier: 3,
-          }
-        : {
-            planning_rounds: 1,
-            expert_count_min: 1,
-            expert_count_max: 2,
-            verifier_count_min: 1,
-            reducer_enabled: false,
-            reviewer_enabled: false,
             debugger_enabled: false,
-            revise_policy: "none",
-            max_revise_nodes: 0,
-            max_revision_per_artifact: 0,
-            reasoning_effort: "medium",
-            timeout_multiplier: 1,
-          })
+            revise_policy: "critical_only",
+            max_revise_nodes: 6,
+            max_revision_per_artifact: 1,
+            reasoning_effort: "high",
+            timeout_multiplier: 1.5,
+          }
+        : effort === "deep"
+          ? {
+              planning_rounds: 3,
+              expert_count_min: 3,
+              expert_count_max: 6,
+              verifier_count_min: 2,
+              reducer_enabled: true,
+              reviewer_enabled: true,
+              debugger_enabled: true,
+              revise_policy: "all_artifacts",
+              max_revise_nodes: 24,
+              max_revision_per_artifact: 2,
+              reasoning_effort: "high",
+              timeout_multiplier: 3,
+            }
+          : {
+              planning_rounds: 1,
+              expert_count_min: 1,
+              expert_count_max: 2,
+              verifier_count_min: 1,
+              reducer_enabled: false,
+              reviewer_enabled: true,
+              debugger_enabled: false,
+              revise_policy: "critical_only",
+              max_revise_nodes: 1,
+              max_revision_per_artifact: 1,
+              reasoning_effort: "medium",
+              timeout_multiplier: 1,
+            },
+  )
+}
+
+function scaleResourceLimit(limit: ResourceLimitType, multiplier: number) {
+  return ResourceLimit.parse({
+    max_rounds: Math.max(1, Math.round(limit.max_rounds * multiplier)),
+    max_model_calls: Math.max(1, Math.round(limit.max_model_calls * multiplier)),
+    max_tool_calls: Math.max(1, Math.round(limit.max_tool_calls * multiplier)),
+    max_subagents: Math.max(1, Math.round(limit.max_subagents * multiplier)),
+    max_wallclock_ms: Math.max(60_000, Math.round(limit.max_wallclock_ms * multiplier)),
+    max_estimated_tokens: Math.max(10_000, Math.round(limit.max_estimated_tokens * multiplier)),
+  })
+}
+
+function capResourceLimit(limit: ResourceLimitType, cap: ResourceLimitType) {
+  return ResourceLimit.parse({
+    max_rounds: Math.min(limit.max_rounds, cap.max_rounds),
+    max_model_calls: Math.min(limit.max_model_calls, cap.max_model_calls),
+    max_tool_calls: Math.min(limit.max_tool_calls, cap.max_tool_calls),
+    max_subagents: Math.min(limit.max_subagents, cap.max_subagents),
+    max_wallclock_ms: Math.min(limit.max_wallclock_ms, cap.max_wallclock_ms),
+    max_estimated_tokens: Math.min(limit.max_estimated_tokens, cap.max_estimated_tokens),
+  })
+}
+
+function taskSizeMultiplier(size: LongTaskProfileType["task_size"]) {
+  if (size === "huge") return 8
+  if (size === "large") return 4
+  if (size === "medium") return 2
+  return 1
+}
+
+function workflowBudgetMultiplier(workflow: TaskTypeType) {
+  if (workflow === "coding" || workflow === "debugging" || workflow === "research") return 1.25
+  if (workflow === "data-analysis" || workflow === "environment-audit") return 1.15
+  if (workflow === "personal-admin" || workflow === "file-data-organization") return 0.85
+  return 1
+}
+
+function budgetScaleMultiplier(scale: BudgetScaleType) {
+  if (scale === "max") return 2.5
+  if (scale === "large") return 1.75
+  if (scale === "small") return 0.5
+  return 1
+}
+
+function absoluteBaseLimit(effort: EffortLevelType) {
+  return ResourceLimit.parse(
+    effort === "low"
+      ? {
+          max_rounds: 8,
+          max_model_calls: 16,
+          max_tool_calls: 80,
+          max_subagents: 4,
+          max_wallclock_ms: 20 * 60 * 1000,
+          max_estimated_tokens: 200_000,
+        }
+      : effort === "high"
+        ? {
+            max_rounds: 20,
+            max_model_calls: 48,
+            max_tool_calls: 240,
+            max_subagents: 12,
+            max_wallclock_ms: 60 * 60 * 1000,
+            max_estimated_tokens: 1_000_000,
+          }
+        : effort === "deep"
+          ? {
+              max_rounds: 30,
+              max_model_calls: 60,
+              max_tool_calls: 300,
+              max_subagents: 12,
+              max_wallclock_ms: 60 * 60 * 1000,
+              max_estimated_tokens: 1_250_000,
+            }
+          : {
+              max_rounds: 12,
+              max_model_calls: 32,
+              max_tool_calls: 160,
+              max_subagents: 8,
+              max_wallclock_ms: 45 * 60 * 1000,
+              max_estimated_tokens: 500_000,
+            },
+  )
+}
+
+function longTaskProfileFor(input: {
+  goal: string
+  intent: IntentProfileType
+  effort: EffortLevelType
+  nodeCount: number
+}) {
+  const normalized = input.goal.toLowerCase()
+  const tokenEstimate = Math.ceil(input.goal.length / 4)
+  const outputDimensions = input.intent.success_criteria.length + (input.goal.match(/\n|\d\.|;|,/g)?.length ?? 0)
+  const explicitLong =
+    isProjectDeepDiveGoal(input.goal) ||
+    hasAny(normalized, [
+      "comprehensive",
+      "thorough",
+      "entire project",
+      "full project",
+      "all files",
+      "architecture",
+      "算法",
+      "完整",
+      "全面",
+      "深入",
+    ])
+  const score =
+    (explicitLong ? 3 : 0) +
+    (input.effort === "deep" ? 3 : input.effort === "high" ? 2 : 0) +
+    (input.nodeCount >= 12 ? 3 : input.nodeCount >= 8 ? 2 : input.nodeCount >= 5 ? 1 : 0) +
+    (tokenEstimate >= 300 ? 2 : tokenEstimate >= 120 ? 1 : 0) +
+    (outputDimensions >= 8 ? 2 : outputDimensions >= 5 ? 1 : 0)
+  const task_size = score >= 10 ? "huge" : score >= 7 ? "large" : score >= 4 ? "medium" : "small"
+  const is_long_task = score >= 4 || ((input.effort === "high" || input.effort === "deep") && explicitLong)
+  return LongTaskProfile.parse({
+    is_long_task,
+    task_size,
+    timeline_required: is_long_task,
+    reasons: [
+      explicitLong ? "broad or deep-dive goal" : undefined,
+      input.effort === "high" || input.effort === "deep" ? `${input.effort} effort selected` : undefined,
+      input.nodeCount >= 5 ? `coordinator plan has ${input.nodeCount} nodes` : undefined,
+      tokenEstimate >= 120 ? `prompt estimate is ${tokenEstimate} tokens` : undefined,
+      outputDimensions >= 5 ? `goal has ${outputDimensions} output dimensions` : undefined,
+    ].filter((item): item is string => Boolean(item)),
+  })
 }
 
 function taskTypeForGoal(goal: string): TaskTypeType {
@@ -138,13 +295,17 @@ function taskTypeForGoal(goal: string): TaskTypeType {
   if (hasAny(normalized, ["debug", "bug", "error", "fail", "failing", "fix"])) return "debugging"
   if (isProjectDeepDiveGoal(goal)) return "research"
   if (hasAny(normalized, ["write", "draft", "essay", "article", "copy", "story"])) return "writing"
-  if (hasAny(normalized, ["data analysis", "analyze dataset", "spreadsheet", "statistics", "stats", "chart"])) return "data-analysis"
-  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"])) return "coding"
+  if (hasAny(normalized, ["data analysis", "analyze dataset", "spreadsheet", "statistics", "stats", "chart"]))
+    return "data-analysis"
+  if (hasAny(normalized, ["implement", "code", "refactor", "test", "typescript", "api", "frontend", "backend"]))
+    return "coding"
   if (hasAny(normalized, ["plan", "roadmap", "strategy", "timeline", "milestone"])) return "planning"
-  if (hasAny(normalized, ["calendar", "email", "inbox", "personal admin", "follow up", "follow-up"])) return "personal-admin"
+  if (hasAny(normalized, ["calendar", "email", "inbox", "personal admin", "follow up", "follow-up"]))
+    return "personal-admin"
   if (hasAny(normalized, ["research", "investigate", "analysis", "analyze"])) return "research"
   if (hasAny(normalized, ["doc", "readme", "documentation", "writing"])) return "documentation"
-  if (hasAny(normalized, ["environment", "audit", "install", "path", "powershell", "python"])) return "environment-audit"
+  if (hasAny(normalized, ["environment", "audit", "install", "path", "powershell", "python"]))
+    return "environment-audit"
   if (hasAny(normalized, ["automation", "automate", "schedule", "cron"])) return "automation"
   if (hasAny(normalized, ["organize", "file", "data", "csv", "xlsx"])) return "file-data-organization"
   return "general-operations"
@@ -152,24 +313,57 @@ function taskTypeForGoal(goal: string): TaskTypeType {
 
 function riskForGoal(goal: string, taskType: TaskTypeType) {
   const normalized = goal.toLowerCase()
-  if (hasAny(normalized, ["delete", "drop", "reset", "wipe", "production", "deploy", "payment", "credential"])) return "high"
-  if (taskType === "coding" || taskType === "debugging" || taskType === "automation" || taskType === "environment-audit") return "medium"
+  if (hasAny(normalized, ["delete", "drop", "reset", "wipe", "production", "deploy", "payment", "credential"]))
+    return "high"
+  if (
+    taskType === "coding" ||
+    taskType === "debugging" ||
+    taskType === "automation" ||
+    taskType === "environment-audit"
+  )
+    return "medium"
   return "low"
 }
 
 function successCriteria(taskType: TaskTypeType) {
-  if (taskType === "coding") return ["Relevant context is gathered", "Requested changes are implemented", "Acceptance checks are verified", "Independent review is completed"]
-  if (taskType === "debugging") return ["Failure context is reproduced or explained", "Root cause is identified", "Minimal fix path is applied", "Verification passes"]
-  if (taskType === "review") return ["Findings are grounded in source references", "Risks are prioritized", "Residual test gaps are reported"]
-  if (taskType === "research") return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
-  if (taskType === "writing") return ["Audience and purpose are identified", "Draft is produced", "Style and factuality are reviewed"]
-  if (taskType === "data-analysis") return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
-  if (taskType === "planning") return ["Goal is decomposed", "Constraints and alternatives are checked", "Risks are reviewed"]
-  if (taskType === "personal-admin") return ["Work items are classified", "Priorities and schedule are proposed", "Privacy risks are reviewed"]
-  if (taskType === "documentation") return ["Context is gathered", "Document is updated or produced", "Output is reviewed for accuracy"]
-  if (taskType === "environment-audit") return ["Toolchain state is inspected", "Real blockers are identified", "Verification commands are reported"]
-  if (taskType === "automation") return ["Repeatable workflow is identified", "Automation plan is generated", "Risk and trigger conditions are verified"]
-  if (taskType === "file-data-organization") return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
+  if (taskType === "coding")
+    return [
+      "Relevant context is gathered",
+      "Requested changes are implemented",
+      "Acceptance checks are verified",
+      "Independent review is completed",
+    ]
+  if (taskType === "debugging")
+    return [
+      "Failure context is reproduced or explained",
+      "Root cause is identified",
+      "Minimal fix path is applied",
+      "Verification passes",
+    ]
+  if (taskType === "review")
+    return ["Findings are grounded in source references", "Risks are prioritized", "Residual test gaps are reported"]
+  if (taskType === "research")
+    return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
+  if (taskType === "writing")
+    return ["Audience and purpose are identified", "Draft is produced", "Style and factuality are reviewed"]
+  if (taskType === "data-analysis")
+    return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
+  if (taskType === "planning")
+    return ["Goal is decomposed", "Constraints and alternatives are checked", "Risks are reviewed"]
+  if (taskType === "personal-admin")
+    return ["Work items are classified", "Priorities and schedule are proposed", "Privacy risks are reviewed"]
+  if (taskType === "documentation")
+    return ["Context is gathered", "Document is updated or produced", "Output is reviewed for accuracy"]
+  if (taskType === "environment-audit")
+    return ["Toolchain state is inspected", "Real blockers are identified", "Verification commands are reported"]
+  if (taskType === "automation")
+    return [
+      "Repeatable workflow is identified",
+      "Automation plan is generated",
+      "Risk and trigger conditions are verified",
+    ]
+  if (taskType === "file-data-organization")
+    return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
   return ["Goal is clarified enough to execute", "Work is completed", "Result is summarized"]
 }
 
@@ -190,10 +384,19 @@ function expectedOutput(taskType: TaskTypeType) {
 }
 
 function permissionExpectations(taskType: TaskTypeType, riskLevel: IntentProfileType["risk_level"]) {
-  const base = taskType === "research" || taskType === "review" ? ["read workspace context"] : ["read workspace context", "run verification commands"]
-  const write = taskType === "coding" || taskType === "debugging" || taskType === "documentation" || taskType === "file-data-organization" || taskType === "writing" || taskType === "data-analysis"
-    ? ["write scoped workspace files"]
-    : []
+  const base =
+    taskType === "research" || taskType === "review"
+      ? ["read workspace context"]
+      : ["read workspace context", "run verification commands"]
+  const write =
+    taskType === "coding" ||
+    taskType === "debugging" ||
+    taskType === "documentation" ||
+    taskType === "file-data-organization" ||
+    taskType === "writing" ||
+    taskType === "data-analysis"
+      ? ["write scoped workspace files"]
+      : []
   const approval = riskLevel === "high" ? ["request approval before high-risk actions"] : []
   return [...base, ...write, ...approval]
 }
@@ -209,9 +412,7 @@ export function settleIntentProfile(input: { goal: string }) {
     success_criteria: successCriteria(task_type),
     risk_level,
     needs_user_clarification,
-    clarification_questions: needs_user_clarification
-      ? ["What concrete output should this task produce?"]
-      : [],
+    clarification_questions: needs_user_clarification ? ["What concrete output should this task produce?"] : [],
     workflow: task_type,
     workflow_confidence: projectDeepDive ? "high" : input.goal.trim().length < 12 ? "low" : "medium",
     secondary_workflows: [],
@@ -220,7 +421,9 @@ export function settleIntentProfile(input: { goal: string }) {
   })
 }
 
-function node(input: Omit<CoordinatorNodeInput, "priority" | "origin"> & Partial<Pick<CoordinatorNodeInput, "priority" | "origin">>) {
+function node(
+  input: Omit<CoordinatorNodeInput, "priority" | "origin"> & Partial<Pick<CoordinatorNodeInput, "priority" | "origin">>,
+) {
   return CoordinatorNode.parse({
     priority: "normal",
     origin: "coordinator",
@@ -269,7 +472,9 @@ function researcherShard(input: {
       ...input.expectedFindings.map((item) => `- ${item}`),
       ``,
       `Return evidence, confidence, unknowns, and the recommended next step for this slice.`,
-    ].filter((item): item is string => Boolean(item)).join("\n"),
+    ]
+      .filter((item): item is string => Boolean(item))
+      .join("\n"),
     task_kind: "research",
     subagent_type: "explore",
     role: "researcher",
@@ -334,13 +539,25 @@ function projectDeepDiveResearchers(goal: string) {
     {
       id: "research_agent_runtime",
       description: "Research agent runtime and algorithms",
-      assignedScope: ["agent loop", "prompt assembly", "tool registry", "subagent orchestration", "coordinator runtime"],
+      assignedScope: [
+        "agent loop",
+        "prompt assembly",
+        "tool registry",
+        "subagent orchestration",
+        "coordinator runtime",
+      ],
       expectedFindings: ["Agent runtime flow summarized", "Subagent and coordinator scheduling algorithms identified"],
     },
     {
       id: "research_data_safety",
       description: "Research state, memory, safety, and events",
-      assignedScope: ["session memory", "personal memory", "database storage", "permission and shell safety", "event bus and SSE"],
+      assignedScope: [
+        "session memory",
+        "personal memory",
+        "database storage",
+        "permission and shell safety",
+        "event bus and SSE",
+      ],
       expectedFindings: ["State and memory model summarized", "Safety envelope and event flow identified"],
     },
     {
@@ -379,7 +596,9 @@ function researchReducer(goal: string, dependsOn: string[]) {
         ? `For project deep dives, produce a technical architecture outline covering core subsystems, key algorithms, data flows, safety/runtime boundaries, important files, extension points, risks, and unknowns.`
         : undefined,
       `Output fields: summary, key_files, architecture_map, risks, recommended_plan_changes, open_questions, confidence.`,
-    ].filter((item): item is string => Boolean(item)).join("\n"),
+    ]
+      .filter((item): item is string => Boolean(item))
+      .join("\n"),
     task_kind: "generic",
     subagent_type: "general",
     role: "reducer",
@@ -397,10 +616,22 @@ function researchReducer(goal: string, dependsOn: string[]) {
 
 function parallelResearchStage(goal: string) {
   const research = researchersForGoal(goal)
-  return [...research, researchReducer(goal, research.map((item) => item.id))]
+  return [
+    ...research,
+    researchReducer(
+      goal,
+      research.map((item) => item.id),
+    ),
+  ]
 }
 
-function verifierShard(input: { id: string; description: string; goal: string; dependsOn: string[]; checks: string[] }) {
+function verifierShard(input: {
+  id: string
+  description: string
+  goal: string
+  dependsOn: string[]
+  checks: string[]
+}) {
   return node({
     id: input.id,
     description: input.description,
@@ -468,11 +699,14 @@ function artifactType(node: CoordinatorNodeType) {
   return node.output_schema
 }
 
-function withExpertHarness(node: CoordinatorNodeType, input: {
-  workflow: TaskTypeType
-  effort: EffortLevelType
-  profile: EffortProfileType
-}) {
+function withExpertHarness(
+  node: CoordinatorNodeType,
+  input: {
+    workflow: TaskTypeType
+    effort: EffortLevelType
+    profile: EffortProfileType
+  },
+) {
   const role = node.expert_role ?? node.role
   return CoordinatorNode.parse({
     ...node,
@@ -486,7 +720,13 @@ function withExpertHarness(node: CoordinatorNodeType, input: {
   })
 }
 
-function plannerNode(input: { id: string; round: number; goal: string; workflow: TaskTypeType; effort: EffortLevelType }) {
+function plannerNode(input: {
+  id: string
+  round: number
+  goal: string
+  workflow: TaskTypeType
+  effort: EffortLevelType
+}) {
   return node({
     id: input.id,
     description: `Planning round ${input.round}`,
@@ -543,7 +783,9 @@ function reviseNode(input: {
       `Revise kind: ${input.kind}`,
       ``,
       `Return JSON-like fields: pass, issues, missing_context, required_changes, confidence, action.`,
-    ].filter((item): item is string => Boolean(item)).join("\n"),
+    ]
+      .filter((item): item is string => Boolean(item))
+      .join("\n"),
     task_kind: "verify",
     subagent_type: "general",
     role: "reviser",
@@ -563,6 +805,45 @@ function reviseNode(input: {
     revision_of: artifactID,
     quality_gate_id: input.id,
     memory_namespace: `${input.workflow}:reviser`,
+  })
+}
+
+function checkpointNode(input: {
+  id: string
+  goal: string
+  workflow: TaskTypeType
+  effort: EffortLevelType
+  dependsOn: string[]
+}) {
+  return node({
+    id: input.id,
+    description: "Budget checkpoint synthesis",
+    prompt: [
+      `Summarize mission progress for a budget checkpoint without continuing exploration.`,
+      ``,
+      `Goal: ${input.goal}`,
+      `Workflow: ${input.workflow}`,
+      `Effort: ${input.effort}`,
+      ``,
+      `Return completed, partial, not_started, blocked, evidence_summary, unresolved_claims, quality_summary, and suggested_continuation when more work is valuable.`,
+    ].join("\n"),
+    task_kind: "verify",
+    subagent_type: "general",
+    role: "reviewer",
+    risk: "low",
+    depends_on: input.dependsOn,
+    write_scope: [],
+    read_scope: [],
+    acceptance_checks: ["Progress checkpoint produced", "Continuation recommendation includes unfinished work"],
+    output_schema: "summary",
+    requires_user_input: false,
+    priority: "normal",
+    expert_id: expertID(input.workflow, "reviewer"),
+    expert_role: "checkpoint-reviewer",
+    workflow: input.workflow,
+    artifact_type: "summary",
+    artifact_id: `${input.id}:output`,
+    memory_namespace: `${input.workflow}:checkpoint`,
   })
 }
 
@@ -592,30 +873,182 @@ function lowEffortNodes(nodes: CoordinatorNodeType[]) {
     .filter((item) => item.role !== "reviewer" && item.role !== "reducer")
   const firstResearch = kept.find((item) => item.task_kind === "research")?.id
   const keptIDs = new Set(kept.map((item) => item.id))
-  return kept
-    .map((item) =>
-      CoordinatorNode.parse({
-        ...item,
-        depends_on: item.depends_on.flatMap((dependency) => {
-          if (keptIDs.has(dependency)) return [dependency]
-          if (dependency.includes("research_synthesis") && firstResearch && firstResearch !== item.id) return [firstResearch]
-          return []
-        }),
+  return kept.map((item) =>
+    CoordinatorNode.parse({
+      ...item,
+      depends_on: item.depends_on.flatMap((dependency) => {
+        if (keptIDs.has(dependency)) return [dependency]
+        if (dependency.includes("research_synthesis") && firstResearch && firstResearch !== item.id)
+          return [firstResearch]
+        return []
       }),
-    )
+    }),
+  )
+}
+
+function todoStage(node: CoordinatorNodeType): "plan" | "research" | "expert" | "reduce" | "verify" | "final" {
+  if (node.role === "planner") return "plan"
+  if (node.role === "reducer") return "reduce"
+  if (node.role === "reviewer" || node.role === "reviser" || node.task_kind === "verify") return "verify"
+  if (node.task_kind === "research") return "research"
+  if (node.id.includes("checkpoint") || node.output_schema === "summary") return "final"
+  return "expert"
+}
+
+function stageTitle(stage: ReturnType<typeof todoStage>, workflow: TaskTypeType) {
+  if (stage === "plan") return `Plan ${workflow} mission`
+  if (stage === "research") return `Gather ${workflow} evidence`
+  if (stage === "reduce") return `Synthesize expert findings`
+  if (stage === "verify") return `Critically verify outputs`
+  if (stage === "final") return `Summarize progress and next steps`
+  return `Execute ${workflow} expert work`
+}
+
+function todoTimelineFor(input: {
+  required: boolean
+  nodes: CoordinatorNodeType[]
+  expertLanes: Array<{ id: string; node_ids: string[] }>
+  workflow: TaskTypeType
+}) {
+  if (!input.required) return TodoTimeline.parse({ required: false, todos: [], phases: [] })
+  const stages = ["plan", "research", "expert", "reduce", "verify", "final"] as const
+  const todos = stages.flatMap((stage) => {
+    const stageNodes = input.nodes.filter((item) => todoStage(item) === stage)
+    if (stageNodes.length === 0) return []
+    const nodeIDs = stageNodes.map((item) => item.id)
+    return [
+      {
+        id: `todo_${stage}`,
+        title: stageTitle(stage, input.workflow),
+        status: "pending" as const,
+        priority: stage === "plan" || stage === "verify" ? ("high" as const) : ("normal" as const),
+        budget_weight:
+          stage === "expert" || stage === "research" ? stageNodes.length * 1.5 : Math.max(1, stageNodes.length),
+        acceptance_hint: stageNodes
+          .flatMap((item) => item.acceptance_checks)
+          .slice(0, 3)
+          .join("; "),
+        depends_on: stages
+          .slice(0, stages.indexOf(stage))
+          .filter((candidate) => input.nodes.some((item) => todoStage(item) === candidate))
+          .slice(-1)
+          .map((candidate) => `todo_${candidate}`),
+        assigned_stage: stage,
+        node_ids: nodeIDs,
+        expert_lane_ids: input.expertLanes
+          .filter((lane) => lane.node_ids.some((id) => nodeIDs.includes(id)))
+          .map((lane) => lane.id),
+      },
+    ]
+  })
+  return TodoTimeline.parse({
+    required: true,
+    todos,
+    phases: todos.map((item, index) => ({
+      id: `phase_${index + 1}_${item.assigned_stage}`,
+      title: item.title,
+      todo_ids: [item.id],
+      expected_outputs: [item.acceptance_hint || item.title],
+      checkpoint_after:
+        item.assigned_stage === "reduce" || item.assigned_stage === "verify" || item.assigned_stage === "final",
+    })),
+  })
+}
+
+function budgetProfileFor(input: {
+  effort: EffortLevelType
+  workflow: TaskTypeType
+  longTask: LongTaskProfileType
+  todoTimeline: TodoTimelineType
+  budget?: BudgetScaleType
+  autoContinue?: AutoContinuePolicyType
+  maxRounds?: number
+  maxSubagents?: number
+  maxWallclockMs?: number
+}) {
+  const scale = input.budget ?? "normal"
+  const absolute = scaleResourceLimit(
+    absoluteBaseLimit(input.effort),
+    taskSizeMultiplier(input.longTask.task_size) *
+      workflowBudgetMultiplier(input.workflow) *
+      budgetScaleMultiplier(scale),
+  )
+  const absolute_ceiling = ResourceLimit.parse({
+    ...absolute,
+    max_rounds: input.maxRounds ?? absolute.max_rounds,
+    max_subagents: input.maxSubagents ?? absolute.max_subagents,
+    max_wallclock_ms: input.maxWallclockMs ?? absolute.max_wallclock_ms,
+  })
+  const mission_ceiling = scaleResourceLimit(absolute_ceiling, 0.65)
+  const phase_ceiling = scaleResourceLimit(absolute_ceiling, input.longTask.is_long_task ? 0.25 : 0.5)
+  const totalWeight = input.todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
+  return BudgetProfile.parse({
+    scale,
+    auto_continue:
+      input.autoContinue ?? (input.effort === "low" ? "never" : input.effort === "medium" ? "checkpoint" : "safe"),
+    mission_ceiling,
+    phase_ceiling,
+    todo_budget: Object.fromEntries(
+      input.todoTimeline.todos.map((item) => [
+        item.id,
+        scaleResourceLimit(mission_ceiling, totalWeight > 0 ? item.budget_weight / totalWeight : 1),
+      ]),
+    ),
+    checkpoint_reserve: scaleResourceLimit(absolute_ceiling, input.longTask.is_long_task ? 0.08 : 0.05),
+    absolute_ceiling,
+    single_checkpoint_ceiling: capResourceLimit(
+      absolute_ceiling,
+      ResourceLimit.parse({
+        max_rounds: 24,
+        max_model_calls: 40,
+        max_tool_calls: 240,
+        max_subagents: 16,
+        max_wallclock_ms: 45 * 60 * 1000,
+        max_estimated_tokens: 1_000_000,
+      }),
+    ),
+    no_progress_stop: {
+      checkpoint_window: 5,
+      min_new_completed_todo_weight: 0.05,
+      min_new_evidence_items: 3,
+      min_quality_delta: 0.03,
+    },
+  })
+}
+
+type BudgetOptions = {
+  budget?: BudgetScaleType
+  autoContinue?: AutoContinuePolicyType
+  maxRounds?: number
+  maxSubagents?: number
+  maxWallclockMs?: number
 }
 
 function effortPlanMetadata(input: {
   nodes: CoordinatorNodeType[]
+  intent: IntentProfileType
   workflow: TaskTypeType
   effort: EffortLevelType
   profile: EffortProfileType
   reviseNodes: CoordinatorNodeType[]
   budgetLimited: boolean
+  budgetOptions?: BudgetOptions
 }) {
   const expert_lanes = ExpertLane.array().parse(
     Object.values(
-      input.nodes.reduce<Record<string, { id: string; workflow: TaskTypeType; role: CoordinatorNodeType["role"]; expert_id: string; node_ids: string[]; memory_namespace: string }>>((acc, item) => {
+      input.nodes.reduce<
+        Record<
+          string,
+          {
+            id: string
+            workflow: TaskTypeType
+            role: CoordinatorNodeType["role"]
+            expert_id: string
+            node_ids: string[]
+            memory_namespace: string
+          }
+        >
+      >((acc, item) => {
         if (!item.expert_id || !item.expert_role) return acc
         const id = `${item.workflow ?? input.workflow}:${item.expert_id}`
         return {
@@ -632,6 +1065,25 @@ function effortPlanMetadata(input: {
       }, {}),
     ),
   )
+  const long_task = longTaskProfileFor({
+    goal: input.intent.goal,
+    intent: input.intent,
+    effort: input.effort,
+    nodeCount: input.nodes.length,
+  })
+  const todo_timeline = todoTimelineFor({
+    required: long_task.timeline_required,
+    nodes: input.nodes,
+    expertLanes: expert_lanes,
+    workflow: input.workflow,
+  })
+  const budget_profile = budgetProfileFor({
+    effort: input.effort,
+    workflow: input.workflow,
+    longTask: long_task,
+    todoTimeline: todo_timeline,
+    ...input.budgetOptions,
+  })
   const revise_points = RevisePoint.array().parse(
     input.reviseNodes.map((item) => ({
       id: item.quality_gate_id ?? item.id,
@@ -658,59 +1110,139 @@ function effortPlanMetadata(input: {
   return {
     expert_lanes,
     revise_points,
-    quality_gates: QualityGate.array().parse(revise_points.map((item) => ({
-      id: item.id,
-      kind: item.kind,
-      node_id: item.node_id,
-      artifact_id: item.artifact_id,
-      status: item.status,
-      required: item.required,
-      issues: [],
-    }))),
+    quality_gates: QualityGate.array().parse(
+      revise_points.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        node_id: item.node_id,
+        artifact_id: item.artifact_id,
+        status: item.status,
+        required: item.required,
+        issues: [],
+      })),
+    ),
     memory_context: {
       scopes: ["profile", "workspace"],
       workflow_tags: [`workflow:${input.workflow}`],
       expert_tags: expert_lanes.map((item) => `expert:${item.expert_id}`),
       note_ids: [],
     },
+    long_task,
+    todo_timeline,
+    budget_profile,
+    budget_state: BudgetState.parse({ budget_limited: input.budgetLimited }),
+    progress_snapshot: ProgressSnapshot.parse({
+      pending: todo_timeline.todos.length,
+      remaining_work_score: todo_timeline.todos.length > 0 ? 1 : 0,
+      evidence_coverage: 0,
+      progress_score: 0,
+    }),
+    checkpoint_memory: CheckpointMemorySummary.parse({
+      todo_state: todo_timeline.todos,
+      next_recommended_todos: todo_timeline.todos.filter((item) => item.priority === "high").map((item) => item.id),
+      compressed_context: long_task.timeline_required
+        ? `Long task checkpoint memory initialized for ${input.workflow}/${input.effort}.`
+        : "",
+    }),
     budget_limited: input.budgetLimited,
   }
 }
 
-function applyEffortGovernance(plan: CoordinatorPlanType, intent: IntentProfileType, effort: EffortLevelType) {
+function finalizeEffortPlan(input: {
+  plan: CoordinatorPlanType
+  intent: IntentProfileType
+  nodes: CoordinatorNodeType[]
+  workflow: TaskTypeType
+  effort: EffortLevelType
+  profile: EffortProfileType
+  reviseNodes: CoordinatorNodeType[]
+  budgetLimited: boolean
+  budgetOptions?: BudgetOptions
+}) {
+  const longTask = longTaskProfileFor({
+    goal: input.plan.goal,
+    intent: input.intent,
+    effort: input.effort,
+    nodeCount: input.nodes.length,
+  })
+  const nodes = longTask.timeline_required
+    ? [
+        ...input.nodes,
+        withExpertHarness(
+          checkpointNode({
+            id: "budget_checkpoint_synthesis",
+            goal: input.plan.goal,
+            workflow: input.workflow,
+            effort: input.effort,
+            dependsOn: sinkIDs(input.nodes),
+          }),
+          { workflow: input.workflow, effort: input.effort, profile: input.profile },
+        ),
+      ]
+    : input.nodes
+  return CoordinatorPlan.parse({
+    ...input.plan,
+    effort: input.effort,
+    workflow: input.workflow,
+    effort_profile: input.profile,
+    nodes,
+    specialization_fallback: input.workflow === "general-operations" || input.intent.workflow_confidence === "low",
+    ...effortPlanMetadata({
+      nodes,
+      intent: input.intent,
+      workflow: input.workflow,
+      effort: input.effort,
+      profile: input.profile,
+      reviseNodes: input.reviseNodes,
+      budgetLimited: input.budgetLimited,
+      budgetOptions: input.budgetOptions,
+    }),
+  })
+}
+
+function applyEffortGovernance(
+  plan: CoordinatorPlanType,
+  intent: IntentProfileType,
+  effort: EffortLevelType,
+  budgetOptions?: BudgetOptions,
+) {
   const profile = effortProfileFor(effort)
   const workflow = intent.workflow
   const baseNodes = (effort === "low" ? lowEffortNodes(plan.nodes) : plan.nodes).map((item) =>
     withExpertHarness(item, { workflow, effort, profile }),
   )
-  const planning = effort === "high" || effort === "deep"
-    ? Array.from({ length: profile.planning_rounds }, (_, index) =>
-        withExpertHarness(plannerNode({
-          id: `planning_round_${index + 1}`,
-          round: index + 1,
+  const planning =
+    effort === "high" || effort === "deep"
+      ? Array.from({ length: profile.planning_rounds }, (_, index) =>
+          withExpertHarness(
+            plannerNode({
+              id: `planning_round_${index + 1}`,
+              round: index + 1,
+              goal: plan.goal,
+              workflow,
+              effort,
+            }),
+            { workflow, effort, profile },
+          ),
+        )
+      : []
+  const planRevise = planning.length
+    ? [
+        reviseNode({
+          id: "plan_revise_final",
+          kind: "plan_revise",
+          target: planning.at(-1),
+          dependsOn: [planning.at(-1)!.id],
           goal: plan.goal,
           workflow,
           effort,
-        }), { workflow, effort, profile }),
-      )
-    : []
-  const planRevise = planning.length
-    ? [reviseNode({
-        id: "plan_revise_final",
-        kind: "plan_revise",
-        target: planning.at(-1),
-        dependsOn: [planning.at(-1)!.id],
-        goal: plan.goal,
-        workflow,
-        effort,
-      })]
+        }),
+      ]
     : []
   const rootGate = planRevise[0]?.id
   const gatedBase = rootGate
     ? baseNodes.map((item) =>
-        item.depends_on.length === 0
-          ? CoordinatorNode.parse({ ...item, depends_on: [rootGate] })
-          : item,
+        item.depends_on.length === 0 ? CoordinatorNode.parse({ ...item, depends_on: [rootGate] }) : item,
       )
     : baseNodes
   const reviseNodes: CoordinatorNodeType[] = [...planRevise]
@@ -734,25 +1266,29 @@ function applyEffortGovernance(plan: CoordinatorPlanType, intent: IntentProfileT
     }
     const rewritten = rewriteDeps(gatedBase, replacements)
     const finalDependsOn = sinkIDs(rewritten).map((item) => replacements.get(item) ?? item)
-    addRevise(reviseNode({
-      id: "final_revise",
-      kind: "final_revise",
-      dependsOn: finalDependsOn,
-      goal: plan.goal,
-      workflow,
-      effort,
-    }))
+    addRevise(
+      reviseNode({
+        id: "final_revise",
+        kind: "final_revise",
+        dependsOn: finalDependsOn,
+        goal: plan.goal,
+        workflow,
+        effort,
+      }),
+    )
     const allNodes = [...planning, ...rewriteDeps(rewritten, replacements), ...reviseNodes].map((item) =>
       withExpertHarness(item, { workflow, effort, profile }),
     )
-    return CoordinatorPlan.parse({
-      ...plan,
-      effort,
-      workflow,
-      effort_profile: profile,
+    return finalizeEffortPlan({
+      plan,
+      intent,
       nodes: allNodes,
-      specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
-      ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes, budgetLimited: budgetLimited.value }),
+      workflow,
+      effort,
+      profile,
+      reviseNodes,
+      budgetLimited: budgetLimited.value,
+      budgetOptions,
     })
   }
 
@@ -766,17 +1302,48 @@ function applyEffortGovernance(plan: CoordinatorPlanType, intent: IntentProfileT
         continue
       }
       const inputID = `${item.id}_input_revise`
-      addRevise(reviseNode({ id: inputID, kind: "input_revise", target: item, dependsOn: item.depends_on, goal: plan.goal, workflow, effort }))
+      addRevise(
+        reviseNode({
+          id: inputID,
+          kind: "input_revise",
+          target: item,
+          dependsOn: item.depends_on,
+          goal: plan.goal,
+          workflow,
+          effort,
+        }),
+      )
       inputReviseByNode.set(item.id, inputID)
       if (reviseNodes.length >= profile.max_revise_nodes) {
         budgetLimited.value = true
         continue
       }
       const outputID = `${item.id}_output_revise`
-      addRevise(reviseNode({ id: outputID, kind: "output_revise", target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }))
+      addRevise(
+        reviseNode({
+          id: outputID,
+          kind: "output_revise",
+          target: item,
+          dependsOn: [item.id],
+          goal: plan.goal,
+          workflow,
+          effort,
+        }),
+      )
       const handoffID = `${item.id}_handoff_revise`
       if (dependents.has(item.id) && reviseNodes.length < profile.max_revise_nodes) {
-        addRevise(reviseNode({ id: handoffID, kind: "handoff_revise", target: item, dependsOn: [outputID], goal: plan.goal, workflow, effort, required: false }))
+        addRevise(
+          reviseNode({
+            id: handoffID,
+            kind: "handoff_revise",
+            target: item,
+            dependsOn: [outputID],
+            goal: plan.goal,
+            workflow,
+            effort,
+            required: false,
+          }),
+        )
         replacements.set(item.id, handoffID)
       } else {
         replacements.set(item.id, outputID)
@@ -785,47 +1352,75 @@ function applyEffortGovernance(plan: CoordinatorPlanType, intent: IntentProfileT
     const rewritten = gatedBase.map((item) =>
       CoordinatorNode.parse({
         ...item,
-        depends_on: [inputReviseByNode.get(item.id) ?? item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency)[0]]
-          .filter((dependency): dependency is string => Boolean(dependency)),
+        depends_on: inputReviseByNode.has(item.id)
+          ? [inputReviseByNode.get(item.id)!]
+          : item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
       }),
     )
-    addRevise(reviseNode({
-      id: "final_revise",
-      kind: "final_revise",
-      dependsOn: sinkIDs(rewritten).map((item) => replacements.get(item) ?? item),
-      goal: plan.goal,
-      workflow,
-      effort,
-    }))
-    const rewrittenRevise = reviseNodes.map((item) =>
-      CoordinatorNode.parse({
+    addRevise(
+      reviseNode({
+        id: "final_revise",
+        kind: "final_revise",
+        dependsOn: sinkIDs(rewritten).map((item) => replacements.get(item) ?? item),
+        goal: plan.goal,
+        workflow,
+        effort,
+      }),
+    )
+    const rewrittenRevise = reviseNodes.map((item) => {
+      const targetID = typeof item.revision_of === "string" ? item.revision_of.split(":")[0] : undefined
+      return CoordinatorNode.parse({
         ...item,
-        depends_on: item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
-      }),
-    )
+        depends_on:
+          item.id.endsWith("_output_revise") && targetID
+            ? [targetID]
+            : item.id.endsWith("_handoff_revise")
+              ? item.depends_on
+              : item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
+      })
+    })
     const allNodes = [...planning, ...rewritten, ...rewrittenRevise].map((item) =>
       withExpertHarness(item, { workflow, effort, profile }),
     )
-    return CoordinatorPlan.parse({
-      ...plan,
-      effort,
-      workflow,
-      effort_profile: profile,
+    return finalizeEffortPlan({
+      plan,
+      intent,
       nodes: allNodes,
-      specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
-      ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes: rewrittenRevise, budgetLimited: budgetLimited.value }),
+      workflow,
+      effort,
+      profile,
+      reviseNodes: rewrittenRevise,
+      budgetLimited: budgetLimited.value,
+      budgetOptions,
     })
   }
 
-  const allNodes = [...planning, ...gatedBase, ...reviseNodes].map((item) => withExpertHarness(item, { workflow, effort, profile }))
-  return CoordinatorPlan.parse({
-    ...plan,
-    effort,
-    workflow,
-    effort_profile: profile,
+  if (effort === "medium") {
+    addRevise(
+      reviseNode({
+        id: "final_revise",
+        kind: "final_revise",
+        dependsOn: sinkIDs(gatedBase),
+        goal: plan.goal,
+        workflow,
+        effort,
+      }),
+    )
+  }
+
+  const allNodes = [...planning, ...gatedBase, ...reviseNodes].map((item) =>
+    withExpertHarness(item, { workflow, effort, profile }),
+  )
+  return finalizeEffortPlan({
+    plan,
+    intent,
     nodes: allNodes,
-    specialization_fallback: workflow === "general-operations" || intent.workflow_confidence === "low",
-    ...effortPlanMetadata({ nodes: allNodes, workflow, effort, profile, reviseNodes, budgetLimited: budgetLimited.value }),
+    workflow,
+    effort,
+    profile,
+    reviseNodes,
+    budgetLimited: budgetLimited.value,
+    budgetOptions,
   })
 }
 
@@ -835,476 +1430,502 @@ function basePlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
   const researchDependsOn = ["research_synthesis"]
   return CoordinatorPlan.parse({
     goal,
-    nodes: intent.workflow === "coding" ? [
-      ...researchStage,
-      node({
-        id: "implement",
-        description: "Implement change",
-        prompt: `Implement the requested change using the research_synthesis handoff as the primary project context.\n\nGoal: ${goal}`,
-        task_kind: "implement",
-        subagent_type: "general",
-        role: "implementer",
-        risk: intent.risk_level,
-        depends_on: researchDependsOn,
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Requested change implemented"],
-        output_schema: "implementation",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      ...parallelVerificationStage(goal, ["implement"]),
-      node({
-        id: "review",
-        description: "Review result",
-        prompt: `Independently review the result using research_synthesis and all verifier evidence. Judge conflicts explicitly.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Review completed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "debugging" ? [
-      ...researchStage,
-      node({
-        id: "debug",
-        description: "Diagnose failure",
-        prompt: `Diagnose the failure and propose the smallest fix path.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "general",
-        role: "debugger",
-        risk: "medium",
-        depends_on: researchDependsOn,
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Root cause identified"],
-        output_schema: "debug",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "implement",
-        description: "Apply minimal fix",
-        prompt: `Apply the smallest safe fix for the diagnosed issue.\n\nGoal: ${goal}`,
-        task_kind: "implement",
-        subagent_type: "general",
-        role: "implementer",
-        risk: intent.risk_level,
-        depends_on: ["debug"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Fix applied"],
-        output_schema: "implementation",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      ...parallelVerificationStage(goal, ["implement"]),
-      node({
-        id: "review",
-        description: "Review fix",
-        prompt: `Review the fix using debugger output, research_synthesis, and verifier evidence.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Fix reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "review" ? [
-      researcher(goal),
-      node({
-        id: "review",
-        description: "Review work",
-        prompt: `Review the requested target and return prioritized findings only when they are actionable.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["research"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Review findings are grounded in evidence"],
-        output_schema: "review",
-        requires_user_input: false,
-        priority: "high",
-      }),
-    ] : intent.workflow === "research" ? [
-      ...researchStage,
-      node({
-        id: "synthesize",
-        description: "Synthesize research",
-        prompt: `Synthesize research_synthesis into actionable conclusions.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "writer",
-        risk: "low",
-        depends_on: researchDependsOn,
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Research report produced"],
-        output_schema: "document",
-        requires_user_input: false,
-      }),
-      node({
-        id: "review",
-        description: "Review synthesis",
-        prompt: `Review the synthesis for unsupported claims and missing caveats.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["synthesize"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Synthesis reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "environment-audit" ? [
-      node({
-        id: "audit",
-        description: "Audit environment",
-        prompt: `Inspect the local environment, dependency state, and toolchain blockers.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "general",
-        role: "environment-auditor",
-        risk: intent.risk_level,
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Environment blockers identified"],
-        output_schema: "environment-diagnosis",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "verify",
-        description: "Verify environment findings",
-        prompt: `Verify the audit findings with concrete checks where possible.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "verifier",
-        risk: "low",
-        depends_on: ["audit"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Findings verified"],
-        output_schema: "verification",
-        requires_user_input: false,
-      }),
-      node({
-        id: "report",
-        description: "Write environment report",
-        prompt: `Write a concise environment diagnosis with blockers and next actions.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "writer",
-        risk: "low",
-        depends_on: ["verify"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Diagnosis report produced"],
-        output_schema: "document",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "writing" ? [
-      node({
-        id: "outline",
-        description: "Plan writing structure",
-        prompt: `Create a concise outline with audience, purpose, claims, and constraints.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "general",
-        role: "planner",
-        risk: "low",
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Audience and structure identified"],
-        output_schema: "outline",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "draft",
-        description: "Write draft",
-        prompt: `Write the requested artifact from the outline. Preserve caveats and user constraints.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "writer",
-        risk: intent.risk_level,
-        depends_on: ["outline"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Draft produced"],
-        output_schema: "draft",
-        requires_user_input: false,
-      }),
-      node({
-        id: "style_review",
-        description: "Review style and factuality",
-        prompt: `Review the draft for style fit, unsupported claims, and missing caveats.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "style-editor",
-        risk: "low",
-        depends_on: ["draft"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Style and factuality reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "data-analysis" ? [
-      node({
-        id: "profile_data",
-        description: "Profile data shape",
-        prompt: `Inspect the available data shape, schema, quality limits, and analysis constraints.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "general",
-        role: "analyst",
-        risk: "low",
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Data schema and limits profiled"],
-        output_schema: "analysis",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "analyze_data",
-        description: "Analyze data",
-        prompt: `Run the requested analysis using the profiled constraints and report caveats.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "analyst",
-        risk: intent.risk_level,
-        depends_on: ["profile_data"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Analysis completed with caveats"],
-        output_schema: "analysis",
-        requires_user_input: false,
-      }),
-      node({
-        id: "verify_stats",
-        description: "Verify statistics and anomalies",
-        prompt: `Verify calculations, statistical assumptions, anomaly handling, and unsupported conclusions.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "verifier",
-        risk: "low",
-        depends_on: ["analyze_data"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Statistics and anomalies verified"],
-        output_schema: "verification",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "planning" ? [
-      node({
-        id: "decompose_goal",
-        description: "Decompose goal",
-        prompt: `Break down the goal into milestones, dependencies, risks, and decision points.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "planner",
-        risk: "low",
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Goal decomposed into actionable plan"],
-        output_schema: "plan",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "check_constraints",
-        description: "Check constraints and alternatives",
-        prompt: `Check constraints, assumptions, alternatives, and failure modes in the plan.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "constraint-checker",
-        risk: "low",
-        depends_on: ["decompose_goal"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Constraints and alternatives checked"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-      node({
-        id: "risk_review",
-        description: "Review plan risks",
-        prompt: `Review the plan for risk, sequencing, missing owners, and unclear acceptance criteria.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "risk-reviewer",
-        risk: "low",
-        depends_on: ["check_constraints"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Plan risks reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "personal-admin" ? [
-      node({
-        id: "classify_inbox",
-        description: "Classify personal admin work",
-        prompt: `Classify the requested personal admin work into actions, priorities, and privacy constraints.\n\nGoal: ${goal}`,
-        task_kind: "research",
-        subagent_type: "general",
-        role: "inbox-classifier",
-        risk: "low",
-        depends_on: [],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Admin work classified"],
-        output_schema: "summary",
-        requires_user_input: false,
-        priority: "high",
-      }),
-      node({
-        id: "schedule_actions",
-        description: "Prioritize and schedule actions",
-        prompt: `Prioritize the actions and propose a safe schedule with follow-up points.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "scheduler",
-        risk: intent.risk_level,
-        depends_on: ["classify_inbox"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Actions prioritized and scheduled"],
-        output_schema: "plan",
-        requires_user_input: false,
-      }),
-      node({
-        id: "privacy_review",
-        description: "Review privacy risk",
-        prompt: `Review the proposed personal admin actions for privacy, overreach, and missing user approval.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "privacy-reviewer",
-        risk: "low",
-        depends_on: ["schedule_actions"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Privacy risk reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "documentation" ? [
-      researcher(goal),
-      node({
-        id: "write",
-        description: "Write documentation",
-        prompt: `Write or update the requested documentation.\n\nGoal: ${goal}`,
-        task_kind: "implement",
-        subagent_type: "general",
-        role: "writer",
-        risk: intent.risk_level,
-        depends_on: ["research"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Documentation produced"],
-        output_schema: "document",
-        requires_user_input: false,
-      }),
-      node({
-        id: "review",
-        description: "Review documentation",
-        prompt: `Review the documentation for accuracy and missing caveats.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["write"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Documentation reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ] : intent.workflow === "automation" ? [
-      researcher(goal),
-      node({
-        id: "automation_plan",
-        description: "Plan automation",
-        prompt: `Turn the repeatable work into an automation plan with trigger, scope, and safety checks.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: "automation-planner",
-        risk: intent.risk_level,
-        depends_on: ["research"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Automation plan produced"],
-        output_schema: "automation-plan",
-        requires_user_input: intent.risk_level === "high",
-      }),
-      node({
-        id: "verify",
-        description: "Verify automation plan",
-        prompt: `Verify the automation plan for safety, permissions, and failure modes.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "verifier",
-        risk: "low",
-        depends_on: ["automation_plan"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Automation safety reviewed"],
-        output_schema: "verification",
-        requires_user_input: false,
-      }),
-    ] : [
-      researcher(goal),
-      node({
-        id: "execute",
-        description: "Execute general task",
-        prompt: `Complete the requested work and produce the expected output.\n\nGoal: ${goal}`,
-        task_kind: "generic",
-        subagent_type: "general",
-        role: intent.workflow === "file-data-organization" ? "implementer" : "writer",
-        risk: intent.risk_level,
-        depends_on: ["research"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Requested work completed"],
-        output_schema: "summary",
-        requires_user_input: intent.risk_level === "high",
-      }),
-      node({
-        id: "review",
-        description: "Review result",
-        prompt: `Review the result against the goal and report residual risks.\n\nGoal: ${goal}`,
-        task_kind: "verify",
-        subagent_type: "general",
-        role: "reviewer",
-        risk: "low",
-        depends_on: ["execute"],
-        write_scope: [],
-        read_scope: [],
-        acceptance_checks: ["Result reviewed"],
-        output_schema: "review",
-        requires_user_input: false,
-      }),
-    ],
+    nodes:
+      intent.workflow === "coding"
+        ? [
+            ...researchStage,
+            node({
+              id: "implement",
+              description: "Implement change",
+              prompt: `Implement the requested change using the research_synthesis handoff as the primary project context.\n\nGoal: ${goal}`,
+              task_kind: "implement",
+              subagent_type: "general",
+              role: "implementer",
+              risk: intent.risk_level,
+              depends_on: researchDependsOn,
+              write_scope: [],
+              read_scope: [],
+              acceptance_checks: ["Requested change implemented"],
+              output_schema: "implementation",
+              requires_user_input: false,
+              priority: "high",
+            }),
+            ...parallelVerificationStage(goal, ["implement"]),
+            node({
+              id: "review",
+              description: "Review result",
+              prompt: `Independently review the result using research_synthesis and all verifier evidence. Judge conflicts explicitly.\n\nGoal: ${goal}`,
+              task_kind: "verify",
+              subagent_type: "general",
+              role: "reviewer",
+              risk: "low",
+              depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
+              write_scope: [],
+              read_scope: [],
+              acceptance_checks: ["Review completed"],
+              output_schema: "review",
+              requires_user_input: false,
+            }),
+          ]
+        : intent.workflow === "debugging"
+          ? [
+              ...researchStage,
+              node({
+                id: "debug",
+                description: "Diagnose failure",
+                prompt: `Diagnose the failure and propose the smallest fix path.\n\nGoal: ${goal}`,
+                task_kind: "research",
+                subagent_type: "general",
+                role: "debugger",
+                risk: "medium",
+                depends_on: researchDependsOn,
+                write_scope: [],
+                read_scope: [],
+                acceptance_checks: ["Root cause identified"],
+                output_schema: "debug",
+                requires_user_input: false,
+                priority: "high",
+              }),
+              node({
+                id: "implement",
+                description: "Apply minimal fix",
+                prompt: `Apply the smallest safe fix for the diagnosed issue.\n\nGoal: ${goal}`,
+                task_kind: "implement",
+                subagent_type: "general",
+                role: "implementer",
+                risk: intent.risk_level,
+                depends_on: ["debug"],
+                write_scope: [],
+                read_scope: [],
+                acceptance_checks: ["Fix applied"],
+                output_schema: "implementation",
+                requires_user_input: false,
+                priority: "high",
+              }),
+              ...parallelVerificationStage(goal, ["implement"]),
+              node({
+                id: "review",
+                description: "Review fix",
+                prompt: `Review the fix using debugger output, research_synthesis, and verifier evidence.\n\nGoal: ${goal}`,
+                task_kind: "verify",
+                subagent_type: "general",
+                role: "reviewer",
+                risk: "low",
+                depends_on: ["verify_typecheck", "verify_focused_tests", "verify_acceptance"],
+                write_scope: [],
+                read_scope: [],
+                acceptance_checks: ["Fix reviewed"],
+                output_schema: "review",
+                requires_user_input: false,
+              }),
+            ]
+          : intent.workflow === "review"
+            ? [
+                researcher(goal),
+                node({
+                  id: "review",
+                  description: "Review work",
+                  prompt: `Review the requested target and return prioritized findings only when they are actionable.\n\nGoal: ${goal}`,
+                  task_kind: "verify",
+                  subagent_type: "general",
+                  role: "reviewer",
+                  risk: "low",
+                  depends_on: ["research"],
+                  write_scope: [],
+                  read_scope: [],
+                  acceptance_checks: ["Review findings are grounded in evidence"],
+                  output_schema: "review",
+                  requires_user_input: false,
+                  priority: "high",
+                }),
+              ]
+            : intent.workflow === "research"
+              ? [
+                  ...researchStage,
+                  node({
+                    id: "synthesize",
+                    description: "Synthesize research",
+                    prompt: `Synthesize research_synthesis into actionable conclusions.\n\nGoal: ${goal}`,
+                    task_kind: "generic",
+                    subagent_type: "general",
+                    role: "writer",
+                    risk: "low",
+                    depends_on: researchDependsOn,
+                    write_scope: [],
+                    read_scope: [],
+                    acceptance_checks: ["Research report produced"],
+                    output_schema: "document",
+                    requires_user_input: false,
+                  }),
+                  node({
+                    id: "review",
+                    description: "Review synthesis",
+                    prompt: `Review the synthesis for unsupported claims and missing caveats.\n\nGoal: ${goal}`,
+                    task_kind: "verify",
+                    subagent_type: "general",
+                    role: "reviewer",
+                    risk: "low",
+                    depends_on: ["synthesize"],
+                    write_scope: [],
+                    read_scope: [],
+                    acceptance_checks: ["Synthesis reviewed"],
+                    output_schema: "review",
+                    requires_user_input: false,
+                  }),
+                ]
+              : intent.workflow === "environment-audit"
+                ? [
+                    node({
+                      id: "audit",
+                      description: "Audit environment",
+                      prompt: `Inspect the local environment, dependency state, and toolchain blockers.\n\nGoal: ${goal}`,
+                      task_kind: "research",
+                      subagent_type: "general",
+                      role: "environment-auditor",
+                      risk: intent.risk_level,
+                      depends_on: [],
+                      write_scope: [],
+                      read_scope: [],
+                      acceptance_checks: ["Environment blockers identified"],
+                      output_schema: "environment-diagnosis",
+                      requires_user_input: false,
+                      priority: "high",
+                    }),
+                    node({
+                      id: "verify",
+                      description: "Verify environment findings",
+                      prompt: `Verify the audit findings with concrete checks where possible.\n\nGoal: ${goal}`,
+                      task_kind: "verify",
+                      subagent_type: "general",
+                      role: "verifier",
+                      risk: "low",
+                      depends_on: ["audit"],
+                      write_scope: [],
+                      read_scope: [],
+                      acceptance_checks: ["Findings verified"],
+                      output_schema: "verification",
+                      requires_user_input: false,
+                    }),
+                    node({
+                      id: "report",
+                      description: "Write environment report",
+                      prompt: `Write a concise environment diagnosis with blockers and next actions.\n\nGoal: ${goal}`,
+                      task_kind: "generic",
+                      subagent_type: "general",
+                      role: "writer",
+                      risk: "low",
+                      depends_on: ["verify"],
+                      write_scope: [],
+                      read_scope: [],
+                      acceptance_checks: ["Diagnosis report produced"],
+                      output_schema: "document",
+                      requires_user_input: false,
+                    }),
+                  ]
+                : intent.workflow === "writing"
+                  ? [
+                      node({
+                        id: "outline",
+                        description: "Plan writing structure",
+                        prompt: `Create a concise outline with audience, purpose, claims, and constraints.\n\nGoal: ${goal}`,
+                        task_kind: "research",
+                        subagent_type: "general",
+                        role: "planner",
+                        risk: "low",
+                        depends_on: [],
+                        write_scope: [],
+                        read_scope: [],
+                        acceptance_checks: ["Audience and structure identified"],
+                        output_schema: "outline",
+                        requires_user_input: false,
+                        priority: "high",
+                      }),
+                      node({
+                        id: "draft",
+                        description: "Write draft",
+                        prompt: `Write the requested artifact from the outline. Preserve caveats and user constraints.\n\nGoal: ${goal}`,
+                        task_kind: "generic",
+                        subagent_type: "general",
+                        role: "writer",
+                        risk: intent.risk_level,
+                        depends_on: ["outline"],
+                        write_scope: [],
+                        read_scope: [],
+                        acceptance_checks: ["Draft produced"],
+                        output_schema: "draft",
+                        requires_user_input: false,
+                      }),
+                      node({
+                        id: "style_review",
+                        description: "Review style and factuality",
+                        prompt: `Review the draft for style fit, unsupported claims, and missing caveats.\n\nGoal: ${goal}`,
+                        task_kind: "verify",
+                        subagent_type: "general",
+                        role: "style-editor",
+                        risk: "low",
+                        depends_on: ["draft"],
+                        write_scope: [],
+                        read_scope: [],
+                        acceptance_checks: ["Style and factuality reviewed"],
+                        output_schema: "review",
+                        requires_user_input: false,
+                      }),
+                    ]
+                  : intent.workflow === "data-analysis"
+                    ? [
+                        node({
+                          id: "profile_data",
+                          description: "Profile data shape",
+                          prompt: `Inspect the available data shape, schema, quality limits, and analysis constraints.\n\nGoal: ${goal}`,
+                          task_kind: "research",
+                          subagent_type: "general",
+                          role: "analyst",
+                          risk: "low",
+                          depends_on: [],
+                          write_scope: [],
+                          read_scope: [],
+                          acceptance_checks: ["Data schema and limits profiled"],
+                          output_schema: "analysis",
+                          requires_user_input: false,
+                          priority: "high",
+                        }),
+                        node({
+                          id: "analyze_data",
+                          description: "Analyze data",
+                          prompt: `Run the requested analysis using the profiled constraints and report caveats.\n\nGoal: ${goal}`,
+                          task_kind: "generic",
+                          subagent_type: "general",
+                          role: "analyst",
+                          risk: intent.risk_level,
+                          depends_on: ["profile_data"],
+                          write_scope: [],
+                          read_scope: [],
+                          acceptance_checks: ["Analysis completed with caveats"],
+                          output_schema: "analysis",
+                          requires_user_input: false,
+                        }),
+                        node({
+                          id: "verify_stats",
+                          description: "Verify statistics and anomalies",
+                          prompt: `Verify calculations, statistical assumptions, anomaly handling, and unsupported conclusions.\n\nGoal: ${goal}`,
+                          task_kind: "verify",
+                          subagent_type: "general",
+                          role: "verifier",
+                          risk: "low",
+                          depends_on: ["analyze_data"],
+                          write_scope: [],
+                          read_scope: [],
+                          acceptance_checks: ["Statistics and anomalies verified"],
+                          output_schema: "verification",
+                          requires_user_input: false,
+                        }),
+                      ]
+                    : intent.workflow === "planning"
+                      ? [
+                          node({
+                            id: "decompose_goal",
+                            description: "Decompose goal",
+                            prompt: `Break down the goal into milestones, dependencies, risks, and decision points.\n\nGoal: ${goal}`,
+                            task_kind: "generic",
+                            subagent_type: "general",
+                            role: "planner",
+                            risk: "low",
+                            depends_on: [],
+                            write_scope: [],
+                            read_scope: [],
+                            acceptance_checks: ["Goal decomposed into actionable plan"],
+                            output_schema: "plan",
+                            requires_user_input: false,
+                            priority: "high",
+                          }),
+                          node({
+                            id: "check_constraints",
+                            description: "Check constraints and alternatives",
+                            prompt: `Check constraints, assumptions, alternatives, and failure modes in the plan.\n\nGoal: ${goal}`,
+                            task_kind: "verify",
+                            subagent_type: "general",
+                            role: "constraint-checker",
+                            risk: "low",
+                            depends_on: ["decompose_goal"],
+                            write_scope: [],
+                            read_scope: [],
+                            acceptance_checks: ["Constraints and alternatives checked"],
+                            output_schema: "review",
+                            requires_user_input: false,
+                          }),
+                          node({
+                            id: "risk_review",
+                            description: "Review plan risks",
+                            prompt: `Review the plan for risk, sequencing, missing owners, and unclear acceptance criteria.\n\nGoal: ${goal}`,
+                            task_kind: "verify",
+                            subagent_type: "general",
+                            role: "risk-reviewer",
+                            risk: "low",
+                            depends_on: ["check_constraints"],
+                            write_scope: [],
+                            read_scope: [],
+                            acceptance_checks: ["Plan risks reviewed"],
+                            output_schema: "review",
+                            requires_user_input: false,
+                          }),
+                        ]
+                      : intent.workflow === "personal-admin"
+                        ? [
+                            node({
+                              id: "classify_inbox",
+                              description: "Classify personal admin work",
+                              prompt: `Classify the requested personal admin work into actions, priorities, and privacy constraints.\n\nGoal: ${goal}`,
+                              task_kind: "research",
+                              subagent_type: "general",
+                              role: "inbox-classifier",
+                              risk: "low",
+                              depends_on: [],
+                              write_scope: [],
+                              read_scope: [],
+                              acceptance_checks: ["Admin work classified"],
+                              output_schema: "summary",
+                              requires_user_input: false,
+                              priority: "high",
+                            }),
+                            node({
+                              id: "schedule_actions",
+                              description: "Prioritize and schedule actions",
+                              prompt: `Prioritize the actions and propose a safe schedule with follow-up points.\n\nGoal: ${goal}`,
+                              task_kind: "generic",
+                              subagent_type: "general",
+                              role: "scheduler",
+                              risk: intent.risk_level,
+                              depends_on: ["classify_inbox"],
+                              write_scope: [],
+                              read_scope: [],
+                              acceptance_checks: ["Actions prioritized and scheduled"],
+                              output_schema: "plan",
+                              requires_user_input: false,
+                            }),
+                            node({
+                              id: "privacy_review",
+                              description: "Review privacy risk",
+                              prompt: `Review the proposed personal admin actions for privacy, overreach, and missing user approval.\n\nGoal: ${goal}`,
+                              task_kind: "verify",
+                              subagent_type: "general",
+                              role: "privacy-reviewer",
+                              risk: "low",
+                              depends_on: ["schedule_actions"],
+                              write_scope: [],
+                              read_scope: [],
+                              acceptance_checks: ["Privacy risk reviewed"],
+                              output_schema: "review",
+                              requires_user_input: false,
+                            }),
+                          ]
+                        : intent.workflow === "documentation"
+                          ? [
+                              researcher(goal),
+                              node({
+                                id: "write",
+                                description: "Write documentation",
+                                prompt: `Write or update the requested documentation.\n\nGoal: ${goal}`,
+                                task_kind: "implement",
+                                subagent_type: "general",
+                                role: "writer",
+                                risk: intent.risk_level,
+                                depends_on: ["research"],
+                                write_scope: [],
+                                read_scope: [],
+                                acceptance_checks: ["Documentation produced"],
+                                output_schema: "document",
+                                requires_user_input: false,
+                              }),
+                              node({
+                                id: "review",
+                                description: "Review documentation",
+                                prompt: `Review the documentation for accuracy and missing caveats.\n\nGoal: ${goal}`,
+                                task_kind: "verify",
+                                subagent_type: "general",
+                                role: "reviewer",
+                                risk: "low",
+                                depends_on: ["write"],
+                                write_scope: [],
+                                read_scope: [],
+                                acceptance_checks: ["Documentation reviewed"],
+                                output_schema: "review",
+                                requires_user_input: false,
+                              }),
+                            ]
+                          : intent.workflow === "automation"
+                            ? [
+                                researcher(goal),
+                                node({
+                                  id: "automation_plan",
+                                  description: "Plan automation",
+                                  prompt: `Turn the repeatable work into an automation plan with trigger, scope, and safety checks.\n\nGoal: ${goal}`,
+                                  task_kind: "generic",
+                                  subagent_type: "general",
+                                  role: "automation-planner",
+                                  risk: intent.risk_level,
+                                  depends_on: ["research"],
+                                  write_scope: [],
+                                  read_scope: [],
+                                  acceptance_checks: ["Automation plan produced"],
+                                  output_schema: "automation-plan",
+                                  requires_user_input: intent.risk_level === "high",
+                                }),
+                                node({
+                                  id: "verify",
+                                  description: "Verify automation plan",
+                                  prompt: `Verify the automation plan for safety, permissions, and failure modes.\n\nGoal: ${goal}`,
+                                  task_kind: "verify",
+                                  subagent_type: "general",
+                                  role: "verifier",
+                                  risk: "low",
+                                  depends_on: ["automation_plan"],
+                                  write_scope: [],
+                                  read_scope: [],
+                                  acceptance_checks: ["Automation safety reviewed"],
+                                  output_schema: "verification",
+                                  requires_user_input: false,
+                                }),
+                              ]
+                            : [
+                                researcher(goal),
+                                node({
+                                  id: "execute",
+                                  description: "Execute general task",
+                                  prompt: `Complete the requested work and produce the expected output.\n\nGoal: ${goal}`,
+                                  task_kind: "generic",
+                                  subagent_type: "general",
+                                  role: intent.workflow === "file-data-organization" ? "implementer" : "writer",
+                                  risk: intent.risk_level,
+                                  depends_on: ["research"],
+                                  write_scope: [],
+                                  read_scope: [],
+                                  acceptance_checks: ["Requested work completed"],
+                                  output_schema: "summary",
+                                  requires_user_input: intent.risk_level === "high",
+                                }),
+                                node({
+                                  id: "review",
+                                  description: "Review result",
+                                  prompt: `Review the result against the goal and report residual risks.\n\nGoal: ${goal}`,
+                                  task_kind: "verify",
+                                  subagent_type: "general",
+                                  role: "reviewer",
+                                  risk: "low",
+                                  depends_on: ["execute"],
+                                  write_scope: [],
+                                  read_scope: [],
+                                  acceptance_checks: ["Result reviewed"],
+                                  output_schema: "review",
+                                  requires_user_input: false,
+                                }),
+                              ],
   })
 }
 
-export function defaultPlanForIntent(intent: IntentProfileType, input?: { effort?: EffortLevelType; workflow?: TaskTypeType }): CoordinatorPlanType {
+export function defaultPlanForIntent(
+  intent: IntentProfileType,
+  input?: { effort?: EffortLevelType; workflow?: TaskTypeType } & BudgetOptions,
+): CoordinatorPlanType {
   const workflow = input?.workflow ?? intent.workflow
   const effort = input?.effort ?? "medium"
   const effectiveIntent = IntentProfile.parse({
@@ -1312,7 +1933,7 @@ export function defaultPlanForIntent(intent: IntentProfileType, input?: { effort
     workflow,
     task_type: workflow,
   })
-  return applyEffortGovernance(basePlanForIntent(effectiveIntent), effectiveIntent, effort)
+  return applyEffortGovernance(basePlanForIntent(effectiveIntent), effectiveIntent, effort, input)
 }
 
 function expandVerifyNodes(plan: CoordinatorPlanType) {
@@ -1416,6 +2037,144 @@ function runFromRow(row: typeof CoordinatorRunTable.$inferSelect) {
   })
 }
 
+function todoStatusFromTasks(items: TaskRuntime.TaskRecord[]) {
+  if (items.length === 0) return "pending" as const
+  if (items.some((item) => item.status === "failed")) return "blocked" as const
+  if (items.some((item) => item.status === "cancelled")) return "skipped" as const
+  if (items.every((item) => item.status === "completed")) return "done" as const
+  if (items.some((item) => item.status === "running")) return "active" as const
+  if (items.some((item) => item.status === "completed")) return "partial" as const
+  return "pending" as const
+}
+
+function runtimeTodoTimeline(plan: CoordinatorPlanType, taskByNode: Map<string, TaskRuntime.TaskRecord>) {
+  return TodoTimeline.parse({
+    ...plan.todo_timeline,
+    todos: plan.todo_timeline.todos.map((item) => ({
+      ...item,
+      status: todoStatusFromTasks(
+        item.node_ids.flatMap((id) => {
+          const task = taskByNode.get(id)
+          return task ? [task] : []
+        }),
+      ),
+    })),
+  })
+}
+
+function progressSnapshotFor(input: {
+  todoTimeline: TodoTimelineType
+  taskList: TaskRuntime.TaskRecord[]
+  qualityGates: CoordinatorPlanType["quality_gates"]
+}) {
+  const totalWeight = input.todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
+  const doneWeight = input.todoTimeline.todos
+    .filter((item) => item.status === "done")
+    .reduce((acc, item) => acc + item.budget_weight, 0)
+  const partialWeight = input.todoTimeline.todos
+    .filter((item) => item.status === "partial" || item.status === "active")
+    .reduce((acc, item) => acc + item.budget_weight * 0.5, 0)
+  const failed = input.taskList.filter((item) => item.status === "failed" || item.status === "cancelled").length
+  const verifierTotal = input.qualityGates.length
+  const verifierPassed = input.qualityGates.filter((item) => item.status === "passed").length
+  const progress_score = totalWeight > 0 ? Math.min(1, (doneWeight + partialWeight) / totalWeight) : 0
+  const failure_penalty = input.taskList.length > 0 ? failed / input.taskList.length : 0
+  const verifier_quality = verifierTotal > 0 ? verifierPassed / verifierTotal : progress_score
+  return ProgressSnapshot.parse({
+    done: input.todoTimeline.todos.filter((item) => item.status === "done").length,
+    partial: input.todoTimeline.todos.filter((item) => item.status === "partial" || item.status === "active").length,
+    blocked: input.todoTimeline.todos.filter((item) => item.status === "blocked").length,
+    pending: input.todoTimeline.todos.filter((item) => item.status === "pending").length,
+    progress_score,
+    evidence_coverage: Math.min(1, progress_score + verifier_quality * 0.2),
+    verifier_quality,
+    tool_success_rate: Math.max(0, 1 - failure_penalty),
+    remaining_work_score: Math.max(0, 1 - progress_score),
+    failure_penalty,
+    confidence: progress_score >= 0.8 && verifier_quality >= 0.6 ? "high" : progress_score >= 0.4 ? "medium" : "low",
+  })
+}
+
+function budgetStateFor(input: {
+  plan: CoordinatorPlanType
+  taskList: TaskRuntime.TaskRecord[]
+  progressSnapshot: ProgressSnapshotType
+}) {
+  const modelCallProxy = Math.max(1, input.taskList.length)
+  const softBudgetUsed = Math.min(
+    1,
+    modelCallProxy / Math.max(1, input.plan.budget_profile.mission_ceiling.max_model_calls),
+  )
+  const absoluteUsed = Math.min(
+    1,
+    modelCallProxy / Math.max(1, input.plan.budget_profile.absolute_ceiling.max_model_calls),
+  )
+  return BudgetState.parse({
+    soft_budget_used: softBudgetUsed,
+    absolute_ceiling_used: absoluteUsed,
+    checkpoint_count: input.taskList.filter(
+      (item) => item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis" && item.status === "completed",
+    ).length,
+    budget_limited: input.plan.budget_limited || softBudgetUsed >= 1,
+    ceiling_hit: absoluteUsed >= 1,
+  })
+}
+
+function checkpointMemoryFor(input: {
+  run: CoordinatorRunType
+  todoTimeline: TodoTimelineType
+  progressSnapshot: ProgressSnapshotType
+}) {
+  return CheckpointMemorySummary.parse({
+    run_id: input.run.id,
+    checkpoint_id: `checkpoint_${input.run.time.updated}`,
+    todo_state: input.todoTimeline.todos,
+    completed_artifacts: input.todoTimeline.todos.filter((item) => item.status === "done").map((item) => item.title),
+    evidence_index: input.todoTimeline.todos
+      .filter((item) => item.status === "done" || item.status === "partial" || item.status === "active")
+      .map((item) => `${item.id}:${item.node_ids.join(",")}`),
+    unresolved_claims: input.todoTimeline.todos
+      .filter((item) => item.status === "partial" || item.status === "pending")
+      .map((item) => item.title),
+    blocked_reasons: input.todoTimeline.todos.filter((item) => item.status === "blocked").map((item) => item.title),
+    quality_scores: {
+      progress_score: input.progressSnapshot.progress_score,
+      evidence_coverage: input.progressSnapshot.evidence_coverage,
+      verifier_quality: input.progressSnapshot.verifier_quality,
+      tool_success_rate: input.progressSnapshot.tool_success_rate,
+    },
+    next_recommended_todos: input.todoTimeline.todos
+      .filter((item) => item.status === "pending" || item.status === "partial" || item.status === "blocked")
+      .slice(0, 5)
+      .map((item) => item.id),
+    compressed_context: `Progress ${Math.round(input.progressSnapshot.progress_score * 100)}%, evidence ${Math.round(input.progressSnapshot.evidence_coverage * 100)}%, confidence ${input.progressSnapshot.confidence}.`,
+  })
+}
+
+function continuationRequestFor(input: {
+  plan: CoordinatorPlanType
+  todoTimeline: TodoTimelineType
+  budgetState: CoordinatorPlanType["budget_state"]
+  progressSnapshot: ProgressSnapshotType
+}) {
+  const next = input.todoTimeline.todos
+    .filter((item) => item.status === "pending" || item.status === "partial" || item.status === "blocked")
+    .slice(0, 5)
+  if (!input.budgetState.ceiling_hit && (!input.budgetState.budget_limited || next.length === 0)) return undefined
+  return ContinuationRequest.parse({
+    reason: input.budgetState.ceiling_hit
+      ? "Absolute ceiling reached before all todo timeline items finished."
+      : "Mission budget checkpoint reached with unfinished timeline items.",
+    requested_budget_delta: scaleResourceLimit(input.plan.budget_profile.single_checkpoint_ceiling, 0.5),
+    next_todos: next.map((item) => item.id),
+    expected_value:
+      input.progressSnapshot.progress_score >= 0.5
+        ? "Continue targeted work on remaining high-value todo items using existing checkpoint memory."
+        : "Continue only if the unfinished todo items are still valuable to the user.",
+    requires_user_approval: input.budgetState.ceiling_hit || input.plan.budget_profile.auto_continue !== "safe",
+  })
+}
+
 export const Event = {
   Created: BusEvent.define("coordinator.created", CoordinatorRun),
   Updated: BusEvent.define("coordinator.updated", CoordinatorRun),
@@ -1424,54 +2183,72 @@ export const Event = {
 
 export interface Interface {
   readonly settleIntent: (input: { goal: string }) => Effect.Effect<IntentProfileType, Error>
-  readonly plan: (input: {
-    goal: string
-    nodes?: CoordinatorNodeInput[]
-    intent?: IntentProfileType
-    effort?: EffortLevelType
-    workflow?: TaskTypeType
-    parallel_policy?: Partial<ParallelExecutionPolicyType>
-  }) => Effect.Effect<CoordinatorPlanType, Error>
-  readonly run: (input: {
-    sessionID: SessionID
-    goal: string
-    nodes?: CoordinatorNodeInput[]
-    intent?: IntentProfileType
-    effort?: EffortLevelType
-    workflow?: TaskTypeType
-    mode?: CoordinatorModeType
-    approved?: boolean
-    parallel_policy?: Partial<ParallelExecutionPolicyType>
-  }) => Effect.Effect<CoordinatorRunType, Error>
+  readonly plan: (
+    input: {
+      goal: string
+      nodes?: CoordinatorNodeInput[]
+      intent?: IntentProfileType
+      effort?: EffortLevelType
+      workflow?: TaskTypeType
+      parallel_policy?: Partial<ParallelExecutionPolicyType>
+    } & BudgetOptions,
+  ) => Effect.Effect<CoordinatorPlanType, Error>
+  readonly run: (
+    input: {
+      sessionID: SessionID
+      goal: string
+      nodes?: CoordinatorNodeInput[]
+      intent?: IntentProfileType
+      effort?: EffortLevelType
+      workflow?: TaskTypeType
+      mode?: CoordinatorModeType
+      approved?: boolean
+      parallel_policy?: Partial<ParallelExecutionPolicyType>
+    } & BudgetOptions,
+  ) => Effect.Effect<CoordinatorRunType, Error>
   readonly approve: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly cancel: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
-  readonly retry: (input: { id: CoordinatorRunIDType; taskID?: SessionID; nodeID?: string }) => Effect.Effect<CoordinatorRunType, Error>
+  readonly retry: (input: {
+    id: CoordinatorRunIDType
+    taskID?: SessionID
+    nodeID?: string
+  }) => Effect.Effect<CoordinatorRunType, Error>
   readonly get: (id: CoordinatorRunIDType) => Effect.Effect<Option.Option<CoordinatorRunType>, Error>
   readonly list: (sessionID: SessionID) => Effect.Effect<CoordinatorRunType[], Error>
   readonly dispatch: (id: CoordinatorRunIDType) => Effect.Effect<{ run: CoordinatorRunType; dispatched: number }, Error>
-  readonly projection: (id: CoordinatorRunIDType) => Effect.Effect<{
-    run: CoordinatorRunType
-    tasks: TaskRuntime.TaskRecord[]
-    counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
-    groups: Array<{
-      id: string
-      node_ids: string[]
-      task_ids: string[]
-      status: "pending" | "running" | "completed" | "failed" | "cancelled"
-      merge_status: "none" | "waiting" | "merged" | "conflict"
-      blocked_by: string[]
-      conflicts: string[]
-      started_at?: number
-      completed_at?: number
-    }>
-    expert_lanes: CoordinatorPlanType["expert_lanes"]
-    quality_gates: CoordinatorPlanType["quality_gates"]
-    revise_points: CoordinatorPlanType["revise_points"]
-    memory_context: CoordinatorPlanType["memory_context"]
-    effort_profile: EffortProfileType
-    budget_limited: boolean
-    specialization_fallback: boolean
-  }, Error>
+  readonly projection: (id: CoordinatorRunIDType) => Effect.Effect<
+    {
+      run: CoordinatorRunType
+      tasks: TaskRuntime.TaskRecord[]
+      counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
+      groups: Array<{
+        id: string
+        node_ids: string[]
+        task_ids: string[]
+        status: "pending" | "running" | "completed" | "failed" | "cancelled"
+        merge_status: "none" | "waiting" | "merged" | "conflict"
+        blocked_by: string[]
+        conflicts: string[]
+        started_at?: number
+        completed_at?: number
+      }>
+      expert_lanes: CoordinatorPlanType["expert_lanes"]
+      quality_gates: CoordinatorPlanType["quality_gates"]
+      revise_points: CoordinatorPlanType["revise_points"]
+      memory_context: CoordinatorPlanType["memory_context"]
+      effort_profile: EffortProfileType
+      long_task: LongTaskProfileType
+      todo_timeline: TodoTimelineType
+      budget_profile: BudgetProfileType
+      budget_state: CoordinatorPlanType["budget_state"]
+      progress_snapshot: ProgressSnapshotType
+      checkpoint_memory: CheckpointMemorySummaryType
+      continuation_request?: CoordinatorPlanType["continuation_request"]
+      budget_limited: boolean
+      specialization_fallback: boolean
+    },
+    Error
+  >
   readonly resume: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly summarize: (id: CoordinatorRunIDType) => Effect.Effect<string, Error>
 }
@@ -1488,8 +2265,10 @@ export const layer = Layer.effect(
     const provider = yield* Provider.Service
     const scope = yield* Scope.Scope
 
-    const publish = (def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed, run: CoordinatorRunType) =>
-      bus.publish(def, run)
+    const publish = (
+      def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed,
+      run: CoordinatorRunType,
+    ) => bus.publish(def, run)
 
     const settleIntent: Interface["settleIntent"] = Effect.fn("Coordinator.settleIntent")(function* (input) {
       return settleIntentProfile(input)
@@ -1505,21 +2284,22 @@ export const layer = Layer.effect(
         task_type: workflow,
       })
       const parallel_policy = ParallelExecutionPolicy.parse(input.parallel_policy ?? {})
-      const base = input.nodes && input.nodes.length > 0
-        ? CoordinatorPlan.parse({
-            goal: input.goal,
-            nodes: input.nodes,
-            parallel_policy,
-            effort,
-            workflow,
-            effort_profile: effortProfileFor(effort),
-          })
-        : CoordinatorPlan.parse({ ...basePlanForIntent(intent), parallel_policy })
+      const base =
+        input.nodes && input.nodes.length > 0
+          ? CoordinatorPlan.parse({
+              goal: input.goal,
+              nodes: input.nodes,
+              parallel_policy,
+              effort,
+              workflow,
+              effort_profile: effortProfileFor(effort),
+            })
+          : CoordinatorPlan.parse({ ...basePlanForIntent(intent), parallel_policy })
       const expanded = expandVerifyNodes(base)
-      const governed = applyEffortGovernance(expanded, intent, effort)
+      const governed = applyEffortGovernance(expanded, intent, effort, input)
       yield* Effect.try({
         try: () => validatePlan(governed),
-        catch: (error) => error instanceof Error ? error : new Error(String(error)),
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
       yield* Effect.forEach(
         governed.nodes.flatMap((item) => (item.model ? [item.model] : [])),
@@ -1551,22 +2331,38 @@ export const layer = Layer.effect(
       const workflow = typeof metadata.workflow === "string" ? `\nWorkflow: ${metadata.workflow}` : ""
       const effort = typeof metadata.effort === "string" ? `\nEffort: ${metadata.effort}` : ""
       const expert = typeof metadata.expert_id === "string" ? `\nExpert: ${metadata.expert_id}` : ""
-      const memoryNamespace = typeof metadata.memory_namespace === "string" ? `\nMemory namespace: ${metadata.memory_namespace}` : ""
-      const revisePolicy = typeof metadata.revise_policy === "string" ? `\nRevise policy: ${metadata.revise_policy}` : ""
-      const parallelGroup = typeof metadata.parallel_group === "string" ? `\nParallel group: ${metadata.parallel_group}` : ""
-      const assignedScope = Array.isArray(metadata.assigned_scope) && metadata.assigned_scope.length
-        ? `\nAssigned scope:\n${metadata.assigned_scope.map((item) => `- ${String(item)}`).join("\n")}`
-        : ""
-      const excludedScope = Array.isArray(metadata.excluded_scope) && metadata.excluded_scope.length
-        ? `\nExcluded scope:\n${metadata.excluded_scope.map((item) => `- ${String(item)}`).join("\n")}`
-        : ""
+      const memoryNamespace =
+        typeof metadata.memory_namespace === "string" ? `\nMemory namespace: ${metadata.memory_namespace}` : ""
+      const revisePolicy =
+        typeof metadata.revise_policy === "string" ? `\nRevise policy: ${metadata.revise_policy}` : ""
+      const longTask =
+        isRecord(metadata.long_task) && metadata.long_task.is_long_task === true ? `\nLong task: true` : ""
+      const todoTimeline =
+        isRecord(metadata.todo_timeline) && Array.isArray(metadata.todo_timeline.todos)
+          ? `\nTodo timeline:\n${metadata.todo_timeline.todos
+              .map((item) =>
+                isRecord(item) ? `- ${String(item.id)}: ${String(item.title)} [${String(item.status)}]` : undefined,
+              )
+              .filter((item): item is string => Boolean(item))
+              .join("\n")}`
+          : ""
+      const parallelGroup =
+        typeof metadata.parallel_group === "string" ? `\nParallel group: ${metadata.parallel_group}` : ""
+      const assignedScope =
+        Array.isArray(metadata.assigned_scope) && metadata.assigned_scope.length
+          ? `\nAssigned scope:\n${metadata.assigned_scope.map((item) => `- ${String(item)}`).join("\n")}`
+          : ""
+      const excludedScope =
+        Array.isArray(metadata.excluded_scope) && metadata.excluded_scope.length
+          ? `\nExcluded scope:\n${metadata.excluded_scope.map((item) => `- ${String(item)}`).join("\n")}`
+          : ""
       const dependencySummaries = dependencies.length
         ? `\n\nCompleted dependency handoff:\n${dependencies.map((item) => `- ${item.description}: ${item.result_summary ?? item.error_summary ?? item.status}`).join("\n")}`
         : ""
       const checks = record.acceptance_checks.length
         ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
         : ""
-      return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
+      return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
     }
 
     const taskModel = (metadata: Record<string, unknown>) => {
@@ -1593,7 +2389,9 @@ export const layer = Layer.effect(
       return all.filter((item) => taskIDs.has(item.task_id))
     })
 
-    const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn("Coordinator.executeTask")(function* (record) {
+    const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn(
+      "Coordinator.executeTask",
+    )(function* (record) {
       const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
       const continueGroup = () =>
         record.group_id ? dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore) : Effect.void
@@ -1608,7 +2406,9 @@ export const layer = Layer.effect(
         yield* continueGroup()
         return
       }
-      const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) => record.depends_on.includes(item.task_id))
+      const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) =>
+        record.depends_on.includes(item.task_id),
+      )
       yield* prompt.value
         .prompt({
           sessionID: record.child_session_id,
@@ -1663,19 +2463,19 @@ export const layer = Layer.effect(
       }
       const allTasks = yield* relevantTasks(run)
       const pending = allTasks.filter((item) => item.status === "pending")
-      const ready = (
-        yield* Effect.forEach(
-          pending,
-          (item) =>
-            tasks.canRun({
+      const ready = (yield* Effect.forEach(
+        pending,
+        (item) =>
+          tasks
+            .canRun({
               parentSessionID: SessionID.make(run.sessionID),
               task: item,
-            }).pipe(Effect.map((allowed) => (allowed ? item : undefined))),
-          {
-            concurrency: "unbounded",
-          },
-        )
-      ).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
+            })
+            .pipe(Effect.map((allowed) => (allowed ? item : undefined))),
+        {
+          concurrency: "unbounded",
+        },
+      )).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
       const planOrder = new Map(run.plan.nodes.map((item, index) => [item.id, index]))
       const groupFor = (item: TaskRuntime.TaskRecord) =>
         typeof item.metadata?.parallel_group === "string" ? item.metadata.parallel_group : undefined
@@ -1683,19 +2483,24 @@ export const layer = Layer.effect(
         typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : ""
       const orderedReady = ready.toSorted((a, b) => (planOrder.get(nodeFor(a)) ?? 0) - (planOrder.get(nodeFor(b)) ?? 0))
       const running = allTasks.filter((item) => item.status === "running")
-      const runningGroups = new Set(running.flatMap((item) => {
-        const group = groupFor(item)
-        return group ? [group] : []
-      }))
-      const activeGroup = run.plan.nodes.map((item) => item.parallel_group).find((item) => item && runningGroups.has(item))
+      const runningGroups = new Set(
+        running.flatMap((item) => {
+          const group = groupFor(item)
+          return group ? [group] : []
+        }),
+      )
+      const activeGroup = run.plan.nodes
+        .map((item) => item.parallel_group)
+        .find((item) => item && runningGroups.has(item))
       const firstReady = orderedReady[0]
       const targetGroup = activeGroup ?? (firstReady ? groupFor(firstReady) : undefined)
       const slots = Math.max(0, run.plan.parallel_policy.max_parallel_agents - running.length)
-      const selected = run.plan.parallel_policy.mode === "off"
-        ? orderedReady.slice(0, Math.min(slots, 1))
-        : targetGroup
-          ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
-          : orderedReady.slice(0, Math.min(slots, 1))
+      const selected =
+        run.plan.parallel_policy.mode === "off"
+          ? orderedReady.slice(0, Math.min(slots, 1))
+          : targetGroup
+            ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
+            : orderedReady.slice(0, Math.min(slots, 1))
       yield* Effect.forEach(
         selected,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
@@ -1711,12 +2516,11 @@ export const layer = Layer.effect(
     })
 
     const subscriptionStops = new Map<string, () => void>()
-    yield* Effect.addFinalizer(
-      () =>
-        Effect.sync(() => {
-          for (const stop of subscriptionStops.values()) stop()
-          subscriptionStops.clear()
-        }),
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        for (const stop of subscriptionStops.values()) stop()
+        subscriptionStops.clear()
+      }),
     )
 
     const ensureSubscribed: () => Effect.Effect<void, Error> = Effect.fn("Coordinator.ensureSubscribed")(function* () {
@@ -1730,9 +2534,7 @@ export const layer = Layer.effect(
           attachWith(dispatchReady(runID), {
             instance,
             workspace,
-          }).pipe(
-            Effect.catchCause(() => Effect.void),
-          ),
+          }).pipe(Effect.catchCause(() => Effect.void)),
         )
       })
       subscriptionStops.set(instance.directory, () => {
@@ -1757,11 +2559,17 @@ export const layer = Layer.effect(
         effort: input.effort,
         workflow,
         parallel_policy: input.parallel_policy,
+        budget: input.budget,
+        autoContinue: input.autoContinue,
+        maxRounds: input.maxRounds,
+        maxSubagents: input.maxSubagents,
+        maxWallclockMs: input.maxWallclockMs,
       })
       const mode = input.mode ?? (intent.risk_level === "high" ? "assisted" : "autonomous")
-      const state = input.approved || (mode === "autonomous" && !intent.needs_user_clarification && intent.risk_level !== "high")
-        ? "active"
-        : "awaiting_approval"
+      const state =
+        input.approved || (mode === "autonomous" && !intent.needs_user_clarification && intent.risk_level !== "high")
+          ? "active"
+          : "awaiting_approval"
       const runID = CoordinatorRunID.ascending()
       const nodeTaskIDs = new Map<string, SessionID>()
       for (const node of planned.nodes) {
@@ -1805,6 +2613,9 @@ export const layer = Layer.effect(
             requires_user_input: node.requires_user_input,
             effort: planned.effort,
             effort_profile: planned.effort_profile,
+            long_task: planned.long_task,
+            todo_timeline: planned.todo_timeline,
+            budget_profile: planned.budget_profile,
             expert_id: node.expert_id,
             expert_role: node.expert_role,
             workflow: node.workflow ?? planned.workflow,
@@ -1828,7 +2639,8 @@ export const layer = Layer.effect(
       const timestamp = now()
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.insert(CoordinatorRunTable)
+          db
+            .insert(CoordinatorRunTable)
             .values({
               id: runID,
               session_id: input.sessionID,
@@ -1855,7 +2667,9 @@ export const layer = Layer.effect(
 
     const get: Interface["get"] = Effect.fn("Coordinator.get")(function* (id) {
       yield* ensureSubscribed()
-      const row = yield* Effect.sync(() => Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()))
+      const row = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
+      )
       return row ? Option.some(runFromRow(row)) : Option.none()
     })
 
@@ -1863,7 +2677,12 @@ export const layer = Layer.effect(
       yield* ensureSubscribed()
       const rows = yield* Effect.sync(() =>
         Database.use((db) =>
-          db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.session_id, sessionID)).orderBy(desc(CoordinatorRunTable.time_created)).all(),
+          db
+            .select()
+            .from(CoordinatorRunTable)
+            .where(eq(CoordinatorRunTable.session_id, sessionID))
+            .orderBy(desc(CoordinatorRunTable.time_created))
+            .all(),
         ),
       )
       return rows.map(runFromRow)
@@ -1877,7 +2696,8 @@ export const layer = Layer.effect(
       const taskList = yield* relevantTasks(run)
       const taskByNode = new Map(
         taskList.flatMap((item) => {
-          const nodeID = typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : undefined
+          const nodeID =
+            typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : undefined
           return nodeID ? [[nodeID, item] as const] : []
         }),
       )
@@ -1889,7 +2709,7 @@ export const layer = Layer.effect(
         return "pending" as const
       }
       const groupIDs = [
-        ...new Set(run.plan.nodes.flatMap((item) => item.parallel_group ? [item.parallel_group] : [])),
+        ...new Set(run.plan.nodes.flatMap((item) => (item.parallel_group ? [item.parallel_group] : []))),
       ]
       const groups = groupIDs.map((groupID) => {
         const nodes = run.plan.nodes.filter((item) => item.parallel_group === groupID)
@@ -1900,27 +2720,33 @@ export const layer = Layer.effect(
         const blocked_by = nodes.flatMap((item) =>
           item.depends_on.filter((dependency) => taskByNode.get(dependency)?.status !== "completed"),
         )
-        const started = groupTasks.flatMap((item) => item.started_at ? [item.started_at] : [])
-        const finished = groupTasks.flatMap((item) => item.finished_at ? [item.finished_at] : [])
-        const reducer = run.plan.nodes.find((item) => item.depends_on.some((dependency) => nodes.some((node) => node.id === dependency)) && item.role === "reducer")
+        const started = groupTasks.flatMap((item) => (item.started_at ? [item.started_at] : []))
+        const finished = groupTasks.flatMap((item) => (item.finished_at ? [item.finished_at] : []))
+        const reducer = run.plan.nodes.find(
+          (item) =>
+            item.depends_on.some((dependency) => nodes.some((node) => node.id === dependency)) &&
+            item.role === "reducer",
+        )
         const reducerTask = reducer ? taskByNode.get(reducer.id) : undefined
         const conflicts = nodes.flatMap((item) => item.conflicts)
         return {
           id: groupID,
           node_ids: nodes.map((item) => item.id),
           task_ids: groupTasks.map((item) => item.task_id),
-          status: groupTasks.length > 0 ? statusFor(groupTasks) : "pending" as const,
-          merge_status: conflicts.length > 0
-            ? "conflict" as const
-            : reducerTask?.status === "completed"
-              ? "merged" as const
-              : reducer
-                ? "waiting" as const
-                : "none" as const,
+          status: groupTasks.length > 0 ? statusFor(groupTasks) : ("pending" as const),
+          merge_status:
+            conflicts.length > 0
+              ? ("conflict" as const)
+              : reducerTask?.status === "completed"
+                ? ("merged" as const)
+                : reducer
+                  ? ("waiting" as const)
+                  : ("none" as const),
           blocked_by: [...new Set(blocked_by)],
           conflicts,
           started_at: started.length ? Math.min(...started) : undefined,
-          completed_at: groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
+          completed_at:
+            groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
         }
       })
       const gateStatus = (nodeID?: string) => {
@@ -1939,6 +2765,24 @@ export const layer = Layer.effect(
         ...item,
         status: gateStatus(item.node_id),
       }))
+      const todo_timeline = runtimeTodoTimeline(run.plan, taskByNode)
+      const progress_snapshot = progressSnapshotFor({
+        todoTimeline: todo_timeline,
+        taskList,
+        qualityGates: quality_gates,
+      })
+      const budget_state = budgetStateFor({ plan: run.plan, taskList, progressSnapshot: progress_snapshot })
+      const checkpoint_memory = checkpointMemoryFor({
+        run,
+        todoTimeline: todo_timeline,
+        progressSnapshot: progress_snapshot,
+      })
+      const continuation_request = continuationRequestFor({
+        plan: run.plan,
+        todoTimeline: todo_timeline,
+        budgetState: budget_state,
+        progressSnapshot: progress_snapshot,
+      })
       return {
         run,
         tasks: taskList,
@@ -1955,6 +2799,13 @@ export const layer = Layer.effect(
         revise_points,
         memory_context: run.plan.memory_context,
         effort_profile: run.plan.effort_profile,
+        long_task: run.plan.long_task,
+        todo_timeline,
+        budget_profile: run.plan.budget_profile,
+        budget_state,
+        progress_snapshot,
+        checkpoint_memory,
+        continuation_request,
         budget_limited: run.plan.budget_limited,
         specialization_fallback: run.plan.specialization_fallback,
       }
@@ -1988,7 +2839,8 @@ export const layer = Layer.effect(
       const finished = state === "completed" || state === "failed" || state === "cancelled" ? now() : null
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.update(CoordinatorRunTable)
+          db
+            .update(CoordinatorRunTable)
             .set({
               state,
               summary,
@@ -2009,10 +2861,12 @@ export const layer = Layer.effect(
     const activateRun = Effect.fn("Coordinator.activateRun")(function* (id: CoordinatorRunIDType) {
       const runOpt = yield* get(id)
       if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled") return runOpt.value
+      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled")
+        return runOpt.value
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.update(CoordinatorRunTable)
+          db
+            .update(CoordinatorRunTable)
             .set({
               state: "active",
               summary: "Coordinator run active",
@@ -2056,7 +2910,8 @@ export const layer = Layer.effect(
       const timestamp = now()
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.update(CoordinatorRunTable)
+          db
+            .update(CoordinatorRunTable)
             .set({
               state: "cancelled",
               summary: "Coordinator run cancelled",
@@ -2121,7 +2976,8 @@ export const layer = Layer.effect(
       )
       yield* Effect.sync(() =>
         Database.use((db) =>
-          db.update(CoordinatorRunTable)
+          db
+            .update(CoordinatorRunTable)
             .set({
               state: "active",
               summary: "Coordinator run retrying",

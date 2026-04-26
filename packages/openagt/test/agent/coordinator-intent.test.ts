@@ -43,8 +43,12 @@ describe("coordinator intent planning", () => {
     const plan = defaultPlanForIntent(intent)
 
     expect(intent.workflow).toBe("environment-audit")
-    expect(plan.nodes.map((item) => item.role)).toEqual(["environment-auditor", "verifier", "writer"])
-    expect(plan.nodes.at(-1)?.output_schema).toBe("document")
+    expect(plan.nodes.filter((item) => item.role !== "reviser").map((item) => item.role)).toEqual([
+      "environment-auditor",
+      "verifier",
+      "writer",
+    ])
+    expect(plan.nodes.find((item) => item.id === "report")?.output_schema).toBe("document")
   })
 
   test("marks high-risk automation as requiring user input", () => {
@@ -66,12 +70,9 @@ describe("coordinator intent planning", () => {
     expect(plan.nodes.some((item) => item.role === "reducer")).toBe(true)
     expect(plan.nodes.some((item) => item.role === "reviewer")).toBe(true)
     expect(plan.expert_lanes.length).toBeGreaterThanOrEqual(2)
-    expect(plan.revise_points.map((item) => item.kind)).toEqual(expect.arrayContaining([
-      "plan_revise",
-      "reducer_revise",
-      "verifier_revise",
-      "final_revise",
-    ]))
+    expect(plan.revise_points.map((item) => item.kind)).toEqual(
+      expect.arrayContaining(["plan_revise", "reducer_revise", "verifier_revise", "final_revise"]),
+    )
     expect(plan.revise_points).toHaveLength(plan.quality_gates.length)
   })
 
@@ -82,19 +83,19 @@ describe("coordinator intent planning", () => {
     expect(plan.effort).toBe("deep")
     expect(plan.effort_profile.revise_policy).toBe("all_artifacts")
     expect(plan.nodes.filter((item) => item.role === "planner")).toHaveLength(3)
-    expect(plan.revise_points.map((item) => item.kind)).toEqual(expect.arrayContaining([
-      "plan_revise",
-      "input_revise",
-      "output_revise",
-      "handoff_revise",
-      "final_revise",
-    ]))
-    expect(plan.nodes.filter((item) => item.role === "reviser").every((item) => item.write_scope.length === 0)).toBe(true)
+    expect(plan.revise_points.map((item) => item.kind)).toEqual(
+      expect.arrayContaining(["plan_revise", "input_revise", "output_revise", "handoff_revise", "final_revise"]),
+    )
+    expect(plan.nodes.filter((item) => item.role === "reviser").every((item) => item.write_scope.length === 0)).toBe(
+      true,
+    )
     expect(plan.revise_points.length).toBeLessThanOrEqual(plan.effort_profile.max_revise_nodes)
   })
 
   test("routes broad project deep dives to sharded research experts", () => {
-    const intent = settleIntentProfile({ goal: "dive deeper into this project and give me a outline of key technological details, algorithems" })
+    const intent = settleIntentProfile({
+      goal: "dive deeper into this project and give me a outline of key technological details, algorithems",
+    })
     const plan = defaultPlanForIntent(intent)
     const research = plan.nodes.filter((item) => item.parallel_group === "research")
 
@@ -114,8 +115,50 @@ describe("coordinator intent planning", () => {
       "research_data_safety",
       "research_tests_release",
     ])
-    expect(plan.nodes.find((item) => item.id === "research_synthesis")?.prompt).toContain("technical architecture outline")
+    expect(plan.nodes.find((item) => item.id === "research_synthesis")?.prompt).toContain(
+      "technical architecture outline",
+    )
     expect(plan.nodes.find((item) => item.id === "synthesize")?.depends_on).toEqual(["research_synthesis"])
+  })
+
+  test("deep broad analysis creates long-task timeline, adaptive budget, and checkpoint synthesis", () => {
+    const intent = settleIntentProfile({
+      goal: "dive deeper into this project and give me a comprehensive outline of key technological details, algorithms, architecture, full project structure and release risks",
+    })
+    const plan = defaultPlanForIntent(intent, { effort: "deep" })
+
+    expect(plan.long_task.is_long_task).toBe(true)
+    expect(plan.long_task.task_size).toBe("huge")
+    expect(plan.long_task.timeline_required).toBe(true)
+    expect(plan.todo_timeline.required).toBe(true)
+    expect(plan.todo_timeline.todos.map((item) => item.id)).toEqual([
+      "todo_plan",
+      "todo_research",
+      "todo_expert",
+      "todo_reduce",
+      "todo_verify",
+    ])
+    expect(plan.todo_timeline.todos.every((item) => item.node_ids.length > 0)).toBe(true)
+    expect(plan.nodes.at(-1)?.id).toBe("budget_checkpoint_synthesis")
+    expect(plan.nodes.find((item) => item.id === "budget_checkpoint_synthesis")?.depends_on).toEqual(["final_revise"])
+    expect(plan.budget_profile.absolute_ceiling.max_rounds).toBeGreaterThanOrEqual(240)
+    expect(plan.budget_profile.absolute_ceiling.max_model_calls).toBeGreaterThanOrEqual(480)
+    expect(plan.budget_profile.absolute_ceiling.max_tool_calls).toBeGreaterThanOrEqual(2400)
+    expect(plan.budget_profile.absolute_ceiling.max_subagents).toBeGreaterThanOrEqual(96)
+    expect(plan.budget_profile.absolute_ceiling.max_wallclock_ms).toBeGreaterThanOrEqual(8 * 60 * 60 * 1000)
+    expect(plan.budget_profile.single_checkpoint_ceiling.max_wallclock_ms).toBe(45 * 60 * 1000)
+    expect(plan.budget_profile.no_progress_stop.checkpoint_window).toBe(5)
+    expect(plan.checkpoint_memory.todo_state).toHaveLength(plan.todo_timeline.todos.length)
+    expect(plan.progress_snapshot.pending).toBe(plan.todo_timeline.todos.length)
+  })
+
+  test("small medium tasks keep timeline optional but still review final output", () => {
+    const plan = defaultPlanForIntent(settleIntentProfile({ goal: "summarize README" }), { effort: "medium" })
+
+    expect(plan.long_task.is_long_task).toBe(false)
+    expect(plan.todo_timeline.required).toBe(false)
+    expect(plan.nodes.some((item) => item.id === "budget_checkpoint_synthesis")).toBe(false)
+    expect(plan.revise_points.some((item) => item.kind === "final_revise")).toBe(true)
   })
 
   test("routes non-coding workflows to specialized expert adapters", () => {
@@ -125,12 +168,31 @@ describe("coordinator intent planning", () => {
     const admin = defaultPlanForIntent(settleIntentProfile({ goal: "prioritize inbox follow-up calendar tasks" }))
 
     expect(writing.workflow).toBe("writing")
-    expect(writing.nodes.map((item) => item.role)).toEqual(["planner", "writer", "style-editor"])
+    expect(writing.nodes.filter((item) => item.role !== "reviser").map((item) => item.role)).toEqual([
+      "planner",
+      "writer",
+      "style-editor",
+    ])
     expect(data.workflow).toBe("data-analysis")
-    expect(data.nodes.map((item) => item.id)).toEqual(["profile_data", "analyze_data", "verify_stats"])
+    expect(data.nodes.filter((item) => item.role !== "reviser").map((item) => item.id)).toEqual([
+      "profile_data",
+      "analyze_data",
+      "verify_stats",
+    ])
     expect(planning.workflow).toBe("planning")
-    expect(planning.nodes.map((item) => item.role)).toEqual(["planner", "constraint-checker", "risk-reviewer"])
+    expect(planning.nodes.filter((item) => item.role !== "reviser").map((item) => item.role)).toEqual([
+      "planner",
+      "constraint-checker",
+      "risk-reviewer",
+    ])
     expect(admin.workflow).toBe("personal-admin")
-    expect(admin.nodes.map((item) => item.role)).toEqual(["inbox-classifier", "scheduler", "privacy-reviewer"])
+    expect(admin.nodes.filter((item) => item.role !== "reviser").map((item) => item.role)).toEqual([
+      "inbox-classifier",
+      "scheduler",
+      "privacy-reviewer",
+    ])
+    expect([writing, data, planning, admin].every((plan) => plan.nodes.some((item) => item.role === "reviser"))).toBe(
+      true,
+    )
   })
 })

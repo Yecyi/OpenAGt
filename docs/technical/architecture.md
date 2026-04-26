@@ -182,6 +182,69 @@ Primary implementation areas:
 - `packages/openagt/src/session/task-runtime.ts`
 - `packages/openagt/src/tool/task*.ts`
 
+## Dynamic Expert Runtime v1.2
+
+Dynamic Expert Runtime extends Coordinator from a fixed task graph into an adaptive expert execution loop.
+
+The model separates two concerns:
+
+- `workflow`: chooses the specialized adapter, expert roles, allowed tools, verifier rules, and memory namespace.
+- `effort`: chooses governance strength, review density, budget, checkpoint frequency, and continuation behavior.
+
+```mermaid
+flowchart TD
+  A["Mission goal"] --> B["LongTaskClassifier"]
+  B --> C{"Long task?"}
+  C -- "yes" --> D["TodoTimelinePlanner"]
+  C -- "no" --> E["Standard task graph"]
+  D --> F["Adaptive Budget Profile"]
+  E --> F
+  F --> G["Coordinator DAG"]
+  G --> H["Expert lanes"]
+  H --> I["Critical review / revise gates"]
+  I --> J["Progress checkpoint"]
+  J --> K{"Continue improving?"}
+  K -- "yes" --> G
+  K -- "no / ceiling hit" --> L["Checkpoint synthesis + continuation request"]
+```
+
+Effort semantics:
+
+| Effort | Runtime behavior |
+| --- | --- |
+| `low` | Fast path with minimal review and no forced timeline |
+| `medium` | Standard path with critical review of key conclusions and final output |
+| `high` | Multi-round planning, multi-expert lanes, reducer/reviewer, and critical-path revise gates |
+| `deep` | Long-task mode with todo timeline, full artifact review, checkpoint synthesis, and larger adaptive ceilings |
+
+Long-task runs add these projection fields for UI, SDK, and future Flutter clients:
+
+- `long_task`
+- `todo_timeline`
+- `budget_profile`
+- `budget_state`
+- `progress_snapshot`
+- `checkpoint_memory`
+- `continuation_request`
+
+Budgeting is split into layered ceilings:
+
+- `mission_ceiling`: normal automatic work budget
+- `phase_ceiling`: per-phase guardrail
+- `todo_budget`: weighted budget per timeline item
+- `checkpoint_reserve`: reserved budget for synthesis and user-facing status
+- `absolute_ceiling`: non-bypassable hard ceiling
+
+When a ceiling or checkpoint is reached, the runtime does not silently stop. It creates a checkpoint synthesis with completed, partial, blocked, and not-started work, then exposes a continuation request when more budget needs user approval.
+
+Primary implementation areas:
+
+- `packages/openagt/src/coordinator/schema.ts`
+- `packages/openagt/src/coordinator/coordinator.ts`
+- `packages/openagt/src/cli/cmd/mission.ts`
+- `packages/openagt/src/cli/cmd/tui/feature-plugins/sidebar/mission.tsx`
+- `packages/sdk/js/src/v2/runtime-helpers.ts`
+
 ## Personal Agent Core v1
 
 Personal Agent Core adds longer-lived backend state beyond a single session.
@@ -288,9 +351,10 @@ sequenceDiagram
 | Packaged binary smoke tests | stable in v1.16 |
 | `openagt debug doctor` and `debug bundle` | stable in v1.16 |
 | Coordinator Runtime projection and dispatch | stable in v1.16 for graph projection, duplicate-id rejection, retry, and cancellation |
+| Dynamic Expert Runtime `effort`, long-task timeline, adaptive budget, checkpoint projection | implemented for v1.2 backend contracts |
 | Personal Agent inbox and memory primitives | implemented; backend contracts stabilized in v1.16 |
 | SSE EventEnvelope | stable in v1.16 |
-| JavaScript SDK runtime helpers | stable in v1.16 |
+| JavaScript SDK runtime helpers | stable in v1.16; extended for Dynamic Expert Runtime projection |
 | Flutter control panel | roadmap; backend contracts only in v1.16 |
 
 ## Repository Map

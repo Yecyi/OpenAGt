@@ -1,14 +1,27 @@
 import { describe, expect, test } from "bun:test"
 import {
   getCoordinatorProjection,
+  getBudgetState,
+  getCheckpointMemorySummary,
+  getContinuationRequest,
   getEffortProfile,
   getExpertLanes,
   getExpertMemoryContext,
+  getProgressSnapshot,
   getQualityGates,
+  getTodoTimeline,
 } from "../src/v2/runtime-helpers"
 
 describe("runtime helpers", () => {
   test("returns coordinator projections with group data", () => {
+    const limit = {
+      max_rounds: 24,
+      max_model_calls: 40,
+      max_tool_calls: 240,
+      max_subagents: 16,
+      max_wallclock_ms: 2700000,
+      max_estimated_tokens: 1000000,
+    }
     const projection = getCoordinatorProjection({
       run: { id: "coordinator_1" },
       tasks: [{ task_id: "ses_1" }],
@@ -75,6 +88,93 @@ describe("runtime helpers", () => {
         max_revision_per_artifact: 1,
         timeout_multiplier: 1.5,
       },
+      long_task: {
+        is_long_task: true,
+        task_size: "large",
+        timeline_required: true,
+        reasons: ["broad goal"],
+      },
+      todo_timeline: {
+        required: true,
+        todos: [
+          {
+            id: "todo_research",
+            title: "Gather evidence",
+            status: "active",
+            priority: "high",
+            budget_weight: 2,
+            acceptance_hint: "Evidence collected",
+            depends_on: [],
+            assigned_stage: "research",
+            node_ids: ["research_repo"],
+            expert_lane_ids: ["coding:coding.verifier"],
+          },
+        ],
+        phases: [
+          {
+            id: "phase_research",
+            title: "Research",
+            todo_ids: ["todo_research"],
+            expected_outputs: ["Evidence collected"],
+            checkpoint_after: true,
+          },
+        ],
+      },
+      budget_profile: {
+        scale: "normal",
+        auto_continue: "safe",
+        mission_ceiling: limit,
+        phase_ceiling: limit,
+        todo_budget: { todo_research: limit },
+        checkpoint_reserve: limit,
+        absolute_ceiling: limit,
+        single_checkpoint_ceiling: limit,
+        no_progress_stop: {
+          checkpoint_window: 5,
+          min_new_completed_todo_weight: 0.05,
+          min_new_evidence_items: 3,
+          min_quality_delta: 0.03,
+        },
+      },
+      budget_state: {
+        soft_budget_used: 0.25,
+        absolute_ceiling_used: 0.1,
+        checkpoint_count: 1,
+        budget_limited: false,
+        ceiling_hit: false,
+      },
+      progress_snapshot: {
+        done: 0,
+        partial: 1,
+        blocked: 0,
+        pending: 0,
+        progress_score: 0.4,
+        evidence_coverage: 0.5,
+        verifier_quality: 0.8,
+        tool_success_rate: 1,
+        remaining_work_score: 0.6,
+        failure_penalty: 0,
+        confidence: "medium",
+      },
+      checkpoint_memory: {
+        run_id: "coordinator_1",
+        checkpoint_id: "checkpoint_1",
+        todo_state: [],
+        completed_artifacts: [],
+        evidence_index: ["Evidence collected"],
+        unresolved_claims: [],
+        blocked_reasons: [],
+        quality_scores: { progress_score: 0.4 },
+        next_recommended_todos: ["todo_research"],
+        compressed_context: "Research is in progress.",
+      },
+      continuation_request: {
+        reason: "Mission budget checkpoint reached with unfinished timeline items.",
+        requested_budget_delta: limit,
+        next_todos: ["todo_research"],
+        expected_value: "Continue targeted work.",
+        requires_user_approval: true,
+      },
     })
 
     expect(projection?.groups[0]?.id).toBe("research")
@@ -83,28 +183,35 @@ describe("runtime helpers", () => {
     expect(getExpertLanes(projection)?.[0]?.expert_id).toBe("coding.verifier")
     expect(getQualityGates(projection)?.[0]?.kind).toBe("final_revise")
     expect(getExpertMemoryContext(projection)?.workflow_tags).toEqual(["workflow:coding"])
+    expect(getTodoTimeline(projection)?.todos[0]?.id).toBe("todo_research")
+    expect(getBudgetState(projection)?.checkpoint_count).toBe(1)
+    expect(getProgressSnapshot(projection)?.evidence_coverage).toBe(0.5)
+    expect(getContinuationRequest(projection)?.next_todos).toEqual(["todo_research"])
+    expect(getCheckpointMemorySummary(projection)?.evidence_index).toEqual(["Evidence collected"])
   })
 
   test("rejects coordinator projections with malformed group data", () => {
-    expect(getCoordinatorProjection({
-      run: { id: "coordinator_1" },
-      tasks: [],
-      counts: {
-        pending: 0,
-        running: 0,
-        completed: 0,
-        failed: 0,
-        cancelled: 0,
-      },
-      groups: [
-        {
-          id: "research",
-          node_ids: "research_repo",
-          task_ids: [],
-          status: "pending",
-          merge_status: "waiting",
+    expect(
+      getCoordinatorProjection({
+        run: { id: "coordinator_1" },
+        tasks: [],
+        counts: {
+          pending: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          cancelled: 0,
         },
-      ],
-    })).toBeUndefined()
+        groups: [
+          {
+            id: "research",
+            node_ids: "research_repo",
+            task_ids: [],
+            status: "pending",
+            merge_status: "waiting",
+          },
+        ],
+      }),
+    ).toBeUndefined()
   })
 })

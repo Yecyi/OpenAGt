@@ -106,9 +106,10 @@ describe("coordinator runtime", () => {
         yield* coordinator.approve(run.id)
         yield* Effect.sleep("20 millis")
         const projection = yield* coordinator.projection(run.id)
+        const failed = projection.tasks.find((item) => item.status === "failed")
 
         expect(projection.counts.failed).toBe(1)
-        expect(projection.tasks[0]?.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
+        expect(failed?.error_summary).toBe("Coordinator executor unavailable: SessionPrompt.Service is not available")
       }),
     ),
   )
@@ -162,17 +163,24 @@ describe("coordinator runtime", () => {
           ],
         })
 
-        expect(run.plan.nodes.map((item) => item.id)).toEqual(["research", "implement", "implement_verify"])
+        expect(run.plan.nodes.map((item) => item.id)).toEqual([
+          "research",
+          "implement",
+          "implement_verify",
+          "final_revise",
+        ])
 
         const records = yield* tasks.list(parent.id)
-        expect(records).toHaveLength(3)
+        expect(records).toHaveLength(4)
         const research = records.find((item) => item.task_kind === "research")
         const implement = records.find((item) => item.task_kind === "implement")
-        const verify = records.find((item) => item.task_kind === "verify")
-        if (!research || !implement || !verify) throw new Error("Coordinator tasks were not created")
+        const verify = records.find((item) => item.metadata?.coordinator_node_id === "implement_verify")
+        const finalRevise = records.find((item) => item.metadata?.coordinator_node_id === "final_revise")
+        if (!research || !implement || !verify || !finalRevise) throw new Error("Coordinator tasks were not created")
 
         expect(implement.depends_on).toEqual([research.task_id])
         expect(verify.depends_on).toEqual([implement.task_id])
+        expect(finalRevise.depends_on).toEqual([verify.task_id])
         expect(verify.read_scope).toEqual(["src/runtime.ts"])
 
         yield* tasks.complete({
@@ -205,6 +213,11 @@ describe("coordinator runtime", () => {
           parentSessionID: parent.id,
           output: "verified",
         })
+        yield* tasks.complete({
+          taskID: finalRevise.task_id,
+          parentSessionID: parent.id,
+          output: "critically reviewed",
+        })
 
         const summary = yield* coordinator.summarize(run.id)
         const projection = yield* coordinator.projection(run.id)
@@ -212,10 +225,10 @@ describe("coordinator runtime", () => {
         yield* Effect.sleep("10 millis")
         const memory = yield* personal.listMemory({ projectID: parent.projectID })
 
-        expect(summary).toContain("3/3 completed")
+        expect(summary).toContain("4/4 completed")
         expect(resumeError.message).toContain("cannot be resumed from state: completed")
-        expect(projection.counts.completed).toBe(3)
-        expect(projection.tasks).toHaveLength(3)
+        expect(projection.counts.completed).toBe(4)
+        expect(projection.tasks).toHaveLength(4)
         expect(memory.some((item) => item.tags.includes(`coordinator_run:${run.id}`))).toBe(true)
         expect(seen).toContain("coordinator.created")
         expect(seen).toContain("coordinator.completed")

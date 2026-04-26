@@ -12,6 +12,8 @@ type MissionFormat = "text" | "json"
 type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection"
 type ParallelMode = "off" | "safe" | "aggressive"
 type MissionEffort = "low" | "medium" | "high" | "deep"
+type MissionBudget = "small" | "normal" | "large" | "max"
+type MissionAutoContinue = "never" | "checkpoint" | "safe"
 type MissionWorkflow =
   | "coding"
   | "research"
@@ -32,6 +34,19 @@ function parseReviewerModel(input?: string) {
     providerID: parsed.providerID,
     modelID: parsed.modelID,
   }
+}
+
+function parseDurationMs(input?: string | number) {
+  if (input === undefined) return
+  if (typeof input === "number") return input
+  const normalized = input.trim().toLowerCase()
+  const value = Number(normalized.replace(/[a-z]+$/, ""))
+  if (!Number.isFinite(value) || value <= 0) return
+  if (normalized.endsWith("ms")) return Math.round(value)
+  if (normalized.endsWith("s")) return Math.round(value * 1000)
+  if (normalized.endsWith("m")) return Math.round(value * 60 * 1000)
+  if (normalized.endsWith("h")) return Math.round(value * 60 * 60 * 1000)
+  return Math.round(value)
 }
 
 function emit(format: MissionFormat, type: string, data: Record<string, unknown>) {
@@ -75,7 +90,9 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     }
     UI.println(UI.Style.TEXT_NORMAL_BOLD + "DAG" + UI.Style.TEXT_NORMAL)
     for (const node of plan.nodes) {
-      UI.println(`  ${node.id} [${node.role}/${node.risk}${node.parallel_group ? `/group:${node.parallel_group}` : ""}] ${node.description}`)
+      UI.println(
+        `  ${node.id} [${node.role}/${node.risk}${node.parallel_group ? `/group:${node.parallel_group}` : ""}] ${node.description}`,
+      )
       if (node.depends_on.length > 0) UI.println(`    depends on: ${node.depends_on.join(", ")}`)
       if (node.assigned_scope?.length) UI.println(`    scope: ${node.assigned_scope.join(", ")}`)
     }
@@ -93,6 +110,22 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
       run: { id: string; state: string; summary?: string }
       counts: Record<string, number>
       effort_profile?: Record<string, unknown>
+      long_task?: { is_long_task: boolean; task_size: string; timeline_required: boolean; reasons: string[] }
+      todo_timeline?: { todos: Array<{ id: string; title: string; status: string }> }
+      budget_state?: {
+        budget_limited: boolean
+        ceiling_hit: boolean
+        checkpoint_count: number
+        soft_budget_used: number
+        absolute_ceiling_used: number
+      }
+      progress_snapshot?: { progress_score: number; evidence_coverage: number; confidence: string }
+      continuation_request?: {
+        reason: string
+        next_todos: string[]
+        expected_value: string
+        requires_user_approval: boolean
+      }
       expert_lanes?: Array<{ id: string; expert_id: string; role: string; node_ids: string[] }>
       quality_gates?: Array<{ id: string; kind: string; status: string }>
       revise_points?: Array<{ id: string; kind: string; status: string }>
@@ -101,8 +134,8 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         description: string
         metadata?: { coordinator_node_id?: unknown; role?: unknown }
         result_summary?: string
-      error_summary?: string
-    }>
+        error_summary?: string
+      }>
       groups?: Array<{
         id: string
         status: string
@@ -112,19 +145,48 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         conflicts: string[]
       }>
     }
-    UI.println(`Run ${projection.run.id}: ${projection.run.state}${projection.run.summary ? ` - ${projection.run.summary}` : ""}`)
+    UI.println(
+      `Run ${projection.run.id}: ${projection.run.state}${projection.run.summary ? ` - ${projection.run.summary}` : ""}`,
+    )
     UI.println(
       `  tasks: ${projection.counts.completed} completed, ${projection.counts.running} running, ${projection.counts.pending} pending, ${projection.counts.failed} failed, ${projection.counts.cancelled} cancelled`,
     )
     if (projection.effort_profile) {
-      UI.println(`  effort: ${String(projection.effort_profile.revise_policy ?? "none")}, revise points ${projection.revise_points?.length ?? 0}`)
+      UI.println(
+        `  effort: ${String(projection.effort_profile.revise_policy ?? "none")}, revise points ${projection.revise_points?.length ?? 0}`,
+      )
+    }
+    if (projection.long_task?.is_long_task) {
+      UI.println(
+        `  long task: ${projection.long_task.task_size}, timeline ${projection.long_task.timeline_required ? "required" : "optional"}`,
+      )
+    }
+    if (projection.progress_snapshot) {
+      UI.println(
+        `  progress: ${Math.round(projection.progress_snapshot.progress_score * 100)}%, evidence ${Math.round(projection.progress_snapshot.evidence_coverage * 100)}%, confidence ${projection.progress_snapshot.confidence}`,
+      )
+    }
+    if (projection.budget_state) {
+      UI.println(
+        `  budget: soft ${Math.round(projection.budget_state.soft_budget_used * 100)}%, ceiling ${Math.round(projection.budget_state.absolute_ceiling_used * 100)}%, checkpoints ${projection.budget_state.checkpoint_count}`,
+      )
+      if (projection.budget_state.ceiling_hit) UI.println(`  ceiling hit: continuation requires approval`)
+    }
+    if (projection.todo_timeline?.todos.length) {
+      UI.println(`  todos: ${projection.todo_timeline.todos.map((item) => `${item.id}:${item.status}`).join(", ")}`)
+    }
+    if (projection.continuation_request) {
+      UI.println(`  continuation: ${projection.continuation_request.reason}`)
+      UI.println(`    next: ${projection.continuation_request.next_todos.join(", ") || "none"}`)
     }
     if (projection.expert_lanes?.length) {
       UI.println(`  experts: ${projection.expert_lanes.map((item) => item.expert_id).join(", ")}`)
     }
     if (showGroups) {
       for (const group of projection.groups ?? []) {
-        UI.println(`  group ${group.id}: ${group.status}, merge ${group.merge_status}, nodes ${group.node_ids.join(", ")}`)
+        UI.println(
+          `  group ${group.id}: ${group.status}, merge ${group.merge_status}, nodes ${group.node_ids.join(", ")}`,
+        )
         if (group.blocked_by.length > 0) UI.println(`    blocked by: ${group.blocked_by.join(", ")}`)
         if (group.conflicts.length > 0) UI.println(`    conflicts: ${group.conflicts.join("; ")}`)
       }
@@ -187,6 +249,11 @@ async function createMission(
     showGroups?: boolean
     effort?: MissionEffort
     workflow?: MissionWorkflow
+    budget?: MissionBudget
+    autoContinue?: MissionAutoContinue
+    maxRounds?: number
+    maxSubagents?: number
+    maxWallclockMs?: number
   },
 ) {
   const sessionID =
@@ -204,6 +271,11 @@ async function createMission(
     parallel_policy,
     effort: input.effort,
     workflow: input.workflow,
+    budget: input.budget,
+    autoContinue: input.autoContinue,
+    maxRounds: input.maxRounds,
+    maxSubagents: input.maxSubagents,
+    maxWallclockMs: input.maxWallclockMs,
   }
   const plan = (await sdk.coordinator.plan2.generate(planPayload, { throwOnError: true })).data
   const reviewerModel = parseReviewerModel(input.reviewerModel)
@@ -222,13 +294,13 @@ async function createMission(
     parallel_policy,
     effort: input.effort,
     workflow: input.workflow,
+    budget: input.budget,
+    autoContinue: input.autoContinue,
+    maxRounds: input.maxRounds,
+    maxSubagents: input.maxSubagents,
+    maxWallclockMs: input.maxWallclockMs,
   }
-  const run = (
-    await sdk.coordinator.run(
-      runPayload,
-      { throwOnError: true },
-    )
-  ).data
+  const run = (await sdk.coordinator.run(runPayload, { throwOnError: true })).data
   emit(input.format, "run", { run, sessionID })
   if ((run.state === "awaiting_approval" || mode === "manual") && !input.approve) {
     if (input.format === "text") UI.println(`Approve with: openagt mission --run ${run.id} --action approve --watch`)
@@ -315,6 +387,30 @@ export const MissionCommand = cmd({
           "general-operations",
         ] as const,
         describe: "specialized workflow adapter",
+      })
+      .option("budget", {
+        type: "string",
+        choices: ["small", "normal", "large", "max"] as const,
+        default: "normal",
+        describe: "mission adaptive budget scale",
+      })
+      .option("auto-continue", {
+        type: "string",
+        choices: ["never", "checkpoint", "safe"] as const,
+        default: "checkpoint",
+        describe: "automatic continuation policy after budget checkpoints",
+      })
+      .option("max-rounds", {
+        type: "number",
+        describe: "override mission absolute round ceiling",
+      })
+      .option("max-subagents", {
+        type: "number",
+        describe: "override mission absolute subagent ceiling",
+      })
+      .option("max-wallclock", {
+        type: "string",
+        describe: "override mission absolute wallclock ceiling, e.g. 30m or 2h",
       })
       .option("approve", {
         type: "boolean",
@@ -411,6 +507,11 @@ export const MissionCommand = cmd({
         showGroups: args["show-groups"],
         effort: args.effort as MissionEffort,
         workflow: args.workflow as MissionWorkflow | undefined,
+        budget: args.budget as MissionBudget,
+        autoContinue: args["auto-continue"] as MissionAutoContinue,
+        maxRounds: args["max-rounds"],
+        maxSubagents: args["max-subagents"],
+        maxWallclockMs: parseDurationMs(args["max-wallclock"]),
       })
     })
   },

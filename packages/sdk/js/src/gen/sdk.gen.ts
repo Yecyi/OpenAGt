@@ -3236,6 +3236,11 @@ export class Plan extends HeyApiClient {
         merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
         conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
       }
+      budget?: "small" | "normal" | "large" | "max"
+      autoContinue?: "never" | "checkpoint" | "safe"
+      maxRounds?: number
+      maxSubagents?: number
+      maxWallclockMs?: number
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3254,6 +3259,11 @@ export class Plan extends HeyApiClient {
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
+            { in: "body", key: "budget" },
+            { in: "body", key: "autoContinue" },
+            { in: "body", key: "maxRounds" },
+            { in: "body", key: "maxSubagents" },
+            { in: "body", key: "maxWallclockMs" },
           ],
         },
       ],
@@ -3464,6 +3474,11 @@ export class Coordinator extends HeyApiClient {
         merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
         conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
       }
+      budget?: "small" | "normal" | "large" | "max"
+      autoContinue?: "never" | "checkpoint" | "safe"
+      maxRounds?: number
+      maxSubagents?: number
+      maxWallclockMs?: number
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3482,6 +3497,11 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
+            { in: "body", key: "budget" },
+            { in: "body", key: "autoContinue" },
+            { in: "body", key: "maxRounds" },
+            { in: "body", key: "maxSubagents" },
+            { in: "body", key: "maxWallclockMs" },
           ],
         },
       ],
@@ -3687,6 +3707,11 @@ export class Coordinator extends HeyApiClient {
         merge_strategy?: "none" | "research-synthesis" | "verification-evidence"
         conflict_resolution_strategy?: "block" | "targeted-research" | "reviewer-judgement"
       }
+      budget?: "small" | "normal" | "large" | "max"
+      autoContinue?: "never" | "checkpoint" | "safe"
+      maxRounds?: number
+      maxSubagents?: number
+      maxWallclockMs?: number
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3706,6 +3731,11 @@ export class Coordinator extends HeyApiClient {
             { in: "body", key: "mode" },
             { in: "body", key: "approved" },
             { in: "body", key: "parallel_policy" },
+            { in: "body", key: "budget" },
+            { in: "body", key: "autoContinue" },
+            { in: "body", key: "maxRounds" },
+            { in: "body", key: "maxSubagents" },
+            { in: "body", key: "maxWallclockMs" },
           ],
         },
       ],

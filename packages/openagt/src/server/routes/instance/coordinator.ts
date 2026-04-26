@@ -17,6 +17,15 @@ import {
   RevisePoint,
   ExpertLane,
   TaskType,
+  AutoContinuePolicy,
+  BudgetProfile,
+  BudgetScale,
+  BudgetState,
+  CheckpointMemorySummary,
+  ContinuationRequest,
+  LongTaskProfile,
+  ProgressSnapshot,
+  TodoTimeline,
 } from "@/coordinator/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { SessionID } from "@/session/schema"
@@ -32,16 +41,23 @@ const runPayload = z.object({
   mode: CoordinatorMode.optional(),
   approved: z.boolean().optional(),
   parallel_policy: ParallelExecutionPolicy.partial().optional(),
+  budget: BudgetScale.optional(),
+  autoContinue: AutoContinuePolicy.optional(),
+  maxRounds: z.number().int().min(1).optional(),
+  maxSubagents: z.number().int().min(1).optional(),
+  maxWallclockMs: z.number().int().min(60_000).optional(),
 })
 
 const intentPayload = z.object({
   goal: z.string(),
 })
 
-const retryPayload = z.object({
-  task_id: SessionID.zod.optional(),
-  node_id: z.string().optional(),
-}).optional()
+const retryPayload = z
+  .object({
+    task_id: SessionID.zod.optional(),
+    node_id: z.string().optional(),
+  })
+  .optional()
 
 const projection = z.object({
   run: CoordinatorRun,
@@ -53,22 +69,31 @@ const projection = z.object({
     failed: z.number().int(),
     cancelled: z.number().int(),
   }),
-  groups: z.array(z.object({
-    id: z.string(),
-    node_ids: z.array(z.string()),
-    task_ids: z.array(z.string()),
-    status: z.enum(["pending", "running", "completed", "failed", "cancelled"]),
-    merge_status: z.enum(["none", "waiting", "merged", "conflict"]),
-    blocked_by: z.array(z.string()),
-    conflicts: z.array(z.string()),
-    started_at: z.number().optional(),
-    completed_at: z.number().optional(),
-  })),
+  groups: z.array(
+    z.object({
+      id: z.string(),
+      node_ids: z.array(z.string()),
+      task_ids: z.array(z.string()),
+      status: z.enum(["pending", "running", "completed", "failed", "cancelled"]),
+      merge_status: z.enum(["none", "waiting", "merged", "conflict"]),
+      blocked_by: z.array(z.string()),
+      conflicts: z.array(z.string()),
+      started_at: z.number().optional(),
+      completed_at: z.number().optional(),
+    }),
+  ),
   expert_lanes: z.array(ExpertLane),
   quality_gates: z.array(QualityGate),
   revise_points: z.array(RevisePoint),
   memory_context: MemoryContext,
   effort_profile: EffortProfile,
+  long_task: LongTaskProfile,
+  todo_timeline: TodoTimeline,
+  budget_profile: BudgetProfile,
+  budget_state: BudgetState,
+  progress_snapshot: ProgressSnapshot,
+  checkpoint_memory: CheckpointMemorySummary,
+  continuation_request: ContinuationRequest.optional(),
   budget_limited: z.boolean(),
   specialization_fallback: z.boolean(),
 })
@@ -176,6 +201,11 @@ export const CoordinatorRoutes = () =>
             mode: body.mode,
             approved: body.approved,
             parallel_policy: body.parallel_policy,
+            budget: body.budget,
+            autoContinue: body.autoContinue,
+            maxRounds: body.maxRounds,
+            maxSubagents: body.maxSubagents,
+            maxWallclockMs: body.maxWallclockMs,
           })
         }),
     )

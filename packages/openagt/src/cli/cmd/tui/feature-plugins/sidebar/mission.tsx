@@ -1,4 +1,9 @@
-import type { CoordinatorListResponse, CoordinatorProjectionResponse, Session, SessionChildrenResponse } from "@openagt/sdk/v2"
+import type {
+  CoordinatorListResponse,
+  CoordinatorProjectionResponse,
+  Session,
+  SessionChildrenResponse,
+} from "@openagt/sdk/v2"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@openagt/plugin/tui"
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 
@@ -117,8 +122,12 @@ function rootSessionID(api: TuiPluginApi, sessionID: string, depth = 0): Promise
 async function loadProjection(api: TuiPluginApi, sessionID: string) {
   const root = await rootSessionID(api, sessionID)
   const [runs, children] = await Promise.all([
-    api.client.coordinator.list({ sessionID: root }, { throwOnError: true }).then((result) => result.data as CoordinatorRun[]),
-    api.client.session.children({ sessionID: root }, { throwOnError: true }).then((result) => result.data as ChildSession[]),
+    api.client.coordinator
+      .list({ sessionID: root }, { throwOnError: true })
+      .then((result) => result.data as CoordinatorRun[]),
+    api.client.session
+      .children({ sessionID: root }, { throwOnError: true })
+      .then((result) => result.data as ChildSession[]),
   ])
   const run = pickRun(runs)
   if (!run) return { root, children }
@@ -188,7 +197,10 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
       if (evt.properties.info.parentID === root() || evt.properties.sessionID === root()) refresh()
     }),
     props.api.event.on("session.status", (evt) => {
-      if (evt.properties.sessionID === props.session_id || childSessions().some((session) => session.id === evt.properties.sessionID))
+      if (
+        evt.properties.sessionID === props.session_id ||
+        childSessions().some((session) => session.id === evt.properties.sessionID)
+      )
         refresh()
     }),
   ]
@@ -215,7 +227,8 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
     const task = currentTask()
     if (task) return [{ node: nodes().find((item) => item.id === taskNodeID(task)), task }]
     const running = runningTasks()
-    if (running.length > 0) return running.map((item) => ({ node: nodes().find((node) => node.id === taskNodeID(item)), task: item }))
+    if (running.length > 0)
+      return running.map((item) => ({ node: nodes().find((node) => node.id === taskNodeID(item)), task: item }))
     return nextPendingNodes().map((node) => ({ node, task: tasksByNode().get(node.id) }))
   })
   const qualityGateSummary = createMemo(() => {
@@ -282,7 +295,10 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
   const sessionStages = createMemo(() => {
     const messages = currentSessionMessages()
     return [
-      { label: messages.some((message) => message.role === "user") ? "prompt received" : "ready", status: "idle" as const },
+      {
+        label: messages.some((message) => message.role === "user") ? "prompt received" : "ready",
+        status: "idle" as const,
+      },
       ...(currentSessionStatus() === "busy" ? [{ label: "agent running", status: "busy" as const }] : []),
       ...(currentSessionStatus() === "retry" ? [{ label: "retrying", status: "retry" as const }] : []),
       ...(messages.some((message) => message.role === "assistant")
@@ -299,6 +315,28 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
       { idle: 0, busy: 0, retry: 0, unknown: 0 },
     ),
   )
+  const progressSummary = createMemo(() => {
+    const progress = projection()?.progress_snapshot
+    if (!progress) return undefined
+    return `progress ${Math.round((progress.progress_score ?? 0) * 100)}%, evidence ${Math.round((progress.evidence_coverage ?? 0) * 100)}%, ${progress.confidence ?? "medium"}`
+  })
+  const budgetSummary = createMemo(() => {
+    const budget = projection()?.budget_state
+    if (!budget) return undefined
+    return {
+      text: `budget soft ${Math.round((budget.soft_budget_used ?? 0) * 100)}%, ceiling ${Math.round((budget.absolute_ceiling_used ?? 0) * 100)}%, checkpoints ${budget.checkpoint_count ?? 0}`,
+      ceiling_hit: budget.ceiling_hit ?? false,
+    }
+  })
+  const todoItems = createMemo(() => projection()?.todo_timeline?.todos ?? [])
+  const continuationSummary = createMemo(() => {
+    const request = projection()?.continuation_request
+    if (!request) return undefined
+    return {
+      reason: request.reason,
+      next: request.next_todos?.join(", ") || "none",
+    }
+  })
 
   return (
     <Show
@@ -355,7 +393,9 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
                 const status = () => sessionStatus(props.api, session.id)
                 return (
                   <box flexDirection="row" gap={1}>
-                    <text fg={sessionStatusColor(theme(), status())}>{session.id === props.session_id ? ">" : sessionStatusMark(status())}</text>
+                    <text fg={sessionStatusColor(theme(), status())}>
+                      {session.id === props.session_id ? ">" : sessionStatusMark(status())}
+                    </text>
                     <text fg={sessionStatusColor(theme(), status())} wrapMode="word">
                       {sessionLabel(session)} {status()}
                     </text>
@@ -408,7 +448,12 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             <text fg={theme().text}>
               <b>Mission</b>
             </text>
-            <text fg={theme().info} onMouseUp={() => props.api.route.navigate("mission", { runID: data().run.id, sessionID: data().run.sessionID })}>
+            <text
+              fg={theme().info}
+              onMouseUp={() =>
+                props.api.route.navigate("mission", { runID: data().run.id, sessionID: data().run.sessionID })
+              }
+            >
               open
             </text>
           </box>
@@ -422,6 +467,11 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             </Show>
             <Show when={data().budget_limited}>
               <text fg={theme().warning}>budget limited</text>
+            </Show>
+            <Show when={data().long_task?.is_long_task}>
+              <text fg={theme().textMuted} wrapMode="word">
+                long task {data().long_task.task_size} / timeline {data().long_task.timeline_required ? "on" : "off"}
+              </text>
             </Show>
             <Show when={loading()}>
               <text fg={theme().textMuted}>syncing...</text>
@@ -447,11 +497,69 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             </text>
             <Show when={qualityGateSummary().total > 0}>
               <text fg={qualityGateSummary().failed > 0 ? theme().error : theme().textMuted}>
-                gates {qualityGateSummary().total}: {qualityGateSummary().pending} pending, {qualityGateSummary().running} running,{" "}
-                {qualityGateSummary().failed} failed
+                gates {qualityGateSummary().total}: {qualityGateSummary().pending} pending,{" "}
+                {qualityGateSummary().running} running, {qualityGateSummary().failed} failed
+              </text>
+            </Show>
+            <Show when={progressSummary()}>
+              <text fg={theme().textMuted}>{progressSummary()}</text>
+            </Show>
+            <Show when={budgetSummary()}>
+              <text fg={budgetSummary()?.ceiling_hit ? theme().warning : theme().textMuted}>
+                {budgetSummary()?.text}
               </text>
             </Show>
           </box>
+
+          <Show when={todoItems().length}>
+            <box>
+              <text fg={theme().text}>
+                <b>Todo Timeline</b>
+              </text>
+              <For each={todoItems().slice(0, 5)}>
+                {(todo) => (
+                  <text
+                    fg={
+                      todo.status === "done"
+                        ? theme().success
+                        : todo.status === "blocked"
+                          ? theme().error
+                          : todo.status === "active"
+                            ? theme().info
+                            : theme().textMuted
+                    }
+                    wrapMode="word"
+                  >
+                    {todo.status === "done"
+                      ? "+"
+                      : todo.status === "blocked"
+                        ? "x"
+                        : todo.status === "active"
+                          ? ">"
+                          : "-"}{" "}
+                    {todo.title}
+                  </text>
+                )}
+              </For>
+              <Show when={todoItems().length > 5}>
+                <text fg={theme().textMuted}>+{todoItems().length - 5} more todos</text>
+              </Show>
+            </box>
+          </Show>
+
+          <Show when={continuationSummary()}>
+            <box>
+              <text fg={theme().warning}>
+                <b>Continuation</b>
+              </text>
+              <text fg={theme().warning} wrapMode="word">
+                {continuationSummary()?.reason}
+              </text>
+              <text fg={theme().textMuted} wrapMode="word">
+                next {continuationSummary()?.next}
+              </text>
+            </box>
+          </Show>
 
           <box>
             <text fg={theme().text}>
@@ -461,7 +569,8 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
               <For each={currentStages().slice(0, 4)}>
                 {(item) => (
                   <text fg={statusColor(theme(), item.task?.status ?? "pending")} wrapMode="word">
-                    {statusMark(item.task?.status ?? "pending")} {item.node?.id ?? taskNodeID(item.task!)} {item.node ? nodeRole(item.node) : item.task ? taskRole(item.task) : "stage"}
+                    {statusMark(item.task?.status ?? "pending")} {item.node?.id ?? taskNodeID(item.task!)}{" "}
+                    {item.node ? nodeRole(item.node) : item.task ? taskRole(item.task) : "stage"}
                   </text>
                 )}
               </For>

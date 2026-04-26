@@ -55,6 +55,15 @@ export type EffortLevel = z.infer<typeof EffortLevel>
 export const ConfidenceLevel = z.enum(["low", "medium", "high"])
 export type ConfidenceLevel = z.infer<typeof ConfidenceLevel>
 
+export const TaskSize = z.enum(["small", "medium", "large", "huge"])
+export type TaskSize = z.infer<typeof TaskSize>
+
+export const BudgetScale = z.enum(["small", "normal", "large", "max"])
+export type BudgetScale = z.infer<typeof BudgetScale>
+
+export const AutoContinuePolicy = z.enum(["never", "checkpoint", "safe"])
+export type AutoContinuePolicy = z.infer<typeof AutoContinuePolicy>
+
 export const RevisePolicy = z.enum(["none", "critical_only", "all_artifacts"])
 export type RevisePolicy = z.infer<typeof RevisePolicy>
 
@@ -77,7 +86,9 @@ export const ParallelExecutionPolicy = z.object({
   read_only_parallel_allowed: z.boolean().default(true),
   write_parallel_requires_disjoint_scope: z.boolean().default(true),
   merge_strategy: z.enum(["none", "research-synthesis", "verification-evidence"]).default("research-synthesis"),
-  conflict_resolution_strategy: z.enum(["block", "targeted-research", "reviewer-judgement"]).default("targeted-research"),
+  conflict_resolution_strategy: z
+    .enum(["block", "targeted-research", "reviewer-judgement"])
+    .default("targeted-research"),
 })
 export type ParallelExecutionPolicy = z.infer<typeof ParallelExecutionPolicy>
 
@@ -166,17 +177,180 @@ export const EffortProfile = z.object({
 })
 export type EffortProfile = z.infer<typeof EffortProfile>
 
+export const LongTaskProfile = z.object({
+  is_long_task: z.boolean().default(false),
+  task_size: TaskSize.default("small"),
+  timeline_required: z.boolean().default(false),
+  reasons: z.array(z.string()).default([]),
+})
+export type LongTaskProfile = z.infer<typeof LongTaskProfile>
+
+export const TodoStatus = z.enum(["pending", "active", "done", "partial", "blocked", "skipped"])
+export type TodoStatus = z.infer<typeof TodoStatus>
+
+export const TodoStage = z.enum(["plan", "research", "expert", "reduce", "verify", "final"])
+export type TodoStage = z.infer<typeof TodoStage>
+
+export const TimelineTodo = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: TodoStatus.default("pending"),
+  priority: NodePriority.default("normal"),
+  budget_weight: z.number().min(0.1).max(100).default(1),
+  acceptance_hint: z.string().default(""),
+  depends_on: z.array(z.string()).default([]),
+  assigned_stage: TodoStage.default("expert"),
+  node_ids: z.array(z.string()).default([]),
+  expert_lane_ids: z.array(z.string()).default([]),
+})
+export type TimelineTodo = z.infer<typeof TimelineTodo>
+
+export const TimelinePhase = z.object({
+  id: z.string(),
+  title: z.string(),
+  todo_ids: z.array(z.string()).default([]),
+  expected_outputs: z.array(z.string()).default([]),
+  checkpoint_after: z.boolean().default(false),
+})
+export type TimelinePhase = z.infer<typeof TimelinePhase>
+
+export const TodoTimeline = z.object({
+  required: z.boolean().default(false),
+  todos: z.array(TimelineTodo).default([]),
+  phases: z.array(TimelinePhase).default([]),
+})
+export type TodoTimeline = z.infer<typeof TodoTimeline>
+
+export const ResourceLimit = z.object({
+  max_rounds: z.number().int().min(0).max(10_000),
+  max_model_calls: z.number().int().min(0).max(20_000),
+  max_tool_calls: z.number().int().min(0).max(100_000),
+  max_subagents: z.number().int().min(0).max(10_000),
+  max_wallclock_ms: z
+    .number()
+    .int()
+    .min(0)
+    .max(14 * 24 * 60 * 60 * 1000),
+  max_estimated_tokens: z.number().int().min(0).max(100_000_000),
+})
+export type ResourceLimit = z.infer<typeof ResourceLimit>
+
+export const defaultResourceLimit = {
+  max_rounds: 12,
+  max_model_calls: 32,
+  max_tool_calls: 160,
+  max_subagents: 8,
+  max_wallclock_ms: 45 * 60 * 1000,
+  max_estimated_tokens: 500_000,
+} as const satisfies ResourceLimit
+
+export const BudgetProfile = z.object({
+  scale: BudgetScale.default("normal"),
+  auto_continue: AutoContinuePolicy.default("checkpoint"),
+  mission_ceiling: ResourceLimit.default(defaultResourceLimit),
+  phase_ceiling: ResourceLimit.default(defaultResourceLimit),
+  todo_budget: z.record(z.string(), ResourceLimit).default({}),
+  checkpoint_reserve: ResourceLimit.default({
+    max_rounds: 2,
+    max_model_calls: 3,
+    max_tool_calls: 12,
+    max_subagents: 1,
+    max_wallclock_ms: 10 * 60 * 1000,
+    max_estimated_tokens: 50_000,
+  }),
+  absolute_ceiling: ResourceLimit.default(defaultResourceLimit),
+  single_checkpoint_ceiling: ResourceLimit.default({
+    max_rounds: 24,
+    max_model_calls: 40,
+    max_tool_calls: 240,
+    max_subagents: 16,
+    max_wallclock_ms: 45 * 60 * 1000,
+    max_estimated_tokens: 1_000_000,
+  }),
+  no_progress_stop: z
+    .object({
+      checkpoint_window: z.number().int().min(1).max(20).default(5),
+      min_new_completed_todo_weight: z.number().min(0).max(1).default(0.05),
+      min_new_evidence_items: z.number().int().min(0).max(100).default(3),
+      min_quality_delta: z.number().min(0).max(1).default(0.03),
+    })
+    .default({
+      checkpoint_window: 5,
+      min_new_completed_todo_weight: 0.05,
+      min_new_evidence_items: 3,
+      min_quality_delta: 0.03,
+    }),
+})
+export type BudgetProfile = z.infer<typeof BudgetProfile>
+
+export const BudgetState = z.object({
+  soft_budget_used: z.number().min(0).max(1).default(0),
+  absolute_ceiling_used: z.number().min(0).max(1).default(0),
+  checkpoint_count: z.number().int().min(0).default(0),
+  budget_limited: z.boolean().default(false),
+  ceiling_hit: z.boolean().default(false),
+})
+export type BudgetState = z.infer<typeof BudgetState>
+
+export const ProgressSnapshot = z.object({
+  done: z.number().int().min(0).default(0),
+  partial: z.number().int().min(0).default(0),
+  blocked: z.number().int().min(0).default(0),
+  pending: z.number().int().min(0).default(0),
+  progress_score: z.number().min(0).max(1).default(0),
+  evidence_coverage: z.number().min(0).max(1).default(0),
+  verifier_quality: z.number().min(0).max(1).default(0),
+  tool_success_rate: z.number().min(0).max(1).default(1),
+  remaining_work_score: z.number().min(0).max(1).default(1),
+  failure_penalty: z.number().min(0).max(1).default(0),
+  confidence: ConfidenceLevel.default("medium"),
+})
+export type ProgressSnapshot = z.infer<typeof ProgressSnapshot>
+
+export const ContinuationRequest = z.object({
+  reason: z.string(),
+  requested_budget_delta: ResourceLimit,
+  next_todos: z.array(z.string()).default([]),
+  expected_value: z.string(),
+  requires_user_approval: z.boolean().default(true),
+})
+export type ContinuationRequest = z.infer<typeof ContinuationRequest>
+
+export const CheckpointMemorySummary = z.object({
+  run_id: z.string().optional(),
+  checkpoint_id: z.string().optional(),
+  todo_state: z.array(TimelineTodo).default([]),
+  completed_artifacts: z.array(z.string()).default([]),
+  evidence_index: z.array(z.string()).default([]),
+  unresolved_claims: z.array(z.string()).default([]),
+  blocked_reasons: z.array(z.string()).default([]),
+  quality_scores: z.record(z.string(), z.number()).default({}),
+  next_recommended_todos: z.array(z.string()).default([]),
+  compressed_context: z.string().default(""),
+})
+export type CheckpointMemorySummary = z.infer<typeof CheckpointMemorySummary>
+
+export const CriticalReviewVerdict = z.object({
+  verdict: z.enum(["pass", "revise", "retry", "ask_user", "stop"]),
+  unsupported_claims: z.array(z.string()).default([]),
+  missing_evidence: z.array(z.string()).default([]),
+  contradictions: z.array(z.string()).default([]),
+  required_changes: z.array(z.string()).default([]),
+  confidence: ConfidenceLevel.default("medium"),
+})
+export type CriticalReviewVerdict = z.infer<typeof CriticalReviewVerdict>
+
 export const defaultEffortProfile = {
   planning_rounds: 1,
   expert_count_min: 1,
   expert_count_max: 2,
   verifier_count_min: 1,
   reducer_enabled: false,
-  reviewer_enabled: false,
+  reviewer_enabled: true,
   debugger_enabled: false,
-  revise_policy: "none",
-  max_revise_nodes: 0,
-  max_revision_per_artifact: 0,
+  revise_policy: "critical_only",
+  max_revise_nodes: 1,
+  max_revision_per_artifact: 1,
   timeout_multiplier: 1,
 } as const satisfies EffortProfile
 
@@ -296,6 +470,22 @@ export const CoordinatorPlan = z.object({
     expert_tags: [],
     note_ids: [],
   }),
+  long_task: LongTaskProfile.default({
+    is_long_task: false,
+    task_size: "small",
+    timeline_required: false,
+    reasons: [],
+  }),
+  todo_timeline: TodoTimeline.default({
+    required: false,
+    todos: [],
+    phases: [],
+  }),
+  budget_profile: BudgetProfile.default(() => BudgetProfile.parse({})),
+  budget_state: BudgetState.default(() => BudgetState.parse({})),
+  progress_snapshot: ProgressSnapshot.default(() => ProgressSnapshot.parse({})),
+  checkpoint_memory: CheckpointMemorySummary.default(() => CheckpointMemorySummary.parse({})),
+  continuation_request: ContinuationRequest.optional(),
   budget_limited: z.boolean().default(false),
   specialization_fallback: z.boolean().default(false),
 })
