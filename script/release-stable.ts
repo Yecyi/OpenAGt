@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
-import { copyFile, mkdir } from "node:fs/promises"
+import { copyFile, mkdir, readdir } from "node:fs/promises"
 import path from "node:path"
 
 const pkg = await Bun.file("packages/openagt/package.json").json()
@@ -35,5 +35,22 @@ if (process.platform === "win32") {
 
 await $`bun run script/release-checksums.ts --dir packages/openagt/dist --output packages/openagt/dist/SHA256SUMS.txt`
 await $`bun run script/release-sbom.ts --output packages/openagt/dist/sbom.spdx.json`
+
+const localAssets = (await readdir(releaseDist, { withFileTypes: true }))
+  .filter((entry) => entry.isFile())
+  .map((entry) => entry.name)
+  .filter((name) => name !== "release-notes.md")
+  .sort()
+
+await Bun.write(
+  path.join(releaseDist, "release-notes.md"),
+  `${await Bun.file(path.join(releaseDist, "release-notes.md")).text()}
+## Local Generated Assets
+
+This local release run produced these files in \`packages/openagt/dist\`:
+
+${localAssets.map((name) => `- \`${name}\``).join("\n")}
+`,
+)
 
 console.log("\nStable release prep completed for the current platform.")
