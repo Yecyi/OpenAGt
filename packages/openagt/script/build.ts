@@ -78,11 +78,14 @@ function releaseReadme(input: { name: string; os: string; arch: "arm64" | "x64" 
     `Architecture: ${input.arch}`,
     ``,
     `Quick start:`,
+    input.os === "win32" ? `  .\\bin\\openagt.cmd` : `  ./bin/openagt`,
     input.os === "win32" ? `  .\\bin\\openagt.cmd --help` : `  ./bin/openagt --help`,
     input.os === "win32" ? `  .\\bin\\opencode.cmd --help` : `  ./bin/opencode --help`,
     ``,
+    `Installed Windows MSI users should open a new terminal and run: openagt`,
+    ``,
     `This stable release covers the CLI, TUI, and headless server runtime.`,
-    `Flutter is not included in the v1.15.0 support matrix.`,
+    `Flutter is not included in this support matrix.`,
   ].join("\n")
 }
 

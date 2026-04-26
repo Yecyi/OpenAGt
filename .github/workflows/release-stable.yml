@@ -15,6 +15,10 @@ on:
         options:
           - rc
           - ga
+      rc_number:
+        description: RC number used when release_kind is rc
+        required: false
+        default: "1"
 
 permissions:
   contents: write
@@ -175,7 +179,7 @@ jobs:
         run: |
           TAG="v${OPENAGT_VERSION}"
           if [ "${{ inputs.release_kind }}" = "rc" ]; then
-            TAG="v${OPENAGT_VERSION}-rc.1"
+            TAG="v${OPENAGT_VERSION}-rc.${{ inputs.rc_number }}"
           fi
           PRERELEASE_ARGS=()
           if [ "${{ inputs.release_kind }}" = "rc" ]; then

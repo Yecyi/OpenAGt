@@ -51,7 +51,7 @@ Current stable release:
 
 Current release candidate:
 
-- [v1.17.0-rc.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.1)
+- [v1.17.0-rc.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.2)
 
 Published assets:
 
@@ -140,7 +140,7 @@ For a fuller architecture breakdown, see [Technical Architecture](docs/technical
 Preferred path:
 
 - download `OpenAGt-Setup-x64.msi`
-- install it
+- install it; the MSI lets you choose the install folder
 - open a **new** terminal
 - run:
 
@@ -161,6 +161,8 @@ Portable path:
 
 Important:
 
+- newer MSI versions upgrade the previous OpenAGt install; rerunning the same version uses Windows repair / maintenance
+- the MSI installs `GETTING_STARTED.txt` and a Start Menu shortcut for basic usage
 - current Windows assets are **not code-signed**
 - Windows SmartScreen may show `Unknown publisher`
 - technical signing workflow is documented separately in [Windows Signing](docs/release/windows-signing.md)

@@ -51,7 +51,7 @@ OpenAGt 当前围绕四个核心方向构建：
 
 当前候选版本：
 
-- [v1.17.0-rc.1](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.1)
+- [v1.17.0-rc.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.2)
 
 发布资产：
 
@@ -90,6 +90,8 @@ OpenAGt 当前后端能力包括：
 | Flutter 前端 | 路线图；先稳定后端契约 |
 
 ## 启动
+
+Windows MSI 安装包会允许选择安装目录；新版本 MSI 会覆盖升级旧版本，同版本重新运行会进入 Windows 修复 / 维护流程。安装完成后会写入 `GETTING_STARTED.txt`，并在开始菜单创建 OpenAGt Getting Started 快捷方式。
 
 从安装包或 portable zip 启动：
 
