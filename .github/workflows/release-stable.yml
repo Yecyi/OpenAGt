@@ -6,11 +6,11 @@ on:
       version:
         description: Stable version to publish
         required: true
-        default: "1.17.0"
+        default: "1.20.0"
       release_kind:
         description: Release kind
         required: true
-        default: "rc"
+        default: "ga"
         type: choice
         options:
           - rc
@@ -44,6 +44,11 @@ jobs:
 
       - name: Verify release baseline
         run: bun run release:verify
+
+      - name: Verify OpenAGt full test gate for GA
+        if: ${{ inputs.release_kind == 'ga' }}
+        working-directory: packages/openagt
+        run: bun test --timeout 30000
 
       - name: Generate release notes
         run: bun run release:notes --version $OPENAGT_VERSION --kind ${{ inputs.release_kind }} --output dist/release-notes.md

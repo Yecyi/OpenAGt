@@ -7,7 +7,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Target | Scope | Gate |
 | --- | --- | --- |
 | `v1.17.0-rc` | Runtime correctness fixes, subagent partial semantics, coordinator validation, permission precedence, release verification hygiene, and current TUI/task visibility improvements. | Typecheck, focused regression tests, full package test with any transient failures documented, and `release:verify`. |
-| `v1.20.0-ga` | Stable audit foundation: server local hardening, WebFetch SSRF guard, TUI ANSI/OSC sanitizer, compaction CAS/circuit breaker, prompt timeout, child-env stripping, prompt cache-control metadata, token estimate improvements, and canonical path checks. | Clean focused security/runtime gate, package test shards, `release:verify`, packaging smoke, checksums, SBOM, and release notes that do not claim deferred Expert Mesh work. |
+| `v1.20.x` | Trustworthy Agent Runtime Foundation: stable local CLI/server/SDK runtime, clear safety boundaries, recoverable long sessions, verifiable assets, and client-consumable diagnostics. | `bun run verify:v1.20`, packaging smoke, checksums, SBOM, and release notes that do not claim deferred Expert Mesh work. |
 
 `v1.17.0-rc` was allowed to ship with documented deferred hardening work. `v1.20.0-ga` is limited to the implemented audit foundation; Expert Registry, Typed Handoffs, Council, Memory v2, and specialist workflow packs remain roadmap items.
 
@@ -36,7 +36,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | --- | --- | --- |
 | Baseline hygiene | implemented for RC | `.claude/` is ignored and removed from the tracked release baseline. Remaining hardening source changes are tracked in this checklist. |
 | Coordinator DAG correctness | implemented | Duplicate ids, dangling dependencies, and cycles are covered by validation. Suitable for `v1.17.0-rc`. |
-| Revise insertion topo safety | needs regression | Validation now catches bad graphs, but a deep revise insertion regression should be added before GA. |
+| Revise insertion topo safety | regression-covered | Deep effort revise gates and checkpoint synthesis are covered by coordinator intent/runtime tests. |
 | Token usage normalization | implemented | Anthropic cache double-count is addressed for task runtime usage. Suitable for RC. |
 | Continue budget velocity floor | partial | Blind default budget growth is blocked. Full progress/evidence velocity floor remains v1.20 work. |
 | Absolute ceiling enforcement | partial | Current work improves budget semantics, but all resource dimensions still need a dedicated enforcement pass. Keep out of RC scope unless a regression appears. |
@@ -48,7 +48,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Coordinator split | deferred | Do not block `v1.17.0-rc`; required for v1.20 maintainability. |
 | Workflow/role coverage | deferred | Public enum/template audit belongs to v1.20 unless a visible workflow is broken. |
 | Runtime efficiency O(n2) fetches | deferred | Not RC-blocking unless full test or real usage shows stalls. |
-| CRLF/Unicode handling | partial | Read/truncate improved; patch/edit round-trip remains v1.20 work. |
+| CRLF/Unicode handling | partial | Read/truncate improved; patch/edit round-trip remains future hardening work. |
 | Permission deny-overrides-allow | implemented | Suitable for RC. |
 | Sandbox process labeling | implemented | Process backend status now calls out process-level enforcement instead of implying OS-native isolation. Full OS-native sandboxing remains roadmap work. |
 | WebFetch redirect SSRF guard | implemented | Redirect hops are checked and private/local/metadata targets are blocked by default. |
@@ -58,8 +58,8 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Prompt timeout / child env stripping | implemented | Prompt steps use local timeout; child processes strip OpenAGt auth-content env values. |
 | Static prompt cache-control / token estimates | implemented | System-prompt zones are marked for cache-control transforms and non-ASCII token estimates are safer. |
 | Path canonicalization | implemented | External-directory grants and path-overlap checks use canonical path comparison. |
-| Storage/event snapshots/indexes | deferred | Scalability work for v1.20. |
-| Personal memory SQL pushdown/wakeup claim | deferred | Scalability/correctness work for v1.20. |
+| Storage/event snapshots/indexes | deferred | Scalability work for a later expert-runtime release line. |
+| Personal memory SQL pushdown/wakeup claim | deferred | Scalability/correctness work for a later expert-runtime release line. |
 
 ## Deferred / Next Pass
 

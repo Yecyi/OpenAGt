@@ -20,6 +20,7 @@
     "release:verify": "bun run script/release-verify.ts",
     "verify:v1.16": "bun run script/v1.16-verify.ts",
     "verify:v1.17": "bun run script/v1.16-verify.ts",
+    "verify:v1.20": "bun run script/v1.20-verify.ts",
     "release:stable": "bun run script/release-stable.ts",
     "typecheck": "bun turbo typecheck",
     "postinstall": "bun run --cwd packages/openagt fix-node-pty",

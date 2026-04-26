@@ -88,5 +88,5 @@ openagt debug bundle --session <id>
 Release maintainers can run the current local release gate with:
 
 ```bash
-bun run release:verify
+bun run verify:v1.20
 ```
