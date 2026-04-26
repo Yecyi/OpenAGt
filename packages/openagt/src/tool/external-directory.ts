@@ -3,8 +3,8 @@ import { Effect } from "effect"
 import { EffectLogger } from "@/effect"
 import { InstanceState } from "@/effect"
 import type * as Tool from "./tool"
-import { Instance } from "../project/instance"
 import { AppFileSystem } from "@openagt/shared/filesystem"
+import { canonicalPath, containsCanonicalPath } from "@/util/path-canonical"
 
 type Kind = "file" | "directory"
 
@@ -23,8 +23,9 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   if (options?.bypass) return
 
   const ins = yield* InstanceState.context
-  const full = process.platform === "win32" ? AppFileSystem.normalizePath(target) : target
-  if (Instance.containsPath(full, ins)) return
+  const full = process.platform === "win32" ? AppFileSystem.normalizePath(canonicalPath(target)) : canonicalPath(target)
+  if (containsCanonicalPath(ins.directory, full)) return
+  if (ins.worktree !== "/" && containsCanonicalPath(ins.worktree, full)) return
 
   const kind = options?.kind ?? "file"
   const dir = kind === "directory" ? full : path.dirname(full)

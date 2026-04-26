@@ -8,6 +8,7 @@
 
 import fs from "fs"
 import path from "path"
+import { Token } from "@/util"
 
 export const DYNAMIC_BOUNDARY_MARKER = "// SYSTEM_PROMPT_DYNAMIC_BOUNDARY"
 
@@ -84,7 +85,7 @@ function setCache(model: string | undefined, agentName: string | undefined, data
 }
 
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4)
+  return Token.estimate(text)
 }
 
 // ============================================================

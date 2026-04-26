@@ -104,7 +104,7 @@ async function killProcessTree(pid: number | undefined, exited?: () => boolean) 
 
 function processBackend(): SandboxBackend {
   return {
-    status: helperStatus("process", process.execPath, true),
+    status: helperStatus("process", process.execPath, true, "Process-level enforcement only; not an OS-native sandbox"),
     run(input) {
       const [cmd, args] = shellArgs(input.request)
       let finished = false

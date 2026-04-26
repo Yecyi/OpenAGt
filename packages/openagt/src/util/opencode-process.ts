@@ -20,7 +20,11 @@ export function ensureProcessMetadata(fallback: OpencodeProcessRole) {
 
 export function sanitizedProcessEnv(overrides?: Record<string, string>) {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    Object.entries(process.env).filter((entry): entry is [string, string] => {
+      if (entry[1] === undefined) return false
+      if (entry[0] === "OPENAGT_AUTH_CONTENT" || entry[0] === "OPENCODE_AUTH_CONTENT") return false
+      return true
+    }),
   )
   return overrides ? Object.assign(env, overrides) : env
 }

@@ -107,19 +107,14 @@ const live: Layer.Layer<
       // TODO: move this to a proper hook
       const isOpenaiOauth = item.id === "openai" && info?.type === "oauth"
 
-      const system: string[] = []
-      system.push(
-        [
-          // use agent prompt otherwise provider prompt
-          ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-          // any custom prompt passed into this call
-          ...input.system,
-          // any custom prompt from last user message
-          ...(input.user.system ? [input.user.system] : []),
-        ]
-          .filter((x) => x)
-          .join("\n"),
-      )
+      const system = [
+        // use agent prompt otherwise provider prompt
+        ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
+        // any custom prompt passed into this call
+        ...input.system,
+        // any custom prompt from last user message
+        ...(input.user.system ? [input.user.system] : []),
+      ].filter((x) => x)
 
       const header = system[0]
       yield* plugin.trigger(
@@ -166,9 +161,14 @@ const live: Layer.Layer<
           ? input.messages
           : [
               ...system.map(
-                (x): ModelMessage => ({
+                (x, index): ModelMessage => ({
                   role: "system",
                   content: x,
+                  providerOptions: {
+                    openagt: {
+                      cacheZone: index <= 1 ? "static" : index === 2 ? "semiStatic" : "dynamic",
+                    },
+                  },
                 }),
               ),
               ...input.messages,

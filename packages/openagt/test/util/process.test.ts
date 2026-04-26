@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
 import { Process } from "../../src/util"
+import { sanitizedProcessEnv } from "../../src/util/opencode-process"
 import { tmpdir } from "../fixture/fixture"
 
 function node(script: string) {
@@ -9,6 +10,17 @@ function node(script: string) {
 }
 
 describe("util.process", () => {
+  test("sanitized process env strips auth content", () => {
+    const previous = process.env.OPENAGT_AUTH_CONTENT
+    process.env.OPENAGT_AUTH_CONTENT = "secret"
+    try {
+      expect(sanitizedProcessEnv().OPENAGT_AUTH_CONTENT).toBeUndefined()
+    } finally {
+      if (previous === undefined) delete process.env.OPENAGT_AUTH_CONTENT
+      else process.env.OPENAGT_AUTH_CONTENT = previous
+    }
+  })
+
   test("captures stdout and stderr", async () => {
     const out = await Process.run(node('process.stdout.write("out");process.stderr.write("err")'))
     expect(out.code).toBe(0)

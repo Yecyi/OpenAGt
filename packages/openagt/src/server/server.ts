@@ -6,7 +6,16 @@ import { Log } from "@/util"
 import { Flag } from "@/flag/flag"
 import { WorkspaceID } from "@/control-plane/schema"
 import { MDNS } from "./mdns"
-import { AuthMiddleware, CompressionMiddleware, CorsMiddleware, ErrorMiddleware, LoggerMiddleware } from "./middleware"
+import {
+  AuthMiddleware,
+  BodyLimitMiddleware,
+  CompressionMiddleware,
+  CorsMiddleware,
+  ErrorMiddleware,
+  JsonDepthMiddleware,
+  LocalOriginMiddleware,
+  LoggerMiddleware,
+} from "./middleware"
 import { FenceMiddleware } from "./fence"
 import { initProjectors } from "./projectors"
 import { InstanceRoutes } from "./routes/instance"
@@ -36,6 +45,9 @@ export const Default = lazy(() => create({}))
 function create(opts: { cors?: string[] }) {
   const app = new Hono()
     .onError(ErrorMiddleware)
+    .use(BodyLimitMiddleware)
+    .use(JsonDepthMiddleware)
+    .use(LocalOriginMiddleware(opts))
     .use(AuthMiddleware)
     .use(LoggerMiddleware)
     .use(CompressionMiddleware)

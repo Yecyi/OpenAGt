@@ -27,6 +27,7 @@ import { BashTool } from "../../tool/bash"
 import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util"
 import { AppRuntime } from "@/effect/app-runtime"
+import { sanitizeTerminalOutput } from "@/util/sanitize-output"
 
 type ToolProps<T> = {
   input: Tool.InferParameters<T>
@@ -58,7 +59,7 @@ function block(info: Inline, output?: string) {
   UI.empty()
   inline(info)
   if (!output?.trim()) return
-  UI.println(output)
+  UI.println(sanitizeTerminalOutput(output))
   UI.empty()
 }
 
@@ -642,7 +643,10 @@ export const RunCommand = cmd({
     if (args.attach) {
       const headers = (() => {
         const password = args.password ?? process.env.OPENAGT_SERVER_PASSWORD ?? process.env.OPENCODE_SERVER_PASSWORD
-        if (!password) return undefined
+        if (!password) {
+          const token = process.env.OPENAGT_SERVER_LOCAL_TOKEN ?? process.env.OPENCODE_SERVER_LOCAL_TOKEN
+          return token ? { Authorization: `Bearer ${token}` } : undefined
+        }
         const username = process.env.OPENAGT_SERVER_USERNAME ?? process.env.OPENCODE_SERVER_USERNAME ?? "openagt"
         const auth = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`
         return { Authorization: auth }
@@ -653,7 +657,10 @@ export const RunCommand = cmd({
 
     await bootstrap(process.cwd(), async () => {
       const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const request = new Request(input, init)
+        const token = process.env.OPENAGT_SERVER_LOCAL_TOKEN ?? process.env.OPENCODE_SERVER_LOCAL_TOKEN
+        const headers = new Headers(init?.headers)
+        if (token && !headers.has("authorization")) headers.set("Authorization", `Bearer ${token}`)
+        const request = new Request(input, { ...init, headers })
         return Server.Default().app.fetch(request)
       }) as typeof globalThis.fetch
       const sdk = createOpencodeClient({ baseUrl: "http://openagt.internal", fetch: fetchFn })

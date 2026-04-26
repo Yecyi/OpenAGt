@@ -73,6 +73,12 @@ When constructing the summary, try to stick to this template:
   skillsTokenBudget: POST_COMPACT_SKILLS_TOKEN_BUDGET,
 }
 
+function truncateWithMarker(text: string, maxChars: number) {
+  const chars = Array.from(text)
+  if (chars.length <= maxChars) return text
+  return `${chars.slice(0, maxChars).join("")}\n... [truncated ${chars.length - maxChars} chars]`
+}
+
 /**
  * Strip image blocks from user messages before sending for compaction.
  * Images are not needed for generating a conversation summary and can
@@ -239,8 +245,8 @@ export function buildCompactContext(
         if (part.state.status !== "completed") continue
 
         const args = part.state.input as Record<string, unknown>
-        const inputStr = JSON.stringify(args).slice(0, 200)
-        const outputStr = part.state.output.slice(0, 500)
+        const inputStr = truncateWithMarker(JSON.stringify(args), 200)
+        const outputStr = truncateWithMarker(part.state.output, 500)
 
         recentTools.push({
           tool: part.tool,
@@ -288,7 +294,7 @@ export function formatCompactPrompt(
 
   if (context.keyFiles.length > 0) {
     parts.push(
-      `RECENTLY READ FILES:\n${context.keyFiles.map((f) => `## ${f.path}\n\`\`\`\n${f.content.slice(0, 2000)}\n\`\`\``).join("\n\n")}\n`,
+      `RECENTLY READ FILES:\n${context.keyFiles.map((f) => `## ${f.path}\n\`\`\`\n${truncateWithMarker(f.content, 2000)}\n\`\`\``).join("\n\n")}\n`,
     )
   }
 

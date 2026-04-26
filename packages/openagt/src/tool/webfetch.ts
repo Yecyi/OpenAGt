@@ -1,6 +1,7 @@
 import z from "zod"
 import { Effect } from "effect"
-import { HttpClient, HttpClientRequest } from "effect/unstable/http"
+import { lookup } from "node:dns/promises"
+import net from "node:net"
 import * as Tool from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
@@ -9,6 +10,7 @@ import { isImageAttachment } from "@/util/media"
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+const MAX_REDIRECTS = 5
 
 const parameters = z.object({
   url: z.string().describe("The URL to fetch content from"),
@@ -22,9 +24,6 @@ const parameters = z.object({
 export const WebFetchTool = Tool.define(
   "webfetch",
   Effect.gen(function* () {
-    const http = yield* HttpClient.HttpClient
-    const httpOk = HttpClient.filterStatusOk(http)
-
     return {
       description: DESCRIPTION,
       parameters,
@@ -71,37 +70,27 @@ export const WebFetchTool = Tool.define(
             "Accept-Language": "en-US,en;q=0.9",
           }
 
-          const request = HttpClientRequest.get(params.url).pipe(HttpClientRequest.setHeaders(headers))
-
-          // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
-          const response = yield* httpOk.execute(request).pipe(
-            Effect.catchIf(
-              (err) =>
-                err.reason._tag === "StatusCodeError" &&
-                err.reason.response.status === 403 &&
-                err.reason.response.headers["cf-mitigated"] === "challenge",
-              () =>
-                httpOk.execute(
-                  HttpClientRequest.get(params.url).pipe(
-                    HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" }),
-                  ),
-                ),
-            ),
-            Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
+          const response = yield* safeFetch(params.url, headers, timeout).pipe(
+            Effect.flatMap((response) => {
+              if (response.status === 403 && response.headers.get("cf-mitigated") === "challenge") {
+                return safeFetch(params.url, { ...headers, "User-Agent": "opencode" }, timeout)
+              }
+              return Effect.succeed(response)
+            }),
           )
 
           // Check content length
-          const contentLength = response.headers["content-length"]
+          const contentLength = response.headers.get("content-length")
           if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
             throw new Error("Response too large (exceeds 5MB limit)")
           }
 
-          const arrayBuffer = yield* response.arrayBuffer
+          const arrayBuffer = yield* Effect.promise(() => response.arrayBuffer())
           if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
             throw new Error("Response too large (exceeds 5MB limit)")
           }
 
-          const contentType = response.headers["content-type"] || ""
+          const contentType = response.headers.get("content-type") || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
           const title = `${params.url} (${contentType})`
 
@@ -153,6 +142,87 @@ export const WebFetchTool = Tool.define(
     }
   }),
 )
+
+function safeFetch(url: string, headers: Record<string, string>, timeout: number) {
+  return Effect.tryPromise({
+    try: async () => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeout)
+      try {
+        let current = new URL(url)
+        for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+          await assertFetchTarget(current, redirect > 0)
+          const response = await fetch(current, {
+            headers,
+            redirect: "manual",
+            signal: controller.signal,
+          })
+          if (!isRedirect(response.status)) {
+            if (response.status < 200 || response.status >= 300) {
+              throw new Error(`Request failed with status ${response.status}`)
+            }
+            return response
+          }
+          const location = response.headers.get("location")
+          if (!location) throw new Error(`Redirect ${response.status} missing Location header`)
+          current = new URL(location, current)
+        }
+        throw new Error(`Too many redirects (>${MAX_REDIRECTS})`)
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+    catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+  })
+}
+
+function isRedirect(status: number) {
+  return status >= 300 && status < 400
+}
+
+async function assertFetchTarget(url: URL, redirected: boolean) {
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Redirect target must use http or https")
+  if (process.env.OPENAGT_ALLOW_PRIVATE_WEBFETCH === "1" || process.env.OPENCODE_ALLOW_PRIVATE_WEBFETCH === "1") return
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  if (host === "metadata.google.internal" || host.endsWith(".metadata.google.internal")) {
+    throw new Error("WebFetch blocked private metadata host")
+  }
+  if (isBlockedAddress(host)) {
+    throw new Error("WebFetch blocked private or local address")
+  }
+  const addresses = await lookup(host, { all: true }).catch(() => [])
+  for (const address of addresses) {
+    if (isBlockedAddress(address.address)) throw new Error("WebFetch blocked private or local address")
+  }
+}
+
+function isBlockedAddress(address: string) {
+  const ipVersion = net.isIP(address)
+  if (ipVersion === 4) return isBlockedIPv4(address)
+  if (ipVersion === 6) return isBlockedIPv6(address)
+  return address === "localhost" || address.endsWith(".localhost")
+}
+
+function isBlockedIPv4(address: string) {
+  const parts = address.split(".").map(Number)
+  const first = parts[0] ?? 0
+  const second = parts[1] ?? 0
+  if (first === 0 || first === 10 || first === 127 || first >= 224) return true
+  if (first === 100 && second >= 64 && second <= 127) return true
+  if (first === 169 && second === 254) return true
+  if (first === 172 && second >= 16 && second <= 31) return true
+  if (first === 192 && second === 168) return true
+  if (first === 198 && (second === 18 || second === 19)) return true
+  return address === "169.254.169.254"
+}
+
+function isBlockedIPv6(address: string) {
+  const lower = address.toLowerCase()
+  if (lower === "::1" || lower === "::") return true
+  if (lower.startsWith("fe80:") || lower.startsWith("fc") || lower.startsWith("fd")) return true
+  if (!lower.startsWith("::ffff:")) return false
+  return isBlockedIPv4(lower.slice("::ffff:".length))
+}
 
 async function extractTextFromHTML(html: string) {
   let text = ""

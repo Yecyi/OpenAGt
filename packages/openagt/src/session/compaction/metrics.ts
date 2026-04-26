@@ -341,6 +341,11 @@ export class PromptCacheMetricsTracker {
   private dynamicBytesTotal = 0
 
   recordStaticHash(hash: string): void {
+    if (this.previousStaticHash === hash) {
+      this.recordCacheHit()
+    } else {
+      this.recordCacheMiss()
+    }
     if (this.previousStaticHash !== null && this.previousStaticHash !== hash) {
       log.warn("prompt static hash changed within session", {
         previous: this.previousStaticHash,

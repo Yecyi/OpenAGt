@@ -98,7 +98,10 @@ Rpc.listen(rpc)
 
 function getAuthorizationHeader(): string | undefined {
   const password = Flag.OPENCODE_SERVER_PASSWORD
-  if (!password) return undefined
+  if (!password) {
+    const token = Flag.OPENAGT_SERVER_LOCAL_TOKEN ?? Flag.OPENCODE_SERVER_LOCAL_TOKEN
+    return token ? `Bearer ${token}` : undefined
+  }
   const username = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
   return `Basic ${btoa(`${username}:${password}`)}`
 }

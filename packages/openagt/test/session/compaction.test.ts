@@ -1212,6 +1212,10 @@ describe("util.token.estimate", () => {
   test("returns 0 for empty string", () => {
     expect(Token.estimate("")).toBe(0)
   })
+
+  test("estimates CJK text closer to one token per character", () => {
+    expect(Token.estimate("深入分析这个项目")).toBeGreaterThan(4)
+  })
 })
 
 describe("SessionNs.getUsage", () => {

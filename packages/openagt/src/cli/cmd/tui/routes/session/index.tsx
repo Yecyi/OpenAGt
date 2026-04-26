@@ -63,7 +63,7 @@ import * as Clipboard from "../../util/clipboard"
 import { Toast, useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv.tsx"
 import * as Editor from "../../util/editor"
-import stripAnsi from "strip-ansi"
+import { sanitizeTerminalOutput } from "@/util/sanitize-output"
 import { usePromptRef } from "../../context/prompt"
 import { useExit } from "../../context/exit"
 import { Filesystem } from "@/util"
@@ -1602,7 +1602,7 @@ function asAnswerGroups(value: unknown): ReadonlyArray<ReadonlyArray<string>> {
 function GenericTool(props: ToolProps<any>) {
   const { theme } = useTheme()
   const ctx = use()
-  const output = createMemo(() => (typeof props.output === "string" ? props.output.trim() : ""))
+  const output = createMemo(() => (typeof props.output === "string" ? sanitizeTerminalOutput(props.output).trim() : ""))
   const [expanded, setExpanded] = createSignal(false)
   const lines = createMemo(() => output().split("\n"))
   const maxLines = 3
@@ -1780,7 +1780,7 @@ function Bash(props: ToolProps<typeof BashTool>) {
   const { theme } = useTheme()
   const sync = useSync()
   const isRunning = createMemo(() => props.part.state.status === "running")
-  const output = createMemo(() => stripAnsi(asString(props.metadata.output)?.trim() ?? ""))
+  const output = createMemo(() => sanitizeTerminalOutput(asString(props.metadata.output)?.trim() ?? ""))
   const [expanded, setExpanded] = createSignal(false)
   const lines = createMemo(() => output().split("\n"))
   const overflow = createMemo(() => lines().length > 10)

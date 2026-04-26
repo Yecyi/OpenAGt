@@ -1,6 +1,6 @@
 # OpenAGt Stable Install
 
-OpenAGt `v1.16.0` stable covers:
+OpenAGt `v1.20.0` stable covers:
 
 - CLI / TUI
 - headless server
@@ -8,7 +8,7 @@ OpenAGt `v1.16.0` stable covers:
 
 Flutter is not part of this release line.
 
-The current candidate line is `v1.17.0-rc.3`, which contains task/subagent visibility, release automation hardening, and an improved Windows installer flow. Treat it as an RC until it is promoted to GA.
+The current stable line is `v1.20.0`, which contains the v1.17 task/subagent baseline plus v1.20 security and runtime hardening for the CLI/server/SDK runtime.
 
 ## Release Assets
 
@@ -88,5 +88,5 @@ openagt debug bundle --session <id>
 Release maintainers can run the current local release gate with:
 
 ```bash
-bun run verify:v1.17
+bun run release:verify
 ```

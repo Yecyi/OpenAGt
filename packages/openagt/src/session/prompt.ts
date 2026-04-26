@@ -1492,6 +1492,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       return configured
     }
 
+    const promptStepTimeoutMs = (agent: Agent.Info, lastUser: MessageV2.User) => {
+      if (lastUser.runtime?.timeoutMs) return lastUser.runtime.timeoutMs
+      if (agent.mode === "subagent") return 10 * 60 * 1000
+      if (lastUser.runtime?.effort === "deep") return 20 * 60 * 1000
+      if (lastUser.runtime?.effort === "high") return 15 * 60 * 1000
+      return 10 * 60 * 1000
+    }
+
     const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
@@ -1695,18 +1703,36 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               ]
               const format = lastUser.format ?? { type: "text" as const }
               if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
-              const result = yield* handle.process({
-                user: lastUser,
-                agent,
-                permission: session.permission,
-                sessionID,
-                parentSessionID: session.parentID,
-                system,
-                messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
-                tools: isLastStep ? {} : tools,
-                model: activeModel,
-                toolChoice: isLastStep ? undefined : format.type === "json_schema" ? "required" : undefined,
-              })
+              const result = yield* handle
+                .process({
+                  user: lastUser,
+                  agent,
+                  permission: session.permission,
+                  sessionID,
+                  parentSessionID: session.parentID,
+                  system,
+                  messages: [
+                    ...modelMsgs,
+                    ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
+                  ],
+                  tools: isLastStep ? {} : tools,
+                  model: activeModel,
+                  toolChoice: isLastStep ? undefined : format.type === "json_schema" ? "required" : undefined,
+                })
+                .pipe(
+                  Effect.timeoutOrElse({
+                    duration: promptStepTimeoutMs(agent, lastUser),
+                    orElse: () =>
+                      Effect.gen(function* () {
+                        handle.message.error = new NamedError.Unknown({
+                          message: `Prompt step timed out after ${promptStepTimeoutMs(agent, lastUser)}ms`,
+                        }).toObject()
+                        handle.message.finish = "error"
+                        yield* sessions.updateMessage(handle.message)
+                        return "stop" as const
+                      }),
+                  }),
+                )
 
               if (structured !== undefined) {
                 handle.message.structured = structured

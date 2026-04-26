@@ -1,4 +1,5 @@
 import path from "path"
+import { comparablePath } from "@/util/path-canonical"
 
 /**
  * Bash commands that operate on paths
@@ -123,8 +124,8 @@ export function extractPathsFromInput(input: Record<string, unknown>): string[] 
 }
 
 export function pathsOverlap(paths1: string[], paths2: string[]): boolean {
-  const normalized1 = paths1.map((p) => path.normalize(p).toLowerCase())
-  const normalized2 = paths2.map((p) => path.normalize(p).toLowerCase())
+  const normalized1 = paths1.map(comparablePath)
+  const normalized2 = paths2.map(comparablePath)
 
   for (const p1 of normalized1) {
     for (const p2 of normalized2) {

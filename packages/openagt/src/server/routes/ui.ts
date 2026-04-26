@@ -4,6 +4,7 @@ import { proxy } from "hono/proxy"
 import { getMimeType } from "hono/utils/mime"
 import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
+import { setLocalServerTokenCookie } from "../middleware"
 
 const embeddedUIPromise = Flag.OPENCODE_DISABLE_EMBEDDED_WEB_UI
   ? Promise.resolve(null)
@@ -51,6 +52,7 @@ export const UIRoutes = (): Hono =>
         c.header("Content-Type", mime)
         if (mime.startsWith("text/html")) {
           c.header("Content-Security-Policy", DEFAULT_CSP)
+          setLocalServerTokenCookie(c)
         }
         return c.body(new Uint8Array(await fs.readFile(match)))
       } else {
@@ -68,6 +70,7 @@ export const UIRoutes = (): Hono =>
         : undefined
       const hash = match ? createHash("sha256").update(match[2]).digest("base64") : ""
       response.headers.set("Content-Security-Policy", csp(hash))
+      if (response.headers.get("content-type")?.includes("text/html")) setLocalServerTokenCookie(c)
       return response
     }
   })

@@ -23,6 +23,7 @@ import { compactionCoordinator, needsCompaction, getRecommendedLayer } from "./c
 import { compressionTracker } from "./compaction/metrics"
 
 const log = Log.create({ service: "session.compaction" })
+const COMPACTION_CIRCUIT_FAILURES = 3
 
 export const Event = {
   Compacted: BusEvent.define(
@@ -81,6 +82,8 @@ export const layer: Layer.Layer<
     const plugin = yield* Plugin.Service
     const processors = yield* SessionProcessor.Service
     const provider = yield* Provider.Service
+    const compactionEpoch = new Map<SessionID, number>()
+    const compactionFailures = new Map<SessionID, number>()
 
     const isOverflow = Effect.fn("SessionCompaction.isOverflow")(function* (input: {
       tokens: MessageV2.Assistant["tokens"]
@@ -205,6 +208,12 @@ export const layer: Layer.Layer<
       auto: boolean
       overflow?: boolean
     }) {
+      if ((compactionFailures.get(input.sessionID) ?? 0) >= COMPACTION_CIRCUIT_FAILURES) {
+        log.error("compaction circuit open", { sessionID: input.sessionID })
+        return "stop"
+      }
+      const epoch = (compactionEpoch.get(input.sessionID) ?? 0) + 1
+      compactionEpoch.set(input.sessionID, epoch)
       const parent = input.messages.findLast((m) => m.info.id === input.parentID)
       if (!parent || parent.info.role !== "user") {
         throw new Error(`Compaction parent must be a user message: ${input.parentID}`)
@@ -305,7 +314,13 @@ export const layer: Layer.Layer<
         toolChoice: "none",
       })
 
+      if (compactionEpoch.get(input.sessionID) !== epoch) {
+        log.warn("compaction epoch superseded", { sessionID: input.sessionID, epoch })
+        return "stop"
+      }
+
       if (result === "compact") {
+        compactionFailures.set(input.sessionID, (compactionFailures.get(input.sessionID) ?? 0) + 1)
         processor.message.error = new MessageV2.ContextOverflowError({
           message: replay
             ? "Conversation history too large to compact - exceeds model context limit"
@@ -398,8 +413,14 @@ export const layer: Layer.Layer<
         }
       }
 
-      if (processor.message.error) return "stop"
-      if (result === "continue") yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
+      if (processor.message.error) {
+        compactionFailures.set(input.sessionID, (compactionFailures.get(input.sessionID) ?? 0) + 1)
+        return "stop"
+      }
+      if (result === "continue") {
+        compactionFailures.delete(input.sessionID)
+        yield* bus.publish(Event.Compacted, { sessionID: input.sessionID })
+      }
       return result
     })
 

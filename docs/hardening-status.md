@@ -7,9 +7,9 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Target | Scope | Gate |
 | --- | --- | --- |
 | `v1.17.0-rc` | Runtime correctness fixes, subagent partial semantics, coordinator validation, permission precedence, release verification hygiene, and current TUI/task visibility improvements. | Typecheck, focused regression tests, full package test with any transient failures documented, and `release:verify`. |
-| `v1.20.0-ga` | Larger architectural hardening: coordinator file split, server local auth, WebFetch SSRF guard, TUI ANSI sanitizer, compaction CAS, storage snapshots/indexes, MCP/provider/LSP scalability, and plugin middleware. | Clean full matrix, packaging smoke, security regression suite, and updated release notes/checksums/SBOM. |
+| `v1.20.0-ga` | Stable audit foundation: server local hardening, WebFetch SSRF guard, TUI ANSI/OSC sanitizer, compaction CAS/circuit breaker, prompt timeout, child-env stripping, prompt cache-control metadata, token estimate improvements, and canonical path checks. | Clean focused security/runtime gate, package test shards, `release:verify`, packaging smoke, checksums, SBOM, and release notes that do not claim deferred Expert Mesh work. |
 
-`v1.17.0-rc` is allowed to ship with documented deferred hardening work. GA should not be declared until the v1.20 security/reliability items are implemented or explicitly risk-accepted.
+`v1.17.0-rc` was allowed to ship with documented deferred hardening work. `v1.20.0-ga` is limited to the implemented audit foundation; Expert Registry, Typed Handoffs, Council, Memory v2, and specialist workflow packs remain roadmap items.
 
 ## Current Pass
 
@@ -50,22 +50,22 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Runtime efficiency O(n2) fetches | deferred | Not RC-blocking unless full test or real usage shows stalls. |
 | CRLF/Unicode handling | partial | Read/truncate improved; patch/edit round-trip remains v1.20 work. |
 | Permission deny-overrides-allow | implemented | Suitable for RC. |
-| Sandbox fail-closed/process labeling | deferred | Important for GA trust; keep as v1.20 security blocker. |
-| WebFetch redirect SSRF guard | deferred | Security blocker for GA, not implemented in RC scope. |
-| TUI ANSI/OSC sanitization | deferred | Security/UX blocker for GA, not implemented in RC scope. |
-| Server body limit/local bearer auth | deferred | Security blocker for GA, not implemented in RC scope. |
-| Compaction CAS/circuit breaker | deferred | Reliability blocker for GA, not implemented in RC scope. |
+| Sandbox process labeling | implemented | Process backend status now calls out process-level enforcement instead of implying OS-native isolation. Full OS-native sandboxing remains roadmap work. |
+| WebFetch redirect SSRF guard | implemented | Redirect hops are checked and private/local/metadata targets are blocked by default. |
+| TUI ANSI/OSC sanitization | implemented | Unsafe control sequences are stripped before TUI render. |
+| Server body limit/local bearer auth | implemented | Body limit, JSON depth guard, local origin check, and optional local bearer/cookie support are implemented. |
+| Compaction CAS/circuit breaker | implemented | Compaction uses epoch checks and hard-stops after repeated failures. |
+| Prompt timeout / child env stripping | implemented | Prompt steps use local timeout; child processes strip OpenAGt auth-content env values. |
+| Static prompt cache-control / token estimates | implemented | System-prompt zones are marked for cache-control transforms and non-ASCII token estimates are safer. |
+| Path canonicalization | implemented | External-directory grants and path-overlap checks use canonical path comparison. |
 | Storage/event snapshots/indexes | deferred | Scalability work for v1.20. |
 | Personal memory SQL pushdown/wakeup claim | deferred | Scalability/correctness work for v1.20. |
 
 ## Deferred / Next Pass
 
-- WebFetch redirect SSRF guard with per-hop public-IP validation.
-- TUI/tool output ANSI/OSC sanitization.
-- Server request body limits, deep JSON guard, and local bearer token enforcement.
-- Compaction epoch/CAS and circuit-breaker hard stop.
-- Static system prompt cache-control and provider tokenizer based estimates.
-- Sandbox fail-closed enforcement and clearer process-sandbox labeling.
-- Path canonicalization/realpath for grants and path overlap.
+- Full OS-native sandbox backend enforcement beyond process-level semantics.
+- Measured cache-control hit-rate benchmark in CI.
+- Full provider tokenizer integration beyond the safer fallback estimator.
 - Provider/MCP/plugin/LSP/bus scalability work.
 - Storage snapshots, event indexes, fsync policy, and personal memory SQL pushdown.
+- Expert Registry, Typed Handoffs, Council, Memory v2, specialist workflow packs, and automation rollback safety.
