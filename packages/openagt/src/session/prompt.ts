@@ -951,6 +951,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       let output = ""
       let aborted = false
+      let started = false
 
       const finish = Effect.uninterruptible(
         Effect.gen(function* () {
@@ -977,6 +978,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       const exit = yield* Effect.gen(function* () {
         const handle = yield* spawner.spawn(cmd)
+        started = true
         yield* Stream.runForEach(Stream.decodeText(handle.all), (chunk) =>
           Effect.sync(() => {
             output += chunk
@@ -999,7 +1001,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         Effect.exit,
       )
 
-      if (Exit.isFailure(exit) && !aborted && !Cause.hasInterruptsOnly(exit.cause)) {
+      if (Exit.isFailure(exit) && !started && !aborted && !Cause.hasInterruptsOnly(exit.cause)) {
         return yield* Effect.failCause(exit.cause)
       }
 

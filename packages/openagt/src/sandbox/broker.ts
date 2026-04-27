@@ -170,11 +170,7 @@ export const layer = Layer.effect(
                 })
               } catch {}
             }
-            if (input.abort?.aborted) {
-              abort()
-            } else if (input.abort) {
-              input.abort.addEventListener("abort", abort, { once: true })
-            }
+            if (input.abort && !input.abort.aborted) input.abort.addEventListener("abort", abort, { once: true })
             pending.set(input.request.request_id, {
               onStdout: input.onStdout,
               onStderr: input.onStderr,
@@ -182,13 +178,17 @@ export const layer = Layer.effect(
                 if (input.abort) input.abort.removeEventListener("abort", abort)
                 resolve(value)
               },
-              reject,
+              reject: (error) => {
+                if (input.abort) input.abort.removeEventListener("abort", abort)
+                reject(error)
+              },
             })
             send({
               type: "exec.start",
               protocol_version: SANDBOX_PROTOCOL_VERSION,
               request: input.request,
             })
+            if (input.abort?.aborted) abort()
           }),
       )
       return result
