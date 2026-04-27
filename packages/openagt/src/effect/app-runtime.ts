@@ -47,7 +47,12 @@ import { Pty } from "@/pty"
 import { Installation } from "@/installation"
 import { Npm } from "@/npm"
 import { Coordinator } from "@/coordinator/coordinator"
+import { ExpertRegistry } from "@/coordinator/expert-registry"
+import { Calibration } from "@/coordinator/calibration"
+import { PromptTemplates } from "@/coordinator/prompt-templates"
 import { PersonalAgent } from "@/personal/personal"
+import { ThreeLayerMemory } from "@/personal/three-layer"
+import { MemoryConsolidator } from "@/personal/consolidator"
 import { memoMap } from "./memo-map"
 
 export const AppLayer = Layer.mergeAll(
@@ -96,8 +101,22 @@ export const AppLayer = Layer.mergeAll(
   Pty.defaultLayer,
   Installation.defaultLayer,
   Coordinator.defaultLayer,
+  ExpertRegistry.defaultLayer,
+  Calibration.defaultLayer,
+  PromptTemplates.defaultLayer,
   PersonalAgent.defaultLayer,
-).pipe(Layer.provideMerge(Observability.layer))
+  ThreeLayerMemory.defaultLayer,
+  MemoryConsolidator.defaultLayer,
+).pipe(
+  // Layer.mergeAll doesn't cross-resolve peer dependencies. Coordinator's
+  // runtime needs ThreeLayerMemory.Service + ExpertRegistry.Service which are
+  // peers in the merge, so we explicitly provide them again to satisfy the R
+  // type. Idempotent: providing a layer that's already in the merge has no
+  // observable effect at runtime.
+  Layer.provide(ThreeLayerMemory.defaultLayer),
+  Layer.provide(ExpertRegistry.defaultLayer),
+  Layer.provideMerge(Observability.layer),
+)
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })
 type Runtime = Pick<typeof rt, "runSync" | "runPromise" | "runPromiseExit" | "runFork" | "runCallback" | "dispose">

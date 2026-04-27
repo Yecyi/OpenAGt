@@ -76,6 +76,12 @@ export const ReviseKind = z.enum([
   "verifier_revise",
   "debugger_revise",
   "final_revise",
+  // MPACR (Multi-Perspective Adversarial Critical Review) stages.
+  "steel_man",
+  "red_team",
+  "defense",
+  "synthesis",
+  "calibration",
 ])
 export type ReviseKind = z.infer<typeof ReviseKind>
 
@@ -130,6 +136,12 @@ export const CoordinatorNodeRole = z.enum([
   "executor",
   "memory-curator",
   "automation-planner",
+  // MPACR (Multi-Perspective Adversarial Critical Review) roles.
+  "steel-manner",
+  "red-team-critic",
+  "defender",
+  "synth-reviser",
+  "calibrator",
 ])
 export type CoordinatorNodeRole = z.infer<typeof CoordinatorNodeRole>
 
@@ -174,6 +186,12 @@ export const EffortProfile = z.object({
   max_revision_per_artifact: z.number().int().min(0).max(8),
   reasoning_effort: z.enum(["low", "medium", "high"]).optional(),
   timeout_multiplier: z.number().min(0.25).max(10),
+  // MPACR (Multi-Perspective Adversarial Critical Review) controls.
+  // Disabled by default to preserve current behavior. Enable explicitly per
+  // effort level via effortProfileFor() once Stream A integration lands.
+  mpacr_enabled: z.boolean().default(false),
+  mpacr_critic_count: z.number().int().min(2).max(6).default(3),
+  mpacr_per_critic_timeout_ms: z.number().int().min(30_000).max(900_000).default(180_000),
 })
 export type EffortProfile = z.infer<typeof EffortProfile>
 
@@ -331,12 +349,19 @@ export const CheckpointMemorySummary = z.object({
 export type CheckpointMemorySummary = z.infer<typeof CheckpointMemorySummary>
 
 export const CriticalReviewVerdict = z.object({
-  verdict: z.enum(["pass", "revise", "retry", "ask_user", "stop"]),
+  verdict: z.enum(["pass", "revise", "retry", "ask_user", "stop", "skipped"]),
   unsupported_claims: z.array(z.string()).default([]),
   missing_evidence: z.array(z.string()).default([]),
   contradictions: z.array(z.string()).default([]),
   required_changes: z.array(z.string()).default([]),
   confidence: ConfidenceLevel.default("medium"),
+  // MPACR fields. Reviewers and revisers must populate evidence_against
+  // alongside evidence_for so feedback is symmetric, not one-sided.
+  evidence_for: z.array(z.string()).default([]),
+  evidence_against: z.array(z.string()).default([]),
+  priors: z.record(z.string(), z.number().min(0).max(1)).default({}),
+  posterior: z.number().min(0).max(1).optional(),
+  brier_score: z.number().min(0).max(1).optional(),
 })
 export type CriticalReviewVerdict = z.infer<typeof CriticalReviewVerdict>
 
@@ -352,6 +377,9 @@ export const defaultEffortProfile = {
   max_revise_nodes: 1,
   max_revision_per_artifact: 1,
   timeout_multiplier: 1,
+  mpacr_enabled: false,
+  mpacr_critic_count: 3,
+  mpacr_per_critic_timeout_ms: 180_000,
 } as const satisfies EffortProfile
 
 export const IntentProfile = z.object({
@@ -403,7 +431,9 @@ export const RevisePoint = z.object({
 export type RevisePoint = z.infer<typeof RevisePoint>
 
 export const MemoryContext = z.object({
-  scopes: z.array(z.enum(["profile", "workspace", "session"])).default(["profile", "workspace"]),
+  scopes: z
+    .array(z.enum(["profile", "workspace", "session", "semantic", "procedural"]))
+    .default(["profile", "workspace"]),
   workflow_tags: z.array(z.string()).default([]),
   expert_tags: z.array(z.string()).default([]),
   note_ids: z.array(z.string()).default([]),
@@ -434,11 +464,18 @@ export const CoordinatorNode = z.object({
   origin: TaskOrigin,
   expert_id: z.string().optional(),
   expert_role: z.string().optional(),
+  prompt_template_id: z.string().optional(),
   workflow: TaskType.optional(),
   artifact_type: z.string().optional(),
   artifact_id: z.string().optional(),
   revision_of: z.string().optional(),
   quality_gate_id: z.string().optional(),
+  mpacr_role: z.enum(["steel_man", "critic", "defender", "synthesis", "calibrator"]).optional(),
+  mpacr_perspective: z.string().optional(),
+  mpacr_quorum: z.number().int().min(1).optional(),
+  mpacr_critic_node_ids: z.array(z.string()).optional(),
+  mpacr_per_critic_timeout_ms: z.number().int().min(1).optional(),
+  mpacr_degraded: z.boolean().optional(),
   memory_namespace: z.string().optional(),
   confidence: ConfidenceLevel.optional(),
   revise_policy: RevisePolicy.optional(),

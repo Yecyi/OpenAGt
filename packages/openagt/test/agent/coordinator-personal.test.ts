@@ -4,8 +4,10 @@ import { Agent } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config"
 import { Coordinator } from "../../src/coordinator/coordinator"
+import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { PersonalAgent } from "../../src/personal/personal"
+import { ThreeLayerMemory } from "../../src/personal/three-layer"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { TaskRuntime } from "../../src/session/task-runtime"
@@ -26,7 +28,9 @@ const it = testEffect(
     TaskRuntime.defaultLayer,
     Coordinator.defaultLayer,
     PersonalAgent.defaultLayer,
-  ),
+    ThreeLayerMemory.defaultLayer,
+    ExpertRegistry.defaultLayer,
+  ).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer)),
 )
 
 describe("coordinator runtime", () => {

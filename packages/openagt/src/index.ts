@@ -28,6 +28,10 @@ import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
+import { ExpertsCommand } from "./cli/cmd/experts"
+import { CalCommand } from "./cli/cmd/cal"
+import { PromptCommand } from "./cli/cmd/prompt"
+import { MemCommand } from "./cli/cmd/mem"
 import { MissionCommand } from "./cli/cmd/mission"
 import path from "path"
 import { Global } from "./global"
@@ -183,6 +187,10 @@ const cli = yargs(args)
   .command(SessionCommand)
   .command(PluginCommand)
   .command(DbCommand)
+  .command(ExpertsCommand)
+  .command(CalCommand)
+  .command(PromptCommand)
+  .command(MemCommand)
   .command(MissionCommand)
   .fail((msg, err) => {
     if (
@@ -231,6 +239,10 @@ try {
       "session",
       "plug",
       "db",
+      "experts",
+      "cal",
+      "prompt",
+      "mem",
       "mission",
       "completion",
       "help",

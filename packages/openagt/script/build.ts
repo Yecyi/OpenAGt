@@ -47,6 +47,21 @@ const migrations = await Promise.all(
 )
 console.log(`Loaded ${migrations.length} migrations`)
 
+const promptTemplateDir = path.join(dir, "src", "coordinator", "prompts")
+const promptTemplates: Record<string, string> = {}
+if (await Bun.file(promptTemplateDir).exists()) {
+  for (const role of await fs.promises.readdir(promptTemplateDir, { withFileTypes: true })) {
+    if (!role.isDirectory()) continue
+    for (const file of await fs.promises.readdir(path.join(promptTemplateDir, role.name), { withFileTypes: true })) {
+      if (!file.isFile() || !file.name.endsWith(".md")) continue
+      promptTemplates[`${role.name}/${file.name}`] = await Bun.file(
+        path.join(promptTemplateDir, role.name, file.name),
+      ).text()
+    }
+  }
+}
+console.log(`Loaded ${Object.keys(promptTemplates).length} prompt templates`)
+
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
@@ -296,6 +311,7 @@ for (const item of targets) {
       OPENAGT_VERSION: `'${Script.version}'`,
       OPENCODE_VERSION: `'${Script.version}'`,
       OPENCODE_MIGRATIONS: JSON.stringify(migrations),
+      OPENAGT_PROMPT_TEMPLATES: JSON.stringify(promptTemplates),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENAGT_CHANNEL: `'${Script.channel}'`,
