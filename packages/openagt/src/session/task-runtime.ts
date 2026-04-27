@@ -276,6 +276,7 @@ export interface Interface {
     taskID: SessionID
     parentSessionID: SessionID
     error: string
+    metadata?: Record<string, unknown>
   }) => Effect.Effect<TaskRecord, Error>
   readonly cancel: (input: {
     taskID: SessionID
@@ -515,6 +516,10 @@ export const layer = Layer.effect(
         draft.status = "failed"
         draft.finished_at = Date.now()
         draft.error_summary = input.error.slice(0, 400)
+        draft.metadata = {
+          ...(draft.metadata ?? {}),
+          ...(input.metadata ?? {}),
+        }
       })
     })
 

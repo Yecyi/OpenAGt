@@ -128,7 +128,7 @@ const cli = yargs(args)
       run_id: processMetadata.runID,
     })
 
-    const marker = Database.Path
+    const marker = path.join(Global.Path.data, "storage", "sqlite-migration")
     if (!(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
@@ -162,6 +162,7 @@ const cli = yargs(args)
           process.stderr.write(`sqlite-migration:done${EOL}`)
         }
       }
+      await Filesystem.write(marker, String(Date.now()))
       process.stderr.write("Database migration complete." + EOL)
     }
   })

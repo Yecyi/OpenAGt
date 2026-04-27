@@ -400,10 +400,53 @@ describe("MemoryConsolidator runOnce integration", () => {
         const metadata = archived?.metadata as Record<string, unknown> | undefined
 
         expect(before.some((item) => item.note_id === fact.note_id)).toBe(true)
-        expect(report.decayed).toBe(1)
+        expect(report.decayed).toBeGreaterThanOrEqual(1)
         expect(after.some((item) => item.note_id === fact.note_id)).toBe(false)
         expect(metadata?.decay_action).toBe("delete")
         expect(metadata?.deleted).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("keep decay advances the update timestamp so repeated runs do not compound age", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const personal = yield* PersonalAgent.Service
+        const threeLayer = yield* ThreeLayerMemory.Service
+        const consolidator = yield* MemoryConsolidatorService
+        const fact = yield* threeLayer.recordSemanticFact({
+          domain: "coding",
+          subject: "StableAPI",
+          predicate: "is",
+          object: "supported",
+          confidence: 0.9,
+          source_note_ids: ["old_note"],
+          rehearsal_count: 0,
+        })
+        const old = Date.now() - 24 * 60 * 60 * 1000
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(PersonalMemoryNoteTable)
+              .set({ time_updated: old, importance: 8 })
+              .where(eq(PersonalMemoryNoteTable.id, MemoryNoteID.zod.parse(fact.note_id)))
+              .run(),
+          ),
+        )
+
+        const report = yield* consolidator.runOnce({
+          replay_window_hours: 1,
+          decay_half_life_days: 30,
+          importance_demote_threshold: 1,
+          importance_delete_threshold: 0.1,
+        })
+        const after = (yield* personal.listMemory({ scope: "semantic" })).find((note) => note.id === fact.note_id)
+        const metadata = after?.metadata as Record<string, unknown> | undefined
+
+        expect(report.decayed).toBeGreaterThanOrEqual(1)
+        expect(after?.time.updated).toBeGreaterThan(old)
+        expect(metadata?.decay_action).toBe("keep")
+        expect(metadata?.decayed_at).toBe(after?.time.updated)
       }),
     ),
   )

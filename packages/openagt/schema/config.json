@@ -83,6 +83,14 @@
         "additionalProperties": false
       }
     },
+    "expert": {
+      "description": "Coordinator expert role definitions (loaded from .opencode/experts/*.md)",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
     "skills": {
       "description": "Additional skill folder paths",
       "type": "object",

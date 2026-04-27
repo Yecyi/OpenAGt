@@ -115,6 +115,8 @@ export const AppLayer = Layer.mergeAll(
   // observable effect at runtime.
   Layer.provide(ThreeLayerMemory.defaultLayer),
   Layer.provide(ExpertRegistry.defaultLayer),
+  Layer.provide(Calibration.defaultLayer),
+  Layer.provide(PromptTemplates.defaultLayer),
   Layer.provideMerge(Observability.layer),
 )
 

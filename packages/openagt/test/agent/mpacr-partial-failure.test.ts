@@ -6,6 +6,8 @@ import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import { shouldUseDegradedMpacr } from "../../src/coordinator/coordinator"
 import { buildDebate, buildDegraded, computeQuorum } from "../../src/coordinator/mpacr"
 import { skippedVerdict } from "../../src/coordinator/mpacr-validation"
+import { PromptOutcomeTable } from "../../src/coordinator/prompt-outcome.sql"
+import { PromptTemplates } from "../../src/coordinator/prompt-templates"
 import { Config } from "../../src/config"
 import { CoordinatorNode, EffortProfile } from "../../src/coordinator/schema"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
@@ -14,6 +16,7 @@ import { ThreeLayerMemory } from "../../src/personal/three-layer"
 import { Session } from "../../src/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { TaskRuntime } from "../../src/session/task-runtime"
+import { Database } from "../../src/storage"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -30,6 +33,7 @@ const coordinatorLayer = Layer.mergeAll(
 ).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer))
 
 const it = testEffect(coordinatorLayer)
+const promptTemplateIt = testEffect(coordinatorLayer.pipe(Layer.provide(PromptTemplates.defaultLayer)))
 
 function sessionPromptLayer(prompt: SessionPrompt.Interface["prompt"]) {
   return Layer.succeed(
@@ -45,10 +49,70 @@ function sessionPromptLayer(prompt: SessionPrompt.Interface["prompt"]) {
   )
 }
 
+function assistantText(text: string) {
+  return {
+    info: {
+      id: `msg_test_${Math.random().toString(36).slice(2)}`,
+      role: "assistant",
+      parentID: "msg_parent",
+      sessionID: "ses_test",
+      mode: "test",
+      agent: "general",
+      cost: 0,
+      path: { cwd: "/", root: "/" },
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      modelID: "test-model",
+      providerID: "test-provider",
+      time: { created: Date.now() },
+    },
+    parts: [{ type: "text", text }],
+  } as never
+}
+
+function promptInputText(input: Parameters<SessionPrompt.Interface["prompt"]>[0]) {
+  return input.parts
+    .filter((part): part is Extract<(typeof input.parts)[number], { type: "text" }> => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+}
+
 const promptFailureIt = testEffect(
   Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.die(new Error("critic exploded")))),
 )
 const promptTimeoutIt = testEffect(Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.never)))
+const quorumPromptCalls: string[] = []
+const promptQuorumIt = testEffect(
+  Layer.mergeAll(
+    coordinatorLayer,
+    sessionPromptLayer((input) => {
+      const text = promptInputText(input)
+      quorumPromptCalls.push(text)
+      if (text.startsWith("Critique the artifact.")) return Effect.die(new Error("critic unavailable"))
+      return Effect.succeed(
+        assistantText(
+          JSON.stringify({
+            verdict: "pass",
+            confidence: "medium",
+            evidence_for: ["stub evidence"],
+            evidence_against: ["stub counter-evidence"],
+          }),
+        ),
+      )
+    }),
+  ),
+)
+const promptValidationIt = testEffect(
+  Layer.mergeAll(
+    coordinatorLayer,
+    sessionPromptLayer(() => Effect.succeed(assistantText(JSON.stringify({ verdict: "pass" })))),
+  ),
+)
+const promptTelemetryIt = testEffect(
+  Layer.mergeAll(
+    coordinatorLayer.pipe(Layer.provide(PromptTemplates.defaultLayer)),
+    sessionPromptLayer(() => Effect.succeed(assistantText("planner completed"))),
+  ),
+)
 
 function mpacrCriticNode(input: { id: string; timeoutMs?: number }) {
   return {
@@ -72,6 +136,29 @@ function mpacrCriticNode(input: { id: string; timeoutMs?: number }) {
   }
 }
 
+function mpacrSynthesisNode(input: { id: string; dependsOn: string[]; criticIDs: string[]; quorum: number }) {
+  return {
+    id: input.id,
+    description: "MPACR synthesis",
+    prompt: "Synthesize the debate.",
+    task_kind: "verify" as const,
+    subagent_type: "general",
+    role: "synth-reviser" as const,
+    risk: "low" as const,
+    depends_on: input.dependsOn,
+    write_scope: [],
+    read_scope: ["src"],
+    acceptance_checks: ["Synthesis verdict recorded"],
+    output_schema: "revise" as const,
+    requires_user_input: false,
+    priority: "normal" as const,
+    origin: "coordinator" as const,
+    mpacr_role: "synthesis" as const,
+    mpacr_quorum: input.quorum,
+    mpacr_critic_node_ids: input.criticIDs,
+  }
+}
+
 function waitForNodeStatus(input: {
   tasks: TaskRuntime.Interface
   parentSessionID: Session.Info["id"]
@@ -79,14 +166,30 @@ function waitForNodeStatus(input: {
   status: TaskRuntime.TaskStatus
 }) {
   return Effect.gen(function* () {
-    for (const _ of Array.from({ length: 40 })) {
+    for (const _ of Array.from({ length: 150 })) {
       const record = (yield* input.tasks.list(input.parentSessionID)).find(
         (item) => item.metadata?.coordinator_node_id === input.nodeID,
       )
       if (record?.status === input.status) return record
       yield* Effect.sleep("20 millis")
     }
-    throw new Error(`Timed out waiting for ${input.nodeID} to become ${input.status}`)
+    const final = (yield* input.tasks.list(input.parentSessionID))
+      .map((item) =>
+        `${String(item.metadata?.coordinator_node_id ?? item.task_id)}:${item.status}:${item.error_summary ?? ""}`,
+      )
+      .join(", ")
+    throw new Error(`Timed out waiting for ${input.nodeID} to become ${input.status}; tasks=${final}`)
+  })
+}
+
+function waitForPromptOutcomes() {
+  return Effect.gen(function* () {
+    for (const _ of Array.from({ length: 50 })) {
+      const outcomes = yield* Effect.sync(() => Database.use((db) => db.select().from(PromptOutcomeTable).all()))
+      if (outcomes.length > 0) return outcomes
+      yield* Effect.sleep("20 millis")
+    }
+    throw new Error("Timed out waiting for prompt outcome telemetry")
   })
 }
 
@@ -246,6 +349,126 @@ describe("Synthesis prompt instructs the model to handle skipped verdicts", () =
   })
 })
 
+describe("Prompt template runtime rendering", () => {
+  promptTemplateIt.live("coordinator stores rendered prompt text for selected templates", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Prompt template render parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Render actual prompt context",
+          mode: "assisted",
+          approved: false,
+          effort: "low",
+          workflow: "coding",
+          nodes: [
+            {
+              id: "planning_template",
+              description: "Planning template",
+              prompt: [
+                "Create or refine the execution plan for this mission.",
+                "",
+                "Goal: Render actual prompt context",
+                "Workflow: coding",
+                "Effort: low",
+                "",
+                "Return summary, assumptions, missing context, risks, confidence, and next step.",
+              ].join("\n"),
+              task_kind: "generic" as const,
+              subagent_type: "general",
+              role: "planner" as const,
+              risk: "low" as const,
+              depends_on: [],
+              write_scope: [],
+              read_scope: [],
+              acceptance_checks: ["Plan rendered"],
+              output_schema: "plan" as const,
+              requires_user_input: false,
+              priority: "normal" as const,
+              origin: "coordinator" as const,
+              expert_role: "planner",
+              workflow: "coding" as const,
+            },
+          ],
+        })
+
+        const rendered = (yield* tasks.list(parent.id)).find(
+          (task) => task.metadata?.coordinator_node_id === "planning_template",
+        )
+
+        expect(rendered?.metadata?.prompt_template_role).toBe("planner")
+        expect(rendered?.metadata?.prompt).toContain("Goal: Render actual prompt context")
+        expect(rendered?.metadata?.prompt).not.toContain("{{goal}}")
+        expect(rendered?.metadata?.prompt).not.toContain("{{workflow}}")
+      }),
+    ),
+  )
+
+  promptTelemetryIt.live("prompt outcome duration is recorded from the completed task", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Prompt telemetry parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Record prompt telemetry duration",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          workflow: "coding",
+          nodes: [
+            {
+              id: "planning_telemetry",
+              description: "Planning telemetry",
+              prompt: [
+                "Create or refine the execution plan for this mission.",
+                "",
+                "Goal: Record prompt telemetry duration",
+                "Workflow: coding",
+                "Effort: low",
+                "",
+                "Return summary, assumptions, missing context, risks, confidence, and next step.",
+              ].join("\n"),
+              task_kind: "generic" as const,
+              subagent_type: "general",
+              role: "planner" as const,
+              risk: "low" as const,
+              depends_on: [],
+              write_scope: [],
+              read_scope: [],
+              acceptance_checks: ["Telemetry recorded"],
+              output_schema: "plan" as const,
+              requires_user_input: false,
+              priority: "normal" as const,
+              origin: "coordinator" as const,
+              expert_role: "planner",
+              workflow: "coding" as const,
+            },
+          ],
+        })
+
+        yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "planning_telemetry",
+          status: "completed",
+        })
+        const outcomes = yield* waitForPromptOutcomes()
+
+        expect(outcomes.length).toBeGreaterThan(0)
+        expect(outcomes[0]?.duration_ms).toBeGreaterThanOrEqual(0)
+      }),
+    ),
+  )
+})
+
 describe("MPACR skipped critic runtime contract", () => {
   it.live("coordinator completes MPACR critic as skipped when executor is unavailable", () =>
     provideTmpdirInstance(() =>
@@ -387,6 +610,93 @@ describe("MPACR skipped critic runtime contract", () => {
 
         expect(yield* tasks.canRun({ parentSessionID: parent.id, task: defender })).toBe(true)
         expect(completed._tag === "Some" ? completed.value.metadata?.mpacr_skipped : undefined).toBe(true)
+      }),
+    ),
+  )
+
+  promptQuorumIt.live("synthesis enforces quorum before accepting model output", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        quorumPromptCalls.length = 0
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR quorum parent" })
+        const criticIDs = ["critic_a", "critic_b"]
+
+        const run = yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review quorum enforcement",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          budget: "large",
+          maxSubagents: 10,
+          maxRounds: 10,
+          nodes: [
+            ...criticIDs.map((id) => mpacrCriticNode({ id })),
+            mpacrSynthesisNode({
+              id: "synthesis",
+              dependsOn: criticIDs,
+              criticIDs,
+              quorum: 2,
+            }),
+          ],
+        })
+
+        yield* Effect.forEach(criticIDs, (nodeID) =>
+          waitForNodeStatus({
+            tasks,
+            parentSessionID: parent.id,
+            nodeID,
+            status: "completed",
+          }),
+        )
+        yield* coordinator.dispatch(run.id)
+
+        const synthesis = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "synthesis",
+          status: "failed",
+        })
+
+        expect(synthesis.metadata?.mpacr_quorum_escalated).toBe(true)
+        expect(synthesis.metadata?.mpacr_quorum_required).toBe(2)
+        expect(synthesis.metadata?.mpacr_quorum_substantive_count).toBe(0)
+        expect(synthesis.metadata?.review_text).toContain('"verdict":"ask_user"')
+        expect(quorumPromptCalls.some((text) => text.startsWith("Synthesize the debate."))).toBe(false)
+      }),
+    ),
+  )
+
+  promptValidationIt.live("validated MPACR critic verdict is persisted instead of raw malformed output", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR validation persistence parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review validation persistence",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          nodes: [mpacrCriticNode({ id: "critic_validation" })],
+        })
+
+        const completed = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "critic_validation",
+          status: "completed",
+        })
+
+        expect(completed.metadata?.review_text).toContain("validator note")
+        expect(completed.metadata?.result_text).toContain("validator note")
+        expect(completed.metadata?.mpacr_validated).toBe(true)
       }),
     ),
   )

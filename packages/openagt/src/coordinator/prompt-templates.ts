@@ -59,6 +59,7 @@ export interface Interface {
   readonly forRole: (role: string) => Effect.Effect<readonly PromptTemplate[]>
   readonly pickVariant: (
     ctx: PickContext,
+    vars?: PromptVars,
     fallback?: () => string,
   ) => Effect.Effect<{ template: PromptTemplate | undefined; rendered: string }>
   readonly render: (template: PromptTemplate, vars: PromptVars) => string
@@ -84,19 +85,19 @@ export function renderTemplate(template: string, vars: PromptVars): string {
 // metadata record. Errors are logged but not thrown so a single bad file does
 // not poison the whole registry.
 function parseTemplate(role: string, raw: string): PromptTemplate | undefined {
-  const fm = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(raw)
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(raw)
   if (!fm) {
     log.warn("template missing frontmatter — treating whole file as default variant body", { role })
     return {
       role,
       variant: "default",
       weight: 1,
-      content: raw.trim(),
+      content: raw.trim().replace(/\r\n/g, "\n"),
       metadata: {},
     }
   }
   const meta: Record<string, unknown> = {}
-  for (const line of fm[1]!.split("\n")) {
+  for (const line of fm[1]!.split(/\r?\n/)) {
     const m = /^(\w+)\s*:\s*(.*?)\s*$/.exec(line)
     if (!m) continue
     const key = m[1]!
@@ -111,7 +112,7 @@ function parseTemplate(role: string, raw: string): PromptTemplate | undefined {
     role,
     variant: typeof meta.variant === "string" ? (meta.variant as string) : "default",
     weight: typeof meta.weight === "number" ? (meta.weight as number) : 1,
-    content: fm[2]!.trim(),
+    content: fm[2]!.trim().replace(/\r\n/g, "\n"),
     metadata: meta,
   }
 }
@@ -354,11 +355,11 @@ export const layer = Layer.effect(
         }
       })
 
-    const pickVariant: Interface["pickVariant"] = (ctx, fallback) =>
+    const pickVariant: Interface["pickVariant"] = (ctx, vars, fallback) =>
       Effect.gen(function* () {
         const history = yield* historyForRole(ctx.role)
         const template = pickVariantFromMap(cache, ctx, history)
-        if (template) return { template, rendered: template.content }
+        if (template) return { template, rendered: renderTemplate(template.content, vars ?? {}) }
         const fallbackText = fallback ? fallback() : ""
         return { template: undefined, rendered: fallbackText }
       })

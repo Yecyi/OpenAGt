@@ -239,7 +239,7 @@
     },
     "packages/openagt": {
       "name": "openagt",
-      "version": "1.20.0",
+      "version": "1.20.1",
       "bin": {
         "openagt": "./bin/openagt",
         "opencode": "./bin/opencode",

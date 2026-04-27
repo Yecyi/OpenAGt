@@ -413,7 +413,6 @@ export const layer = Layer.effect(
           const action = classifyDecayAction(newImportance, config)
           const importance = Math.max(0, Math.min(10, Math.round(newImportance)))
           if (action === "keep") {
-            if (importance === note.importance) continue
             yield* Effect.sync(() =>
               Database.use((db) =>
                 db
@@ -423,13 +422,16 @@ export const layer = Layer.effect(
                       ...(meta ?? {}),
                       decay_action: "keep",
                       decay_importance: newImportance,
+                      decayed_at: now,
                     },
                     importance,
+                    time_updated: now,
                   })
                   .where(eq(PersonalMemoryNoteTable.id, note.id))
                   .run(),
               ),
             )
+            decayed++
             writes++
             if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
             continue
