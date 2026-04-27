@@ -503,7 +503,7 @@ export const layer: Layer.Layer<
 
         yield* Effect.forEach(
           Object.values(ctx.toolcalls),
-          (call) => Deferred.await(call.done).pipe(Effect.timeout("2500 millis"), Effect.ignore),
+          (call) => Deferred.await(call.done).pipe(Effect.timeout("5 seconds"), Effect.ignore),
           { concurrency: "unbounded" },
         )
 

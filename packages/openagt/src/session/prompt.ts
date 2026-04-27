@@ -999,7 +999,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         Effect.exit,
       )
 
-      if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
+      if (Exit.isFailure(exit) && !aborted && !Cause.hasInterruptsOnly(exit.cause)) {
         return yield* Effect.failCause(exit.cause)
       }
 

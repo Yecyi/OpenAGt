@@ -80,7 +80,7 @@ function shellArgs(request: SandboxExecRequest) {
   return ["/bin/sh", ["-c", request.command]] as const
 }
 
-async function killProcessTree(pid: number | undefined, exited?: () => boolean) {
+async function killProcessTree(pid: number | undefined, exited?: () => boolean, graceMs = 2000) {
   if (!pid || exited?.()) return
   if (process.platform === "win32") {
     await new Promise<void>((resolve) => {
@@ -93,13 +93,20 @@ async function killProcessTree(pid: number | undefined, exited?: () => boolean) 
     })
     return
   }
-  try {
-    process.kill(-pid, "SIGTERM")
-  } catch {
+  const signal = (value: NodeJS.Signals) => {
     try {
-      process.kill(pid, "SIGTERM")
-    } catch {}
+      process.kill(-pid, value)
+      return
+    } catch {
+      try {
+        process.kill(pid, value)
+      } catch {}
+    }
   }
+  signal("SIGTERM")
+  setTimeout(() => {
+    if (!exited?.()) signal("SIGKILL")
+  }, graceMs)
 }
 
 function processBackend(): SandboxBackend {
@@ -126,6 +133,7 @@ function processBackend(): SandboxBackend {
         stderr: "pipe",
         stdout: "pipe",
         stdin: "ignore",
+        detached: process.platform !== "win32",
       })
       const timer = setTimeout(() => {
         terminationReason = "timeout"
