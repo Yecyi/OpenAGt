@@ -261,6 +261,7 @@ export interface Interface {
     parentSessionID: SessionID
     result?: MessageV2.WithParts
     output?: string
+    metadata?: Record<string, unknown>
   }) => Effect.Effect<TaskRecord, Error>
   readonly partial: (input: {
     taskID: SessionID
@@ -457,6 +458,7 @@ export const layer = Layer.effect(
         draft.error_summary = undefined
         draft.metadata = {
           ...(draft.metadata ?? {}),
+          ...(input.metadata ?? {}),
           result_text: fullMessageText(text),
         }
         if (draft.metadata?.output_schema === "revise" || draft.metadata?.role === "reviser") {

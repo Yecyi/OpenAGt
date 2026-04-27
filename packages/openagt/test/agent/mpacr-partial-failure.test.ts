@@ -1,7 +1,94 @@
 import { describe, expect, test } from "bun:test"
+import { Effect, Layer } from "effect"
+import { Bus } from "../../src/bus"
+import { Coordinator } from "../../src/coordinator/coordinator"
+import { ExpertRegistry } from "../../src/coordinator/expert-registry"
+import { shouldUseDegradedMpacr } from "../../src/coordinator/coordinator"
 import { buildDebate, buildDegraded, computeQuorum } from "../../src/coordinator/mpacr"
 import { skippedVerdict } from "../../src/coordinator/mpacr-validation"
+import { Config } from "../../src/config"
 import { CoordinatorNode, EffortProfile } from "../../src/coordinator/schema"
+import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import { PersonalAgent } from "../../src/personal/personal"
+import { ThreeLayerMemory } from "../../src/personal/three-layer"
+import { Session } from "../../src/session"
+import { SessionPrompt } from "../../src/session/prompt"
+import { TaskRuntime } from "../../src/session/task-runtime"
+import { provideTmpdirInstance } from "../fixture/fixture"
+import { testEffect } from "../lib/effect"
+
+const coordinatorLayer = Layer.mergeAll(
+  Bus.layer,
+  Config.defaultLayer,
+  CrossSpawnSpawner.defaultLayer,
+  Session.defaultLayer,
+  TaskRuntime.defaultLayer,
+  Coordinator.defaultLayer,
+  PersonalAgent.defaultLayer,
+  ThreeLayerMemory.defaultLayer,
+  ExpertRegistry.defaultLayer,
+).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer))
+
+const it = testEffect(coordinatorLayer)
+
+function sessionPromptLayer(prompt: SessionPrompt.Interface["prompt"]) {
+  return Layer.succeed(
+    SessionPrompt.Service,
+    SessionPrompt.Service.of({
+      cancel: () => Effect.void,
+      prompt,
+      loop: () => Effect.die(new Error("not used")),
+      shell: () => Effect.die(new Error("not used")),
+      command: () => Effect.die(new Error("not used")),
+      resolvePromptParts: () => Effect.succeed([]),
+    }),
+  )
+}
+
+const promptFailureIt = testEffect(
+  Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.die(new Error("critic exploded")))),
+)
+const promptTimeoutIt = testEffect(Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.never)))
+
+function mpacrCriticNode(input: { id: string; timeoutMs?: number }) {
+  return {
+    id: input.id,
+    description: "MPACR critic",
+    prompt: "Critique the artifact.",
+    task_kind: "verify" as const,
+    subagent_type: "general",
+    role: "red-team-critic" as const,
+    risk: "low" as const,
+    depends_on: [],
+    write_scope: [],
+    read_scope: ["src"],
+    acceptance_checks: ["Critic verdict recorded"],
+    output_schema: "revise" as const,
+    requires_user_input: false,
+    priority: "normal" as const,
+    origin: "coordinator" as const,
+    mpacr_role: "critic" as const,
+    mpacr_per_critic_timeout_ms: input.timeoutMs ?? 180_000,
+  }
+}
+
+function waitForNodeStatus(input: {
+  tasks: TaskRuntime.Interface
+  parentSessionID: Session.Info["id"]
+  nodeID: string
+  status: TaskRuntime.TaskStatus
+}) {
+  return Effect.gen(function* () {
+    for (const _ of Array.from({ length: 40 })) {
+      const record = (yield* input.tasks.list(input.parentSessionID)).find(
+        (item) => item.metadata?.coordinator_node_id === input.nodeID,
+      )
+      if (record?.status === input.status) return record
+      yield* Effect.sleep("20 millis")
+    }
+    throw new Error(`Timed out waiting for ${input.nodeID} to become ${input.status}`)
+  })
+}
 
 function fakeTarget() {
   return CoordinatorNode.parse({
@@ -93,6 +180,28 @@ describe("MPACR debate carries quorum metadata", () => {
     expect(out.synthesis.prompt).toContain("Quorum required: 1")
   })
 
+  test("budget-constrained MPACR switches to degraded graph", () => {
+    expect(shouldUseDegradedMpacr(profile(3), { budget: "small" })).toBe(true)
+    expect(shouldUseDegradedMpacr(profile(3), { maxSubagents: 6 })).toBe(true)
+    expect(shouldUseDegradedMpacr(profile(3), { budget: "normal", maxSubagents: 7 })).toBe(false)
+  })
+
+  test("critic and synthesis nodes carry runtime quorum metadata", () => {
+    const out = buildDebate({
+      idPrefix: "x",
+      target: fakeTarget(),
+      goal: "g",
+      workflow: "coding",
+      effort: "high",
+      profile: profile(3),
+      dependsOn: [],
+    })
+    expect(out.critics[0]?.mpacr_role).toBe("critic")
+    expect(out.critics[0]?.mpacr_per_critic_timeout_ms).toBe(180_000)
+    expect(out.synthesis.mpacr_quorum).toBe(2)
+    expect(out.synthesis.mpacr_critic_node_ids).toEqual(out.critics.map((item) => item.id))
+  })
+
   test("synthesis acceptance checks include the quorum value for traceability", () => {
     const out = buildDebate({
       idPrefix: "x",
@@ -135,6 +244,152 @@ describe("Synthesis prompt instructs the model to handle skipped verdicts", () =
     expect(out.synthesis.prompt).toContain("ask_user")
     expect(out.synthesis.prompt).toContain("missing perspectives")
   })
+})
+
+describe("MPACR skipped critic runtime contract", () => {
+  it.live("coordinator completes MPACR critic as skipped when executor is unavailable", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR unavailable executor parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review partial failure behavior",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          nodes: [mpacrCriticNode({ id: "critic_unavailable" })],
+        })
+
+        const completed = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "critic_unavailable",
+          status: "completed",
+        })
+
+        expect(completed.metadata?.mpacr_skipped).toBe(true)
+        expect(completed.metadata?.mpacr_skip_reason).toContain("SessionPrompt.Service is not available")
+        expect(completed.metadata?.result_text).toContain('"verdict":"skipped"')
+      }),
+    ),
+  )
+
+  promptFailureIt.live("coordinator converts MPACR critic prompt errors into skipped verdicts", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR prompt failure parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review prompt failure behavior",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          nodes: [mpacrCriticNode({ id: "critic_failure" })],
+        })
+
+        const completed = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "critic_failure",
+          status: "completed",
+        })
+
+        expect(completed.metadata?.mpacr_skipped).toBe(true)
+        expect(completed.metadata?.mpacr_skip_reason).toBe("critic exploded")
+        expect(completed.error_summary).toBeUndefined()
+      }),
+    ),
+  )
+
+  promptTimeoutIt.live("coordinator converts MPACR critic prompt timeouts into skipped verdicts", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR prompt timeout parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review timeout behavior",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          nodes: [mpacrCriticNode({ id: "critic_timeout", timeoutMs: 5 })],
+        })
+
+        const completed = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "critic_timeout",
+          status: "completed",
+        })
+
+        expect(completed.metadata?.mpacr_skipped).toBe(true)
+        expect(completed.metadata?.mpacr_skip_reason).toBe("MPACR critic timed out after 5ms")
+        expect(completed.error_summary).toBeUndefined()
+      }),
+    ),
+  )
+
+  it.live("synthetic skipped critic completion unblocks defender dependencies", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR skipped critic parent" })
+        const steel = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_mpacr_steel" as never,
+          taskKind: "verify",
+          subagentType: "general",
+          description: "steel",
+          prompt: "steel",
+          dependsOn: [],
+        })
+        const critic = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_mpacr_critic" as never,
+          taskKind: "verify",
+          subagentType: "general",
+          description: "critic",
+          prompt: "critic",
+          dependsOn: [steel.task_id],
+          metadata: { output_schema: "revise", role: "red-team-critic", mpacr_role: "critic" },
+        })
+        const defender = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_mpacr_defender" as never,
+          taskKind: "verify",
+          subagentType: "general",
+          description: "defender",
+          prompt: "defender",
+          dependsOn: [steel.task_id, critic.task_id],
+        })
+
+        yield* tasks.complete({ taskID: steel.task_id, parentSessionID: parent.id, output: "steel complete" })
+        expect(yield* tasks.canRun({ parentSessionID: parent.id, task: defender })).toBe(false)
+        yield* tasks.complete({
+          taskID: critic.task_id,
+          parentSessionID: parent.id,
+          output: JSON.stringify(skippedVerdict("critic timed out")),
+          metadata: { mpacr_skipped: true, mpacr_skip_reason: "critic timed out" },
+        })
+        const completed = yield* tasks.get({ taskID: critic.task_id, parentSessionID: parent.id })
+
+        expect(yield* tasks.canRun({ parentSessionID: parent.id, task: defender })).toBe(true)
+        expect(completed._tag === "Some" ? completed.value.metadata?.mpacr_skipped : undefined).toBe(true)
+      }),
+    ),
+  )
 })
 
 describe("skippedVerdict round-trip integration", () => {

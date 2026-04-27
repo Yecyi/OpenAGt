@@ -431,7 +431,9 @@ export const RevisePoint = z.object({
 export type RevisePoint = z.infer<typeof RevisePoint>
 
 export const MemoryContext = z.object({
-  scopes: z.array(z.enum(["profile", "workspace", "session"])).default(["profile", "workspace"]),
+  scopes: z
+    .array(z.enum(["profile", "workspace", "session", "semantic", "procedural"]))
+    .default(["profile", "workspace"]),
   workflow_tags: z.array(z.string()).default([]),
   expert_tags: z.array(z.string()).default([]),
   note_ids: z.array(z.string()).default([]),
@@ -462,11 +464,18 @@ export const CoordinatorNode = z.object({
   origin: TaskOrigin,
   expert_id: z.string().optional(),
   expert_role: z.string().optional(),
+  prompt_template_id: z.string().optional(),
   workflow: TaskType.optional(),
   artifact_type: z.string().optional(),
   artifact_id: z.string().optional(),
   revision_of: z.string().optional(),
   quality_gate_id: z.string().optional(),
+  mpacr_role: z.enum(["steel_man", "critic", "defender", "synthesis", "calibrator"]).optional(),
+  mpacr_perspective: z.string().optional(),
+  mpacr_quorum: z.number().int().min(1).optional(),
+  mpacr_critic_node_ids: z.array(z.string()).optional(),
+  mpacr_per_critic_timeout_ms: z.number().int().min(1).optional(),
+  mpacr_degraded: z.boolean().optional(),
   memory_namespace: z.string().optional(),
   confidence: ConfidenceLevel.optional(),
   revise_policy: RevisePolicy.optional(),

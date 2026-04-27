@@ -1,14 +1,38 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { Effect, Layer } from "effect"
+import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import {
   classifyDecayAction,
   DEFAULT_CONFIG,
   extractCandidateTriples,
   filterPatterns,
   groupTriples,
+  defaultLayer as memoryConsolidatorLayer,
   scoreDecay,
   scorePatternConfidence,
+  Service as MemoryConsolidatorService,
 } from "../../src/personal/consolidator"
-import { MemoryNote } from "../../src/personal/schema"
+import { PersonalAgent } from "../../src/personal/personal"
+import { PersonalMemoryNoteTable } from "../../src/personal/personal.sql"
+import { MemoryNote, MemoryNoteID } from "../../src/personal/schema"
+import { ThreeLayerMemory } from "../../src/personal/three-layer"
+import { Instance } from "../../src/project/instance"
+import { Database, eq } from "../../src/storage"
+import { provideTmpdirInstance } from "../fixture/fixture"
+import { testEffect } from "../lib/effect"
+
+afterEach(async () => {
+  await Instance.disposeAll()
+})
+
+const it = testEffect(
+  Layer.mergeAll(
+    CrossSpawnSpawner.defaultLayer,
+    PersonalAgent.defaultLayer,
+    ThreeLayerMemory.defaultLayer,
+    memoryConsolidatorLayer,
+  ),
+)
 
 function fakeNote(overrides: Partial<Parameters<typeof MemoryNote.parse>[0]>): ReturnType<typeof MemoryNote.parse> {
   return MemoryNote.parse({
@@ -268,4 +292,119 @@ describe("DEFAULT_CONFIG sanity", () => {
   test("delete threshold strictly below demote threshold", () => {
     expect(DEFAULT_CONFIG.importance_delete_threshold).toBeLessThan(DEFAULT_CONFIG.importance_demote_threshold)
   })
+})
+
+describe("MemoryConsolidator runOnce integration", () => {
+  it.live("replays existing semantic facts instead of creating duplicates", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const personal = yield* PersonalAgent.Service
+        const threeLayer = yield* ThreeLayerMemory.Service
+        const consolidator = yield* MemoryConsolidatorService
+        const existing = yield* threeLayer.recordSemanticFact({
+          domain: "coding",
+          subject: "Bun",
+          predicate: "is",
+          object: "fast",
+          confidence: 0.6,
+          source_note_ids: ["old_note"],
+          rehearsal_count: 1,
+        })
+        const episodic = yield* Effect.all(
+          Array.from({ length: 3 }, (_, index) =>
+            personal.remember({
+              scope: "workspace",
+              title: `Bun speed observation ${index}`,
+              content: "Bun is fast",
+              tags: ["domain:coding"],
+              metadata: {
+                domain: "coding",
+                subject: "Bun",
+                predicate: "is",
+                object: "fast",
+              },
+              source: "manual",
+              importance: 5,
+            }),
+          ),
+        )
+
+        const report = yield* consolidator.runOnce({ decay_half_life_days: 30_000 })
+        const semanticNotes = yield* personal.listMemory({ scope: "semantic" })
+        const matching = semanticNotes.filter((note) => {
+          const metadata = note.metadata as Record<string, unknown>
+          return metadata.subject === "Bun" && metadata.predicate === "is" && metadata.object === "fast"
+        })
+        const updated = matching[0]!
+        const metadata = updated.metadata as Record<string, unknown>
+        const workspaceNotes = yield* personal.listMemory({ scope: "workspace" })
+        const consolidatedIDs = new Set(
+          workspaceNotes
+            .filter((note) => (note.metadata as Record<string, unknown>).consolidated === true)
+            .map((note) => note.id),
+        )
+
+        expect(report.encoded).toBe(0)
+        expect(report.replayed).toBe(1)
+        expect(matching.map((note) => String(note.id))).toEqual([existing.note_id])
+        expect(metadata.rehearsal_count).toBe(4)
+        expect(metadata.source_note_ids).toEqual(
+          expect.arrayContaining(["old_note", ...episodic.map((note) => note.id)]),
+        )
+        expect(episodic.every((note) => consolidatedIDs.has(note.id))).toBe(true)
+      }),
+    ),
+  )
+
+  it.live("decay soft-deletes semantic notes and removes them from semantic search", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const personal = yield* PersonalAgent.Service
+        const threeLayer = yield* ThreeLayerMemory.Service
+        const consolidator = yield* MemoryConsolidatorService
+        const fact = yield* threeLayer.recordSemanticFact({
+          domain: "coding",
+          subject: "LegacyEndpoint",
+          predicate: "is",
+          object: "obsolete",
+          confidence: 0.9,
+          source_note_ids: ["old_note"],
+          rehearsal_count: 0,
+        })
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(PersonalMemoryNoteTable)
+              .set({ time_updated: Date.now() - 365 * 24 * 60 * 60 * 1000 })
+              .where(eq(PersonalMemoryNoteTable.id, MemoryNoteID.zod.parse(fact.note_id)))
+              .run(),
+          ),
+        )
+
+        const before = yield* threeLayer.searchSemantic({
+          query: "",
+          domain: "coding",
+          minConfidence: 0.5,
+        })
+        const report = yield* consolidator.runOnce({
+          replay_window_hours: 1,
+          decay_half_life_days: 1,
+        })
+        const after = yield* threeLayer.searchSemantic({
+          query: "",
+          domain: "coding",
+          minConfidence: 0.5,
+        })
+        const profileNotes = yield* personal.listMemory({ scope: "profile" })
+        const archived = profileNotes.find((note) => note.id === fact.note_id)
+        const metadata = archived?.metadata as Record<string, unknown> | undefined
+
+        expect(before.some((item) => item.note_id === fact.note_id)).toBe(true)
+        expect(report.decayed).toBe(1)
+        expect(after.some((item) => item.note_id === fact.note_id)).toBe(false)
+        expect(metadata?.decay_action).toBe("delete")
+        expect(metadata?.deleted).toBe(true)
+      }),
+    ),
+  )
 })

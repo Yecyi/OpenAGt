@@ -16,7 +16,10 @@ import { existsSync, readdirSync } from "fs"
 import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
-import { buildDebate } from "./mpacr"
+import { buildDebate, buildDegraded } from "./mpacr"
+import { skippedVerdict, validateCritique } from "./mpacr-validation"
+import { Calibration } from "./calibration"
+import { PromptTemplates } from "./prompt-templates"
 import { ThreeLayerMemory } from "@/personal/three-layer"
 import { ExpertRegistry } from "./expert-registry"
 import { BudgetTuning } from "@/agent/budget-tuning"
@@ -828,6 +831,14 @@ function reviseNode(input: {
 // in legacy mode it's the lone reviser; in MPACR mode it's the synthesis node
 // so dependents wait for the whole debate to settle. The whole graph is
 // returned in `all` so the caller can splice every node into reviseNodes.
+export function shouldUseDegradedMpacr(profile: EffortProfileType, budgetOptions?: BudgetOptions) {
+  const fullNodeCount = Math.max(2, Math.min(5, Math.floor(profile.mpacr_critic_count))) + 4
+  if (budgetOptions?.budget === "small") return true
+  if (typeof budgetOptions?.maxSubagents === "number" && budgetOptions.maxSubagents < fullNodeCount) return true
+  if (typeof budgetOptions?.maxRounds === "number" && budgetOptions.maxRounds < fullNodeCount) return true
+  return false
+}
+
 function reviseGraphFor(
   input: {
     id: string
@@ -840,6 +851,7 @@ function reviseGraphFor(
     required?: boolean
   },
   profile: EffortProfileType,
+  budgetOptions?: BudgetOptions,
 ): { entry: CoordinatorNodeType; all: CoordinatorNodeType[] } {
   // MPACR requires a concrete target artifact to debate. When the caller has
   // no target (e.g. plan_revise without a planning round, or a synthetic
@@ -848,7 +860,7 @@ function reviseGraphFor(
     const single = reviseNode(input)
     return { entry: single, all: [single] }
   }
-  const debate = buildDebate({
+  const debateInput = {
     idPrefix: input.id,
     target: input.target,
     goal: input.goal,
@@ -856,7 +868,8 @@ function reviseGraphFor(
     effort: input.effort,
     profile,
     dependsOn: input.dependsOn,
-  })
+  }
+  const debate = shouldUseDegradedMpacr(profile, budgetOptions) ? buildDegraded(debateInput) : buildDebate(debateInput)
   return { entry: debate.synthesis, all: [...debate.all] }
 }
 
@@ -1316,6 +1329,7 @@ export function applyEffortGovernance(
           effort,
         },
         profile,
+        budgetOptions,
       )
     : undefined
   const planRevise = planReviseGraph ? planReviseGraph.all : []
@@ -1352,7 +1366,11 @@ export function applyEffortGovernance(
       const kind = item.role === "reducer" ? "reducer_revise" : "verifier_revise"
       const id = `${item.id}_${kind}`
       const entryId = addReviseGraph(
-        reviseGraphFor({ id, kind, target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }, profile),
+        reviseGraphFor(
+          { id, kind, target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort },
+          profile,
+          budgetOptions,
+        ),
       )
       if (entryId) replacements.set(item.id, entryId)
     }
@@ -1369,6 +1387,7 @@ export function applyEffortGovernance(
           effort,
         },
         profile,
+        budgetOptions,
       ),
     )
     const allNodes = [...planning, ...rewriteDeps(rewritten, replacements), ...reviseNodes].map((item) =>
@@ -1410,6 +1429,7 @@ export function applyEffortGovernance(
             effort,
           },
           profile,
+          budgetOptions,
         ),
       )
       if (inputEntry) inputReviseByNode.set(item.id, inputEntry)
@@ -1430,6 +1450,7 @@ export function applyEffortGovernance(
             effort,
           },
           profile,
+          budgetOptions,
         ),
       )
       const handoffID = `${item.id}_handoff_revise`
@@ -1447,6 +1468,7 @@ export function applyEffortGovernance(
               required: false,
             },
             profile,
+            budgetOptions,
           ),
         )
         if (handoffEntry) {
@@ -1477,6 +1499,7 @@ export function applyEffortGovernance(
           effort,
         },
         profile,
+        budgetOptions,
       ),
     )
     const rewrittenRevise = reviseNodes.map((item) => {
@@ -1520,6 +1543,7 @@ export function applyEffortGovernance(
           effort,
         },
         profile,
+        budgetOptions,
       ),
     )
   }
@@ -2633,6 +2657,8 @@ export const layer = Layer.effect(
     const provider = yield* Provider.Service
     const tlm = yield* ThreeLayerMemory.Service
     const expertRegistry = yield* ExpertRegistry.Service
+    const calibration = yield* Effect.serviceOption(Calibration.Service)
+    const promptTemplates = yield* Effect.serviceOption(PromptTemplates.Service)
     const scope = yield* Scope.Scope
 
     const publish = (
@@ -2752,6 +2778,108 @@ export const layer = Layer.effect(
       return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
     }
 
+    const promptTemplateSelection = Effect.fn("Coordinator.promptTemplateSelection")(function* (
+      runID: CoordinatorRunIDType,
+      node: CoordinatorNodeType,
+    ) {
+      if (Option.isNone(promptTemplates)) return { prompt: node.prompt }
+      const roleAndVariant = node.prompt_template_id?.split("/") ?? []
+      const role = roleAndVariant[0] || node.expert_role || node.role
+      const forceVariant = roleAndVariant.length > 1 ? roleAndVariant.slice(1).join("/") : undefined
+      const picked = yield* promptTemplates.value
+        .pickVariant({ role, forceVariant, seed: `${runID}:${node.id}` }, () => node.prompt)
+        .pipe(Effect.catch(() => Effect.succeed({ template: undefined, rendered: node.prompt })))
+      return {
+        prompt: picked.rendered || node.prompt,
+        prompt_template_role: picked.template?.role,
+        prompt_template_variant: picked.template?.variant,
+      }
+    })
+
+    const recordPromptOutcome = (record: TaskRuntime.TaskRecord, success: boolean) => {
+      if (Option.isNone(promptTemplates)) return Effect.void
+      const role =
+        typeof record.metadata?.prompt_template_role === "string" ? record.metadata.prompt_template_role : undefined
+      const variant =
+        typeof record.metadata?.prompt_template_variant === "string"
+          ? record.metadata.prompt_template_variant
+          : undefined
+      if (!role || !variant) return Effect.void
+      return promptTemplates.value.recordOutcome({
+        role,
+        variant,
+        success,
+        task_id: record.task_id,
+        expert_id: typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : undefined,
+        duration_ms:
+          record.started_at && record.finished_at ? Math.max(0, record.finished_at - record.started_at) : undefined,
+      }).pipe(Effect.ignore)
+    }
+
+    const posteriorForVerdict = (verdict: CriticalReviewVerdictType) => {
+      if (typeof verdict.posterior === "number") return verdict.posterior
+      if (verdict.verdict === "pass") return verdict.confidence === "high" ? 0.9 : verdict.confidence === "low" ? 0.6 : 0.75
+      if (verdict.verdict === "revise" || verdict.verdict === "retry") return 0.35
+      if (verdict.verdict === "ask_user") return 0.5
+      return 0.1
+    }
+
+    const outcomeForVerdict = (verdict: CriticalReviewVerdictType) => {
+      if (verdict.verdict === "pass") return 1
+      if (verdict.verdict === "ask_user") return 0.5
+      if (verdict.verdict === "skipped") return 0
+      return 0.25
+    }
+
+    const recordCalibrationOutcome = (record: TaskRuntime.TaskRecord, verdict: CriticalReviewVerdictType | undefined) => {
+      if (!verdict || Option.isNone(calibration)) return Effect.void
+      const expertID = typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : record.subagent_type
+      const workflow = typeof record.metadata?.workflow === "string" ? record.metadata.workflow : "general-operations"
+      return calibration.value
+        .record({
+          expert_id: expertID,
+          workflow,
+          prior: 0.5,
+          posterior: posteriorForVerdict(verdict),
+          outcome: outcomeForVerdict(verdict),
+        })
+        .pipe(Effect.ignore)
+    }
+
+    const isMpacrReviewTask = (metadata: Record<string, unknown> | undefined) =>
+      metadata?.output_schema === "revise" &&
+      ["red-team-critic", "synth-reviser"].includes(typeof metadata.role === "string" ? metadata.role : "")
+
+    const isMpacrCriticTask = (metadata: Record<string, unknown> | undefined) =>
+      metadata?.output_schema === "revise" &&
+      (metadata?.mpacr_role === "critic" || metadata?.role === "red-team-critic")
+
+    const mpacrCriticTimeoutMs = (metadata: Record<string, unknown> | undefined) => {
+      if (typeof metadata?.mpacr_per_critic_timeout_ms === "number") return metadata.mpacr_per_critic_timeout_ms
+      const profile = metadata?.effort_profile
+      if (!profile || typeof profile !== "object" || Array.isArray(profile)) return 180_000
+      const value = (profile as Record<string, unknown>).mpacr_per_critic_timeout_ms
+      return typeof value === "number" ? value : 180_000
+    }
+
+    const reviewVerdictForMessage = (
+      metadata: Record<string, unknown> | undefined,
+      text: string,
+      originalPrompt: string,
+      retryCount: number,
+    ) => {
+      const parsed =
+        metadata?.output_schema === "revise" || metadata?.role === "reviser" ? reviewVerdictFromText(text) : undefined
+      if (!isMpacrReviewTask(metadata)) return { verdict: parsed, retryPrompt: undefined }
+      const validated = validateCritique({
+        raw: parsed ?? text,
+        originalPrompt,
+        retryCount,
+      })
+      if (validated.kind === "retry") return { verdict: undefined, retryPrompt: validated.sharpenedPrompt }
+      return { verdict: validated.verdict, retryPrompt: undefined }
+    }
+
     const taskModel = (metadata: Record<string, unknown>) => {
       const value = metadata.model
       if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
@@ -2769,6 +2897,23 @@ export const layer = Layer.effect(
       const model = value as Record<string, unknown>
       return typeof model.variant === "string" ? model.variant : undefined
     }
+
+    const completeMpacrCriticAsSkipped = (
+      record: TaskRuntime.TaskRecord,
+      reason: string,
+    ): Effect.Effect<void, Error> =>
+      Effect.gen(function* () {
+        yield* tasks.complete({
+          taskID: record.task_id,
+          parentSessionID: record.parent_session_id,
+          output: JSON.stringify(skippedVerdict(reason)),
+          metadata: {
+            mpacr_skipped: true,
+            mpacr_skip_reason: reason,
+          },
+        })
+        yield* recordPromptOutcome(record, false)
+      })
 
     const relevantTasks = Effect.fn("Coordinator.relevantTasks")(function* (run: CoordinatorRunType) {
       const all = yield* tasks.list(SessionID.make(run.sessionID))
@@ -2845,6 +2990,14 @@ export const layer = Layer.effect(
       const started = yield* tasks.tryStartPending(record.task_id, record.parent_session_id)
       if (!started) return
       if (Option.isNone(prompt)) {
+        if (isMpacrCriticTask(record.metadata)) {
+          yield* completeMpacrCriticAsSkipped(
+            record,
+            "Coordinator executor unavailable: SessionPrompt.Service is not available",
+          )
+          yield* continueGroup()
+          return
+        }
         yield* tasks.fail({
           taskID: record.task_id,
           parentSessionID: record.parent_session_id,
@@ -2856,8 +3009,9 @@ export const layer = Layer.effect(
       const dependencies = (yield* tasks.list(record.parent_session_id)).filter((item) =>
         record.depends_on.includes(item.task_id),
       )
-      yield* prompt.value
-        .prompt({
+      const basePrompt = taskPrompt(record, dependencies)
+      const promptOnce = (text: string) => {
+        const effect = prompt.value.prompt({
           sessionID: record.child_session_id,
           agent: record.subagent_type,
           model: taskModel(record.metadata ?? {}),
@@ -2865,46 +3019,81 @@ export const layer = Layer.effect(
           parts: [
             {
               type: "text",
-              text: taskPrompt(record, dependencies),
+              text,
             },
           ],
         })
+        if (!isMpacrCriticTask(record.metadata)) return effect
+        const timeoutMs = mpacrCriticTimeoutMs(record.metadata)
+        return effect.pipe(
+          Effect.timeout(`${timeoutMs} millis`),
+          Effect.catchTag("TimeoutError", () =>
+            Effect.fail(new Error(`MPACR critic timed out after ${timeoutMs}ms`)),
+          ),
+        )
+      }
+      yield* promptOnce(basePrompt)
         .pipe(
           Effect.tap((message: MessageV2.WithParts) =>
             Effect.gen(function* () {
-              const reviewFailure = reviewFailureMessage(
-                record.metadata?.output_schema === "revise" || record.metadata?.role === "reviser"
-                  ? reviewVerdictFromText(messageText(message))
-                  : undefined,
-              )
+              const firstReview = reviewVerdictForMessage(record.metadata, messageText(message), basePrompt, 0)
+              const final = yield* firstReview.retryPrompt
+                ? promptOnce(firstReview.retryPrompt).pipe(
+                    Effect.map((retryMessage) => ({
+                      message: retryMessage,
+                      verdict: reviewVerdictForMessage(record.metadata, messageText(retryMessage), basePrompt, 1)
+                        .verdict,
+                    })),
+                  )
+                : Effect.succeed({ message, verdict: firstReview.verdict })
+              const reviewFailure = isMpacrCriticTask(record.metadata)
+                ? undefined
+                : reviewFailureMessage(final.verdict)
+              yield* recordCalibrationOutcome(record, final.verdict)
               if (reviewFailure) {
                 yield* tasks.fail({
                   taskID: record.task_id,
                   parentSessionID: record.parent_session_id,
                   error: reviewFailure,
                 })
+                yield* recordPromptOutcome(record, false)
+                return
+              }
+              if (isMpacrCriticTask(record.metadata) && final.verdict?.verdict === "skipped") {
+                yield* tasks.complete({
+                  taskID: record.task_id,
+                  parentSessionID: record.parent_session_id,
+                  output: JSON.stringify(final.verdict),
+                  metadata: {
+                    mpacr_skipped: true,
+                    mpacr_skip_reason: final.verdict.unsupported_claims.join("; ") || "MPACR critic skipped",
+                  },
+                })
+                yield* recordPromptOutcome(record, false)
                 return
               }
               yield* tasks.complete({
                 taskID: record.task_id,
                 parentSessionID: record.parent_session_id,
-                result: message,
+                result: final.message,
               })
-            }),
-          ),
-          Effect.tapError((error) =>
-            tasks.fail({
-              taskID: record.task_id,
-              parentSessionID: record.parent_session_id,
-              error: error instanceof Error ? error.message : String(error),
+              yield* recordPromptOutcome(record, true)
             }),
           ),
           Effect.catchCause((cause) => {
             const error = Cause.squash(cause)
-            return tasks.fail({
-              taskID: record.task_id,
-              parentSessionID: record.parent_session_id,
-              error: error instanceof Error ? error.message : String(error),
+            return Effect.gen(function* () {
+              const reason = error instanceof Error ? error.message : String(error)
+              if (isMpacrCriticTask(record.metadata)) {
+                yield* completeMpacrCriticAsSkipped(record, reason)
+                return
+              }
+              yield* tasks.fail({
+                taskID: record.task_id,
+                parentSessionID: record.parent_session_id,
+                error: reason,
+              })
+              yield* recordPromptOutcome(record, false)
             })
           }),
           Effect.tap(continueGroup),
@@ -3091,6 +3280,7 @@ export const layer = Layer.effect(
       for (const node of planned.nodes) {
         const taskID = nodeTaskIDs.get(node.id)
         if (!taskID) continue
+        const selectedPrompt = yield* promptTemplateSelection(runID, node)
         yield* tasks.create({
           parentSessionID: input.sessionID,
           childSessionID: taskID,
@@ -3099,13 +3289,16 @@ export const layer = Layer.effect(
           taskKind: node.task_kind,
           subagentType: node.subagent_type,
           description: node.description,
-          prompt: node.prompt,
+          prompt: selectedPrompt.prompt,
           dependsOn: node.depends_on.flatMap((item) => {
             const dependency = nodeTaskIDs.get(item)
             return dependency ? [dependency] : []
           }),
           metadata: {
-            prompt: node.prompt,
+            prompt: selectedPrompt.prompt,
+            prompt_template_id: node.prompt_template_id,
+            prompt_template_role: selectedPrompt.prompt_template_role,
+            prompt_template_variant: selectedPrompt.prompt_template_variant,
             write_scope: node.write_scope,
             read_scope: node.read_scope,
             acceptance_checks: node.acceptance_checks,
@@ -3135,6 +3328,12 @@ export const layer = Layer.effect(
             artifact_id: node.artifact_id,
             revision_of: node.revision_of,
             quality_gate_id: node.quality_gate_id,
+            mpacr_role: node.mpacr_role,
+            mpacr_perspective: node.mpacr_perspective,
+            mpacr_quorum: node.mpacr_quorum,
+            mpacr_critic_node_ids: node.mpacr_critic_node_ids,
+            mpacr_per_critic_timeout_ms: node.mpacr_per_critic_timeout_ms,
+            mpacr_degraded: node.mpacr_degraded,
             memory_namespace: node.memory_namespace,
             confidence: node.confidence,
             revise_policy: node.revise_policy,

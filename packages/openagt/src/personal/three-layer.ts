@@ -15,7 +15,7 @@ export * as ThreeLayerMemory from "./three-layer"
 
 import { Context, Effect, Layer } from "effect"
 import z from "zod"
-import { PersonalAgent } from "./personal"
+import { Service as PersonalAgentService, defaultLayer as personalDefaultLayer } from "./personal"
 import type { ProjectID } from "@/project/schema"
 import type { SessionID } from "@/session/schema"
 import {
@@ -326,7 +326,7 @@ export class Service extends Context.Service<Service, Interface>()("@openagt/Thr
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const personal = yield* PersonalAgent.Service
+    const personal = yield* PersonalAgentService
 
     const recordSemanticFact: Interface["recordSemanticFact"] = Effect.fn("ThreeLayer.recordSemanticFact")(
       function* (input) {
@@ -422,7 +422,7 @@ export const layer = Layer.effect(
 )
 
 // Provides PersonalAgent so this layer can call remember()/searchMemory().
-export const defaultLayer = layer.pipe(Layer.provide(PersonalAgent.defaultLayer))
+export const defaultLayer = Layer.suspend(() => layer.pipe(Layer.provide(personalDefaultLayer)))
 
 // =============================================================================
 // B.4 — Plan-level enrichment Effect

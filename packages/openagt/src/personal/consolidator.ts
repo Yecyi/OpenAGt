@@ -31,9 +31,11 @@ import {
   tryAdvisoryLock,
   walCheckpointTruncate,
 } from "@/storage/db"
+import { Database, eq } from "@/storage"
 import { Log } from "../util"
 import { PersonalAgent } from "./personal"
 import { ThreeLayerMemory } from "./three-layer"
+import { PersonalMemoryNoteTable } from "./personal.sql"
 import type { MemoryNote as MemoryNoteType } from "./schema"
 
 const log = Log.create({ service: "consolidator" })
@@ -175,6 +177,28 @@ export function groupTriples(candidates: readonly CandidateTriple[]): TripleGrou
   }))
 }
 
+function tripleKey(input: { domain: string; subject: string; predicate: string; object: string }) {
+  return `${input.domain}::${input.subject}::${input.predicate}::${input.object}`.toLowerCase()
+}
+
+function semanticKey(note: MemoryNoteType): string | undefined {
+  const meta = note.metadata as Record<string, unknown> | undefined
+  if (
+    typeof meta?.domain !== "string" ||
+    typeof meta.subject !== "string" ||
+    typeof meta.predicate !== "string" ||
+    typeof meta.object !== "string"
+  ) {
+    return undefined
+  }
+  return tripleKey({
+    domain: meta.domain,
+    subject: meta.subject,
+    predicate: meta.predicate,
+    object: meta.object,
+  })
+}
+
 // Confidence scoring: more occurrences = higher confidence, capped at 0.95
 // so we never claim certainty from observation alone.
 export function scorePatternConfidence(occurrences: number): number {
@@ -275,11 +299,60 @@ export const layer = Layer.effect(
         )
         const candidates = extractCandidateTriples(recentEpisodic)
 
-        // Phase 2 — Pattern extraction
+        // Phase 2 — Replay + pattern extraction
         const groups = groupTriples(candidates)
-        const patterns = filterPatterns(groups, config)
+        const existingSemanticByKey = new Map(
+          (yield* personal.listMemory({ scope: "semantic" })).flatMap((note) => {
+            const key = semanticKey(note)
+            return key ? [[key, note] as const] : []
+          }),
+        )
+        const replayGroups = groups
+          .filter((pattern) => existingSemanticByKey.has(pattern.key))
+          .sort((a, b) => b.occurrences - a.occurrences)
+          .slice(0, config.max_facts_per_run)
+        const patterns = filterPatterns(groups, config).filter((pattern) => !existingSemanticByKey.has(pattern.key))
 
         let writes = 0
+        let replayed = 0
+        for (const pattern of replayGroups) {
+          const note = existingSemanticByKey.get(pattern.key)
+          if (!note) continue
+          const meta = note.metadata as Record<string, unknown>
+          const sourceNoteIDs = Array.isArray(meta.source_note_ids)
+            ? meta.source_note_ids.filter((item): item is string => typeof item === "string")
+            : []
+          const rehearsalCount =
+            (typeof meta.rehearsal_count === "number" ? meta.rehearsal_count : 0) + pattern.occurrences
+          const confidence = Math.max(
+            typeof meta.confidence === "number" ? meta.confidence : 0,
+            scorePatternConfidence(rehearsalCount),
+          )
+          const timestamp = Date.now()
+          yield* Effect.sync(() =>
+            Database.use((db) =>
+              db
+                .update(PersonalMemoryNoteTable)
+                .set({
+                  metadata: {
+                    ...meta,
+                    source_note_ids: [...new Set([...sourceNoteIDs, ...pattern.source_note_ids])],
+                    rehearsal_count: rehearsalCount,
+                    confidence,
+                    replayed_at: timestamp,
+                  },
+                  importance: Math.max(note.importance, Math.round(confidence * 10)),
+                  time_updated: timestamp,
+                })
+                .where(eq(PersonalMemoryNoteTable.id, note.id))
+                .run(),
+            ),
+          )
+          replayed++
+          writes++
+          if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
+        }
+
         let encoded = 0
         for (const pattern of patterns) {
           yield* tlm.recordSemanticFact({
@@ -296,20 +369,39 @@ export const layer = Layer.effect(
           if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
         }
 
-        // Phase 3 — Replay (placeholder): a future revision will cross-reference
-        // existing semantic facts and bump rehearsal_count rather than emitting
-        // new ones. For now `replayed` reports 0; pattern extraction subsumes
-        // most of replay's effect via source_note_ids merging.
-        const replayed = 0
+        const sourceIDs = new Set(
+          [...replayGroups, ...patterns].flatMap((pattern) => pattern.source_note_ids),
+        )
+        if (sourceIDs.size > 0) {
+          const timestamp = Date.now()
+          for (const note of recentEpisodic.filter((item) => sourceIDs.has(item.id))) {
+            yield* Effect.sync(() =>
+              Database.use((db) =>
+                db
+                  .update(PersonalMemoryNoteTable)
+                  .set({
+                    metadata: {
+                      ...(note.metadata as Record<string, unknown>),
+                      consolidated: true,
+                      consolidated_at: timestamp,
+                    },
+                    time_updated: timestamp,
+                  })
+                  .where(eq(PersonalMemoryNoteTable.id, note.id))
+                  .run(),
+              ),
+            )
+            writes++
+            if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
+          }
+        }
 
-        // Phase 4 — Decay (read-only metrics for now): walk semantic notes and
-        // count how many would be demoted/deleted. Actual demotion/delete is
-        // gated on a feature flag in DEFAULT_CONFIG so v1.21 can ship the loop
-        // observable-only first; B.3 follow-up enables the writes.
+        // Phase 3 — Decay
         const semanticNotes = yield* personal.listMemory({ scope: "semantic" })
         const now = Date.now()
         let decayed = 0
         for (const note of semanticNotes) {
+          if (note.pinned) continue
           const meta = note.metadata as Record<string, unknown> | undefined
           const rehearsal = typeof meta?.rehearsal_count === "number" ? meta.rehearsal_count : 0
           const newImportance = scoreDecay({
@@ -319,7 +411,55 @@ export const layer = Layer.effect(
             half_life_days: config.decay_half_life_days,
           })
           const action = classifyDecayAction(newImportance, config)
-          if (action !== "keep") decayed++
+          const importance = Math.max(0, Math.min(10, Math.round(newImportance)))
+          if (action === "keep") {
+            if (importance === note.importance) continue
+            yield* Effect.sync(() =>
+              Database.use((db) =>
+                db
+                  .update(PersonalMemoryNoteTable)
+                  .set({
+                    metadata: {
+                      ...(meta ?? {}),
+                      decay_action: "keep",
+                      decay_importance: newImportance,
+                    },
+                    importance,
+                  })
+                  .where(eq(PersonalMemoryNoteTable.id, note.id))
+                  .run(),
+              ),
+            )
+            writes++
+            if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
+            continue
+          }
+          yield* Effect.sync(() =>
+            Database.use((db) =>
+              db
+                .update(PersonalMemoryNoteTable)
+                .set({
+                  scope: "profile",
+                  tags: action === "delete" ? note.tags.filter((tag) => tag !== "fact") : note.tags,
+                  metadata: {
+                    ...(meta ?? {}),
+                    archived: action === "delete" ? true : undefined,
+                    deleted: action === "delete" ? true : undefined,
+                    decayed_from: "semantic",
+                    decay_action: action,
+                    decay_importance: newImportance,
+                    decayed_at: now,
+                  },
+                  importance: action === "delete" ? 0 : importance,
+                  time_updated: now,
+                })
+                .where(eq(PersonalMemoryNoteTable.id, note.id))
+                .run(),
+            ),
+          )
+          decayed++
+          writes++
+          if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
         }
 
         // Final WAL checkpoint to trim the journal after our writes.

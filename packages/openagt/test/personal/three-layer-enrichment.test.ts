@@ -4,6 +4,7 @@ import {
   extractKeywords,
   taskSignatureFor,
 } from "../../src/personal/three-layer"
+import { CoordinatorPlan } from "../../src/coordinator/schema"
 
 describe("extractKeywords — stable signature inputs", () => {
   test("strips short tokens (< 4 chars) and dedupes, preserves first-appearance order", () => {
@@ -130,6 +131,21 @@ describe("enrichMemoryContext — pure merge", () => {
     expect(enriched.scopes).toContain("workspace")
     expect(enriched.scopes).toContain("semantic")
     expect(enriched.scopes).toContain("procedural")
+  })
+
+  test("expanded scopes remain CoordinatorPlan schema-compatible", () => {
+    const enriched = enrichMemoryContext({
+      base: baseCtx,
+      facts: [],
+      recipes: [],
+      domain: "general",
+    })
+    const plan = CoordinatorPlan.parse({
+      goal: "review schema compatibility",
+      nodes: [],
+      memory_context: enriched,
+    })
+    expect(plan.memory_context.scopes).toEqual(["profile", "workspace", "semantic", "procedural"])
   })
 
   test("expert_tags pass through unchanged", () => {

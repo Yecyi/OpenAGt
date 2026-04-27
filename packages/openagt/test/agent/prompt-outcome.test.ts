@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   EXPLORATION_FRACTION,
+  pickVariantFromMap,
   pickWithHistory,
   sampleBeta,
   type OutcomeStats,
@@ -129,6 +130,20 @@ describe("pickWithHistory — Thompson sampling behaviour", () => {
     }
     expect(aCount / N).toBeGreaterThan(0.4)
     expect(aCount / N).toBeLessThan(0.6)
+  })
+})
+
+describe("pickVariantFromMap history integration", () => {
+  test("uses outcome history instead of static weights when supplied", () => {
+    const picked = pickVariantFromMap(
+      new Map([["reviser", [template("good", 1), template("bad", 1000)]]]),
+      { role: "reviser", seed: "history-prefers-good" },
+      new Map<string, OutcomeStats>([
+        ["good", { success: 200, failure: 0 }],
+        ["bad", { success: 0, failure: 200 }],
+      ]),
+    )
+    expect(picked?.variant).toBe("good")
   })
 })
 

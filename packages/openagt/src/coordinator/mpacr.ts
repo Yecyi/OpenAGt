@@ -104,6 +104,8 @@ function steelManNode(input: MpacrInput): CoordinatorNodeType {
     workflow: input.workflow,
     artifact_type: "review",
     artifact_id: `${id}:output`,
+    mpacr_role: "steel_man",
+    mpacr_degraded: false,
     memory_namespace: `${input.workflow}:steel-manner`,
   })
 }
@@ -148,6 +150,10 @@ function criticNode(input: MpacrInput, perspective: CriticPerspective, idx: numb
     workflow: input.workflow,
     artifact_type: "revise",
     artifact_id: `${id}:output`,
+    mpacr_role: "critic",
+    mpacr_perspective: perspective,
+    mpacr_per_critic_timeout_ms: input.profile.mpacr_per_critic_timeout_ms,
+    mpacr_degraded: false,
     memory_namespace: `${input.workflow}:red-team:${perspective}`,
   })
 }
@@ -186,6 +192,9 @@ function defenderNode(input: MpacrInput, criticIds: readonly string[], steelManI
     workflow: input.workflow,
     artifact_type: "review",
     artifact_id: `${id}:output`,
+    mpacr_role: "defender",
+    mpacr_critic_node_ids: [...criticIds],
+    mpacr_degraded: false,
     memory_namespace: `${input.workflow}:defender`,
   })
 }
@@ -244,6 +253,10 @@ function synthesisNode(
     artifact_id: `${id}:output`,
     revision_of: artifactID,
     quality_gate_id: id,
+    mpacr_role: "synthesis",
+    mpacr_quorum: quorum,
+    mpacr_critic_node_ids: [...criticIds],
+    mpacr_degraded: false,
     memory_namespace: `${input.workflow}:synth-reviser`,
   })
 }
@@ -285,7 +298,16 @@ function calibratorNode(input: MpacrInput, synthesisId: string): CoordinatorNode
     expert_id: expertID(input.workflow, "calibrator"),
     expert_role: "calibrator",
     workflow: input.workflow,
+    mpacr_role: "calibrator",
+    mpacr_degraded: false,
     memory_namespace: `${input.workflow}:calibrator`,
+  })
+}
+
+function markDegraded(node: CoordinatorNodeType) {
+  return CoordinatorNode.parse({
+    ...node,
+    mpacr_degraded: true,
   })
 }
 
@@ -326,13 +348,13 @@ export function buildDegraded(input: MpacrInput): MpacrOutput {
   // Calibrator omitted but we keep a placeholder summary node so callers can
   // still subscribe to a single terminal node id.
   return {
-    steelMan,
-    critics: [critic],
-    defender,
-    synthesis,
-    calibrator: synthesis,
+    steelMan: markDegraded(steelMan),
+    critics: [markDegraded(critic)],
+    defender: markDegraded(defender),
+    synthesis: markDegraded(synthesis),
+    calibrator: markDegraded(synthesis),
     quorum,
-    all: [steelMan, critic, defender, synthesis],
+    all: [steelMan, critic, defender, synthesis].map(markDegraded),
   }
 }
 

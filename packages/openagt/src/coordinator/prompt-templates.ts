@@ -16,6 +16,9 @@ import { Context, Effect, Layer } from "effect"
 import { existsSync, readdirSync, readFileSync, statSync } from "fs"
 import path from "path"
 import { Log } from "../util"
+import { Database, eq, gte, and } from "@/storage"
+import { Identifier } from "@/id/id"
+import { PromptOutcomeTable } from "./prompt-outcome.sql"
 
 const log = Log.create({ service: "prompt-templates" })
 
@@ -255,6 +258,7 @@ export function pickWithHistory(
 export function pickVariantFromMap(
   byRole: Map<string, PromptTemplate[]>,
   ctx: PickContext,
+  history?: Map<string, OutcomeStats>,
 ): PromptTemplate | undefined {
   const list = byRole.get(ctx.role) ?? []
   if (list.length === 0) return undefined
@@ -263,6 +267,7 @@ export function pickVariantFromMap(
     if (found) return found
   }
   const rand = ctx.seed ? seededRandom(ctx.seed) : Math.random
+  if (history) return pickWithHistory(list, history, rand)
   return weightedPick(list, rand)
 }
 
@@ -320,9 +325,39 @@ export const layer = Layer.effect(
 
     const forRole: Interface["forRole"] = (role) => Effect.sync(() => cache.get(role) ?? [])
 
-    const pickVariant: Interface["pickVariant"] = (ctx, fallback) =>
+    const historyForRole = (role: string) =>
       Effect.sync(() => {
-        const template = pickVariantFromMap(cache, ctx)
+        try {
+          const since = Date.now() - 30 * 24 * 60 * 60 * 1000
+          const rows = Database.use((db) =>
+            db
+              .select({
+                variant: PromptOutcomeTable.variant,
+                success: PromptOutcomeTable.success,
+              })
+              .from(PromptOutcomeTable)
+              .where(and(eq(PromptOutcomeTable.role, role), gte(PromptOutcomeTable.time_recorded, since)))
+              .all(),
+          )
+          const history = new Map<string, OutcomeStats>()
+          for (const row of rows) {
+            const current = history.get(row.variant) ?? { success: 0, failure: 0 }
+            history.set(row.variant, {
+              success: current.success + (row.success > 0 ? 1 : 0),
+              failure: current.failure + (row.success > 0 ? 0 : 1),
+            })
+          }
+          return history
+        } catch (err) {
+          log.warn("prompt outcome history unavailable", { role, err: String(err) })
+          return new Map<string, OutcomeStats>()
+        }
+      })
+
+    const pickVariant: Interface["pickVariant"] = (ctx, fallback) =>
+      Effect.gen(function* () {
+        const history = yield* historyForRole(ctx.role)
+        const template = pickVariantFromMap(cache, ctx, history)
         if (template) return { template, rendered: template.content }
         const fallbackText = fallback ? fallback() : ""
         return { template: undefined, rendered: fallbackText }
@@ -330,8 +365,32 @@ export const layer = Layer.effect(
 
     const render: Interface["render"] = (template, vars) => renderTemplate(template.content, vars)
 
-    const recordOutcome: Interface["recordOutcome"] = () => Effect.void
-    // C.5 implements the actual outcome telemetry write; this skeleton no-ops.
+    const recordOutcome: Interface["recordOutcome"] = (record) =>
+      Effect.sync(() => {
+        try {
+          const ts = Date.now()
+          Database.use((db) =>
+            db
+              .insert(PromptOutcomeTable)
+              .values({
+                id: Identifier.ascending("promptOutcome"),
+                role: record.role,
+                variant: record.variant,
+                task_id: record.task_id,
+                expert_id: record.expert_id,
+                success: record.success ? 1 : 0,
+                quality: record.quality,
+                duration_ms: record.duration_ms,
+                time_recorded: ts,
+                time_created: ts,
+                time_updated: ts,
+              })
+              .run(),
+          )
+        } catch (err) {
+          log.warn("prompt outcome record failed", { role: record.role, variant: record.variant, err: String(err) })
+        }
+      })
 
     const reload: Interface["reload"] = () =>
       Effect.sync(() => {

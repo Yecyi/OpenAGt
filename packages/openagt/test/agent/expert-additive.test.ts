@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test"
+import { Effect, Layer } from "effect"
 import {
+  applyUserExpertsToPlan,
   applyExpertOverride,
   buildRegistry,
   resolveBuiltinAncestor,
+  Service as ExpertRegistryService,
   type ExpertEntry,
 } from "../../src/coordinator/expert-registry"
 import { CoordinatorNode } from "../../src/coordinator/schema"
@@ -46,6 +49,20 @@ function userExpertEntry(overrides: Partial<ExpertEntry> & { role: string; inher
     mpacr_perspective: undefined,
     ...overrides,
   } as ExpertEntry
+}
+
+function expertLayer(entries: ExpertEntry[]) {
+  return Layer.succeed(
+    ExpertRegistryService,
+    ExpertRegistryService.of({
+      all: () => Effect.succeed(entries),
+      get: (role) => Effect.succeed(entries.find((item) => item.role === role)),
+      forWorkflow: (workflow) => Effect.succeed(entries.filter((item) => item.workflows?.includes(workflow))),
+      byDomain: (domain) => Effect.succeed(entries.filter((item) => item.domain === domain)),
+      resolveBuiltinAncestor: () => Effect.succeed(undefined),
+      reload: () => Effect.void,
+    }),
+  )
 }
 
 describe("applyExpertOverride — happy path", () => {
@@ -207,5 +224,64 @@ describe("buildRegistry + applyExpertOverride end-to-end", () => {
     expect(resolveBuiltinAncestor(registry, "factuality-checker")).toBe("factuality-checker")
     // Unknown role — not in registry at all.
     expect(resolveBuiltinAncestor(registry, "unknown")).toBeUndefined()
+  })
+})
+
+describe("applyUserExpertsToPlan scope matching", () => {
+  test("does not apply workflow or domain-scoped experts to unrelated nodes", async () => {
+    const plan = {
+      workflow: "coding",
+      nodes: [
+        fakeBuiltinNode("factuality-checker", {
+          prompt: "Verify TypeScript implementation evidence",
+          memory_namespace: "coding:factuality-checker",
+        }),
+      ],
+    }
+    const result = await Effect.runPromise(
+      applyUserExpertsToPlan(plan).pipe(
+        Effect.provide(
+          expertLayer([
+            userExpertEntry({
+              role: "tax-law-checker",
+              inherits: "factuality-checker",
+              workflows: ["review"],
+              domain: "tax-law",
+            }),
+          ]),
+        ),
+      ),
+    )
+    expect(result.nodes[0]!.expert_id).toBe("coding.factuality-checker")
+    expect(result.nodes[0]!.prompt).toBe("Verify TypeScript implementation evidence")
+  })
+
+  test("applies a scoped expert when inherited role, workflow, and domain match", async () => {
+    const plan = {
+      workflow: "review",
+      nodes: [
+        fakeBuiltinNode("factuality-checker", {
+          prompt: "Verify tax-law citations",
+          workflow: "review",
+          memory_namespace: "review:tax-law",
+        }),
+      ],
+    }
+    const result = await Effect.runPromise(
+      applyUserExpertsToPlan(plan).pipe(
+        Effect.provide(
+          expertLayer([
+            userExpertEntry({
+              role: "tax-law-checker",
+              inherits: "factuality-checker",
+              workflows: ["review"],
+              domain: "tax-law",
+            }),
+          ]),
+        ),
+      ),
+    )
+    expect(result.nodes[0]!.expert_id).toBe("tax-law-checker")
+    expect(result.nodes[0]!.prompt).toBe("You are a tax-law-aware factuality checker. Verify cited regulations.")
   })
 })

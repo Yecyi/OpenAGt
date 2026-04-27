@@ -285,6 +285,7 @@ export function applyExpertOverride(input: ExpertOverrideInput): CoordinatorNode
     prompt: entry.prompt ?? node.prompt,
     expert_id: entry.role,
     expert_role: entry.role,
+    prompt_template_id: entry.prompt_template_id ?? node.prompt_template_id,
     memory_namespace: memoryNamespace,
     acceptance_checks:
       entry.acceptance_checks && entry.acceptance_checks.length > 0
@@ -302,8 +303,45 @@ export function applyExpertOverride(input: ExpertOverrideInput): CoordinatorNode
 // Loose plan shape so this module doesn't import the heavy CoordinatorPlan
 // schema. The coordinator passes its concrete type in.
 export interface PlanLikeForExperts {
+  readonly goal?: string
   readonly workflow?: string
+  readonly memory_context?: {
+    readonly workflow_tags?: readonly string[]
+  }
   readonly nodes: readonly CoordinatorNodeType[]
+}
+
+function goalMatchesDomain(goal: string | undefined, domain: string) {
+  if (!goal) return false
+  const lower = goal.toLowerCase()
+  if (lower.includes(domain)) return true
+  if (domain === "coding") return /\b(api|backend|frontend|code|implement|module|package|repo|test|typescript|javascript)\b/.test(lower)
+  return false
+}
+
+function expertMatchesPlan(input: { expert: ExpertEntry; plan: PlanLikeForExperts; node: CoordinatorNodeType }) {
+  if (!input.expert.inherits) return false
+  const workflow = input.node.workflow ?? input.plan.workflow
+  if (input.expert.workflows && (!workflow || !input.expert.workflows.includes(workflow))) return false
+  if (input.expert.domain) {
+    const namespace = input.node.memory_namespace ?? ""
+    const prompt = input.node.prompt.toLowerCase()
+    const domain = input.expert.domain.toLowerCase()
+    const workflowMatches = typeof workflow === "string" && workflow.toLowerCase() === domain
+    const tagMatches = input.plan.memory_context?.workflow_tags?.some((tag) =>
+      [`workflow:${domain}`, `domain:${domain}`].includes(tag.toLowerCase()),
+    )
+    if (
+      !workflowMatches &&
+      !tagMatches &&
+      !goalMatchesDomain(input.plan.goal, domain) &&
+      !namespace.toLowerCase().includes(domain) &&
+      !prompt.includes(domain)
+    ) {
+      return false
+    }
+  }
+  return true
 }
 
 // For each plan node, if a user-defined expert exists whose `inherits` matches
@@ -312,9 +350,8 @@ export interface PlanLikeForExperts {
 // the rewritten nodes; nodes that don't match any user expert pass through
 // unchanged.
 //
-// Selection rule: if multiple user experts inherit from the same builtin role,
-// the FIRST registered one wins. This is intentional v1.21 behavior — fancier
-// per-domain selection lives in a follow-up.
+// Selection rule: if multiple user experts match the same builtin role and
+// scope, the first registered matching expert wins.
 export const applyUserExpertsToPlan = <P extends PlanLikeForExperts>(
   plan: P,
 ): Effect.Effect<P, Error, Service> =>
@@ -323,17 +360,11 @@ export const applyUserExpertsToPlan = <P extends PlanLikeForExperts>(
     const all = yield* registry.all()
     const userExperts = all.filter((e) => e.source === "user")
     if (userExperts.length === 0) return plan
-    // Index user experts by their parent (inherits) role for O(1) lookup.
-    const byParent = new Map<string, ExpertEntry>()
-    for (const expert of userExperts) {
-      if (!expert.inherits) continue
-      if (byParent.has(expert.inherits)) continue // first-wins
-      byParent.set(expert.inherits, expert)
-    }
-    if (byParent.size === 0) return plan
     let touched = 0
     const nodes = plan.nodes.map((node) => {
-      const expert = byParent.get(node.role)
+      const expert = userExperts.find(
+        (item) => item.inherits === node.role && expertMatchesPlan({ expert: item, plan, node }),
+      )
       if (!expert) return node
       touched++
       return applyExpertOverride({ node, entry: expert, workflow: plan.workflow })
