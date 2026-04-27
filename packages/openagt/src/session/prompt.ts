@@ -1808,10 +1808,18 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       function* (input: ShellInput) {
         const instance = yield* InstanceState.context
         const workspace = yield* InstanceState.workspaceID
-        return yield* state.startShell(
-          input.sessionID,
-          attachWith(lastAssistant(input.sessionID), { instance, workspace }),
-          attachWith(shellImpl(input), { instance, workspace }),
+        const fallback = attachWith(lastAssistant(input.sessionID), { instance, workspace })
+        return yield* state
+          .startShell(input.sessionID, fallback, attachWith(shellImpl(input), { instance, workspace }))
+          .pipe(
+            Effect.catchCauseIf(
+              (cause) => {
+                const error = Cause.squash(cause)
+                const message = error instanceof Error ? `${error.name} ${error.message}` : String(error)
+                return Cause.hasInterrupts(cause) || /abort|cancel|interrupt/i.test(message)
+              },
+              () => fallback,
+            ),
         )
       },
     )

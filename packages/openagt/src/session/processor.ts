@@ -138,12 +138,20 @@ export const layer: Layer.Layer<
         const message = errorMessage(error).toLowerCase()
         return message.includes("abort") || message.includes("cancel") || message.includes("interrupt")
       }
-      const isShellRunnerBash = (part: MessageV2.ToolPart, metadata: Record<string, unknown>, output: string) =>
-        part.tool === "bash" &&
-        (output.length > 0 ||
-          typeof metadata.description === "string" ||
-          typeof metadata.backendPreference === "string" ||
-          typeof metadata.enforcement === "string")
+      const isShellRunnerBash = (part: MessageV2.ToolPart, metadata: Record<string, unknown>, output: string) => {
+        const partInput = isRecord(part.state.input) ? part.state.input : {}
+        return (
+          part.tool === "bash" &&
+          (typeof partInput.command === "string" ||
+            typeof partInput.description === "string" ||
+            typeof partInput.timeout === "number" ||
+            typeof partInput.workdir === "string" ||
+            output.length > 0 ||
+            typeof metadata.description === "string" ||
+            typeof metadata.backendPreference === "string" ||
+            typeof metadata.enforcement === "string")
+        )
+      }
       const completeInterruptedBash = Effect.fn("SessionProcessor.completeInterruptedBash")(function* (
         part: MessageV2.ToolPart,
         metadata: Record<string, unknown>,
@@ -256,7 +264,7 @@ export const layer: Layer.Layer<
         const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : undefined
         const metadataRecord = metadata ?? {}
         const output = typeof metadataRecord.output === "string" ? metadataRecord.output : ""
-        if (isAbortLikeError(error) && isShellRunnerBash(match.part, metadataRecord, output)) {
+        if ((aborted || isAbortLikeError(error)) && isShellRunnerBash(match.part, metadataRecord, output)) {
           yield* completeInterruptedBash(match.part, metadataRecord, output, end)
           yield* settleToolCall(toolCallID)
           return true
