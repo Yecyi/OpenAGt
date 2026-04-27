@@ -134,6 +134,54 @@ export const layer: Layer.Layer<
           providerID: input.model.providerID,
           aborted,
         })
+      const isAbortLikeError = (error: unknown) => {
+        const message = errorMessage(error).toLowerCase()
+        return message.includes("abort") || message.includes("cancel") || message.includes("interrupt")
+      }
+      const isShellRunnerBash = (part: MessageV2.ToolPart, metadata: Record<string, unknown>, output: string) =>
+        part.tool === "bash" &&
+        (output.length > 0 ||
+          typeof metadata.description === "string" ||
+          typeof metadata.backendPreference === "string" ||
+          typeof metadata.enforcement === "string")
+      const completeInterruptedBash = Effect.fn("SessionProcessor.completeInterruptedBash")(function* (
+        part: MessageV2.ToolPart,
+        metadata: Record<string, unknown>,
+        output: string,
+        end: number,
+      ) {
+        const captured = output || "(no output captured before abort)"
+        const truncated =
+          metadata.truncated === true ||
+          output.length === 0 ||
+          captured.startsWith("...\n\n") ||
+          Buffer.byteLength(captured, "utf-8") > Truncate.MAX_BYTES
+        const outputPath = truncated ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`) : undefined
+        if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, captured))
+        yield* session.updatePart({
+          ...part,
+          state: {
+            status: "completed",
+            input: part.state.input,
+            output:
+              (truncated && outputPath
+                ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${captured}`
+                : captured) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
+            metadata: {
+              ...metadata,
+              output: captured,
+              truncated,
+              ...(outputPath ? { outputPath } : {}),
+              terminationReason: "abort",
+              interrupted: true,
+              interruption_origin: "session_cleanup",
+              root_cause: "bash_result_missing_after_session_interrupt",
+            },
+            title: typeof metadata.description === "string" ? metadata.description : "Shell command",
+            time: { start: "time" in part.state ? part.state.time.start : end, end },
+          },
+        })
+      })
 
       const settleToolCall = Effect.fn("SessionProcessor.settleToolCall")(function* (toolCallID: string) {
         const done = ctx.toolcalls[toolCallID]?.done
@@ -205,7 +253,14 @@ export const layer: Layer.Layer<
         if (!match) return false
         if (match.part.state.status !== "running" && match.part.state.status !== "pending") return false
         const end = Date.now()
-        const metadata = "metadata" in match.part.state ? match.part.state.metadata : undefined
+        const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : undefined
+        const metadataRecord = metadata ?? {}
+        const output = typeof metadataRecord.output === "string" ? metadataRecord.output : ""
+        if (isAbortLikeError(error) && isShellRunnerBash(match.part, metadataRecord, output)) {
+          yield* completeInterruptedBash(match.part, metadataRecord, output, end)
+          yield* settleToolCall(toolCallID)
+          return true
+        }
         yield* session.updatePart({
           ...match.part,
           state: {
@@ -517,46 +572,8 @@ export const layer: Layer.Layer<
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
           const output = typeof metadata.output === "string" ? metadata.output : ""
-          if (
-            part.tool === "bash" &&
-            (output.length > 0 ||
-              typeof metadata.description === "string" ||
-              typeof metadata.backendPreference === "string" ||
-              typeof metadata.enforcement === "string")
-          ) {
-            const captured = output || "(no output captured before abort)"
-            const truncated =
-              metadata.truncated === true ||
-              output.length === 0 ||
-              captured.startsWith("...\n\n") ||
-              Buffer.byteLength(captured, "utf-8") > Truncate.MAX_BYTES
-            const outputPath = truncated
-              ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`)
-              : undefined
-            if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, captured))
-            yield* session.updatePart({
-              ...part,
-              state: {
-                status: "completed",
-                input: part.state.input,
-                output:
-                  (truncated && outputPath
-                    ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${captured}`
-                    : captured) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
-                metadata: {
-                  ...metadata,
-                  output: captured,
-                  truncated,
-                  ...(outputPath ? { outputPath } : {}),
-                  terminationReason: "abort",
-                  interrupted: true,
-                  interruption_origin: "session_cleanup",
-                  root_cause: "bash_result_missing_after_session_interrupt",
-                },
-                title: typeof metadata.description === "string" ? metadata.description : "Shell command",
-                time: { start: "time" in part.state ? part.state.time.start : end, end },
-              },
-            })
+          if (isShellRunnerBash(part, metadata, output)) {
+            yield* completeInterruptedBash(part, metadata, output, end)
             yield* settleToolCall(toolCallID)
             continue
           }
