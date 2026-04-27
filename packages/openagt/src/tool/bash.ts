@@ -859,6 +859,7 @@ export const BashTool = Tool.define(
               ctx,
             )
             .pipe(
+              Effect.uninterruptible,
               Effect.map((result) => ({
                 ...result,
                 metadata: {
