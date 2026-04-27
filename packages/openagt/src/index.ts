@@ -43,6 +43,7 @@ import { Heap } from "./cli/heap"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { ensureProcessMetadata } from "./util/opencode-process"
 import { executeFastPath, isFastPathCommand } from "./cli/fast-path"
+import { needsTuiCommands } from "./cli/needs-tui"
 
 const processMetadata = ensureProcessMetadata("main")
 
@@ -127,7 +128,7 @@ const cli = yargs(args)
       run_id: processMetadata.runID,
     })
 
-    const marker = path.join(Global.Path.data, "openagt.db")
+    const marker = Database.Path
     if (!(await Filesystem.exists(marker))) {
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
@@ -211,45 +212,7 @@ try {
     const result = executeFastPath(args)
     if (result.exit) process.exit(result.code)
   }
-  const needsTuiCommands = (() => {
-    const first = args[0]
-    if (!first) return true
-    if (first === "attach") return true
-    if (first.startsWith("-")) return false
-    return !new Set([
-      "acp",
-      "mcp",
-      "run",
-      "generate",
-      "init",
-      "debug",
-      "account",
-      "providers",
-      "agent",
-      "upgrade",
-      "uninstall",
-      "serve",
-      "web",
-      "models",
-      "stats",
-      "export",
-      "import",
-      "github",
-      "pr",
-      "session",
-      "plug",
-      "db",
-      "experts",
-      "cal",
-      "prompt",
-      "mem",
-      "mission",
-      "completion",
-      "help",
-      "version",
-    ]).has(first)
-  })()
-  if (needsTuiCommands) {
+  if (needsTuiCommands(args)) {
     const [{ AttachCommand }, { TuiThreadCommand }] = await Promise.all([
       import("./cli/cmd/tui/attach"),
       import("./cli/cmd/tui/thread"),
