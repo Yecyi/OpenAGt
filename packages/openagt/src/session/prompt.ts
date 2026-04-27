@@ -60,11 +60,6 @@ import { isBroadAgentTask } from "@/agent/task-classifier"
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
 
-function shouldCompleteToolCall(signal: AbortSignal | undefined, output: { metadata?: Record<string, unknown> }) {
-  if (!signal?.aborted) return true
-  return output.metadata?.terminationReason === "abort"
-}
-
 async function computeSHA256(text: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(text)
@@ -502,9 +497,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
                     output,
                   )
-                  if (shouldCompleteToolCall(options.abortSignal, output)) {
-                    yield* input.processor.completeToolCall(call.toolCallId, output)
-                  }
+                  yield* input.processor.completeToolCall(call.toolCallId, output)
                   return output
                 }),
               ),
@@ -590,9 +583,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     })),
                     content: result.content,
                   }
-                  if (shouldCompleteToolCall(opts.abortSignal, output)) {
-                    yield* input.processor.completeToolCall(toolCallId, output)
-                  }
+                  yield* input.processor.completeToolCall(toolCallId, output)
                   return output
                 }),
               ),
