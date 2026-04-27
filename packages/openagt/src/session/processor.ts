@@ -517,15 +517,17 @@ export const layer: Layer.Layer<
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
           const output = typeof metadata.output === "string" ? metadata.output : ""
-          if (part.tool === "bash" && output.length > 0) {
+          if (part.tool === "bash") {
+            const captured = output || "(no output captured before abort)"
             const truncated =
               metadata.truncated === true ||
-              output.startsWith("...\n\n") ||
-              Buffer.byteLength(output, "utf-8") > Truncate.MAX_BYTES
+              output.length === 0 ||
+              captured.startsWith("...\n\n") ||
+              Buffer.byteLength(captured, "utf-8") > Truncate.MAX_BYTES
             const outputPath = truncated
               ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`)
               : undefined
-            if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, output))
+            if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, captured))
             yield* session.updatePart({
               ...part,
               state: {
@@ -533,11 +535,11 @@ export const layer: Layer.Layer<
                 input: part.state.input,
                 output:
                   (truncated && outputPath
-                    ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${output}`
-                    : output) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
+                    ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${captured}`
+                    : captured) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
                 metadata: {
                   ...metadata,
-                  output,
+                  output: captured,
                   truncated,
                   ...(outputPath ? { outputPath } : {}),
                   terminationReason: "abort",
