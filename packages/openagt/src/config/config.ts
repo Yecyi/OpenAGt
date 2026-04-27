@@ -26,6 +26,7 @@ import { EffectFlock } from "@openagt/shared/util/effect-flock"
 import { InstanceRef } from "@/effect/instance-ref"
 import { zod, ZodOverride } from "@/util/effect-zod"
 import { ConfigAgent } from "./agent"
+import { ConfigExpert } from "./expert"
 import { ConfigCommand } from "./command"
 import { ConfigExecPolicy } from "./exec-policy"
 import { ConfigFormatter } from "./formatter"
@@ -102,6 +103,13 @@ const InfoSchema = Schema.Struct({
   }),
   command: Schema.optional(Schema.Record(Schema.String, ConfigCommand.Info)).annotate({
     description: "Command configuration",
+  }),
+  // Coordinator expert role definitions. Loaded from .opencode/experts/*.md
+  // (mirrors agent/command loaders). Each entry MUST `inherits` from a builtin
+  // CoordinatorNodeRole. Validation lives in ExpertRegistry — Config keeps the
+  // value untyped here to avoid mixing zod and Effect Schema.
+  expert: Schema.optional(Schema.Record(Schema.String, Schema.Any)).annotate({
+    description: "Coordinator expert role definitions (loaded from .opencode/experts/*.md)",
   }),
   skills: Schema.optional(ConfigSkills.Info).annotate({ description: "Additional skill folder paths" }),
   watcher: Schema.optional(
@@ -637,6 +645,8 @@ export const layer = Layer.effect(
           result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => ConfigCommand.load(dir)))
           result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.load(dir)))
           result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.loadMode(dir)))
+          // C.1 — load .opencode/experts/*.md the same way as agents/commands.
+          result.expert = mergeDeep(result.expert ?? {}, yield* Effect.promise(() => ConfigExpert.load(dir)))
           // Auto-discovered plugins under `.opencode/plugin(s)` are already local files, so ConfigPlugin.load
           // returns normalized Specs and we only need to attach origin metadata here.
           const list = yield* Effect.promise(() => ConfigPlugin.load(dir))

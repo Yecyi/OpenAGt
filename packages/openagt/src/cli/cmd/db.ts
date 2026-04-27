@@ -6,6 +6,7 @@ import { Database as BunDatabase } from "bun:sqlite"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
 import { JsonMigration } from "../../storage"
+import { integrityCheck, listSchemaVersions } from "../../storage/db"
 import { EOL } from "os"
 import { errorMessage } from "../../util/error"
 
@@ -110,11 +111,63 @@ const MigrateCommand = cmd({
   },
 })
 
+// `openagt db status` — surfaces the v1.21 _schema_version audit table and an
+// on-demand integrity_check. Used by ops to confirm migrations applied cleanly
+// and the SQLite file isn't corrupted.
+const StatusCommand = cmd({
+  command: "status",
+  describe: "show migration history and run an integrity check",
+  builder: (yargs: Argv) =>
+    yargs
+      .option("integrity", {
+        type: "boolean",
+        default: true,
+        describe: "Run PRAGMA integrity_check (slow on large DBs)",
+      })
+      .option("format", {
+        type: "string",
+        choices: ["text", "json"],
+        default: "text",
+        describe: "Output format",
+      }),
+  handler: (args: { integrity: boolean; format: string }) => {
+    try {
+      const versions = listSchemaVersions()
+      const integrity = args.integrity ? integrityCheck() : "skipped"
+      if (args.format === "json") {
+        console.log(JSON.stringify({ path: Database.Path, integrity, migrations: versions }, null, 2))
+        return
+      }
+      UI.println(`Database: ${Database.Path}`)
+      UI.println(`Integrity: ${integrity}`)
+      UI.println(`Migrations applied: ${versions.length}`)
+      if (versions.length > 0) {
+        UI.println("")
+        for (const v of versions) {
+          const when = new Date(v.applied_at).toISOString()
+          const checksum = v.checksum === "legacy" ? "legacy" : v.checksum.slice(0, 8)
+          UI.println(`  ${v.migration_name}  applied=${when}  checksum=${checksum}`)
+        }
+      } else {
+        UI.println("(no _schema_version table — pre-v1.21 database)")
+      }
+    } catch (err) {
+      UI.error(errorMessage(err))
+      process.exit(1)
+    }
+  },
+})
+
 export const DbCommand = cmd({
   command: "db",
   describe: "database tools",
   builder: (yargs: Argv) => {
-    return yargs.command(QueryCommand).command(PathCommand).command(MigrateCommand).demandCommand()
+    return yargs
+      .command(QueryCommand)
+      .command(PathCommand)
+      .command(MigrateCommand)
+      .command(StatusCommand)
+      .demandCommand()
   },
   handler: () => {},
 })

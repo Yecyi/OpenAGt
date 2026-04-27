@@ -16,6 +16,9 @@ import { existsSync, readdirSync } from "fs"
 import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
+import { buildDebate } from "./mpacr"
+import { ThreeLayerMemory } from "@/personal/three-layer"
+import { ExpertRegistry } from "./expert-registry"
 import { BudgetTuning } from "@/agent/budget-tuning"
 import {
   classifyGoal,
@@ -819,6 +822,44 @@ function reviseNode(input: {
   })
 }
 
+// A.2 — reviseGraphFor: returns either a single revise node (legacy path) or
+// the full MPACR debate graph (K+3 nodes) when EffortProfile.mpacr_enabled
+// is true. The `entry` field is what downstream `replacements` maps point to:
+// in legacy mode it's the lone reviser; in MPACR mode it's the synthesis node
+// so dependents wait for the whole debate to settle. The whole graph is
+// returned in `all` so the caller can splice every node into reviseNodes.
+function reviseGraphFor(
+  input: {
+    id: string
+    kind: z.infer<typeof RevisePoint>["kind"]
+    target?: CoordinatorNodeType
+    dependsOn: string[]
+    goal: string
+    workflow: TaskTypeType
+    effort: EffortLevelType
+    required?: boolean
+  },
+  profile: EffortProfileType,
+): { entry: CoordinatorNodeType; all: CoordinatorNodeType[] } {
+  // MPACR requires a concrete target artifact to debate. When the caller has
+  // no target (e.g. plan_revise without a planning round, or a synthetic
+  // final_revise gate), fall back to the single-node legacy reviser.
+  if (!profile.mpacr_enabled || !input.target) {
+    const single = reviseNode(input)
+    return { entry: single, all: [single] }
+  }
+  const debate = buildDebate({
+    idPrefix: input.id,
+    target: input.target,
+    goal: input.goal,
+    workflow: input.workflow,
+    effort: input.effort,
+    profile,
+    dependsOn: input.dependsOn,
+  })
+  return { entry: debate.synthesis, all: [...debate.all] }
+}
+
 function checkpointNode(input: {
   id: string
   goal: string
@@ -1097,28 +1138,41 @@ function effortPlanMetadata(input: {
     todoTimeline: todo_timeline,
     ...input.budgetOptions,
   })
+  // A.2: filter revise nodes down to logical "gates". A legacy reviseNode is
+  // already 1 node = 1 gate. An MPACR debate expands to K+3 process nodes
+  // plus 1 synthesis node — only the synthesis carries `quality_gate_id`, so
+  // filtering by that field collapses each debate back to a single gate.
+  // Process nodes (steel_man / critics / defender / calibrator) keep their
+  // node_id but do NOT spawn RevisePoints.
   const revise_points = RevisePoint.array().parse(
-    input.reviseNodes.map((item) => ({
-      id: item.quality_gate_id ?? item.id,
-      kind: item.id.includes("input_revise")
-        ? "input_revise"
-        : item.id.includes("output_revise")
-          ? "output_revise"
-          : item.id.includes("handoff_revise")
-            ? "handoff_revise"
-            : item.id.includes("verifier_revise")
-              ? "verifier_revise"
-              : item.id.includes("reducer_revise")
-                ? "reducer_revise"
-                : item.id.includes("final_revise")
-                  ? "final_revise"
-                  : "plan_revise",
-      target_node_id: typeof item.revision_of === "string" ? item.revision_of.split(":")[0] : undefined,
-      artifact_id: item.revision_of,
-      required: item.priority !== "low",
-      node_id: item.id,
-      status: "pending",
-    })),
+    input.reviseNodes
+      .filter((item) => Boolean(item.quality_gate_id))
+      .map((item) => {
+        // For MPACR synthesis nodes the id looks like `<parent_revise_id>:synthesis`.
+        // Strip the suffix so the kind classifier sees the parent prefix.
+        const idForKind = item.id.endsWith(":synthesis") ? item.id.slice(0, -":synthesis".length) : item.id
+        return {
+          id: item.quality_gate_id ?? item.id,
+          kind: idForKind.includes("input_revise")
+            ? "input_revise"
+            : idForKind.includes("output_revise")
+              ? "output_revise"
+              : idForKind.includes("handoff_revise")
+                ? "handoff_revise"
+                : idForKind.includes("verifier_revise")
+                  ? "verifier_revise"
+                  : idForKind.includes("reducer_revise")
+                    ? "reducer_revise"
+                    : idForKind.includes("final_revise")
+                      ? "final_revise"
+                      : "plan_revise",
+          target_node_id: typeof item.revision_of === "string" ? item.revision_of.split(":")[0] : undefined,
+          artifact_id: item.revision_of,
+          required: item.priority !== "low",
+          node_id: item.id,
+          status: "pending",
+        }
+      }),
   )
   return {
     expert_lanes,
@@ -1216,13 +1270,20 @@ function finalizeEffortPlan(input: {
   })
 }
 
-function applyEffortGovernance(
+// A.2: profileOverride lets callers (tests + future config) opt MPACR on
+// without rewiring the effort enum. Production code keeps passing only
+// (plan, intent, effort, budgetOptions) and gets the default EffortProfile
+// for that effort level — behavior unchanged.
+export function applyEffortGovernance(
   plan: CoordinatorPlanType,
   intent: IntentProfileType,
   effort: EffortLevelType,
   budgetOptions?: BudgetOptions,
+  profileOverride?: Partial<EffortProfileType>,
 ) {
-  const profile = effortProfileFor(effort)
+  const profile = profileOverride
+    ? EffortProfile.parse({ ...effortProfileFor(effort), ...profileOverride })
+    : effortProfileFor(effort)
   const workflow = intent.workflow
   const workspaceSignals = workspaceSignalsForGoal(plan.goal)
   const baseNodes = (effort === "low" ? lowEffortNodes(plan.nodes) : plan.nodes).map((item) =>
@@ -1243,9 +1304,9 @@ function applyEffortGovernance(
           ),
         )
       : []
-  const planRevise = planning.length
-    ? [
-        reviseNode({
+  const planReviseGraph = planning.length
+    ? reviseGraphFor(
+        {
           id: "plan_revise_final",
           kind: "plan_revise",
           target: planning.at(-1),
@@ -1253,24 +1314,36 @@ function applyEffortGovernance(
           goal: plan.goal,
           workflow,
           effort,
-        }),
-      ]
-    : []
-  const rootGate = planRevise[0]?.id
+        },
+        profile,
+      )
+    : undefined
+  const planRevise = planReviseGraph ? planReviseGraph.all : []
+  // entry == synthesis (MPACR) or single reviser (legacy). Downstream nodes
+  // depend on this id so the entire debate must settle before they run.
+  const rootGate = planReviseGraph?.entry.id
   const gatedBase = rootGate
     ? baseNodes.map((item) =>
         item.depends_on.length === 0 ? CoordinatorNode.parse({ ...item, depends_on: [rootGate] }) : item,
       )
     : baseNodes
   const reviseNodes: CoordinatorNodeType[] = [...planRevise]
+  // A.2: track logical revise units separately from physical node count.
+  // MPACR debates expand 1 logical revise into K+3 nodes; only the unit count
+  // gates against profile.max_revise_nodes. planRevise consumed one unit if
+  // present.
+  const reviseUnits = { value: planReviseGraph ? 1 : 0 }
   const budgetLimited = { value: false }
-  const addRevise = (item: CoordinatorNodeType) => {
-    if (reviseNodes.length >= profile.max_revise_nodes) {
+  const addReviseGraph = (graph: { entry: CoordinatorNodeType; all: CoordinatorNodeType[] }) => {
+    if (reviseUnits.value >= profile.max_revise_nodes) {
       budgetLimited.value = true
-      return
+      return undefined
     }
-    reviseNodes.push(item)
+    reviseNodes.push(...graph.all)
+    reviseUnits.value++
+    return graph.entry.id
   }
+  const addRevise = (item: CoordinatorNodeType) => addReviseGraph({ entry: item, all: [item] })
 
   if (effort === "high") {
     const critical = gatedBase.filter((item) => item.role === "reducer" || item.role === "verifier")
@@ -1278,20 +1351,25 @@ function applyEffortGovernance(
     for (const item of critical) {
       const kind = item.role === "reducer" ? "reducer_revise" : "verifier_revise"
       const id = `${item.id}_${kind}`
-      addRevise(reviseNode({ id, kind, target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }))
-      if (!budgetLimited.value) replacements.set(item.id, id)
+      const entryId = addReviseGraph(
+        reviseGraphFor({ id, kind, target: item, dependsOn: [item.id], goal: plan.goal, workflow, effort }, profile),
+      )
+      if (entryId) replacements.set(item.id, entryId)
     }
     const rewritten = rewriteDeps(gatedBase, replacements)
     const finalDependsOn = sinkIDs(rewritten).map((item) => replacements.get(item) ?? item)
-    addRevise(
-      reviseNode({
-        id: "final_revise",
-        kind: "final_revise",
-        dependsOn: finalDependsOn,
-        goal: plan.goal,
-        workflow,
-        effort,
-      }),
+    addReviseGraph(
+      reviseGraphFor(
+        {
+          id: "final_revise",
+          kind: "final_revise",
+          dependsOn: finalDependsOn,
+          goal: plan.goal,
+          workflow,
+          effort,
+        },
+        profile,
+      ),
     )
     const allNodes = [...planning, ...rewriteDeps(rewritten, replacements), ...reviseNodes].map((item) =>
       withExpertHarness(item, { workflow, effort, profile }),
@@ -1315,56 +1393,69 @@ function applyEffortGovernance(
     const replacements = new Map<string, string>()
     const inputReviseByNode = new Map<string, string>()
     for (const item of gatedBase) {
-      if (reviseNodes.length >= profile.max_revise_nodes) {
+      if (reviseUnits.value >= profile.max_revise_nodes) {
         budgetLimited.value = true
         continue
       }
       const inputID = `${item.id}_input_revise`
-      addRevise(
-        reviseNode({
-          id: inputID,
-          kind: "input_revise",
-          target: item,
-          dependsOn: item.depends_on,
-          goal: plan.goal,
-          workflow,
-          effort,
-        }),
+      const inputEntry = addReviseGraph(
+        reviseGraphFor(
+          {
+            id: inputID,
+            kind: "input_revise",
+            target: item,
+            dependsOn: item.depends_on,
+            goal: plan.goal,
+            workflow,
+            effort,
+          },
+          profile,
+        ),
       )
-      inputReviseByNode.set(item.id, inputID)
-      if (reviseNodes.length >= profile.max_revise_nodes) {
+      if (inputEntry) inputReviseByNode.set(item.id, inputEntry)
+      if (reviseUnits.value >= profile.max_revise_nodes) {
         budgetLimited.value = true
         continue
       }
       const outputID = `${item.id}_output_revise`
-      addRevise(
-        reviseNode({
-          id: outputID,
-          kind: "output_revise",
-          target: item,
-          dependsOn: [item.id],
-          goal: plan.goal,
-          workflow,
-          effort,
-        }),
-      )
-      const handoffID = `${item.id}_handoff_revise`
-      if (dependents.has(item.id) && reviseNodes.length < profile.max_revise_nodes) {
-        addRevise(
-          reviseNode({
-            id: handoffID,
-            kind: "handoff_revise",
+      const outputEntry = addReviseGraph(
+        reviseGraphFor(
+          {
+            id: outputID,
+            kind: "output_revise",
             target: item,
-            dependsOn: [outputID],
+            dependsOn: [item.id],
             goal: plan.goal,
             workflow,
             effort,
-            required: false,
-          }),
+          },
+          profile,
+        ),
+      )
+      const handoffID = `${item.id}_handoff_revise`
+      if (dependents.has(item.id) && reviseUnits.value < profile.max_revise_nodes) {
+        const handoffEntry = addReviseGraph(
+          reviseGraphFor(
+            {
+              id: handoffID,
+              kind: "handoff_revise",
+              target: item,
+              dependsOn: outputEntry ? [outputEntry] : [outputID],
+              goal: plan.goal,
+              workflow,
+              effort,
+              required: false,
+            },
+            profile,
+          ),
         )
-        replacements.set(item.id, handoffID)
-      } else {
-        replacements.set(item.id, outputID)
+        if (handoffEntry) {
+          replacements.set(item.id, handoffEntry)
+        } else if (outputEntry) {
+          replacements.set(item.id, outputEntry)
+        }
+      } else if (outputEntry) {
+        replacements.set(item.id, outputEntry)
       }
     }
     const rewritten = gatedBase.map((item) =>
@@ -1375,15 +1466,18 @@ function applyEffortGovernance(
           : item.depends_on.map((dependency) => replacements.get(dependency) ?? dependency),
       }),
     )
-    addRevise(
-      reviseNode({
-        id: "final_revise",
-        kind: "final_revise",
-        dependsOn: sinkIDs(rewritten).map((item) => replacements.get(item) ?? item),
-        goal: plan.goal,
-        workflow,
-        effort,
-      }),
+    addReviseGraph(
+      reviseGraphFor(
+        {
+          id: "final_revise",
+          kind: "final_revise",
+          dependsOn: sinkIDs(rewritten).map((item) => replacements.get(item) ?? item),
+          goal: plan.goal,
+          workflow,
+          effort,
+        },
+        profile,
+      ),
     )
     const rewrittenRevise = reviseNodes.map((item) => {
       const targetID = typeof item.revision_of === "string" ? item.revision_of.split(":")[0] : undefined
@@ -1415,15 +1509,18 @@ function applyEffortGovernance(
   }
 
   if (effort === "medium") {
-    addRevise(
-      reviseNode({
-        id: "final_revise",
-        kind: "final_revise",
-        dependsOn: sinkIDs(gatedBase),
-        goal: plan.goal,
-        workflow,
-        effort,
-      }),
+    addReviseGraph(
+      reviseGraphFor(
+        {
+          id: "final_revise",
+          kind: "final_revise",
+          dependsOn: sinkIDs(gatedBase),
+          goal: plan.goal,
+          workflow,
+          effort,
+        },
+        profile,
+      ),
     )
   }
 
@@ -1444,7 +1541,7 @@ function applyEffortGovernance(
   })
 }
 
-function basePlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
+export function basePlanForIntent(intent: IntentProfileType): CoordinatorPlanType {
   const goal = intent.goal
   const researchStage = parallelResearchStage(goal)
   const researchDependsOn = ["research_synthesis"]
@@ -2534,6 +2631,8 @@ export const layer = Layer.effect(
     const tasks = yield* TaskRuntime.Service
     const agents = yield* Agent.Service
     const provider = yield* Provider.Service
+    const tlm = yield* ThreeLayerMemory.Service
+    const expertRegistry = yield* ExpertRegistry.Service
     const scope = yield* Scope.Scope
 
     const publish = (
@@ -2577,7 +2676,24 @@ export const layer = Layer.effect(
         (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
         { concurrency: BudgetTuning.concurrency.storageRead, discard: true },
       )
-      return orderPlan(governed)
+      const ordered = orderPlan(governed)
+      // B.4 — enrich memory_context with semantic facts + procedural recipes
+      // from prior sessions. Best-effort: failures degrade to the bare plan
+      // so a memory backend hiccup never blocks plan creation. Provide tlm
+      // explicitly so this Effect's R type stays `never` (matches Interface.plan).
+      const enriched = yield* ThreeLayerMemory.enrichPlanMemory(ordered).pipe(
+        Effect.provideService(ThreeLayerMemory.Service, tlm),
+        Effect.catch(() => Effect.succeed(ordered)),
+      )
+      // C.4 — apply user-defined expert overrides. Each plan node whose role
+      // matches a registered user expert's `inherits` gets prompt + expert_id
+      // + memory_namespace replaced. Same best-effort posture: registry hiccup
+      // never blocks plan creation.
+      const finalPlan = yield* ExpertRegistry.applyUserExpertsToPlan(enriched).pipe(
+        Effect.provideService(ExpertRegistry.Service, expertRegistry),
+        Effect.catch(() => Effect.succeed(enriched)),
+      )
+      return finalPlan
     })
 
     const createTaskSession = Effect.fn("Coordinator.createTaskSession")(function* (input: {
@@ -3462,6 +3578,10 @@ export const layer = Layer.effect(
   }),
 )
 
+// ThreeLayerMemory and ExpertRegistry are NOT bundled here (they would create
+// a circular import via personal.ts → coordinator.ts). AppRuntime's mergeAll
+// composes them at the peer level so the Coordinator's runtime Service
+// requirements are satisfied at the merged layer.
 export const defaultLayer = layer.pipe(
   Layer.provide(Bus.layer),
   Layer.provide(TaskRuntime.defaultLayer),

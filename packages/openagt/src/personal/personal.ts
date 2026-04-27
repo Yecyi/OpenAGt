@@ -34,8 +34,13 @@ import {
   type WorkPriority as WorkPriorityType,
 } from "./schema"
 
+// Scope-weight ordering reflects retrieval-priority: session is the freshest
+// context; semantic/procedural are long-lived knowledge so they outrank
+// workspace/profile but stay below the live session.
 const scopeWeight = {
   session: 30,
+  semantic: 25,
+  procedural: 22,
   workspace: 20,
   profile: 10,
 } as const satisfies Record<MemoryScopeType, number>

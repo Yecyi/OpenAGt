@@ -2,7 +2,9 @@ import { afterEach, describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { Bus } from "../../src/bus"
 import { Coordinator } from "../../src/coordinator/coordinator"
+import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import { PersonalAgent } from "../../src/personal/personal"
+import { ThreeLayerMemory } from "../../src/personal/three-layer"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { SessionPrompt } from "../../src/session/prompt"
@@ -79,7 +81,9 @@ const it = testEffect(
     SessionPrompt.defaultLayer,
     Coordinator.defaultLayer,
     PersonalAgent.defaultLayer,
-  ),
+    ThreeLayerMemory.defaultLayer,
+    ExpertRegistry.defaultLayer,
+  ).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer)),
 )
 
 describe("coordinator runner", () => {

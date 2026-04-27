@@ -17,6 +17,7 @@ const prefixes = {
   inbox: "ibx",
   wakeup: "wak",
   memory: "mem",
+  calibration: "cal",
 } as const
 
 export function schema(prefix: keyof typeof prefixes) {

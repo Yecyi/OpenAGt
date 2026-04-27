@@ -43,7 +43,14 @@ export const ScheduledWakeupID = scheduledWakeupIdSchema.pipe(
   })),
 )
 
-export const MemoryScope = z.enum(["profile", "workspace", "session"])
+// Memory scope hierarchy for the Three-Layer Memory Architecture (3LMA, B.2):
+//   - episodic layer: profile / workspace / session — short-term, in-flight context
+//   - semantic layer: cross-session domain facts (entity-attribute-value triples)
+//   - procedural layer: reusable task recipes derived from successful runs
+// All four scopes share the same `personal_memory_note` table; consolidation
+// (B.3) is what promotes episodic notes into semantic facts and procedural
+// recipes.
+export const MemoryScope = z.enum(["profile", "workspace", "session", "semantic", "procedural"])
 export type MemoryScope = z.infer<typeof MemoryScope>
 
 export const MemorySource = z.enum([
