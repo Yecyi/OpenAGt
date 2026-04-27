@@ -517,7 +517,13 @@ export const layer: Layer.Layer<
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
           const output = typeof metadata.output === "string" ? metadata.output : ""
-          if (part.tool === "bash") {
+          if (
+            part.tool === "bash" &&
+            (output.length > 0 ||
+              typeof metadata.description === "string" ||
+              typeof metadata.backendPreference === "string" ||
+              typeof metadata.enforcement === "string")
+          ) {
             const captured = output || "(no output captured before abort)"
             const truncated =
               metadata.truncated === true ||

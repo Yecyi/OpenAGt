@@ -151,9 +151,9 @@ export const make = <A, E = never>(
         return [
           Effect.gen(function* () {
             const exit = yield* Fiber.await(fiber)
-            const wasCancelled = cancelledShells.delete(id)
+            cancelledShells.delete(id)
             if (Exit.isSuccess(exit)) return exit.value
-            if ((wasCancelled || Cause.hasInterruptsOnly(exit.cause)) && onInterrupt) return yield* onInterrupt
+            if (onInterrupt) return yield* onInterrupt
             return yield* Effect.failCause(exit.cause)
           }),
           { _tag: "Shell", shell },
