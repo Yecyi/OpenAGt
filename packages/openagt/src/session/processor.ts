@@ -1,5 +1,7 @@
 import { Cause, Deferred, Effect, Layer, Context, Scope } from "effect"
 import * as Stream from "effect/Stream"
+import os from "os"
+import path from "path"
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Config } from "@/config"
@@ -17,6 +19,7 @@ import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider"
 import { Question } from "@/question"
+import * as Truncate from "@/tool/truncate"
 import { errorMessage } from "@/util/error"
 import { Log } from "@/util"
 import { isRecord } from "@/util/record"
@@ -513,6 +516,42 @@ export const layer: Layer.Layer<
           const part = match.part
           const end = Date.now()
           const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
+          const output = typeof metadata.output === "string" ? metadata.output : ""
+          if (part.tool === "bash" && output.length > 0) {
+            const truncated =
+              metadata.truncated === true ||
+              output.startsWith("...\n\n") ||
+              Buffer.byteLength(output, "utf-8") > Truncate.MAX_BYTES
+            const outputPath = truncated
+              ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`)
+              : undefined
+            if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, output))
+            yield* session.updatePart({
+              ...part,
+              state: {
+                status: "completed",
+                input: part.state.input,
+                output:
+                  (truncated && outputPath
+                    ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${output}`
+                    : output) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
+                metadata: {
+                  ...metadata,
+                  output,
+                  truncated,
+                  ...(outputPath ? { outputPath } : {}),
+                  terminationReason: "abort",
+                  interrupted: true,
+                  interruption_origin: "session_cleanup",
+                  root_cause: "bash_result_missing_after_session_interrupt",
+                },
+                title: typeof metadata.description === "string" ? metadata.description : "Shell command",
+                time: { start: "time" in part.state ? part.state.time.start : end, end },
+              },
+            })
+            yield* settleToolCall(toolCallID)
+            continue
+          }
           yield* session.updatePart({
             ...part,
             state: {

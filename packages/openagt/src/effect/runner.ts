@@ -46,6 +46,7 @@ export const make = <A, E = never>(
   const idle = opts?.onIdle ?? Effect.void
   const busy = opts?.onBusy ?? Effect.void
   const onInterrupt = opts?.onInterrupt
+  const cancelledShells = new Set<number>()
   let ids = 0
 
   const state = () => SynchronizedRef.getUnsafe(ref)
@@ -150,8 +151,9 @@ export const make = <A, E = never>(
         return [
           Effect.gen(function* () {
             const exit = yield* Fiber.await(fiber)
+            const wasCancelled = cancelledShells.delete(id)
             if (Exit.isSuccess(exit)) return exit.value
-            if (Cause.hasInterruptsOnly(exit.cause) && onInterrupt) return yield* onInterrupt
+            if ((wasCancelled || Cause.hasInterruptsOnly(exit.cause)) && onInterrupt) return yield* onInterrupt
             return yield* Effect.failCause(exit.cause)
           }),
           { _tag: "Shell", shell },
@@ -175,6 +177,7 @@ export const make = <A, E = never>(
       case "Shell":
         return [
           Effect.gen(function* () {
+            cancelledShells.add(st.shell.id)
             yield* stopShell(st.shell)
             yield* idleIfCurrent()
           }),
@@ -184,6 +187,7 @@ export const make = <A, E = never>(
         return [
           Effect.gen(function* () {
             yield* Deferred.fail(st.run.done, new Cancelled()).pipe(Effect.asVoid)
+            cancelledShells.add(st.shell.id)
             yield* stopShell(st.shell)
             yield* idleIfCurrent()
           }),
