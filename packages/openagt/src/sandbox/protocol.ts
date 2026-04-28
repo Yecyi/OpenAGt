@@ -2,6 +2,7 @@ import { SANDBOX_PROTOCOL_VERSION, type SandboxBrokerFrame, type SandboxBrokerRe
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
+export const MAX_FRAME_BYTES = 4 * 1024 * 1024
 
 function bytes(input: SandboxBrokerFrame | SandboxBrokerRequestFrame) {
   return textEncoder.encode(JSON.stringify(input))
@@ -30,6 +31,11 @@ export function createFrameParser(
       const size = Number.parseInt(textDecoder.decode(buffer.subarray(0, 8)), 16)
       if (!Number.isFinite(size) || size < 0) {
         onError?.(new Error("Invalid sandbox frame header"))
+        buffer = new Uint8Array(0)
+        return
+      }
+      if (size > MAX_FRAME_BYTES) {
+        onError?.(new Error(`Sandbox frame exceeds maximum size: ${size}`))
         buffer = new Uint8Array(0)
         return
       }

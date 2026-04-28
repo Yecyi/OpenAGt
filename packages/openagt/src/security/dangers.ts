@@ -39,7 +39,8 @@ export const COMMAND_SUBSTITUTION_PATTERNS: CommandSubstitutionPattern[] = [
  * Binary hijack variables - these can be used to inject malicious code
  * by prepending custom library paths or executing arbitrary code
  */
-export const BINARY_HIJACK_VARS = /^(LD_|DYLD_|PATH$)/
+export const BINARY_HIJACK_VARS =
+  /^(?:LD_|DYLD_|PATH$|NODE_OPTIONS$|BUN_OPTIONS$|DENO_OPTIONS$|BASH_ENV$|ENV$|PROMPT_COMMAND$|PS4$|IFS$|PYTHONPATH$|PYTHONSTARTUP$|PYTHONHOME$|PERL5OPT$|PERL5LIB$|PERLLIB$|RUBYOPT$|RUBYLIB$|JAVA_TOOL_OPTIONS$|_JAVA_OPTIONS$|GIT_SSH_COMMAND$|GIT_EXEC_PATH$|GIT_DIR$|MAIL$|MAILPATH$)/i
 
 /**
  * Safe environment variables whitelist - only these variables are allowed
@@ -59,8 +60,6 @@ export const SAFE_ENV_VARS = new Set([
   "NODE_ENV",
   "PYTHONUNBUFFERED",
   "PYTHONDONTWRITEBYTECODE",
-  // API/Auth
-  "ANTHROPIC_API_KEY",
   // Locale/Terminal
   "LANG",
   "LANGUAGE",
@@ -96,11 +95,6 @@ export const ANT_ONLY_SAFE_ENV_VARS = new Set([
   "COO_NAMESPACE",
   "CUDA_VISIBLE_DEVICES",
   "JAX_PLATFORMS",
-  "PGPASSWORD",
-  "GH_TOKEN",
-  "GITHUB_TOKEN",
-  "GITEA_TOKEN",
-  "GITLAB_TOKEN",
 ])
 
 // ============================================================

@@ -31,7 +31,7 @@ export class EnvSanitizer {
     // Check ANT-specific whitelist
     if (this.isAntContext && ANT_ONLY_SAFE_ENV_VARS.has(key)) return true
 
-    // Check against binary hijack patterns (LD_*, DYLD_*, PATH)
+    // Check against shell injection and binary hijack patterns.
     if (BINARY_HIJACK_VARS.test(key)) return false
 
     // Default: not safe
@@ -90,7 +90,7 @@ export class EnvSanitizer {
         if (BINARY_HIJACK_VARS.test(key)) {
           dangerous.push({
             key,
-            reason: `binary hijack variable (${key})`,
+            reason: `dangerous shell environment variable (${key})`,
           })
         } else {
           dangerous.push({

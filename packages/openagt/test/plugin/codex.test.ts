@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import type { PluginInput } from "@openagt/plugin"
+import type { Model, Provider } from "@openagt/sdk"
 import {
+  CodexAuthPlugin,
   parseJwtClaims,
   extractAccountIdFromClaims,
   extractAccountId,
@@ -12,7 +15,111 @@ function createTestJwt(payload: object): string {
   return `${header}.${body}.sig`
 }
 
+function createModel(id: string, apiID = id): Model {
+  return {
+    id,
+    providerID: "openai",
+    api: {
+      id: apiID,
+      url: "https://api.openai.com/v1",
+      npm: "@ai-sdk/openai",
+    },
+    name: id,
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        pdf: true,
+      },
+      output: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        pdf: false,
+      },
+      interleaved: false,
+    },
+    cost: {
+      input: 1,
+      output: 2,
+      cache: { read: 3, write: 4 },
+    },
+    limit: {
+      context: 200_000,
+      output: 100_000,
+    },
+    status: "active",
+    options: {},
+    headers: {},
+    release_date: "2026-04-28",
+  }
+}
+
+function createProvider(models: Model[]): Provider {
+  return {
+    id: "openai",
+    name: "OpenAI",
+    source: "api",
+    env: [],
+    options: {},
+    models: Object.fromEntries(models.map((model) => [model.id, model])),
+  }
+}
+
+async function loadOAuthProvider(provider: Provider) {
+  const hooks = await CodexAuthPlugin({} as PluginInput)
+  if (!hooks.auth?.loader) throw new Error("missing codex auth loader")
+  await hooks.auth.loader(
+    async () => ({
+      type: "oauth",
+      refresh: "refresh",
+      access: "access",
+      expires: Date.now() + 60_000,
+    }),
+    provider,
+  )
+}
+
 describe("plugin.codex", () => {
+  describe("OAuth model filtering", () => {
+    test("keeps future GPT minor versions and applies gpt-5.5 limits", async () => {
+      const provider = createProvider([
+        createModel("gpt-5.4"),
+        createModel("gpt-5.5"),
+        createModel("gpt-5.5-mini"),
+        createModel("gpt-5.3-codex"),
+        createModel("gpt-5"),
+        createModel("gpt-4o"),
+      ])
+
+      await loadOAuthProvider(provider)
+
+      expect(Object.keys(provider.models).sort()).toEqual(["gpt-5.3-codex", "gpt-5.4", "gpt-5.5", "gpt-5.5-mini"])
+      expect(provider.models["gpt-5.5"].cost).toEqual({
+        input: 0,
+        output: 0,
+        cache: { read: 0, write: 0 },
+      })
+      expect(provider.models["gpt-5.5"].limit).toEqual({
+        context: 400_000,
+        input: 272_000,
+        output: 128_000,
+      })
+      expect(provider.models["gpt-5.5-mini"].limit).toEqual({
+        context: 400_000,
+        input: 272_000,
+        output: 128_000,
+      })
+    })
+  })
+
   describe("parseJwtClaims", () => {
     test("parses valid JWT with claims", () => {
       const payload = { email: "test@example.com", chatgpt_account_id: "acc-123" }

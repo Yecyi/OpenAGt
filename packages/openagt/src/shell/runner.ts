@@ -117,13 +117,22 @@ export const layer = Layer.effect(
         input.backendPreference === "auto"
           ? capabilities.find((item) => item.name === autoBackendName())
           : capabilities.find((item) => item.name === input.backendPreference)
+      const processBackend = capabilities.find((item) => item.name === "process")
+      const executionBackendPreference =
+        !preferred?.available &&
+        processBackend?.available &&
+        (input.backendPreference === "auto" || input.failurePolicy !== "closed")
+          ? "process"
+          : input.backendPreference
+      const executionBackend =
+        executionBackendPreference === "process" ? processBackend : preferred
 
       // B-P0-4: Advisory refusal on medium+ risk when broker absent
       // If enforcement is advisory and no preferred backend is available and risk is medium or high, refuse
       const MEDIUM_RISK_LEVELS = ["medium", "high"]
       if (
         input.enforcement === "advisory" &&
-        !preferred?.available &&
+        !executionBackend?.available &&
         input.riskLevel &&
         MEDIUM_RISK_LEVELS.includes(input.riskLevel)
       ) {
@@ -133,7 +142,12 @@ export const layer = Layer.effect(
         )
       }
 
-      if (input.enforcement === "required" && input.failurePolicy === "closed" && !preferred?.available) {
+      if (
+        input.enforcement === "required" &&
+        input.failurePolicy === "closed" &&
+        !preferred?.available &&
+        (input.backendPreference !== "auto" || (input.riskLevel && MEDIUM_RISK_LEVELS.includes(input.riskLevel)))
+      ) {
         throw new Error(preferred?.reason ?? "Required sandbox backend unavailable")
       }
 
@@ -150,7 +164,7 @@ export const layer = Layer.effect(
         },
       })
 
-      const updates = yield* Queue.unbounded<string>()
+      const updates = yield* Queue.sliding<string>(1)
       let metadataClosed = false
       const metadataFiber = Effect.runFork(
         Effect.forever(
@@ -170,7 +184,7 @@ export const layer = Layer.effect(
               }),
             ),
           ),
-        ).pipe(Effect.catch(() => Effect.void)),
+        ).pipe(Effect.catchCause(() => Effect.void)),
       )
 
       const push = (text: string) => {
@@ -185,7 +199,7 @@ export const layer = Layer.effect(
         }
         last = preview(last + text)
         if (!metadataClosed) {
-          Effect.runFork(Queue.offer(updates, last).pipe(Effect.asVoid))
+          Queue.offerUnsafe(updates, last)
         }
         if (file) {
           try {
@@ -210,7 +224,7 @@ export const layer = Layer.effect(
           env,
           env_policy: "sanitize",
           enforcement: input.enforcement,
-          backend_preference: input.backendPreference,
+          backend_preference: executionBackendPreference,
           filesystem_policy: input.filesystemPolicy,
           allowed_paths: input.allowedPaths,
           writable_paths: input.writablePaths,
@@ -259,9 +273,23 @@ export const layer = Layer.effect(
             }),
         )
       }
+      if (last) {
+        yield* ctx.metadata({
+          metadata: {
+            output: last,
+            description: input.description,
+            backendPreference: input.backendPreference,
+            enforcement: input.enforcement,
+            filesystemPolicy: input.filesystemPolicy,
+            networkPolicy: input.networkPolicy,
+            allowedPaths: input.allowedPaths,
+            writablePaths: input.writablePaths,
+          },
+        })
+      }
       metadataClosed = true
       yield* Queue.shutdown(updates).pipe(Effect.ignore)
-      yield* Fiber.await(metadataFiber).pipe(Effect.ignore)
+      yield* Fiber.interrupt(metadataFiber).pipe(Effect.ignore)
 
       return {
         title: input.description,

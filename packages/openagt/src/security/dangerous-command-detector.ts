@@ -43,6 +43,7 @@ interface DetectionResult {
 }
 
 const SEVERITY_ORDER: Record<DangerSeverity, number> = { safe: 0, low: 1, medium: 2, high: 3 }
+const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
 
 function mergeSeverity(current: DangerSeverity, next: DangerSeverity) {
   return SEVERITY_ORDER[next] > SEVERITY_ORDER[current] ? next : current
@@ -129,7 +130,7 @@ function detectBashDanger(command: string): DetectionResult {
     severity = "high"
   }
 
-  if (/rm\s+-rf\s+(\/|\*|~)/i.test(command)) {
+  if (/rm\s+-rf\s+(\/|\*|~)/i.test(command) || DESTRUCTIVE_RM_PATTERN.test(command)) {
     reasons.push("Dangerous recursive delete pattern")
     patterns.push("rm_rf_root")
     severity = "high"

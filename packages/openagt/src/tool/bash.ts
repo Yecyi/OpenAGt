@@ -16,8 +16,6 @@ import { Shell } from "@/shell/shell"
 import { ShellRunner } from "@/shell/runner"
 import { SandboxBroker } from "@/sandbox/broker"
 import { SandboxPolicy } from "@/sandbox/policy"
-import type { ResolvedPolicy } from "@/sandbox/policy"
-import { autoBackendName } from "@/sandbox/backends"
 
 import { BashArity } from "@/permission/arity"
 import * as Truncate from "./truncate"
@@ -27,17 +25,12 @@ import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import {
-  classifyApprovalKind,
-  formatShellSafety,
-  isPrivilegeEscalationCommand,
-  ShellSecurity,
-} from "../security/shell-security"
+import { formatShellSafety, isPrivilegeEscalationCommand, ShellSecurity } from "../security/shell-security"
 import type { ShellDecision, ShellFinding, ShellRiskLevel, ShellSafety } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
 import type { ExecPolicyDecision } from "@/security/exec-policy"
+import { resolveExecutionDecision, strictestDecision } from "@/security/decision-pipeline"
 import type {
-  SandboxBackendName,
   SandboxBackendStatus,
   SandboxBackendPreference,
   SandboxEnforcement,
@@ -355,62 +348,6 @@ const askShellNetwork = Effect.fn("BashTool.askShellNetwork")(function* (
   })
 })
 
-const DECISION_ORDER: Record<ExecPolicyDecision, number> = {
-  allow: 0,
-  confirm: 1,
-  block: 2,
-}
-
-function stricterDecision(left: ExecPolicyDecision, right: ExecPolicyDecision): ExecPolicyDecision {
-  return DECISION_ORDER[left] >= DECISION_ORDER[right] ? left : right
-}
-
-function preferredBackendName(preference: SandboxBackendPreference): SandboxBackendName | undefined {
-  if (preference !== "auto") return preference
-  return autoBackendName()
-}
-
-function preferredBackendStatus(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
-  const name = preferredBackendName(preference)
-  if (!name) return
-  return capabilities.find((item) => item.name === name)
-}
-
-function backendAvailability(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
-  const backend = preferredBackendStatus(preference, capabilities)
-  if (!backend) return preference === "auto" ? "auto:unknown" : `${preference}:unknown`
-  if (backend.available) return `${backend.name}:available`
-  return `${backend.name}:unavailable${backend.reason ? ` (${backend.reason})` : ""}`
-}
-
-function sandboxEscalationReason(input: {
-  decision: ShellDecision
-  matchedRules: string[]
-  privilegeEscalation: boolean
-  needsNetworkPermission: boolean
-  policy: Pick<ResolvedPolicy, "sandbox" | "backend_preference">
-  capabilities: SandboxBackendStatus[]
-}) {
-  if (input.decision === "block") return
-  if (input.matchedRules.length > 0) return
-  if (input.privilegeEscalation) return
-  if (input.needsNetworkPermission) return
-  if (!input.policy.sandbox.enabled) {
-    return "Sandbox is disabled; confirmation required before running without isolation."
-  }
-  if (input.policy.sandbox.report_only) {
-    return "Sandbox enforcement is in report-only mode; confirmation required before running without enforcement."
-  }
-  const backend = preferredBackendStatus(input.policy.backend_preference, input.capabilities)
-  if (
-    !backend?.available &&
-    input.policy.backend_preference !== "auto" &&
-    input.policy.sandbox.failure_policy !== "closed"
-  ) {
-    return `Sandbox backend ${backend?.name ?? input.policy.backend_preference} is unavailable; confirmation required before downgrade.`
-  }
-}
-
 const parser = lazy(async () => {
   const { Parser } = await import("web-tree-sitter")
   const { default: treeWasm } = await import("web-tree-sitter/tree-sitter.wasm" as string, {
@@ -574,6 +511,7 @@ export const BashTool = Tool.define(
     })
 
     const shellEnv = Effect.fn("BashTool.shellEnv")(function* (ctx: Tool.Context, cwd: string) {
+      if (Flag.OPENCODE_DISABLE_DEFAULT_PLUGINS || Flag.OPENAGT_DISABLE_DEFAULT_PLUGINS) return process.env
       const extra = yield* plugin.trigger(
         "shell.env",
         { cwd, sessionID: ctx.sessionID, callID: ctx.callID },
@@ -629,12 +567,6 @@ export const BashTool = Tool.define(
             command: security.normalized_command || params.command,
             shellFamily: security.shell_family,
           })
-          const preliminaryDecision = stricterDecision(security.decision, policyDecision.decision)
-          const preliminaryReason =
-            preliminaryDecision === policyDecision.decision && policyDecision.matchedRules.length > 0
-              ? policyDecision.reason
-              : security.explanation
-          const matchedRules = policyDecision.matchedRules.map((item) => item.pattern.join(" "))
           const externalPaths = Array.from(scan.dirs)
           const permissionMetadata = shellSecurity.createPermissionMetadata({
             result: security,
@@ -642,52 +574,13 @@ export const BashTool = Tool.define(
             workdir: cwd,
             externalPaths,
           })
+          const preliminaryDecision = strictestDecision(security.decision, policyDecision.decision)
           const preliminaryPolicy = yield* sandboxPolicy.resolve({
             result: security,
             decision: preliminaryDecision,
             cwd,
             externalPaths,
           })
-          if (preliminaryDecision === "block") {
-            const matchedRules = policyDecision.matchedRules.map((item) => item.pattern.join(" "))
-            const shellSafety = formatShellSafety({
-              decision: "block",
-              riskLevel: security.risk_level,
-              reason: preliminaryReason,
-              approvalKind: "dangerous_command",
-              approvalRequired: true,
-              policySource: policyDecision.matchedRules.length > 0 ? "exec_policy" : "shell_security",
-              backendPreference: preliminaryPolicy.backend_preference,
-              enforcement: preliminaryPolicy.enforcement,
-              filesystemPolicy: preliminaryPolicy.filesystem_policy,
-              networkPolicy: preliminaryPolicy.network_policy,
-              backendAvailability: "not_checked",
-              policyReason: preliminaryReason,
-              matchedRules,
-            })
-            return {
-              title: "Bash Command Blocked",
-              metadata: {
-                output: shellSafety.summary,
-                exit: null as number | null,
-                description: params.description ?? "",
-                truncated: false,
-                findings: security.findings,
-                riskLevel: security.risk_level,
-                decision: "block",
-                reviewApiVersion: security.review_api_version,
-                reviewMode: security.review_mode,
-                reviewStatus: security.review_status,
-                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                shell_safety: shellSafety,
-                safetySummary: shellSafety.summary,
-                safetyDetails: shellSafety.details,
-              } satisfies BashMetadata,
-              output: shellSafety.summary,
-            }
-          }
           const capabilities = yield* sandboxBroker.capabilities().pipe(
             Effect.catchCause((cause) =>
               Effect.sync(() => {
@@ -697,18 +590,18 @@ export const BashTool = Tool.define(
             ),
           )
           const privilegeEscalation = isPrivilegeEscalationCommand(security.normalized_command || params.command)
-          const escalationReason = sandboxEscalationReason({
-            decision: preliminaryDecision,
-            matchedRules,
-            privilegeEscalation,
-            needsNetworkPermission: preliminaryPolicy.needs_network_permission,
+          const decision = resolveExecutionDecision({
+            securityDecision: security.decision,
+            securityReason: security.explanation,
+            riskLevel: security.risk_level,
+            policyDecision,
             policy: preliminaryPolicy,
             capabilities,
+            privilegeEscalation,
           })
-          const finalDecision = escalationReason
-            ? stricterDecision(preliminaryDecision, "confirm")
-            : preliminaryDecision
-          const finalReason = escalationReason && preliminaryDecision === "allow" ? escalationReason : preliminaryReason
+          const finalDecision = decision.finalDecision
+          const finalReason = decision.finalReason
+          const matchedRules = decision.matchedRules
           const policy =
             finalDecision === preliminaryDecision
               ? preliminaryPolicy
@@ -718,29 +611,14 @@ export const BashTool = Tool.define(
                   cwd,
                   externalPaths,
                 })
-          const backendAvailabilitySummary = backendAvailability(policy.backend_preference, capabilities)
-          const approvalKind = classifyApprovalKind({
-            decision: finalDecision,
-            reason: finalReason,
-            matchedRules,
-            needsNetworkPermission: policy.needs_network_permission,
-            privilegeEscalation,
-            sandboxEscalation: Boolean(escalationReason),
-          })
+          const backendAvailabilitySummary = decision.backendAvailability
           const shellSafety = formatShellSafety({
             decision: finalDecision,
             riskLevel: security.risk_level,
             reason: finalReason,
-            approvalKind,
+            approvalKind: decision.approvalKind,
             approvalRequired: finalDecision !== "allow" || policy.needs_network_permission,
-            policySource:
-              policyDecision.matchedRules.length > 0
-                ? "exec_policy"
-                : escalationReason
-                  ? "sandbox_policy"
-                  : policy.needs_network_permission
-                    ? "sandbox_policy"
-                    : "shell_security",
+            policySource: decision.policySource,
             backendPreference: policy.backend_preference,
             enforcement: policy.enforcement,
             filesystemPolicy: policy.filesystem_policy,

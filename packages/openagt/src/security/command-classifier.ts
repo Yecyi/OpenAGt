@@ -39,6 +39,8 @@ export interface ClassificationResult {
   subId?: number
 }
 
+const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
+
 // ============================================================
 // Command Classifier
 // ============================================================
@@ -84,6 +86,16 @@ export class CommandClassifier {
         bypassable: riskLevel !== "high",
         checkId: validatorResult.checkId,
         subId: validatorResult.subId,
+      }
+    }
+    if (validatorResult.behavior === "allow" && validatorResult.message === "Safe quoted heredoc") {
+      return {
+        riskLevel: "safe",
+        matchedPatterns: [],
+        warnings: [],
+        sanitizedCommand: stripped,
+        shouldBlock: false,
+        bypassable: true,
       }
     }
 
@@ -203,6 +215,10 @@ export class CommandClassifier {
         matches.push(`dangerous_bash: ${pattern}`)
         warnings.push(`Dangerous bash pattern detected: ${pattern}`)
       }
+    }
+    if (DESTRUCTIVE_RM_PATTERN.test(cmd)) {
+      matches.push("dangerous_bash: rm_recursive_force_root")
+      warnings.push("Dangerous recursive delete pattern")
     }
 
     return { matches, warnings }
@@ -444,6 +460,7 @@ export class CommandClassifier {
       "command_substitution: $|",
       "dangerous_bash: eval",
       "dangerous_bash: exec",
+      "dangerous_bash: rm_recursive_force_root",
       "rm -rf",
       "dangerous_variable: LD_",
       "dangerous_variable: DYLD_",

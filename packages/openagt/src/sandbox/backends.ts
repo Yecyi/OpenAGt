@@ -1,7 +1,6 @@
 import path from "path"
 import { Global } from "@/global"
 import { Flag } from "@/flag/flag"
-import { Shell } from "@/shell/shell"
 import { spawn } from "child_process"
 import type {
   SandboxBackendName,
@@ -72,8 +71,7 @@ function shellArgs(request: SandboxExecRequest) {
       return [request.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", request.command]] as const
     }
     if (request.shell_family === "posix") {
-      const login = Shell.login(request.shell)
-      return [request.shell, [login ? "-lc" : "-c", request.command]] as const
+      return [request.shell, ["-c", request.command]] as const
     }
     return [request.shell, ["/d", "/s", "/c", request.command]] as const
   }
@@ -153,7 +151,7 @@ function processBackend(): SandboxBackend {
       child.exited
         .then(async (exitCode) => {
           clearTimeout(timer)
-          await Promise.race([Promise.allSettled([stdout, stderr]), new Promise((resolve) => setTimeout(resolve, 100))])
+          await Promise.race([Promise.allSettled([stdout, stderr]), new Promise((resolve) => setTimeout(resolve, 1000))])
           exit({
             request_id: input.request.request_id,
             exit_code: terminationReason === "exit" ? exitCode : null,

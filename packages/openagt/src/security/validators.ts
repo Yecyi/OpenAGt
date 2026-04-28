@@ -80,9 +80,9 @@ const SHELL_METACHAR_PATTERNS = [
 const BRACE_PATTERN = /[{}]/
 const UNQUOTED_CLOSE_BRACE_EXCESS = /(?<![\\'"])[}][^;|&$<>`\n\r]*$/
 
-// Safe heredoc delimiter pattern
-const HEREDOC_DELIMITER_RE = /^(?:'+([A-Za-z_]\w*)'+|\\([A-Za-z_]\w*))/
 const HEREDOC_PATTERN = /\$\(cat[ \t]*<<(-?)[ \t]*(?:'+([A-Za-z_]\w*)'+|\\([A-Za-z_]\w*))/
+const SAFE_HEREDOC_SUBSTITUTION_RE =
+  /^\s*\$\(cat[ \t]*<<-?[ \t]*(?:'([A-Za-z_]\w*)'|\\([A-Za-z_]\w*))[ \t]*\r?\n([\s\S]*)\r?\n([A-Za-z_]\w*)[ \t]*\)\s*$/
 
 // Git commit pattern
 const GIT_COMMIT_PATTERN = /^git[ \t]+commit[ \t]+[^;&|`$<>()\n\r]*?-m[ \t]+(["'])([\s\S]*?)\1(.*)$/
@@ -165,21 +165,10 @@ export function validateEmpty(context: ValidationContext): ValidatorResult {
 // ============================================================
 
 export function validateIncompleteCommands(context: ValidationContext): ValidatorResult {
-  const trimmed = context.originalCommand.trim()
-
-  // Check for tab as first character after whitespace (incomplete command)
-  if (/^\s/.test(trimmed)) {
-    return {
-      behavior: "ask",
-      message: "Command appears incomplete (starts with tab)",
-      checkId: CHECK_IDS.INCOMPLETE_COMMANDS,
-      subId: 1,
-      isMisparsingCheck: true,
-    }
-  }
+  const command = context.originalCommand
 
   // Check for flag as first non-whitespace (incomplete command)
-  if (/^\s-/.test(trimmed)) {
+  if (/^\s+-/.test(command)) {
     return {
       behavior: "ask",
       message: "Command appears incomplete (starts with flag)",
@@ -190,12 +179,23 @@ export function validateIncompleteCommands(context: ValidationContext): Validato
   }
 
   // Check for operator as first non-whitespace (incomplete command)
-  if (/^\s(?:\&\&|\|\||;|>>?|<<?|<)/.test(trimmed)) {
+  if (/^\s+(?:\&\&|\|\||;|>>?|<<?|<)/.test(command)) {
     return {
       behavior: "ask",
       message: "Command appears incomplete (starts with operator)",
       checkId: CHECK_IDS.INCOMPLETE_COMMANDS,
       subId: 3,
+      isMisparsingCheck: true,
+    }
+  }
+
+  // Check for leading whitespace that may indicate a sliced command.
+  if (/^\s/.test(command)) {
+    return {
+      behavior: "ask",
+      message: "Command appears incomplete (starts with whitespace)",
+      checkId: CHECK_IDS.INCOMPLETE_COMMANDS,
+      subId: 1,
       isMisparsingCheck: true,
     }
   }
@@ -208,14 +208,11 @@ export function validateIncompleteCommands(context: ValidationContext): Validato
 // ============================================================
 
 function isSafeHeredoc(command: string): boolean {
-  // Check if command contains heredoc in substitution
-  if (!HEREDOC_PATTERN.test(command)) {
-    return true // No heredoc in substitution, safe
-  }
-
-  // For now, flag heredoc as needing review
-  // Full implementation would check delimiter quoting and content
-  return false
+  const match = SAFE_HEREDOC_SUBSTITUTION_RE.exec(command)
+  if (!match) return false
+  const delimiter = match[1] ?? match[2]
+  if (!delimiter || match[4] !== delimiter) return false
+  return !/(\$\(|`|\$\{)/.test(match[3] ?? "") && !/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(match[3] ?? "")
 }
 
 export function validateSafeCommandSubstitution(context: ValidationContext): ValidatorResult {
@@ -231,6 +228,7 @@ export function validateSafeCommandSubstitution(context: ValidationContext): Val
       isMisparsingCheck: true,
     }
   }
+  if (hasHeredoc) return { behavior: "allow", message: "Safe quoted heredoc" }
 
   return { behavior: "passthrough" }
 }
@@ -342,7 +340,7 @@ export function validateDangerousVariables(context: ValidationContext): Validato
   const { fullyUnquotedContent } = context
 
   // Check for variable followed by redirect/pipe operator
-  if (/<\|>\s*\$[A-Za-z_]/.test(fullyUnquotedContent)) {
+  if (/[<>|]\s*\$[A-Za-z_]/.test(fullyUnquotedContent)) {
     return {
       behavior: "ask",
       message: "Variable in dangerous context (<, >, |)",

@@ -30,13 +30,14 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Sa
 
 export function brokerCommand(argv = process.argv, execPath = process.execPath, execArgv = process.execArgv) {
   const script = argv[1]
-  const sourceEntry = fileURLToPath(new URL("../index.ts", import.meta.url))
-  if (execPath.toLowerCase().includes("bun") && (!script || script === "test")) return [execPath, sourceEntry]
+  const sourceBroker = fileURLToPath(new URL("./broker-main.ts", import.meta.url))
+  if (execPath.toLowerCase().includes("bun") && (!script || script === "test")) return [execPath, sourceBroker]
   if (execPath.toLowerCase().includes("bun") && script && /\.test\.[cm]?[jt]sx?$/i.test(script)) {
-    return [execPath, sourceEntry]
+    return [execPath, sourceBroker]
   }
   if (!script) return [execPath]
   if (!/\.(?:[cm]?[jt]s|tsx?|jsx?)$/i.test(script)) return [execPath]
+  if (execPath.toLowerCase().includes("bun")) return [execPath, ...execArgv, sourceBroker]
   return [execPath, ...execArgv, script]
 }
 
@@ -161,34 +162,44 @@ export const layer = Layer.effect(
       const result = yield* Effect.promise(
         () =>
           new Promise<SandboxExecResult>((resolve, reject) => {
+            const requestID = input.request.request_id
             const abort = () => {
               try {
                 send({
                   type: "exec.abort",
                   protocol_version: SANDBOX_PROTOCOL_VERSION,
-                  request_id: input.request.request_id,
+                  request_id: requestID,
                 })
               } catch {}
             }
-            if (input.abort && !input.abort.aborted) input.abort.addEventListener("abort", abort, { once: true })
-            pending.set(input.request.request_id, {
+            const cleanup = () => {
+              input.abort?.removeEventListener("abort", abort)
+              pending.delete(requestID)
+            }
+            pending.set(requestID, {
               onStdout: input.onStdout,
               onStderr: input.onStderr,
               resolve: (value) => {
-                if (input.abort) input.abort.removeEventListener("abort", abort)
+                cleanup()
                 resolve(value)
               },
               reject: (error) => {
-                if (input.abort) input.abort.removeEventListener("abort", abort)
+                cleanup()
                 reject(error)
               },
             })
+            if (input.abort?.aborted) {
+              abort()
+              cleanup()
+              reject(new Error("Command aborted before start"))
+              return
+            }
+            input.abort?.addEventListener("abort", abort, { once: true })
             send({
               type: "exec.start",
               protocol_version: SANDBOX_PROTOCOL_VERSION,
               request: input.request,
             })
-            if (input.abort?.aborted) abort()
           }),
       )
       return result

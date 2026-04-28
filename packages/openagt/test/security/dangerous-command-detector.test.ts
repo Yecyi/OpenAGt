@@ -69,6 +69,12 @@ describe("detect - bash dangers", () => {
     expect(result.allowed).toBe(false)
   })
 
+  test("detects recursive delete with separated flags", () => {
+    const result = detect("rm -r -f /", "/bin/bash")
+    expect(result.severity).toBe("high")
+    expect(result.allowed).toBe(false)
+  })
+
   test("detects control characters", () => {
     const result = detect("echo hello\x00world", "/bin/bash")
     expect(result.severity).toBe("high")

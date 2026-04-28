@@ -152,6 +152,8 @@ export type ShellSafetyInput = {
   matchedRules?: string[]
 }
 
+const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
+
 function shellName(shell: string) {
   return (shell.replace(/\\/g, "/").split("/").pop() || shell).toLowerCase().replace(/\.(exe|cmd|bat|com|ps1)$/i, "")
 }
@@ -183,7 +185,7 @@ function shouldBlock(input: { command: string; risk: ShellRiskLevel; warnings: s
   if (/(curl|wget).*\|.*(sh|bash|zsh|pwsh|powershell|cmd)(\s|$)/i.test(lower)) return true
   if (input.risk !== "high") return false
   if (/(^|[\s;&|])eval[\s(]/i.test(lower)) return true
-  if (/rm\s+-rf\s+(\/|\*|~)/i.test(lower)) return true
+  if (/rm\s+-rf\s+(\/|\*|~)/i.test(lower) || DESTRUCTIVE_RM_PATTERN.test(lower)) return true
   if (/mkfs|format\s+[a-z]:|diskpart|fdisk|parted/i.test(lower)) return true
   return input.warnings.some((item) => {
     const warning = item.toLowerCase()
