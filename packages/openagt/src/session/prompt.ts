@@ -56,6 +56,7 @@ import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
 import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
+import { mcpToolOutputParts } from "./prompt/mcp-output"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 
@@ -506,29 +507,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     result,
                   )
 
-                  const textParts: string[] = []
-                  const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
-                  for (const contentItem of result.content) {
-                    if (contentItem.type === "text") textParts.push(contentItem.text)
-                    else if (contentItem.type === "image") {
-                      attachments.push({
-                        type: "file",
-                        mime: contentItem.mimeType,
-                        url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
-                      })
-                    } else if (contentItem.type === "resource") {
-                      const { resource } = contentItem
-                      if (resource.text) textParts.push(resource.text)
-                      if (resource.blob) {
-                        attachments.push({
-                          type: "file",
-                          mime: resource.mimeType ?? "application/octet-stream",
-                          url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
-                          filename: resource.uri,
-                        })
-                      }
-                    }
-                  }
+                  const { textParts, attachments } = mcpToolOutputParts(result.content)
 
                   const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
                   const metadata = {
