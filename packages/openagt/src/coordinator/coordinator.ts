@@ -54,6 +54,7 @@ import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./t
 import { messageText, promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
 import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
 import { buildCoordinatorProjection, type CoordinatorProjection } from "./projection"
+import { buildCoordinatorSummary } from "./summary"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -2538,24 +2539,8 @@ export const layer = Layer.effect(
       const taskIDs = info.task_ids.map((item) => SessionID.make(item))
       const all = yield* tasks.list(SessionID.make(info.sessionID))
       const relevant = all.filter((item: (typeof all)[number]) => taskIDs.includes(item.task_id))
-      const completed = relevant.filter((item) => item.status === "completed").length
-      const partial = relevant.filter((item) => item.status === "partial").length
-      const failed = relevant.filter((item) => item.status === "failed").length
-      const running = relevant.filter((item) => item.status === "running").length
-      const pending = relevant.filter((item) => item.status === "pending").length
-      const cancelled = relevant.filter((item) => item.status === "cancelled").length
-      const summary = `${completed}/${relevant.length} completed, ${partial} partial, ${running} running, ${pending} pending, ${failed} failed, ${cancelled} cancelled`
+      const { summary, state } = buildCoordinatorSummary(relevant)
       const runtime = runtimeStateFor(info, relevant)
-      const state =
-        failed > 0
-          ? "failed"
-          : cancelled > 0 && completed + cancelled === relevant.length
-            ? "cancelled"
-            : completed === relevant.length && relevant.length > 0
-              ? "completed"
-              : running === 0 && (pending > 0 || partial > 0)
-                ? "blocked"
-                : "active"
       const finished = state === "completed" || state === "failed" || state === "cancelled" ? now() : null
       yield* Effect.sync(() =>
         Database.use((db) =>
