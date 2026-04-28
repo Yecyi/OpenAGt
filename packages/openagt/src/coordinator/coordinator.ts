@@ -53,6 +53,7 @@ import { settleIntentProfile } from "./intent-profile"
 import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./task-record"
 import { messageText, promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
 import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
+import { buildCoordinatorProjection, type CoordinatorProjection } from "./projection"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -1831,39 +1832,7 @@ export interface Interface {
   readonly get: (id: CoordinatorRunIDType) => Effect.Effect<Option.Option<CoordinatorRunType>, Error>
   readonly list: (sessionID: SessionID) => Effect.Effect<CoordinatorRunType[], Error>
   readonly dispatch: (id: CoordinatorRunIDType) => Effect.Effect<{ run: CoordinatorRunType; dispatched: number }, Error>
-  readonly projection: (id: CoordinatorRunIDType) => Effect.Effect<
-    {
-      run: CoordinatorRunType
-      tasks: TaskRuntime.TaskRecord[]
-      counts: Record<"pending" | "running" | "completed" | "partial" | "failed" | "cancelled", number>
-      groups: Array<{
-        id: string
-        node_ids: string[]
-        task_ids: string[]
-        status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
-        merge_status: "none" | "waiting" | "merged" | "conflict"
-        blocked_by: string[]
-        conflicts: string[]
-        started_at?: number
-        completed_at?: number
-      }>
-      expert_lanes: CoordinatorPlanType["expert_lanes"]
-      quality_gates: CoordinatorPlanType["quality_gates"]
-      revise_points: CoordinatorPlanType["revise_points"]
-      memory_context: CoordinatorPlanType["memory_context"]
-      effort_profile: EffortProfileType
-      long_task: LongTaskProfileType
-      todo_timeline: TodoTimelineType
-      budget_profile: BudgetProfileType
-      budget_state: CoordinatorPlanType["budget_state"]
-      progress_snapshot: ProgressSnapshotType
-      checkpoint_memory: CheckpointMemorySummaryType
-      continuation_request?: CoordinatorPlanType["continuation_request"]
-      budget_limited: boolean
-      specialization_fallback: boolean
-    },
-    Error
-  >
+  readonly projection: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorProjection, Error>
   readonly resume: (id: CoordinatorRunIDType) => Effect.Effect<CoordinatorRunType, Error>
   readonly summarize: (id: CoordinatorRunIDType) => Effect.Effect<string, Error>
 }
@@ -2557,83 +2526,7 @@ export const layer = Layer.effect(
       const run = runOpt.value
       const taskList = yield* relevantTasks(run)
       const runtime = runtimeStateFor(run, taskList)
-      const taskByNode = runtime.taskByNode
-      const statusFor = (items: TaskRuntime.TaskRecord[]) => {
-        if (items.some((item) => item.status === "failed")) return "failed" as const
-        if (items.some((item) => item.status === "cancelled")) return "cancelled" as const
-        if (items.some((item) => item.status === "partial")) return "partial" as const
-        if (items.every((item) => item.status === "completed")) return "completed" as const
-        if (items.some((item) => item.status === "running")) return "running" as const
-        return "pending" as const
-      }
-      const groupIDs = [
-        ...new Set(run.plan.nodes.flatMap((item) => (item.parallel_group ? [item.parallel_group] : []))),
-      ]
-      const groups = groupIDs.map((groupID) => {
-        const nodes = run.plan.nodes.filter((item) => item.parallel_group === groupID)
-        const groupTasks = nodes.flatMap((item) => {
-          const task = taskByNode.get(item.id)
-          return task ? [task] : []
-        })
-        const blocked_by = nodes.flatMap((item) =>
-          item.depends_on.filter((dependency) => taskByNode.get(dependency)?.status !== "completed"),
-        )
-        const started = groupTasks.flatMap((item) => (item.started_at ? [item.started_at] : []))
-        const finished = groupTasks.flatMap((item) => (item.finished_at ? [item.finished_at] : []))
-        const reducer = run.plan.nodes.find(
-          (item) =>
-            item.depends_on.some((dependency) => nodes.some((node) => node.id === dependency)) &&
-            item.role === "reducer",
-        )
-        const reducerTask = reducer ? taskByNode.get(reducer.id) : undefined
-        const conflicts = nodes.flatMap((item) => item.conflicts)
-        return {
-          id: groupID,
-          node_ids: nodes.map((item) => item.id),
-          task_ids: groupTasks.map((item) => item.task_id),
-          status: groupTasks.length > 0 ? statusFor(groupTasks) : ("pending" as const),
-          merge_status:
-            conflicts.length > 0
-              ? ("conflict" as const)
-              : reducerTask?.status === "completed"
-                ? ("merged" as const)
-                : reducer
-                  ? ("waiting" as const)
-                  : ("none" as const),
-          blocked_by: [...new Set(blocked_by)],
-          conflicts,
-          started_at: started.length ? Math.min(...started) : undefined,
-          completed_at:
-            groupTasks.length > 0 && groupTasks.every((item) => item.finished_at) ? Math.max(...finished) : undefined,
-        }
-      })
-      return {
-        run,
-        tasks: taskList,
-        counts: {
-          pending: taskList.filter((item) => item.status === "pending").length,
-          running: taskList.filter((item) => item.status === "running").length,
-          completed: taskList.filter((item) => item.status === "completed").length,
-          partial: taskList.filter((item) => item.status === "partial").length,
-          failed: taskList.filter((item) => item.status === "failed").length,
-          cancelled: taskList.filter((item) => item.status === "cancelled").length,
-        },
-        groups,
-        expert_lanes: run.plan.expert_lanes,
-        quality_gates: runtime.quality_gates,
-        revise_points: runtime.revise_points,
-        memory_context: run.plan.memory_context,
-        effort_profile: run.plan.effort_profile,
-        long_task: run.plan.long_task,
-        todo_timeline: runtime.todo_timeline,
-        budget_profile: run.plan.budget_profile,
-        budget_state: runtime.budget_state,
-        progress_snapshot: runtime.progress_snapshot,
-        checkpoint_memory: runtime.checkpoint_memory,
-        continuation_request: runtime.continuation_request,
-        budget_limited: runtime.budget_state.budget_limited,
-        specialization_fallback: run.plan.specialization_fallback,
-      }
+      return buildCoordinatorProjection({ run, taskList, runtime })
     })
 
     const summarize: Interface["summarize"] = Effect.fn("Coordinator.summarize")(function* (id) {
