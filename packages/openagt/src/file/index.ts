@@ -13,6 +13,14 @@ import z from "zod"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { Log } from "../util"
+import {
+  getImageMimeType,
+  isImageMimeType,
+  isImagePath,
+  isKnownBinaryPath,
+  isKnownTextPath,
+  shouldInlineBase64,
+} from "./content-type"
 import { Protected } from "./protected"
 import { Ripgrep } from "./ripgrep"
 
@@ -85,224 +93,12 @@ export const Event = {
 const log = Log.create({ service: "file" })
 const MAX_ENCODE_BYTES = 5 * 1024 * 1024
 
-const binary = new Set([
-  "exe",
-  "dll",
-  "pdb",
-  "bin",
-  "so",
-  "dylib",
-  "o",
-  "a",
-  "lib",
-  "wav",
-  "mp3",
-  "ogg",
-  "oga",
-  "ogv",
-  "ogx",
-  "flac",
-  "aac",
-  "wma",
-  "m4a",
-  "weba",
-  "mp4",
-  "avi",
-  "mov",
-  "wmv",
-  "flv",
-  "webm",
-  "mkv",
-  "zip",
-  "tar",
-  "gz",
-  "gzip",
-  "bz",
-  "bz2",
-  "bzip",
-  "bzip2",
-  "7z",
-  "rar",
-  "xz",
-  "lz",
-  "z",
-  "pdf",
-  "doc",
-  "docx",
-  "ppt",
-  "pptx",
-  "xls",
-  "xlsx",
-  "dmg",
-  "iso",
-  "img",
-  "vmdk",
-  "ttf",
-  "otf",
-  "woff",
-  "woff2",
-  "eot",
-  "sqlite",
-  "db",
-  "mdb",
-  "apk",
-  "ipa",
-  "aab",
-  "xapk",
-  "app",
-  "pkg",
-  "deb",
-  "rpm",
-  "snap",
-  "flatpak",
-  "appimage",
-  "msi",
-  "msp",
-  "jar",
-  "war",
-  "ear",
-  "class",
-  "kotlin_module",
-  "dex",
-  "vdex",
-  "odex",
-  "oat",
-  "art",
-  "wasm",
-  "wat",
-  "bc",
-  "ll",
-  "s",
-  "ko",
-  "sys",
-  "drv",
-  "efi",
-  "rom",
-  "com",
-])
-
-const image = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "bmp",
-  "webp",
-  "ico",
-  "tif",
-  "tiff",
-  "svg",
-  "svgz",
-  "avif",
-  "apng",
-  "jxl",
-  "heic",
-  "heif",
-  "raw",
-  "cr2",
-  "nef",
-  "arw",
-  "dng",
-  "orf",
-  "raf",
-  "pef",
-  "x3f",
-])
-
-const text = new Set([
-  "ts",
-  "tsx",
-  "mts",
-  "cts",
-  "mtsx",
-  "ctsx",
-  "js",
-  "jsx",
-  "mjs",
-  "cjs",
-  "sh",
-  "bash",
-  "zsh",
-  "fish",
-  "ps1",
-  "psm1",
-  "cmd",
-  "bat",
-  "json",
-  "jsonc",
-  "json5",
-  "yaml",
-  "yml",
-  "toml",
-  "md",
-  "mdx",
-  "txt",
-  "xml",
-  "html",
-  "htm",
-  "css",
-  "scss",
-  "sass",
-  "less",
-  "graphql",
-  "gql",
-  "sql",
-  "ini",
-  "cfg",
-  "conf",
-  "env",
-])
-
-const textName = new Set([
-  "dockerfile",
-  "makefile",
-  ".gitignore",
-  ".gitattributes",
-  ".editorconfig",
-  ".npmrc",
-  ".nvmrc",
-  ".prettierrc",
-  ".eslintrc",
-])
-
-const mime: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  bmp: "image/bmp",
-  webp: "image/webp",
-  ico: "image/x-icon",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  svg: "image/svg+xml",
-  svgz: "image/svg+xml",
-  avif: "image/avif",
-  apng: "image/apng",
-  jxl: "image/jxl",
-  heic: "image/heic",
-  heif: "image/heif",
-}
-
 type Entry = { files: string[]; dirs: string[] }
 
-const ext = (file: string) => path.extname(file).toLowerCase().slice(1)
-const name = (file: string) => path.basename(file).toLowerCase()
-const isImageByExtension = (file: string) => image.has(ext(file))
-const isTextByExtension = (file: string) => text.has(ext(file))
-const isTextByName = (file: string) => textName.has(name(file))
-const isBinaryByExtension = (file: string) => binary.has(ext(file))
-const isImage = (mimeType: string) => mimeType.startsWith("image/")
-const getImageMimeType = (file: string) => mime[ext(file)] || "image/" + ext(file)
-
-function shouldEncode(mimeType: string) {
+function shouldEncode(mimeType: string): boolean {
   const type = mimeType.toLowerCase()
   log.debug("shouldEncode", { type })
-  if (!type) return false
-  if (type.startsWith("text/")) return false
-  if (type.includes("charset=")) return false
-  const top = type.split("/", 2)[0]
-  return ["image", "audio", "video", "font", "model", "multipart"].includes(top)
+  return shouldInlineBase64(type)
 }
 
 const hidden = (item: string) => {
@@ -518,7 +314,7 @@ export const layer = Layer.effect(
         throw new Error("Access denied: path escapes project directory")
       }
 
-      if (isImageByExtension(file)) {
+      if (isImagePath(file)) {
         const exists = yield* appFs.existsSafe(full)
         if (exists) {
           const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.void))
@@ -537,9 +333,9 @@ export const layer = Layer.effect(
         return { type: "text" as const, content: "" }
       }
 
-      const knownText = isTextByExtension(file) || isTextByName(file)
+      const knownText = isKnownTextPath(file)
 
-      if (isBinaryByExtension(file) && !knownText) return { type: "binary" as const, content: "" }
+      if (isKnownBinaryPath(file) && !knownText) return { type: "binary" as const, content: "" }
 
       const exists = yield* appFs.existsSafe(full)
       if (!exists) return { type: "text" as const, content: "" }
@@ -547,7 +343,7 @@ export const layer = Layer.effect(
       const mimeType = AppFileSystem.mimeType(full)
       const encode = knownText ? false : shouldEncode(mimeType)
 
-      if (encode && !isImage(mimeType)) return { type: "binary" as const, content: "", mimeType }
+      if (encode && !isImageMimeType(mimeType)) return { type: "binary" as const, content: "", mimeType }
 
       if (encode) {
         const info = yield* appFs.stat(full).pipe(Effect.catch(() => Effect.void))
