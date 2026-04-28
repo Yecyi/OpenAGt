@@ -9,6 +9,13 @@ import { Config } from "../config"
 import { Global } from "../global"
 import { Log } from "../util"
 import { buildFileDiff, filterIgnoredRows, parseNameStatus, parseNumstatRows, type SnapshotDiffRow } from "./diff-rows"
+import {
+  blockedLargeUntracked,
+  filesNotIgnored,
+  mergeCandidateFiles,
+  snapshotExcludeText,
+  splitNulList,
+} from "./file-selection"
 import { cfg, core, limit, prune, quote } from "./git-constants"
 export { FileDiff, Patch } from "./schema"
 import type { FileDiff, Patch } from "./schema"
@@ -175,12 +182,7 @@ export const layer: Layer.Layer<
         const sync = Effect.fnUntraced(function* (list: string[] = []) {
           const file = yield* excludes()
           const target = path.join(state.gitdir, "info", "exclude")
-          const text = [
-            file ? (yield* read(file)).trimEnd() : "",
-            ...list.map((item) => `/${item.replaceAll("\\", "/")}`),
-          ]
-            .filter(Boolean)
-            .join("\n")
+          const text = snapshotExcludeText(file ? (yield* read(file)).trimEnd() : "", list)
           yield* fs.ensureDir(path.join(state.gitdir, "info")).pipe(Effect.orDie)
           yield* fs.writeFileString(target, text ? `${text}\n` : "").pipe(Effect.orDie)
         })
@@ -208,9 +210,9 @@ export const layer: Layer.Layer<
             return
           }
 
-          const tracked = diff.text.split("\0").filter(Boolean)
-          const untracked = other.text.split("\0").filter(Boolean)
-          const all = Array.from(new Set([...tracked, ...untracked]))
+          const tracked = splitNulList(diff.text)
+          const untracked = splitNulList(other.text)
+          const all = mergeCandidateFiles(tracked, untracked)
           if (!all.length) return
 
           // Resolve source-repo ignore rules against the exact candidate set.
@@ -224,7 +226,7 @@ export const layer: Layer.Layer<
             yield* drop(ignoredFiles)
           }
 
-          const allow = all.filter((item) => !ignored.has(item))
+          const allow = filesNotIgnored(all, ignored)
           if (!allow.length) return
 
           const large = new Set(
@@ -244,7 +246,7 @@ export const layer: Layer.Layer<
               { concurrency: 8 },
             )).filter((item): item is string => Boolean(item)),
           )
-          const block = new Set(untracked.filter((item) => large.has(item)))
+          const block = blockedLargeUntracked(untracked, large)
           yield* sync(Array.from(block))
           // Stage only the allowed candidate paths so snapshot updates stay scoped.
           yield* stage(allow.filter((item) => !block.has(item)))
@@ -318,9 +320,7 @@ export const layer: Layer.Layer<
 
               return {
                 hash,
-                files: files
-                  .filter((item) => !ignored.has(item))
-                  .map((x) => path.join(state.worktree, x).replaceAll("\\", "/")),
+                files: filesNotIgnored(files, ignored).map((x) => path.join(state.worktree, x).replaceAll("\\", "/")),
               }
             }),
           )
