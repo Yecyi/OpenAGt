@@ -9,17 +9,19 @@
  */
 
 import {
+  hasControlCharacters,
+  hasUnicodeWhitespace,
+  hasNewlines,
+} from "./danger-helpers"
+import {
   COMMAND_SUBSTITUTION_PATTERNS,
   ZSH_DANGEROUS_COMMANDS,
   DANGEROUS_BASH_PATTERNS,
   OBFUSCATED_FLAG_PATTERNS,
   BARE_SHELL_PREFIXES,
-  BINARY_HIJACK_VARS,
-  hasControlCharacters,
-  hasUnicodeWhitespace,
-  hasNewlines,
-} from "./dangers"
-import type { DangerSeverity } from "./dangers"
+} from "./danger-patterns"
+import { BINARY_HIJACK_VARS } from "./danger-env"
+import type { DangerSeverity } from "./danger-contracts"
 import { EnvSanitizer } from "./env-sanitizer"
 import { WrapperStripper } from "./wrapper-stripper"
 import { validateCommand } from "./validators"

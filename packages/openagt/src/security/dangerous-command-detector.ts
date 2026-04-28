@@ -7,17 +7,16 @@
 import { Effect, Layer, Context } from "effect"
 import { Shell } from "@/shell/shell"
 import {
-  COMMAND_SUBSTITUTION_PATTERNS,
-  BINARY_HIJACK_VARS,
-  OBFUSCATED_FLAG_PATTERNS,
   hasBareShellPrefix,
   hasControlCharacters,
   hasUnicodeWhitespace,
   hasNewlines,
   containsDangerousPatterns,
   hasZshDangerousCommand,
-  type DangerSeverity,
-} from "./dangers"
+} from "./danger-helpers"
+import { BINARY_HIJACK_VARS } from "./danger-env"
+import { COMMAND_SUBSTITUTION_PATTERNS, OBFUSCATED_FLAG_PATTERNS } from "./danger-patterns"
+import type { DangerSeverity } from "./danger-contracts"
 import { ENCODED_COMMAND_PATTERNS, REMOTE_EXECUTION_PATTERNS, validatePowerShellCommand } from "./powershell"
 import { parsePowerShellAst } from "./powershell-ast"
 

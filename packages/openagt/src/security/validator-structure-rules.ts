@@ -1,7 +1,7 @@
 // Structural shell validator rules for braces, comments, whitespace, and zsh.
 // This file does not define validator ordering; validators.ts owns that order.
 
-import { ZSH_DANGEROUS_COMMANDS } from "./dangers"
+import { ZSH_DANGEROUS_COMMANDS } from "./danger-patterns"
 import { createQuoteState, updateQuoteState } from "./quote-scanner"
 import { CHECK_IDS } from "./validator-checks"
 import type { ValidationContext, ValidatorResult } from "./validator-contracts"

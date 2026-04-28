@@ -1,7 +1,7 @@
 // Individual shell validator rules.
 // This file returns validator decisions only; ordering is defined by validators.ts.
 
-import { COMMAND_SUBSTITUTION_PATTERNS } from "./dangers"
+import { COMMAND_SUBSTITUTION_PATTERNS } from "./danger-patterns"
 import { hasBackslashEscapedOperator, hasBackslashEscapedWhitespace } from "./quote-scanner"
 import { CHECK_IDS } from "./validator-checks"
 import type { ValidationContext, ValidatorResult } from "./validator-contracts"
