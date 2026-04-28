@@ -12,8 +12,6 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
 import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
-import { existsSync, readdirSync } from "fs"
-import path from "path"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { buildDebate, buildDegraded } from "./mpacr"
@@ -23,11 +21,10 @@ import { PromptTemplates } from "./prompt-templates"
 import { ThreeLayerMemory } from "@/personal/three-layer"
 import { ExpertRegistry } from "./expert-registry"
 import { BudgetTuning } from "@/agent/budget-tuning"
-import {
-  classifyGoal,
-  isBroadAgentTask,
-  isProjectDeepDiveGoal as classifiedProjectDeepDiveGoal,
-} from "@/agent/task-classifier"
+import { isBroadAgentTask, isProjectDeepDiveGoal } from "@/agent/task-classifier"
+import { effortProfileFor } from "./effort-profile"
+import { settleIntentProfile } from "./intent-profile"
+import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -73,6 +70,9 @@ import {
   type TodoTimeline as TodoTimelineType,
 } from "./schema"
 
+export { effortProfileFor } from "./effort-profile"
+export { settleIntentProfile } from "./intent-profile"
+
 function now() {
   return Date.now()
 }
@@ -81,143 +81,8 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
-type WorkspaceSignals = {
-  file_count: number
-  package_count: number
-  language_count: number
-  reasons: string[]
-}
-
-const workspaceSignalCache = new Map<string, { at: number; value: WorkspaceSignals }>()
-const workspaceSignalTtlMs = 30_000
-
-function safeReaddir(dir: string) {
-  try {
-    return readdirSync(dir, { withFileTypes: true }).slice(0, 256)
-  } catch {
-    return []
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
-}
-
-function workspaceSignalsForGoal(goal: string): WorkspaceSignals {
-  if (!isProjectDeepDiveGoal(goal)) {
-    return { file_count: 0, package_count: 0, language_count: 0, reasons: [] }
-  }
-  const root = process.cwd()
-  const cached = workspaceSignalCache.get(root)
-  if (cached && now() - cached.at < workspaceSignalTtlMs) {
-    return {
-      ...cached.value,
-      reasons: [...cached.value.reasons, "workspace signal cache hit"],
-    }
-  }
-  const ignored = new Set([".git", "node_modules", "dist", "build", ".next", ".turbo", "coverage", ".artifacts"])
-  const extensions = new Set<string>()
-  const seenPackages = { value: 0 }
-  const scan = (dir: string, remaining: number): number => {
-    if (remaining <= 0) return 0
-    if (!existsSync(dir)) return 0
-    return safeReaddir(dir).reduce((count, entry) => {
-      if (count >= remaining) return count
-      if (ignored.has(entry.name)) return count
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory()) return count + scan(full, remaining - count)
-      if (!entry.isFile()) return count
-      if (entry.name === "package.json") seenPackages.value += 1
-      const ext = path.extname(entry.name).toLowerCase()
-      if (ext) extensions.add(ext)
-      return count + 1
-    }, 0)
-  }
-  const file_count = scan(root, 2_000)
-  const package_count =
-    seenPackages.value +
-    (existsSync(path.join(root, "bun.lock")) || existsSync(path.join(root, "pnpm-lock.yaml")) ? 1 : 0)
-  const language_count = extensions.size
-  const value = {
-    file_count,
-    package_count,
-    language_count,
-    reasons: [
-      file_count >= 100 ? `workspace has at least ${file_count} scanned files` : undefined,
-      package_count >= 2 ? `workspace has ${package_count} package or lockfile markers` : undefined,
-      language_count >= 4 ? `workspace has ${language_count} file extension families` : undefined,
-    ].filter((item): item is string => Boolean(item)),
-  }
-  workspaceSignalCache.set(root, { at: now(), value })
-  return value
-}
-
-function isProjectDeepDiveGoal(goal: string) {
-  return classifiedProjectDeepDiveGoal(goal)
-}
-
-export function effortProfileFor(effort: EffortLevelType): EffortProfileType {
-  return EffortProfile.parse(
-    effort === "low"
-      ? {
-          planning_rounds: 1,
-          expert_count_min: 1,
-          expert_count_max: 1,
-          verifier_count_min: 0,
-          reducer_enabled: false,
-          reviewer_enabled: false,
-          debugger_enabled: false,
-          revise_policy: "none",
-          max_revise_nodes: 0,
-          max_revision_per_artifact: 0,
-          reasoning_effort: "low",
-          timeout_multiplier: 0.75,
-        }
-      : effort === "high"
-        ? {
-            planning_rounds: 2,
-            expert_count_min: 2,
-            expert_count_max: 4,
-            verifier_count_min: 1,
-            reducer_enabled: true,
-            reviewer_enabled: true,
-            debugger_enabled: false,
-            revise_policy: "critical_only",
-            max_revise_nodes: 6,
-            max_revision_per_artifact: 1,
-            reasoning_effort: "high",
-            timeout_multiplier: 1.5,
-          }
-        : effort === "deep"
-          ? {
-              planning_rounds: 3,
-              expert_count_min: 3,
-              expert_count_max: 6,
-              verifier_count_min: 2,
-              reducer_enabled: true,
-              reviewer_enabled: true,
-              debugger_enabled: true,
-              revise_policy: "all_artifacts",
-              max_revise_nodes: 24,
-              max_revision_per_artifact: 2,
-              reasoning_effort: "high",
-              timeout_multiplier: 3,
-            }
-          : {
-              planning_rounds: 1,
-              expert_count_min: 1,
-              expert_count_max: 2,
-              verifier_count_min: 1,
-              reducer_enabled: false,
-              reviewer_enabled: true,
-              debugger_enabled: false,
-              revise_policy: "critical_only",
-              max_revise_nodes: 1,
-              max_revision_per_artifact: 1,
-              reasoning_effort: "medium",
-              timeout_multiplier: 1,
-            },
-  )
 }
 
 function scaleResourceLimit(limit: ResourceLimitType, multiplier: number) {
@@ -330,111 +195,6 @@ function longTaskProfileFor(input: {
       outputDimensions >= 5 ? `goal has ${outputDimensions} output dimensions` : undefined,
       ...(input.workspaceSignals?.reasons ?? []),
     ].filter((item): item is string => Boolean(item)),
-  })
-}
-
-function taskTypeForGoal(goal: string): TaskTypeType {
-  return classifyGoal(goal).workflow
-}
-
-function riskForGoal(goal: string, _taskType: TaskTypeType) {
-  return classifyGoal(goal).risk_level
-}
-
-function successCriteria(taskType: TaskTypeType) {
-  if (taskType === "coding")
-    return [
-      "Relevant context is gathered",
-      "Requested changes are implemented",
-      "Acceptance checks are verified",
-      "Independent review is completed",
-    ]
-  if (taskType === "debugging")
-    return [
-      "Failure context is reproduced or explained",
-      "Root cause is identified",
-      "Minimal fix path is applied",
-      "Verification passes",
-    ]
-  if (taskType === "review")
-    return ["Findings are grounded in source references", "Risks are prioritized", "Residual test gaps are reported"]
-  if (taskType === "research")
-    return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
-  if (taskType === "writing")
-    return ["Audience and purpose are identified", "Draft is produced", "Style and factuality are reviewed"]
-  if (taskType === "data-analysis")
-    return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
-  if (taskType === "planning")
-    return ["Goal is decomposed", "Constraints and alternatives are checked", "Risks are reviewed"]
-  if (taskType === "personal-admin")
-    return ["Work items are classified", "Priorities and schedule are proposed", "Privacy risks are reviewed"]
-  if (taskType === "documentation")
-    return ["Context is gathered", "Document is updated or produced", "Output is reviewed for accuracy"]
-  if (taskType === "environment-audit")
-    return ["Toolchain state is inspected", "Real blockers are identified", "Verification commands are reported"]
-  if (taskType === "automation")
-    return [
-      "Repeatable workflow is identified",
-      "Automation plan is generated",
-      "Risk and trigger conditions are verified",
-    ]
-  if (taskType === "file-data-organization")
-    return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
-  return ["Goal is clarified enough to execute", "Work is completed", "Result is summarized"]
-}
-
-function expectedOutput(taskType: TaskTypeType) {
-  if (taskType === "coding") return "code changes, verification results, and review notes"
-  if (taskType === "debugging") return "root cause, fix, and verification evidence"
-  if (taskType === "review") return "prioritized findings with file references and residual risks"
-  if (taskType === "research") return "research report with actionable synthesis"
-  if (taskType === "writing") return "structured written draft with style and factuality review"
-  if (taskType === "data-analysis") return "analysis summary with data caveats, checks, and anomalies"
-  if (taskType === "planning") return "execution plan with constraints, alternatives, and risks"
-  if (taskType === "personal-admin") return "prioritized personal admin actions with privacy review"
-  if (taskType === "documentation") return "updated documentation or a written artifact"
-  if (taskType === "environment-audit") return "environment diagnosis with blockers and next actions"
-  if (taskType === "automation") return "automation plan or configured automation"
-  if (taskType === "file-data-organization") return "organized files/data and a change summary"
-  return "completed work summary with evidence"
-}
-
-function permissionExpectations(taskType: TaskTypeType, riskLevel: IntentProfileType["risk_level"]) {
-  const base =
-    taskType === "research" || taskType === "review"
-      ? ["read workspace context"]
-      : ["read workspace context", "run verification commands"]
-  const write =
-    taskType === "coding" ||
-    taskType === "debugging" ||
-    taskType === "documentation" ||
-    taskType === "file-data-organization" ||
-    taskType === "writing" ||
-    taskType === "data-analysis"
-      ? ["write scoped workspace files"]
-      : []
-  const approval = riskLevel === "high" ? ["request approval before high-risk actions"] : []
-  return [...base, ...write, ...approval]
-}
-
-export function settleIntentProfile(input: { goal: string }) {
-  const classification = classifyGoal(input.goal)
-  const task_type = taskTypeForGoal(input.goal)
-  const risk_level = riskForGoal(input.goal, task_type)
-  const needs_user_clarification = input.goal.trim().length < 12
-  const projectDeepDive = isProjectDeepDiveGoal(input.goal)
-  return IntentProfile.parse({
-    goal: input.goal,
-    task_type,
-    success_criteria: successCriteria(task_type),
-    risk_level,
-    needs_user_clarification,
-    clarification_questions: needs_user_clarification ? ["What concrete output should this task produce?"] : [],
-    workflow: task_type,
-    workflow_confidence: projectDeepDive ? "high" : classification.confidence,
-    secondary_workflows: [],
-    expected_output: expectedOutput(task_type),
-    permission_expectations: permissionExpectations(task_type, risk_level),
   })
 }
 
