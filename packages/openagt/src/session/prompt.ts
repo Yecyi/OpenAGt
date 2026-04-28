@@ -28,7 +28,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
-import { pathToFileURL, fileURLToPath } from "url"
+import { fileURLToPath } from "url"
 import { ConfigMarkdown } from "../config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@openagt/shared/util/error"
@@ -57,6 +57,7 @@ import { createToolScheduler } from "./prompt/tool-resolution"
 import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
 import { mcpToolOutputParts } from "./prompt/mcp-output"
+import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 
@@ -132,9 +133,7 @@ export const layer = Layer.effect(
           const name = match[1]
           if (seen.has(name)) return
           seen.add(name)
-          const filepath = name.startsWith("~/")
-            ? path.join(os.homedir(), name.slice(2))
-            : path.resolve(ctx.worktree, name)
+          const filepath = promptReferencePath({ name, worktree: ctx.worktree, homeDir: os.homedir })
 
           const info = yield* fsys.stat(filepath).pipe(Effect.option)
           if (Option.isNone(info)) {
@@ -143,12 +142,7 @@ export const layer = Layer.effect(
             return
           }
           const stat = info.value
-          parts.push({
-            type: "file",
-            url: pathToFileURL(filepath).href,
-            filename: name,
-            mime: stat.type === "Directory" ? "application/x-directory" : "text/plain",
-          })
+          parts.push(promptReferenceFilePart({ name, filepath, fileType: stat.type }))
         }),
         { concurrency: "unbounded", discard: true },
       )
