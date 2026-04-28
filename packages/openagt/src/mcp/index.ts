@@ -10,7 +10,6 @@ import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
 import { Installation } from "../installation"
 import { InstallationVersion } from "../installation/version"
-import { withTimeout } from "@/util/timeout"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
@@ -29,6 +28,7 @@ import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing
 import { closeTransportIfSupported } from "./transport-utils"
 import { BrowserOpenFailed, ToolsChanged } from "./events"
 import { McpPendingOAuthTransports, type TransportWithAuth } from "./pending-oauth-transports"
+import { computeMcpBackoff, connectMcpTransport, sleep, type MCPTransport } from "./connection-runtime"
 import type { Status } from "./schema"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
@@ -126,51 +126,13 @@ export const layer = Layer.effect(
     const auth = yield* McpAuth.Service
     const bus = yield* Bus.Service
 
-    type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
-
     // MCP layer-level circuit breaker
     const mcpCircuitBreaker: Record<string, { failures: number; lastFailure: number }> = {}
     const MCP_CB_THRESHOLD = 5
     const MCP_CB_RESET_MS = 60_000
     const MCP_RETRY_ATTEMPTS = 3
-    const MCP_RETRY_BASE_DELAY_MS = 1000
-    const MCP_RETRY_MAX_DELAY_MS = 30_000
-    const MCP_RETRY_MIN_ATTEMPT_MS = 250
-    const MCP_RETRY_JITTER = 0.3
 
     const clearPendingOAuthTransport = (mcpName: string) => pendingOAuthTransports.clearOne(mcpName)
-
-    function computeBackoff(attempt: number): number {
-      const exponential = Math.min(MCP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt), MCP_RETRY_MAX_DELAY_MS)
-      const jitter = Math.abs((Math.random() * 2 - 1) * MCP_RETRY_JITTER * exponential)
-      return Math.max(MCP_RETRY_BASE_DELAY_MS, Math.round(exponential + jitter))
-    }
-
-    async function sleep(ms: number): Promise<void> {
-      return new Promise((resolve) => setTimeout(resolve, ms))
-    }
-
-    /**
-     * Connect a client via the given transport with resource safety:
-     * on failure the transport is closed; on success the caller owns it.
-     */
-    const connectTransport = (transport: Transport, timeout: number) =>
-      Effect.tryPromise({
-        try: async () => {
-          const client = new Client({ name: "opencode", version: InstallationVersion })
-          try {
-            await withTimeout(client.connect(transport), timeout)
-            return client
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e))
-            if (!(err instanceof UnauthorizedError) && !err.message.includes("OAuth")) {
-              await transport.close().catch(() => {})
-            }
-            throw err
-          }
-        },
-        catch: (e) => (e instanceof Error ? e : new Error(String(e))),
-      })
 
     const DISABLED_RESULT: CreateResult = { status: { status: "disabled" } }
 
@@ -256,7 +218,7 @@ export const layer = Layer.effect(
           }
 
           const transport = create()
-          const result = yield* connectTransport(transport, timeLeft).pipe(
+          const result = yield* connectMcpTransport(transport, timeLeft).pipe(
             Effect.map((client) => ({ client, transportName: name })),
             Effect.catch((error) => {
               const err = error instanceof Error ? error : new Error(String(error))
@@ -321,7 +283,7 @@ export const layer = Layer.effect(
 
           attempt++
           if (attempt < MCP_RETRY_ATTEMPTS) {
-            const delay = computeBackoff(attempt - 1)
+            const delay = computeMcpBackoff(attempt - 1)
             const wait = Math.min(delay, 250, Math.max(0, remaining() - 25))
             if (wait <= 0) break
             log.info("mcp connection retrying", { key, transport: name, attempt, delayMs: wait })
@@ -372,7 +334,7 @@ export const layer = Layer.effect(
       })
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
-      return yield* connectTransport(transport, connectTimeout).pipe(
+      return yield* connectMcpTransport(transport as MCPTransport, connectTimeout).pipe(
         Effect.map((client): { client: MCPClient | undefined; status: Status } => ({
           client,
           status: { status: "connected" },
