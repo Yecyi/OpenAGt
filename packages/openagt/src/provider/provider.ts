@@ -35,6 +35,7 @@ import { extendCatalogWithConfigProviders } from "./config-provider-catalog"
 import { BundledProviderRegistry, type BundledSDK } from "./bundled-provider-registry"
 import { useLanguageModel } from "./custom-loader-helpers"
 import { coreCustomLoaders } from "./custom-loaders-core"
+import { routingCustomLoaders, zenmuxCustomLoader } from "./custom-loaders-routing"
 import type {
   CustomDep,
   CustomDiscoverModels,
@@ -250,37 +251,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
       }
     }),
-    llmgateway: () =>
-      Effect.succeed({
-        autoload: false,
-        options: {
-          headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
-            "X-Source": "opencode",
-          },
-        },
-      }),
-    openrouter: () =>
-      Effect.succeed({
-        autoload: false,
-        options: {
-          headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
-          },
-        },
-      }),
-    vercel: () =>
-      Effect.succeed({
-        autoload: false,
-        options: {
-          headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
-          },
-        },
-      }),
+    ...routingCustomLoaders(),
     "google-vertex": Effect.fnUntraced(function* (provider: Info) {
       const env = yield* dep.env()
       const project =
@@ -366,16 +337,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
       }
     }),
-    zenmux: () =>
-      Effect.succeed({
-        autoload: false,
-        options: {
-          headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
-          },
-        },
-      }),
+    ...zenmuxCustomLoader(),
     gitlab: Effect.fnUntraced(function* (input: Info) {
       const {
         VERSION: GITLAB_PROVIDER_VERSION,
