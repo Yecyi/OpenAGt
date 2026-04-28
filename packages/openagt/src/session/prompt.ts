@@ -45,7 +45,7 @@ import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { computeSHA256 } from "./prompt/hash"
-import { expandCommandShellBlocks, renderCommandTemplate } from "./prompt/command-template"
+import { PromptCommandRunner } from "./prompt/command-runner"
 import { PromptPartResolver, type PromptPartDraft } from "./prompt/part-resolver"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { PromptShellRunner, type PromptShellRunnerInput } from "./prompt/shell-runner"
@@ -853,86 +853,20 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     )
 
     const command = Effect.fn("SessionPrompt.command")(function* (input: CommandInput) {
-      yield* elog.info("command", { sessionID: input.sessionID, command: input.command, agent: input.agent })
-      const cmd = yield* commands.get(input.command)
-      if (!cmd) {
-        const available = (yield* commands.list()).map((c) => c.name)
-        const hint = available.length ? ` Available commands: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Command not found: "${input.command}".${hint}` })
-        yield* bus.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
-        throw error
-      }
-      const agentName = cmd.agent ?? input.agent ?? (yield* agents.defaultAgent())
-
-      const templateCommand = yield* Effect.promise(async () => cmd.template)
-      const template = yield* expandCommandShellBlocks(
-        renderCommandTemplate({ template: templateCommand, arguments: input.arguments }),
-      )
-
-      const taskModel = yield* Effect.gen(function* () {
-        if (cmd.model) return Provider.parseModel(cmd.model)
-        if (cmd.agent) {
-          const cmdAgent = yield* agents.get(cmd.agent)
-          if (cmdAgent?.model) return cmdAgent.model
-        }
-        if (input.model) return Provider.parseModel(input.model)
-        return yield* lastModel(input.sessionID)
-      })
-
-      yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
-
-      const agent = yield* agents.get(agentName)
-      if (!agent) {
-        const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-        const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${agentName}".${hint}` })
-        yield* bus.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
-        throw error
-      }
-
-      const templateParts = yield* resolvePromptParts(template)
-      const isSubtask = (agent.mode === "subagent" && cmd.subtask !== false) || cmd.subtask === true
-      const parts = isSubtask
-        ? [
-            {
-              type: "subtask" as const,
-              agent: agent.name,
-              description: cmd.description ?? "",
-              command: input.command,
-              model: { providerID: taskModel.providerID, modelID: taskModel.modelID },
-              prompt: templateParts.find((y) => y.type === "text")?.text ?? "",
-            },
-          ]
-        : [...templateParts, ...(input.parts ?? [])]
-
-      const userAgent = isSubtask ? (input.agent ?? (yield* agents.defaultAgent())) : agentName
-      const userModel = isSubtask
-        ? input.model
-          ? Provider.parseModel(input.model)
-          : yield* lastModel(input.sessionID)
-        : taskModel
-
-      yield* plugin.trigger(
-        "command.execute.before",
-        { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
-        { parts },
-      )
-
-      const result = yield* prompt({
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        model: userModel,
-        agent: userAgent,
-        parts,
-        variant: input.variant,
-      })
-      yield* bus.publish(Command.Event.Executed, {
-        name: input.command,
-        sessionID: input.sessionID,
-        arguments: input.arguments,
-        messageID: result.info.id,
-      })
-      return result
+      return yield* new PromptCommandRunner(
+        {
+          agents,
+          bus,
+          commands,
+          getModel,
+          lastModel,
+          log: elog,
+          plugin,
+          prompt,
+          resolvePromptParts,
+        },
+        input,
+      ).run()
     })
 
     return Service.of({
