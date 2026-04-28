@@ -8,8 +8,6 @@ import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@mod
 import { Config } from "../config"
 import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
-import { NamedError } from "@openagt/shared/util/error"
-import z from "zod/v4"
 import { Installation } from "../installation"
 import { InstallationVersion } from "../installation/version"
 import { withTimeout } from "@/util/timeout"
@@ -17,7 +15,6 @@ import { AppFileSystem } from "@openagt/shared/filesystem"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
-import { BusEvent } from "../bus/bus-event"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import open from "open"
@@ -30,89 +27,15 @@ import { checkToolsQuality } from "./tool-quality"
 import { convertMcpTool, sanitizeMcpName } from "./tool-adapter"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
 import { closeTransportIfSupported } from "./transport-utils"
+import { BrowserOpenFailed, ToolsChanged } from "./events"
+import type { Status } from "./schema"
+export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
+export { Resource, Status } from "./schema"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
 
-export const Resource = z
-  .object({
-    name: z.string(),
-    uri: z.string(),
-    description: z.string().optional(),
-    mimeType: z.string().optional(),
-    client: z.string(),
-  })
-  .meta({ ref: "McpResource" })
-export type Resource = z.infer<typeof Resource>
-
-export const ToolsChanged = BusEvent.define(
-  "mcp.tools.changed",
-  z.object({
-    server: z.string(),
-  }),
-)
-
-export const BrowserOpenFailed = BusEvent.define(
-  "mcp.browser.open.failed",
-  z.object({
-    mcpName: z.string(),
-    url: z.string(),
-  }),
-)
-
-export const Failed = NamedError.create(
-  "MCPFailed",
-  z.object({
-    name: z.string(),
-  }),
-)
-
 type MCPClient = Client
-
-export const Status = z
-  .discriminatedUnion("status", [
-    z
-      .object({
-        status: z.literal("connected"),
-      })
-      .meta({
-        ref: "MCPStatusConnected",
-      }),
-    z
-      .object({
-        status: z.literal("disabled"),
-      })
-      .meta({
-        ref: "MCPStatusDisabled",
-      }),
-    z
-      .object({
-        status: z.literal("failed"),
-        error: z.string(),
-      })
-      .meta({
-        ref: "MCPStatusFailed",
-      }),
-    z
-      .object({
-        status: z.literal("needs_auth"),
-      })
-      .meta({
-        ref: "MCPStatusNeedsAuth",
-      }),
-    z
-      .object({
-        status: z.literal("needs_client_registration"),
-        error: z.string(),
-      })
-      .meta({
-        ref: "MCPStatusNeedsClientRegistration",
-      }),
-  ])
-  .meta({
-    ref: "MCPStatus",
-  })
-export type Status = z.infer<typeof Status>
 
 // Store transports for OAuth servers to allow finishing auth
 type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
