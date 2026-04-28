@@ -32,10 +32,8 @@ import { SessionProcessor } from "./processor"
 import { Permission } from "@/permission"
 import { SessionStatus } from "./status"
 import { LLM } from "./llm"
-import { Shell } from "@/shell/shell"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { Truncate } from "@/tool"
-import { Process } from "@/util"
 import { Cause, Effect, Exit, Layer, Option, Scope, Context } from "effect"
 import { EffectLogger } from "@/effect"
 import { InstanceState } from "@/effect"
@@ -47,6 +45,7 @@ import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { computeSHA256 } from "./prompt/hash"
+import { expandCommandShellBlocks, renderCommandTemplate } from "./prompt/command-template"
 import { PromptPartResolver, type PromptPartDraft } from "./prompt/part-resolver"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { PromptShellRunner, type PromptShellRunnerInput } from "./prompt/shell-runner"
@@ -865,43 +864,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       }
       const agentName = cmd.agent ?? input.agent ?? (yield* agents.defaultAgent())
 
-      const raw = input.arguments.match(argsRegex) ?? []
-      const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
       const templateCommand = yield* Effect.promise(async () => cmd.template)
-
-      const placeholders = templateCommand.match(placeholderRegex) ?? []
-      let last = 0
-      for (const item of placeholders) {
-        const value = Number(item.slice(1))
-        if (value > last) last = value
-      }
-
-      const withArgs = templateCommand.replaceAll(placeholderRegex, (_, index) => {
-        const position = Number(index)
-        const argIndex = position - 1
-        if (argIndex >= args.length) return ""
-        if (position === last) return args.slice(argIndex).join(" ")
-        return args[argIndex]
-      })
-      const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
-      let template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
-
-      if (placeholders.length === 0 && !usesArgumentsPlaceholder && input.arguments.trim()) {
-        template = template + "\n\n" + input.arguments
-      }
-
-      const shellMatches = ConfigMarkdown.shell(template)
-      if (shellMatches.length > 0) {
-        const sh = Shell.preferred()
-        const results = yield* Effect.promise(() =>
-          Promise.all(
-            shellMatches.map(async ([, cmd]) => (await Process.text([cmd], { shell: sh, nothrow: true })).text),
-          ),
-        )
-        let index = 0
-        template = template.replace(bashRegex, () => results[index++])
-      }
-      template = template.trim()
+      const template = yield* expandCommandShellBlocks(
+        renderCommandTemplate({ template: templateCommand, arguments: input.arguments }),
+      )
 
       const taskModel = yield* Effect.gen(function* () {
         if (cmd.model) return Provider.parseModel(cmd.model)
@@ -1117,12 +1083,6 @@ export const CommandInput = z.object({
     .optional(),
 })
 export type CommandInput = z.infer<typeof CommandInput>
-
-const bashRegex = /!`([^`]+)`/g
-// Match [Image N] as single token, quoted strings, or non-space sequences
-const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
-const placeholderRegex = /\$(\d+)/g
-const quoteTrimRegex = /^["']|["']$/g
 
 export { parseFilePartRange } from "./prompt/file-range"
 export { createStructuredOutputTool } from "./prompt/structured-output"
