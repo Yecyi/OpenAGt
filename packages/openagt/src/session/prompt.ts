@@ -10,7 +10,6 @@ import { Agent } from "../agent/agent"
 import { Provider, ProviderFallback } from "../provider"
 import { ModelID, ProviderID } from "../provider/schema"
 import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
-import type { JSONSchema7 } from "@ai-sdk/provider"
 import { SessionCompaction } from "./compaction"
 import { Bus } from "../bus"
 import { ProviderTransform } from "../provider"
@@ -56,45 +55,12 @@ import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
 import { isBroadAgentTask } from "@/agent/task-classifier"
+import { parseFilePartRange } from "./prompt/file-range"
+import { computeSHA256 } from "./prompt/hash"
+import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
-
-async function computeSHA256(text: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 16)
-}
-
-export function parseFilePartRange(url: URL): {} | { start: number; end?: number } | { error: string } {
-  const start = url.searchParams.get("start")
-  if (start == null) return {}
-  const startLine = Number.parseInt(start, 10)
-  if (Number.isNaN(startLine)) return { error: "Invalid file range: start must be an integer" }
-  if (startLine < 1) return { error: "Invalid file range: start must be greater than or equal to 1" }
-  const end = url.searchParams.get("end")
-  if (end == null) return { start: startLine }
-  const endLine = Number.parseInt(end, 10)
-  if (Number.isNaN(endLine)) return { error: "Invalid file range: end must be an integer" }
-  if (endLine < 1) return { error: "Invalid file range: end must be greater than or equal to 1" }
-  if (endLine < startLine) return { error: "Invalid file range: end must be greater than or equal to start" }
-  return { start: startLine, end: endLine }
-}
-
-const STRUCTURED_OUTPUT_DESCRIPTION = `Use this tool to return your final response in the requested structured format.
-
-IMPORTANT:
-- You MUST call this tool exactly once at the end of your response
-- The input must be valid JSON matching the required schema
-- Complete all necessary research and tool calls BEFORE calling this tool
-- This tool provides your final answer - no further actions are taken after calling it`
-
-const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 const log = Log.create({ service: "session.prompt" })
 const elog = EffectLogger.create({ service: "session.prompt" })
@@ -2089,38 +2055,12 @@ export const CommandInput = z.object({
 })
 export type CommandInput = z.infer<typeof CommandInput>
 
-/** @internal Exported for testing */
-export function createStructuredOutputTool(input: {
-  schema: Record<string, any>
-  onSuccess: (output: unknown) => void
-}): AITool {
-  // Remove $schema property if present (not needed for tool input)
-  const { $schema: _, ...toolSchema } = input.schema
-
-  return tool({
-    description: STRUCTURED_OUTPUT_DESCRIPTION,
-    inputSchema: jsonSchema(toolSchema as JSONSchema7),
-    async execute(args) {
-      // AI SDK validates args against inputSchema before calling execute()
-      input.onSuccess(args)
-      return {
-        output: "Structured output captured successfully.",
-        title: "Structured Output",
-        metadata: { valid: true },
-      }
-    },
-    toModelOutput({ output }) {
-      return {
-        type: "text",
-        value: output.output,
-      }
-    },
-  })
-}
 const bashRegex = /!`([^`]+)`/g
 // Match [Image N] as single token, quoted strings, or non-space sequences
 const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
 const placeholderRegex = /\$(\d+)/g
 const quoteTrimRegex = /^["']|["']$/g
 
+export { parseFilePartRange } from "./prompt/file-range"
+export { createStructuredOutputTool } from "./prompt/structured-output"
 export * as SessionPrompt from "./prompt"
