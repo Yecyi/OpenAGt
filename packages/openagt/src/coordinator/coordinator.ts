@@ -28,6 +28,7 @@ import {
   scaleResourceLimit,
   type BudgetOptions,
 } from "./budget-governance"
+import { dispatchSelectionFor } from "./dispatch-selection"
 import { effortProfileFor } from "./effort-profile"
 import {
   isMpacrCriticTask,
@@ -47,8 +48,6 @@ import {
   resourceUsageFor,
   runtimeStateFor,
   subtractResourceLimit,
-  todoForNode,
-  todoUsageFor,
 } from "./runtime-state"
 import { settleIntentProfile } from "./intent-profile"
 import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./task-record"
@@ -2336,70 +2335,35 @@ export const layer = Layer.effect(
           dispatched: 0,
         }
       }
-      const readyCandidates = ceilingHit || softBudgetHit ? (checkpointReady ? [checkpointReady] : []) : ready
-      const planOrder = new Map(run.plan.nodes.map((item, index) => [item.id, index]))
-      const groupFor = (item: TaskRuntime.TaskRecord) =>
-        typeof item.metadata?.parallel_group === "string" ? item.metadata.parallel_group : undefined
-      const nodeFor = (item: TaskRuntime.TaskRecord) =>
-        typeof item.metadata?.coordinator_node_id === "string" ? item.metadata.coordinator_node_id : ""
-      const orderedReady = readyCandidates.toSorted(
-        (a, b) => (planOrder.get(nodeFor(a)) ?? 0) - (planOrder.get(nodeFor(b)) ?? 0),
-      )
-      const running = allTasks.filter((item) => item.status === "running")
-      const runningGroups = new Set(
-        running.flatMap((item) => {
-          const group = groupFor(item)
-          return group ? [group] : []
-        }),
-      )
-      const activeGroup = run.plan.nodes
-        .map((item) => item.parallel_group)
-        .find((item) => item && runningGroups.has(item))
-      const firstReady = orderedReady[0]
-      const targetGroup = activeGroup ?? (firstReady ? groupFor(firstReady) : undefined)
-      const slots = Math.max(0, run.plan.parallel_policy.max_parallel_agents - running.length)
-      const budgetSlots =
-        softBudgetHit && checkpointReady
-          ? Math.min(1, checkpointSlots)
-          : Math.min(
-              resourceLimitSlots(usage, normalAbsoluteLimit),
-              resourceLimitSlots(usage, run.plan.budget_profile.mission_ceiling),
-              resourceLimitSlots(usage, run.plan.budget_profile.phase_ceiling),
-            )
-      if (budgetSlots === 0 && orderedReady.length > 0) {
+      const selection = dispatchSelectionFor({
+        run,
+        allTasks,
+        ready,
+        checkpointReady,
+        usage,
+        normalAbsoluteLimit,
+        checkpointSlots,
+        ceilingHit,
+        softBudgetHit,
+      })
+      if (selection.budgetSlots === 0 && selection.orderedReady.length > 0) {
         const blocked = yield* blockRunForBudget(run, "absolute")
         return {
           run: blocked,
           dispatched: 0,
         }
       }
-      const withinTodoBudget = (item: TaskRuntime.TaskRecord) => {
-        if (item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis") return true
-        const todo = todoForNode(run.plan, nodeFor(item))
-        const budget = todo ? run.plan.budget_profile.todo_budget[todo.id] : undefined
-        if (!todo || !budget) return true
-        return resourceLimitSlots(todoUsageFor(run, allTasks, todo.id), budget) > 0
-      }
-      const selected = (
-        run.plan.parallel_policy.mode === "off"
-          ? orderedReady.slice(0, Math.min(slots, 1))
-          : targetGroup
-            ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
-            : orderedReady.slice(0, Math.min(slots, 1))
-      )
-        .filter(withinTodoBudget)
-        .slice(0, budgetSlots)
       yield* Effect.forEach(
-        selected,
+        selection.selected,
         (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
         {
           concurrency: BudgetTuning.concurrency.storageRead,
         },
       )
-      if (selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
+      if (selection.selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
       return {
         run,
-        dispatched: selected.length,
+        dispatched: selection.selected.length,
       }
     })
 
