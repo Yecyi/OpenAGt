@@ -28,7 +28,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
-import { fileURLToPath } from "url"
 import { ConfigMarkdown } from "../config"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@openagt/shared/util/error"
@@ -40,7 +39,6 @@ import { LLM } from "./llm"
 import { Shell } from "@/shell/shell"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { Truncate } from "@/tool"
-import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util"
 import { Cause, Effect, Exit, Layer, Option, Scope, Context } from "effect"
 import { EffectLogger } from "@/effect"
@@ -49,16 +47,13 @@ import { attachWith } from "@/effect/run-service"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
-import { scanForInjection, sanitizeContent } from "@/security/injection"
 import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
-import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
-import { mcpResourceBinaryPart, mcpResourceFailurePart, mcpResourceReadPart } from "./prompt/mcp-resource-parts"
 import { mcpToolOutputParts } from "./prompt/mcp-output"
-import { readToolCallPart, readToolFailurePart, syntheticTextPart } from "./prompt/read-parts"
+import { PromptPartResolver, type PromptPartDraft } from "./prompt/part-resolver"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
@@ -1016,256 +1011,22 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
       yield* Effect.addFinalizer(() => instruction.clear(info.id))
 
-      type Draft<T> = T extends MessageV2.Part ? Omit<T, "id"> & { id?: string } : never
-      const assign = (part: Draft<MessageV2.Part>): MessageV2.Part => ({
+      const assign = (part: PromptPartDraft): MessageV2.Part => ({
         ...part,
         id: part.id ? PartID.make(part.id) : PartID.ascending(),
       })
 
-      const guardInjectedContent = Effect.fn("SessionPrompt.guardInjectedContent")(function* (
-        source: string,
-        content: string,
-      ) {
-        const scan = scanForInjection(content)
-        if (scan.clean) return content
-
-        const high = scan.issues.filter((issue) => issue.severity === "high")
-        if (high.length > 0) {
-          const summary = high
-            .slice(0, 3)
-            .map((issue) => issue.description)
-            .join(", ")
-          const message = `Blocked content from ${source} due to high-severity prompt injection patterns: ${summary}`
-          yield* bus.publish(Session.Event.Error, {
-            sessionID: input.sessionID,
-            error: new NamedError.Unknown({ message }).toObject(),
-          })
-          return `[Blocked content from ${source} due to potential prompt injection patterns.]`
-        }
-
-        const sanitized = sanitizeContent(content)
-        if (sanitized.removed <= 0) return content
-        return `[Sanitized potentially unsafe content from ${source}; removed ${sanitized.removed} characters.]\n${sanitized.sanitized}`
-      })
-
-      const resolvePart: (part: PromptInput["parts"][number]) => Effect.Effect<Draft<MessageV2.Part>[]> = Effect.fn(
-        "SessionPrompt.resolveUserPart",
-      )(function* (part) {
-        if (part.type === "file") {
-          if (part.source?.type === "resource") {
-            const { clientName, uri } = part.source
-            log.info("mcp resource", { clientName, uri, mime: part.mime })
-            const pieces: Draft<MessageV2.Part>[] = [
-              mcpResourceReadPart({ messageID: info.id, sessionID: input.sessionID }, part.filename, uri),
-            ]
-            const exit = yield* mcp.readResource(clientName, uri).pipe(Effect.exit)
-            if (Exit.isSuccess(exit)) {
-              const content = exit.value
-              if (!content) throw new Error(`Resource not found: ${clientName}/${uri}`)
-              const items = Array.isArray(content.contents) ? content.contents : [content.contents]
-              for (const c of items) {
-                if ("text" in c && c.text) {
-                  const safeText = yield* guardInjectedContent(`MCP resource ${part.filename}`, c.text)
-                  pieces.push({
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: safeText,
-                  })
-                } else if ("blob" in c && c.blob) {
-                  const mime = "mimeType" in c ? c.mimeType : part.mime
-                  pieces.push(mcpResourceBinaryPart({ messageID: info.id, sessionID: input.sessionID }, mime))
-                }
-              }
-              pieces.push({ ...part, messageID: info.id, sessionID: input.sessionID })
-            } else {
-              const error = Cause.squash(exit.cause)
-              log.error("failed to read MCP resource", { error, clientName, uri })
-              const message = error instanceof Error ? error.message : String(error)
-              pieces.push(
-                mcpResourceFailurePart({ messageID: info.id, sessionID: input.sessionID }, part.filename, message),
-              )
-            }
-            return pieces
-          }
-          const url = new URL(part.url)
-          switch (url.protocol) {
-            case "data:":
-              if (part.mime === "text/plain") {
-                const safeData = yield* guardInjectedContent(part.filename ?? "data-url", decodeDataUrl(part.url))
-                return [
-                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, { filePath: part.filename }),
-                  syntheticTextPart({ messageID: info.id, sessionID: input.sessionID }, safeData),
-                  { ...part, messageID: info.id, sessionID: input.sessionID },
-                ]
-              }
-              break
-            case "file:": {
-              log.info("file", { mime: part.mime })
-              const filepath = fileURLToPath(part.url)
-              if (yield* fsys.isDir(filepath)) part.mime = "application/x-directory"
-
-              const { read } = yield* registry.named()
-              const execRead = (args: Parameters<typeof read.execute>[0], extra?: Tool.Context["extra"]) => {
-                const controller = new AbortController()
-                return read
-                  .execute(args, {
-                    sessionID: input.sessionID,
-                    abort: controller.signal,
-                    agent: input.agent!,
-                    messageID: info.id,
-                    extra: { bypassCwdCheck: true, ...extra },
-                    messages: [],
-                    metadata: () => Effect.void,
-                    ask: () => Effect.void,
-                  })
-                  .pipe(Effect.onInterrupt(() => Effect.sync(() => controller.abort())))
-              }
-
-              if (part.mime === "text/plain") {
-                let offset: number | undefined
-                let limit: number | undefined
-                const range = parseFilePartRange(url)
-                if ("error" in range && range.error !== undefined) {
-                  const message = range.error
-                  yield* bus.publish(Session.Event.Error, {
-                    sessionID: input.sessionID,
-                    error: new NamedError.Unknown({ message }).toObject(),
-                  })
-                  return [
-                    readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message),
-                  ] satisfies Draft<MessageV2.Part>[]
-                }
-                if ("start" in range && range.start !== undefined) {
-                  const filePathURI = part.url.split("?")[0]
-                  let start = range.start
-                  let end = range.end
-                  if (start === end) {
-                    const targetLine = start - 1
-                    const symbols = yield* lsp.documentSymbol(filePathURI).pipe(Effect.catch(() => Effect.succeed([])))
-                    for (const symbol of symbols) {
-                      let r: LSP.Range | undefined
-                      if ("range" in symbol) r = symbol.range
-                      else if ("location" in symbol) r = symbol.location.range
-                      if (r?.start?.line === targetLine) {
-                        start = r.start.line + 1
-                        end = (r?.end?.line ?? r.start.line) + 1
-                        break
-                      }
-                    }
-                  }
-                  offset = Math.max(start, 1)
-                  if (end) limit = end - (offset - 1)
-                }
-                const args = { filePath: filepath, offset, limit }
-                const pieces: Draft<MessageV2.Part>[] = [
-                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, args),
-                ]
-                const exit = yield* provider.getModel(info.model.providerID, info.model.modelID).pipe(
-                  Effect.flatMap((mdl) => execRead(args, { model: mdl })),
-                  Effect.exit,
-                )
-                if (Exit.isSuccess(exit)) {
-                  const result = exit.value
-                  const safeOutput = yield* guardInjectedContent(filepath, result.output)
-                  pieces.push(syntheticTextPart({ messageID: info.id, sessionID: input.sessionID }, safeOutput))
-                  if (result.attachments?.length) {
-                    pieces.push(
-                      ...result.attachments.map((a) => ({
-                        ...a,
-                        synthetic: true,
-                        filename: a.filename ?? part.filename,
-                        messageID: info.id,
-                        sessionID: input.sessionID,
-                      })),
-                    )
-                  } else {
-                    pieces.push({ ...part, messageID: info.id, sessionID: input.sessionID })
-                  }
-                } else {
-                  const error = Cause.squash(exit.cause)
-                  log.error("failed to read file", { error })
-                  const message = error instanceof Error ? error.message : String(error)
-                  yield* bus.publish(Session.Event.Error, {
-                    sessionID: input.sessionID,
-                    error: new NamedError.Unknown({ message }).toObject(),
-                  })
-                  pieces.push(readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message))
-                }
-                return pieces
-              }
-
-              if (part.mime === "application/x-directory") {
-                const args = { filePath: filepath }
-                const exit = yield* execRead(args).pipe(Effect.exit)
-                if (Exit.isFailure(exit)) {
-                  const error = Cause.squash(exit.cause)
-                  log.error("failed to read directory", { error })
-                  const message = error instanceof Error ? error.message : String(error)
-                  yield* bus.publish(Session.Event.Error, {
-                    sessionID: input.sessionID,
-                    error: new NamedError.Unknown({ message }).toObject(),
-                  })
-                  return [
-                    readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message),
-                  ]
-                }
-                return [
-                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, args),
-                  syntheticTextPart(
-                    { messageID: info.id, sessionID: input.sessionID },
-                    yield* guardInjectedContent(filepath, exit.value.output),
-                  ),
-                  { ...part, messageID: info.id, sessionID: input.sessionID },
-                ]
-              }
-
-              return [
-                {
-                  messageID: info.id,
-                  sessionID: input.sessionID,
-                  type: "text",
-                  synthetic: true,
-                  text: `Called the Read tool with the following input: {"filePath":"${filepath}"}`,
-                },
-                {
-                  id: part.id,
-                  messageID: info.id,
-                  sessionID: input.sessionID,
-                  type: "file",
-                  url:
-                    `data:${part.mime};base64,` +
-                    Buffer.from(yield* fsys.readFile(filepath).pipe(Effect.catch(Effect.die))).toString("base64"),
-                  mime: part.mime,
-                  filename: part.filename!,
-                  source: part.source,
-                },
-              ]
-            }
-          }
-        }
-
-        if (part.type === "agent") {
-          const perm = Permission.evaluate("task", part.name, ag.permission)
-          const hint = perm.action === "deny" ? " . Invoked by user; guaranteed to exist." : ""
-          return [
-            { ...part, messageID: info.id, sessionID: input.sessionID },
-            {
-              messageID: info.id,
-              sessionID: input.sessionID,
-              type: "text",
-              synthetic: true,
-              text:
-                " Use the above message and context to generate a prompt and call the task tool with subagent: " +
-                part.name +
-                hint,
-            },
-          ]
-        }
-
-        return [{ ...part, messageID: info.id, sessionID: input.sessionID }]
-      })
+      const resolver = new PromptPartResolver(
+        { bus, fsys, log, lsp, mcp, provider, registry },
+        {
+          agent: ag,
+          inputAgent: input.agent,
+          messageID: info.id,
+          model: info.model,
+          sessionID: input.sessionID,
+        },
+      )
+      const resolvePart = (part: PromptInput["parts"][number]) => resolver.resolve(part)
 
       const parts = yield* Effect.forEach(input.parts, resolvePart, { concurrency: "unbounded" }).pipe(
         Effect.map((x) => x.flat().map(assign)),
