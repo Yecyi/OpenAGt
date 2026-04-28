@@ -2,7 +2,7 @@ import z from "zod"
 import os from "os"
 import fuzzysort from "fuzzysort"
 import { Config } from "../config"
-import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
+import { mapValues, mergeDeep, omit, pickBy } from "remeda"
 import { NoSuchModelError, type Provider as SDK } from "ai"
 import { Log } from "../util"
 import { Npm } from "../npm"
@@ -29,6 +29,9 @@ import { withProcessEnv } from "@/util/process-env"
 
 import * as ProviderTransform from "./transform"
 import { ModelID, ProviderID } from "./schema"
+import { defaultModelIDs, parseModel, sort } from "./model-selection"
+
+export { defaultModelIDs, parseModel, sort } from "./model-selection"
 
 const log = Log.create({ service: "provider" })
 
@@ -909,10 +912,6 @@ export const ConfigProvidersResult = Schema.Struct({
 }).pipe(withStatics((s) => ({ zod: zod(s) })))
 export type ConfigProvidersResult = Types.DeepMutable<Schema.Schema.Type<typeof ConfigProvidersResult>>
 
-export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
-  return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
-}
-
 export interface Interface {
   readonly list: () => Effect.Effect<Record<ProviderID, Info>>
   readonly getProvider: (providerID: ProviderID) => Effect.Effect<Info>
@@ -1681,24 +1680,6 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Plugin.defaultLayer),
   ),
 )
-
-const priority = ["gpt-5", "claude-sonnet-4", "big-pickle", "gemini-3-pro"]
-export function sort<T extends { id: string }>(models: T[]) {
-  return sortBy(
-    models,
-    [(model) => priority.findIndex((filter) => model.id.includes(filter)), "desc"],
-    [(model) => (model.id.includes("latest") ? 0 : 1), "asc"],
-    [(model) => model.id, "desc"],
-  )
-}
-
-export function parseModel(model: string) {
-  const [providerID, ...rest] = model.split("/")
-  return {
-    providerID: ProviderID.make(providerID),
-    modelID: ModelID.make(rest.join("/")),
-  }
-}
 
 export const ModelNotFoundError = NamedError.create(
   "ProviderModelNotFoundError",
