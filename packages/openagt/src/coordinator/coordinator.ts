@@ -15,7 +15,6 @@ import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { buildDebate, buildDegraded } from "./mpacr"
-import { skippedVerdict, validateCritique } from "./mpacr-validation"
 import { Calibration } from "./calibration"
 import { PromptTemplates } from "./prompt-templates"
 import { ThreeLayerMemory } from "@/personal/three-layer"
@@ -31,10 +30,16 @@ import {
 } from "./budget-governance"
 import { effortProfileFor } from "./effort-profile"
 import {
+  isMpacrCriticTask,
+  isMpacrReviewTask,
   mpacrQuorumEscalation,
   mpacrVerdictMetadata,
+  outcomeForVerdict,
+  posteriorForVerdict,
   reviewFailureMessage,
+  reviewVerdictForMessage,
   reviewVerdictFromText,
+  skippedReviewVerdict,
 } from "./review-verdict"
 import {
   planWithRuntimeState,
@@ -2033,21 +2038,6 @@ export const layer = Layer.effect(
       }).pipe(Effect.ignore)
     }
 
-    const posteriorForVerdict = (verdict: CriticalReviewVerdictType) => {
-      if (typeof verdict.posterior === "number") return verdict.posterior
-      if (verdict.verdict === "pass") return verdict.confidence === "high" ? 0.9 : verdict.confidence === "low" ? 0.6 : 0.75
-      if (verdict.verdict === "revise" || verdict.verdict === "retry") return 0.35
-      if (verdict.verdict === "ask_user") return 0.5
-      return 0.1
-    }
-
-    const outcomeForVerdict = (verdict: CriticalReviewVerdictType) => {
-      if (verdict.verdict === "pass") return 1
-      if (verdict.verdict === "ask_user") return 0.5
-      if (verdict.verdict === "skipped") return 0
-      return 0.25
-    }
-
     const recordCalibrationOutcome = (record: TaskRuntime.TaskRecord, verdict: CriticalReviewVerdictType | undefined) => {
       if (!verdict || Option.isNone(calibration)) return Effect.void
       const expertID = typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : record.subagent_type
@@ -2063,38 +2053,12 @@ export const layer = Layer.effect(
         .pipe(Effect.ignore)
     }
 
-    const isMpacrReviewTask = (metadata: Record<string, unknown> | undefined) =>
-      metadata?.output_schema === "revise" &&
-      ["red-team-critic", "synth-reviser"].includes(typeof metadata.role === "string" ? metadata.role : "")
-
-    const isMpacrCriticTask = (metadata: Record<string, unknown> | undefined) =>
-      metadata?.output_schema === "revise" &&
-      (metadata?.mpacr_role === "critic" || metadata?.role === "red-team-critic")
-
     const mpacrCriticTimeoutMs = (metadata: Record<string, unknown> | undefined) => {
       if (typeof metadata?.mpacr_per_critic_timeout_ms === "number") return metadata.mpacr_per_critic_timeout_ms
       const profile = metadata?.effort_profile
       if (!profile || typeof profile !== "object" || Array.isArray(profile)) return 180_000
       const value = (profile as Record<string, unknown>).mpacr_per_critic_timeout_ms
       return typeof value === "number" ? value : 180_000
-    }
-
-    const reviewVerdictForMessage = (
-      metadata: Record<string, unknown> | undefined,
-      text: string,
-      originalPrompt: string,
-      retryCount: number,
-    ) => {
-      const parsed =
-        metadata?.output_schema === "revise" || metadata?.role === "reviser" ? reviewVerdictFromText(text) : undefined
-      if (!isMpacrReviewTask(metadata)) return { verdict: parsed, retryPrompt: undefined }
-      const validated = validateCritique({
-        raw: parsed ?? text,
-        originalPrompt,
-        retryCount,
-      })
-      if (validated.kind === "retry") return { verdict: undefined, retryPrompt: validated.sharpenedPrompt }
-      return { verdict: validated.verdict, retryPrompt: undefined }
     }
 
     const taskModel = (metadata: Record<string, unknown>) => {
@@ -2123,7 +2087,7 @@ export const layer = Layer.effect(
         const completed = yield* tasks.complete({
           taskID: record.task_id,
           parentSessionID: record.parent_session_id,
-          output: JSON.stringify(skippedVerdict(reason)),
+          output: JSON.stringify(skippedReviewVerdict(reason)),
           metadata: {
             mpacr_skipped: true,
             mpacr_skip_reason: reason,

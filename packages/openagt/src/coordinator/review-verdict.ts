@@ -1,4 +1,5 @@
 import { TaskRuntime } from "@/session/task-runtime"
+import { skippedVerdict, validateCritique } from "./mpacr-validation"
 import { CriticalReviewVerdict, type CriticalReviewVerdict as CriticalReviewVerdictType } from "./schema"
 import { nodeIDForTask } from "./task-record"
 
@@ -84,6 +85,54 @@ export function reviewVerdictForTask(task: TaskRuntime.TaskRecord) {
       task.result_summary ??
       task.error_summary,
   )
+}
+
+export function posteriorForVerdict(verdict: CriticalReviewVerdictType) {
+  if (typeof verdict.posterior === "number") return verdict.posterior
+  if (verdict.verdict === "pass") return verdict.confidence === "high" ? 0.9 : verdict.confidence === "low" ? 0.6 : 0.75
+  if (verdict.verdict === "revise" || verdict.verdict === "retry") return 0.35
+  if (verdict.verdict === "ask_user") return 0.5
+  return 0.1
+}
+
+export function outcomeForVerdict(verdict: CriticalReviewVerdictType) {
+  if (verdict.verdict === "pass") return 1
+  if (verdict.verdict === "ask_user") return 0.5
+  if (verdict.verdict === "skipped") return 0
+  return 0.25
+}
+
+export function isMpacrReviewTask(metadata: Record<string, unknown> | undefined) {
+  return (
+    metadata?.output_schema === "revise" &&
+    ["red-team-critic", "synth-reviser"].includes(typeof metadata.role === "string" ? metadata.role : "")
+  )
+}
+
+export function isMpacrCriticTask(metadata: Record<string, unknown> | undefined) {
+  return metadata?.output_schema === "revise" && (metadata?.mpacr_role === "critic" || metadata?.role === "red-team-critic")
+}
+
+export function reviewVerdictForMessage(
+  metadata: Record<string, unknown> | undefined,
+  text: string,
+  originalPrompt: string,
+  retryCount: number,
+) {
+  const parsed =
+    metadata?.output_schema === "revise" || metadata?.role === "reviser" ? reviewVerdictFromText(text) : undefined
+  if (!isMpacrReviewTask(metadata)) return { verdict: parsed, retryPrompt: undefined }
+  const validated = validateCritique({
+    raw: parsed ?? text,
+    originalPrompt,
+    retryCount,
+  })
+  if (validated.kind === "retry") return { verdict: undefined, retryPrompt: validated.sharpenedPrompt }
+  return { verdict: validated.verdict, retryPrompt: undefined }
+}
+
+export function skippedReviewVerdict(reason: string) {
+  return skippedVerdict(reason)
 }
 
 export function mpacrQuorumEscalation(record: TaskRuntime.TaskRecord, dependencies: TaskRuntime.TaskRecord[]) {
