@@ -1,6 +1,5 @@
 import { Cause, Duration, Effect, Layer, Schedule, Semaphore, Context, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
-import { formatPatch, structuredPatch } from "diff"
 import path from "path"
 import z from "zod"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
@@ -10,6 +9,7 @@ import { Hash } from "@openagt/shared/util/hash"
 import { Config } from "../config"
 import { Global } from "../global"
 import { Log } from "../util"
+import { buildFileDiff, filterIgnoredRows, parseNameStatus, parseNumstatRows, type SnapshotDiffRow } from "./diff-rows"
 
 export const Patch = z.object({
   hash: z.string(),
@@ -512,21 +512,13 @@ export const layer: Layer.Layer<
         const diffFull = Effect.fnUntraced(function* (from: string, to: string) {
           return yield* locked(
             Effect.gen(function* () {
-              type Row = {
-                file: string
-                status: "added" | "deleted" | "modified"
-                binary: boolean
-                additions: number
-                deletions: number
-              }
-
               type Ref = {
                 file: string
                 side: "before" | "after"
                 ref: string
               }
 
-              const show = Effect.fnUntraced(function* (row: Row) {
+              const show = Effect.fnUntraced(function* (row: SnapshotDiffRow) {
                 if (row.binary) return ["", ""]
                 if (row.status === "added") {
                   return [
@@ -552,7 +544,7 @@ export const layer: Layer.Layer<
               })
 
               const load = Effect.fnUntraced(
-                function* (rows: Row[]) {
+                function* (rows: SnapshotDiffRow[]) {
                   const refs = rows.flatMap((row) => {
                     if (row.binary) return []
                     if (row.status === "added")
@@ -649,19 +641,11 @@ export const layer: Layer.Layer<
               )
 
               const result: FileDiff[] = []
-              const status = new Map<string, "added" | "deleted" | "modified">()
 
               const statuses = yield* git(
                 [...quote, ...args(["diff", "--no-ext-diff", "--name-status", "--no-renames", from, to, "--", "."])],
                 { cwd: state.directory },
               )
-
-              for (const line of statuses.text.trim().split("\n")) {
-                if (!line) continue
-                const [code, file] = line.split("\t")
-                if (!code || !file) continue
-                status.set(file, code.startsWith("A") ? "added" : code.startsWith("D") ? "deleted" : "modified")
-              }
 
               const numstat = yield* git(
                 [...quote, ...args(["diff", "--no-ext-diff", "--no-renames", "--numstat", from, to, "--", "."])],
@@ -670,38 +654,13 @@ export const layer: Layer.Layer<
                 },
               )
 
-              const rows = numstat.text
-                .trim()
-                .split("\n")
-                .filter(Boolean)
-                .flatMap((line) => {
-                  const [adds, dels, file] = line.split("\t")
-                  if (!file) return []
-                  const binary = adds === "-" && dels === "-"
-                  const additions = binary ? 0 : parseInt(adds)
-                  const deletions = binary ? 0 : parseInt(dels)
-                  return [
-                    {
-                      file,
-                      status: status.get(file) ?? "modified",
-                      binary,
-                      additions: Number.isFinite(additions) ? additions : 0,
-                      deletions: Number.isFinite(deletions) ? deletions : 0,
-                    } satisfies Row,
-                  ]
-                })
+              let rows = parseNumstatRows(numstat.text, parseNameStatus(statuses.text))
 
               // Hide ignored-file removals from the user-facing diff output.
               const ignored = yield* ignore(rows.map((r) => r.file))
-              if (ignored.size > 0) {
-                const filtered = rows.filter((r) => !ignored.has(r.file))
-                rows.length = 0
-                rows.push(...filtered)
-              }
+              rows = filterIgnoredRows(rows, ignored)
 
               const step = 100
-              const patch = (file: string, before: string, after: string) =>
-                formatPatch(structuredPatch(file, file, before, after, "", "", { context: Number.MAX_SAFE_INTEGER }))
 
               for (let i = 0; i < rows.length; i += step) {
                 const run = rows.slice(i, i + step)
@@ -710,13 +669,7 @@ export const layer: Layer.Layer<
                 for (const row of run) {
                   const hit = text?.get(row.file) ?? { before: "", after: "" }
                   const [before, after] = row.binary ? ["", ""] : text ? [hit.before, hit.after] : yield* show(row)
-                  result.push({
-                    file: row.file,
-                    patch: row.binary ? "" : patch(row.file, before, after),
-                    additions: row.additions,
-                    deletions: row.deletions,
-                    status: row.status,
-                  })
+                  result.push(buildFileDiff(row, before, after))
                 }
               }
 
