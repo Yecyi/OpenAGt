@@ -1,14 +1,10 @@
-import { dynamicTool, type Tool, jsonSchema, type JSONSchema7 } from "ai"
+import { type Tool } from "ai"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
-import {
-  CallToolResultSchema,
-  type Tool as MCPToolDef,
-  ToolListChangedNotificationSchema,
-} from "@modelcontextprotocol/sdk/types.js"
+import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "../config"
 import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
@@ -31,6 +27,8 @@ import { InstanceState } from "@/effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { checkToolsQuality } from "./tool-quality"
+import { convertMcpTool, sanitizeMcpName } from "./tool-adapter"
+import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
@@ -141,75 +139,8 @@ function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
   return typeof entry === "object" && entry !== null && "type" in entry
 }
 
-const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
-
-const MAX_TOOL_NAME_LENGTH = 128
-const ALLOWED_TOOL_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,127}$/
-
-function validateToolName(name: string): { valid: boolean; reason?: string } {
-  const sanitized = sanitize(name)
-  if (!sanitized || sanitized.length === 0) {
-    return { valid: false, reason: "Empty tool name" }
-  }
-  if (sanitized.length > MAX_TOOL_NAME_LENGTH) {
-    return { valid: false, reason: `Tool name exceeds ${MAX_TOOL_NAME_LENGTH} chars` }
-  }
-  if (!ALLOWED_TOOL_NAME_PATTERN.test(sanitized)) {
-    return { valid: false, reason: "Tool name contains invalid characters" }
-  }
-  if (/\.\.|\/|\$/.test(name)) {
-    return { valid: false, reason: "Tool name contains path traversal or injection patterns" }
-  }
-  return { valid: true }
-}
-
-// Convert MCP tool definition to AI SDK Tool type
-function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool | null {
-  const validation = validateToolName(mcpTool.name)
-  if (!validation.valid) {
-    log.warn("skipping tool with invalid name", { name: mcpTool.name, reason: validation.reason })
-    return null
-  }
-
-  const inputSchema = mcpTool.inputSchema as JSONSchema7 | undefined
-  const schema: JSONSchema7 =
-    inputSchema && typeof inputSchema === "object"
-      ? (structuredClone(inputSchema) as JSONSchema7)
-      : {
-          type: "object",
-          properties: {},
-        }
-
-  return dynamicTool({
-    description: mcpTool.description ?? "",
-    inputSchema: jsonSchema(schema),
-    execute: async (args: unknown) => {
-      return client.callTool(
-        {
-          name: mcpTool.name,
-          arguments: (args || {}) as Record<string, unknown>,
-        },
-        CallToolResultSchema,
-        {
-          resetTimeoutOnProgress: true,
-          timeout,
-        },
-      )
-    },
-  })
-}
-
 function defs(key: string, client: MCPClient, timeout?: number) {
-  return Effect.tryPromise({
-    try: () => withTimeout(client.listTools(), timeout ?? DEFAULT_TIMEOUT),
-    catch: (err) => (err instanceof Error ? err : new Error(String(err))),
-  }).pipe(
-    Effect.map((result) => result.tools),
-    Effect.catch((err) => {
-      log.error("failed to get tools from client", { key, error: err })
-      return Effect.succeed(undefined)
-    }),
-  )
+  return listToolDefinitions({ key, client, timeout, defaultTimeout: DEFAULT_TIMEOUT, log })
 }
 
 function fetchFromClient<T extends { name: string }>(
@@ -218,23 +149,7 @@ function fetchFromClient<T extends { name: string }>(
   listFn: (c: Client) => Promise<T[]>,
   label: string,
 ) {
-  return Effect.tryPromise({
-    try: () => listFn(client),
-    catch: (e: any) => {
-      log.error(`failed to get ${label}`, { clientName, error: e.message })
-      return e
-    },
-  }).pipe(
-    Effect.map((items) => {
-      const out: Record<string, T & { client: string }> = {}
-      const sanitizedClient = sanitize(clientName)
-      for (const item of items) {
-        out[sanitizedClient + ":" + sanitize(item.name)] = { ...item, client: clientName }
-      }
-      return out
-    }),
-    Effect.orElseSucceed(() => undefined),
-  )
+  return fetchNamedItemsFromClient({ clientName, client, listFn, label, log })
 }
 
 interface CreateResult {
@@ -813,9 +728,9 @@ export const layer = Layer.effect(
 
             const timeout = entry?.timeout ?? defaultTimeout
             for (const mcpTool of listed) {
-              const tool = convertMcpTool(mcpTool, client, timeout)
+              const tool = convertMcpTool({ mcpTool, client, timeout, log })
               if (tool) {
-                result[sanitize(clientName) + "_" + sanitize(mcpTool.name)] = tool
+                result[sanitizeMcpName(clientName) + "_" + sanitizeMcpName(mcpTool.name)] = tool
               }
             }
           }),
