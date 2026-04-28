@@ -26,45 +26,18 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
 import { formatShellSafety, isPrivilegeEscalationCommand, ShellSecurity } from "../security/shell-security"
-import type { ShellDecision, ShellFinding, ShellRiskLevel, ShellSafety } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
-import type { ExecPolicyDecision } from "@/security/exec-policy"
 import { resolveExecutionDecision, strictestDecision } from "@/security/decision-pipeline"
 import type {
   SandboxBackendStatus,
-  SandboxBackendPreference,
-  SandboxEnforcement,
-  SandboxFilesystemPolicy,
-  SandboxNetworkPolicy,
 } from "@/sandbox/types"
-
-type BashMetadata = {
-  output: string
-  exit: number | null
-  description: string
-  truncated: boolean
-  findings: ShellFinding[]
-  riskLevel: ShellRiskLevel
-  decision: ShellDecision
-  reviewApiVersion: 1
-  reviewMode: "disabled"
-  reviewStatus: "not_requested"
-  policyDecision?: ExecPolicyDecision
-  policyReason?: string
-  matchedRules?: string[]
-  shell_safety?: ShellSafety
-  safetySummary?: string
-  safetyDetails?: string[]
-  outputPath?: string
-  backendPreference?: SandboxBackendPreference
-  enforcement?: SandboxEnforcement
-  filesystemPolicy?: SandboxFilesystemPolicy
-  networkPolicy?: SandboxNetworkPolicy
-  allowedPaths?: string[]
-  writablePaths?: string[]
-  backendUsed?: string
-  terminationReason?: string
-}
+import {
+  addShellReviewMetadata,
+  buildBlockedCommandResult,
+  buildNetworkPermissionMetadata,
+  buildShellPermissionMetadata,
+  type BashMetadata,
+} from "./bash-metadata"
 
 const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
 const PS = new Set(["powershell", "pwsh"])
@@ -645,58 +618,30 @@ export const BashTool = Tool.define(
                 matchedRules,
               })
             : undefined
-          const metadata = {
-            ...permissionMetadata,
-            decision: finalDecision,
-            reason: finalReason,
-            backendPreference: policy.backend_preference,
-            enforcement: policy.enforcement,
-            filesystemPolicy: policy.filesystem_policy,
-            networkPolicy: policy.network_policy,
-            allowedPathsSummary: policy.allowed_paths,
-            backendAvailability: backendAvailabilitySummary,
-            ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-            ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-            ...(matchedRules.length > 0 ? { matchedRules } : {}),
-            shell_safety: shellSafety,
-            safetySummary: shellSafety.summary,
-            safetyDetails: shellSafety.details,
-          }
-          const networkMetadata = networkShellSafety
-            ? {
-                ...metadata,
-                decision: "confirm" as const,
-                reason: networkReason,
-                shell_safety: networkShellSafety,
-                safetySummary: networkShellSafety.summary,
-                safetyDetails: networkShellSafety.details,
-              }
-            : metadata
+          const metadata = buildShellPermissionMetadata({
+            permissionMetadata,
+            finalDecision,
+            finalReason,
+            policy,
+            backendAvailabilitySummary,
+            policyDecision,
+            matchedRules,
+            shellSafety,
+          })
+          const networkMetadata = buildNetworkPermissionMetadata({
+            metadata,
+            networkShellSafety,
+            networkReason,
+          })
 
           if (finalDecision === "block") {
-            const errorMsg = shellSafety.summary
-            return {
-              title: "Bash Command Blocked",
-              metadata: {
-                output: errorMsg,
-                exit: null as number | null,
-                description: params.description ?? "",
-                truncated: false,
-                findings: security.findings,
-                riskLevel: security.risk_level,
-                decision: finalDecision,
-                reviewApiVersion: security.review_api_version,
-                reviewMode: security.review_mode,
-                reviewStatus: security.review_status,
-                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                shell_safety: shellSafety,
-                safetySummary: shellSafety.summary,
-                safetyDetails: shellSafety.details,
-              } satisfies BashMetadata,
-              output: errorMsg,
-            }
+            return buildBlockedCommandResult({
+              description: params.description ?? "",
+              security,
+              decision,
+              policyDecision,
+              shellSafety,
+            })
           }
 
           yield* ask(ctx, scan, metadata)
@@ -738,24 +683,9 @@ export const BashTool = Tool.define(
             )
             .pipe(
               Effect.uninterruptible,
-              Effect.map((result) => ({
-                ...result,
-                metadata: {
-                  ...result.metadata,
-                  findings: security.findings,
-                  riskLevel: security.risk_level,
-                  decision: finalDecision,
-                  reviewApiVersion: security.review_api_version,
-                  reviewMode: security.review_mode,
-                  reviewStatus: security.review_status,
-                  ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                  ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                  ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                  shell_safety: shellSafety,
-                  safetySummary: shellSafety.summary,
-                  safetyDetails: shellSafety.details,
-                },
-              })),
+              Effect.map((result) =>
+                addShellReviewMetadata({ result, security, finalDecision, policyDecision, matchedRules, shellSafety }),
+              ),
             )
         }),
     }
