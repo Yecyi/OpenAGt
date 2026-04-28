@@ -33,16 +33,11 @@ import { applyModelCatalogPolicy } from "./model-catalog-policy"
 import { defaultModelIDs, parseModel, sort } from "./model-selection"
 import { extendCatalogWithConfigProviders } from "./config-provider-catalog"
 import { BundledProviderRegistry, type BundledSDK } from "./bundled-provider-registry"
+import { shouldUseCopilotResponsesApi, useLanguageModel } from "./custom-loader-helpers"
 
 export { defaultModelIDs, parseModel, sort } from "./model-selection"
 
 const log = Log.create({ service: "provider" })
-
-function shouldUseCopilotResponsesApi(modelID: string): boolean {
-  const match = /^gpt-(\d+)/.exec(modelID)
-  if (!match) return false
-  return Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")
-}
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -108,10 +103,6 @@ type CustomDep = {
   config: () => Effect.Effect<Config.Info>
   env: () => Effect.Effect<Record<string, string | undefined>>
   get: (key: string) => Effect.Effect<string | undefined>
-}
-
-function useLanguageModel(sdk: any) {
-  return sdk.responses === undefined && sdk.chat === undefined
 }
 
 function custom(dep: CustomDep): Record<string, CustomLoader> {
