@@ -54,10 +54,10 @@ import { promptCacheMetrics } from "./compaction/metrics"
 import { loadMemory } from "./memory"
 import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
-import { isBroadAgentTask } from "@/agent/task-classifier"
 import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
+import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -1433,36 +1433,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       if (msgs.length > 0) return msgs[0]
       throw new Error("Impossible")
     })
-
-    const userText = (message: MessageV2.WithParts | undefined) =>
-      message?.parts
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join("\n")
-        .toLowerCase() ?? ""
-
-    const effectiveMaxSteps = (
-      agent: Agent.Info,
-      lastUser: MessageV2.User,
-      lastUserMsg: MessageV2.WithParts | undefined,
-    ) => {
-      const configured = agent.steps ?? Number.POSITIVE_INFINITY
-      const explicit = lastUser.runtime?.stepBudget
-      if (explicit) return Math.max(configured, explicit)
-      if (!Number.isFinite(configured)) return configured
-      const text = [lastUser.system ?? "", userText(lastUserMsg)].join("\n")
-      const broad = isBroadAgentTask(text)
-      if (agent.name === "explore" && broad) return Math.max(configured, 48)
-      if (agent.mode === "subagent" && broad) return Math.max(configured, 36)
-      return configured
-    }
-
-    const promptStepTimeoutMs = (agent: Agent.Info, lastUser: MessageV2.User) => {
-      if (lastUser.runtime?.timeoutMs) return lastUser.runtime.timeoutMs
-      if (agent.mode === "subagent") return 10 * 60 * 1000
-      if (lastUser.runtime?.effort === "deep") return 20 * 60 * 1000
-      if (lastUser.runtime?.effort === "high") return 15 * 60 * 1000
-      return 10 * 60 * 1000
-    }
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
