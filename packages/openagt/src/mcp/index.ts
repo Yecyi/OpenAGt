@@ -28,6 +28,7 @@ import { convertMcpTool, sanitizeMcpName } from "./tool-adapter"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
 import { closeTransportIfSupported } from "./transport-utils"
 import { BrowserOpenFailed, ToolsChanged } from "./events"
+import { McpPendingOAuthTransports, type TransportWithAuth } from "./pending-oauth-transports"
 import type { Status } from "./schema"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
@@ -37,9 +38,7 @@ const DEFAULT_TIMEOUT = 30_000
 
 type MCPClient = Client
 
-// Store transports for OAuth servers to allow finishing auth
-type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
-const pendingOAuthTransports = new Map<string, TransportWithAuth>()
+const pendingOAuthTransports = new McpPendingOAuthTransports()
 
 // Prompt cache types
 type PromptInfo = Awaited<ReturnType<MCPClient["listPrompts"]>>["prompts"][number]
@@ -139,16 +138,7 @@ export const layer = Layer.effect(
     const MCP_RETRY_MIN_ATTEMPT_MS = 250
     const MCP_RETRY_JITTER = 0.3
 
-    const closePendingOAuthTransport = (mcpName: string, except?: TransportWithAuth) => {
-      const transport = pendingOAuthTransports.get(mcpName)
-      if (!transport || transport === except) return Effect.void
-      return closeTransportIfSupported(transport)
-    }
-    const clearPendingOAuthTransport = (mcpName: string) =>
-      Effect.gen(function* () {
-        yield* closePendingOAuthTransport(mcpName)
-        pendingOAuthTransports.delete(mcpName)
-      })
+    const clearPendingOAuthTransport = (mcpName: string) => pendingOAuthTransports.clearOne(mcpName)
 
     function computeBackoff(attempt: number): number {
       const exponential = Math.min(MCP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt), MCP_RETRY_MAX_DELAY_MS)
@@ -289,8 +279,7 @@ export const layer = Layer.effect(
                     .pipe(Effect.ignore, Effect.as(undefined))
                 } else {
                   return Effect.gen(function* () {
-                    yield* closePendingOAuthTransport(key, transport)
-                    pendingOAuthTransports.set(key, transport)
+                    yield* pendingOAuthTransports.replace(key, transport)
                     lastStatus = { status: "needs_auth" as const }
                     yield* bus
                       .publish(TuiEvent.ToastShow, {
@@ -522,10 +511,7 @@ export const layer = Layer.effect(
                 }),
               { concurrency: "unbounded" },
             )
-            yield* Effect.forEach(Array.from(pendingOAuthTransports.values()), closeTransportIfSupported, {
-              concurrency: "unbounded",
-            })
-            pendingOAuthTransports.clear()
+            yield* pendingOAuthTransports.closeAll()
           }),
         )
 
@@ -766,8 +752,7 @@ export const layer = Layer.effect(
           if (error instanceof UnauthorizedError && capturedUrl) {
             const authorizationUrl = capturedUrl.toString()
             return Effect.gen(function* () {
-              yield* closePendingOAuthTransport(mcpName, transport)
-              pendingOAuthTransports.set(mcpName, transport)
+              yield* pendingOAuthTransports.replace(mcpName, transport)
               return { authorizationUrl, oauthState } satisfies AuthResult
             })
           }
