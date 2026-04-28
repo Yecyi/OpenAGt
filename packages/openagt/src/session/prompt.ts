@@ -52,6 +52,7 @@ import { PromptShellRunner, type PromptShellRunnerInput } from "./prompt/shell-r
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { PromptSubtaskRunner, type PromptSubtaskRunnerInput } from "./prompt/subtask-runner"
 import { collectRunLoopState, shouldExitRunLoop } from "./prompt/run-loop-state"
+import { wrapUserMessagesAfterFinish } from "./prompt/run-loop-reminders"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 import { PromptToolResolver, type PromptToolResolverInput } from "./prompt/tool-resolver"
 
@@ -684,23 +685,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   .summarize({ sessionID, messageID: lastUser.id })
                   .pipe(Effect.ignore, Effect.forkIn(scope))
 
-              if (step > 1 && lastFinished) {
-                for (const m of msgs) {
-                  if (m.info.role !== "user" || m.info.id <= lastFinished.id) continue
-                  for (const p of m.parts) {
-                    if (p.type !== "text" || p.ignored || p.synthetic) continue
-                    if (!p.text.trim()) continue
-                    p.text = [
-                      "<system-reminder>",
-                      "The user sent the following message:",
-                      p.text,
-                      "",
-                      "Please address this message and continue with your tasks.",
-                      "</system-reminder>",
-                    ].join("\n")
-                  }
-                }
-              }
+              if (step > 1) wrapUserMessagesAfterFinish(msgs, lastFinished)
 
               yield* plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
