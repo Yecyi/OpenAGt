@@ -51,7 +51,7 @@ import {
   todoUsageFor,
 } from "./runtime-state"
 import { settleIntentProfile } from "./intent-profile"
-import { nodeIDForTask } from "./task-record"
+import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./task-record"
 import { messageText, promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
 import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
 import {
@@ -2051,32 +2051,6 @@ export const layer = Layer.effect(
           outcome: outcomeForVerdict(verdict),
         })
         .pipe(Effect.ignore)
-    }
-
-    const mpacrCriticTimeoutMs = (metadata: Record<string, unknown> | undefined) => {
-      if (typeof metadata?.mpacr_per_critic_timeout_ms === "number") return metadata.mpacr_per_critic_timeout_ms
-      const profile = metadata?.effort_profile
-      if (!profile || typeof profile !== "object" || Array.isArray(profile)) return 180_000
-      const value = (profile as Record<string, unknown>).mpacr_per_critic_timeout_ms
-      return typeof value === "number" ? value : 180_000
-    }
-
-    const taskModel = (metadata: Record<string, unknown>) => {
-      const value = metadata.model
-      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
-      const model = value as Record<string, unknown>
-      if (typeof model.providerID !== "string" || typeof model.modelID !== "string") return undefined
-      return {
-        providerID: ProviderID.make(model.providerID),
-        modelID: ModelID.make(model.modelID),
-      }
-    }
-
-    const taskVariant = (metadata: Record<string, unknown>) => {
-      const value = metadata.model
-      if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
-      const model = value as Record<string, unknown>
-      return typeof model.variant === "string" ? model.variant : undefined
     }
 
     const completeMpacrCriticAsSkipped = (
