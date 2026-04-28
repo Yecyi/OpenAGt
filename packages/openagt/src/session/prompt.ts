@@ -52,6 +52,7 @@ import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference
 import { PromptShellRunner, type PromptShellRunnerInput } from "./prompt/shell-runner"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { PromptSubtaskRunner, type PromptSubtaskRunnerInput } from "./prompt/subtask-runner"
+import { collectRunLoopState, shouldExitRunLoop } from "./prompt/run-loop-state"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 import { PromptToolResolver, type PromptToolResolverInput } from "./prompt/tool-resolver"
 
@@ -560,38 +561,18 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
           let msgs = yield* MessageV2.filterCompactedEffect(sessionID)
 
-          let lastUser: MessageV2.User | undefined
-          let lastAssistant: MessageV2.Assistant | undefined
-          let lastFinished: MessageV2.Assistant | undefined
-          let tasks: (MessageV2.CompactionPart | MessageV2.SubtaskPart)[] = []
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            const msg = msgs[i]
-            if (!lastUser && msg.info.role === "user") lastUser = msg.info
-            if (!lastAssistant && msg.info.role === "assistant") lastAssistant = msg.info
-            if (!lastFinished && msg.info.role === "assistant" && msg.info.finish) lastFinished = msg.info
-            if (lastUser && lastFinished) break
-            const task = msg.parts.filter((part) => part.type === "compaction" || part.type === "subtask")
-            if (task && !lastFinished) tasks.push(...task)
-          }
+          const loopState = collectRunLoopState(msgs)
+          const lastUser = loopState.lastUser
+          const lastAssistant = loopState.lastAssistant
+          const lastFinished = loopState.lastFinished
+          const tasks = loopState.tasks
 
           if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
 
           const lastAssistantMsg = msgs.findLast(
             (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistant?.id,
           )
-          // Some providers return "stop" even when the assistant message contains tool calls.
-          // Keep the loop running so tool results can be sent back to the model.
-          // Skip provider-executed tool parts — those were fully handled within the
-          // provider's stream (e.g. DWS Agent Platform) and don't need a re-loop.
-          const hasToolCalls =
-            lastAssistantMsg?.parts.some((part) => part.type === "tool" && !part.metadata?.providerExecuted) ?? false
-
-          if (
-            lastAssistant?.finish &&
-            !["tool-calls"].includes(lastAssistant.finish) &&
-            !hasToolCalls &&
-            lastUser.id < lastAssistant.id
-          ) {
+          if (shouldExitRunLoop({ lastUser, lastAssistant, lastAssistantMsg })) {
             yield* slog.info("exiting loop")
             break
           }
