@@ -41,7 +41,7 @@ import { Cause, Effect, Exit, Layer, Option, Scope, Context } from "effect"
 import { EffectLogger } from "@/effect"
 import { InstanceState } from "@/effect"
 import { attachWith } from "@/effect/run-service"
-import { TaskTool, type TaskPromptOps } from "@/tool/task"
+import type { TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { EffectBridge } from "@/effect"
 import { promptCacheMetrics } from "./compaction/metrics"
@@ -51,6 +51,7 @@ import { computeSHA256 } from "./prompt/hash"
 import { PromptPartResolver, type PromptPartDraft } from "./prompt/part-resolver"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
+import { PromptSubtaskRunner, type PromptSubtaskRunnerInput } from "./prompt/subtask-runner"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
 import { PromptToolResolver, type PromptToolResolverInput } from "./prompt/tool-resolver"
 
@@ -357,238 +358,24 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       ).resolve()
     })
 
-    const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* (input: {
-      task: MessageV2.SubtaskPart
-      model: Provider.Model
-      lastUser: MessageV2.User
-      sessionID: SessionID
-      session: Session.Info
-      msgs: MessageV2.WithParts[]
-    }) {
-      const { task, model, lastUser, sessionID, session, msgs } = input
+    const handleSubtask = Effect.fn("SessionPrompt.handleSubtask")(function* (input: PromptSubtaskRunnerInput) {
       const ctx = yield* InstanceState.context
       const promptOps = yield* ops()
-      const { task: taskTool } = yield* registry.named()
-      const requestedModel = task.model
-        ? { providerID: task.model.providerID, modelID: task.model.modelID }
-        : { providerID: model.providerID, modelID: model.id }
-      const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
-        id: MessageID.ascending(),
-        role: "assistant",
-        parentID: lastUser.id,
-        sessionID,
-        mode: task.agent,
-        agent: task.agent,
-        variant: lastUser.model.variant,
-        path: { cwd: ctx.directory, root: ctx.worktree },
-        cost: 0,
-        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        modelID: requestedModel.modelID,
-        providerID: requestedModel.providerID,
-        time: { created: Date.now() },
-      })
-      let part: MessageV2.ToolPart = yield* sessions.updatePart({
-        id: PartID.ascending(),
-        messageID: assistantMessage.id,
-        sessionID: assistantMessage.sessionID,
-        type: "tool",
-        callID: ulid(),
-        tool: TaskTool.id,
-        state: {
-          status: "running",
-          input: {
-            prompt: task.prompt,
-            description: task.description,
-            subagent_type: task.agent,
-            command: task.command,
-          },
-          title: task.description,
-          metadata: {
-            sessionId: assistantMessage.sessionID,
-            model: requestedModel,
-          },
-          time: { start: Date.now() },
+      return yield* new PromptSubtaskRunner(
+        {
+          agents,
+          bus,
+          getModel,
+          instance: ctx,
+          log,
+          permission,
+          plugin,
+          promptOps,
+          registry,
+          sessions,
         },
-      })
-      const taskArgs = {
-        prompt: task.prompt,
-        description: task.description,
-        subagent_type: task.agent,
-        command: task.command,
-      }
-      yield* plugin.trigger(
-        "tool.execute.before",
-        { tool: TaskTool.id, sessionID, callID: part.id },
-        { args: taskArgs },
-      )
-
-      const taskAgent = yield* agents.get(task.agent)
-      if (!taskAgent) {
-        const available = (yield* agents.list()).filter((a) => !a.hidden).map((a) => a.name)
-        const hint = available.length ? ` Available agents: ${available.join(", ")}` : ""
-        const error = new NamedError.Unknown({ message: `Agent not found: "${task.agent}".${hint}` })
-        yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
-        throw error
-      }
-
-      let error: Error | undefined
-      const taskAbort = new AbortController()
-      const result = yield* Effect.gen(function* () {
-        const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
-        if (assistantMessage.modelID !== taskModel.id || assistantMessage.providerID !== taskModel.providerID) {
-          assistantMessage.modelID = taskModel.id
-          assistantMessage.providerID = taskModel.providerID
-          yield* sessions.updateMessage(assistantMessage)
-        }
-        const execution = taskTool.execute(taskArgs, {
-          agent: task.agent,
-          messageID: assistantMessage.id,
-          sessionID,
-          abort: taskAbort.signal,
-          callID: part.callID,
-          extra: { bypassAgentCheck: true, promptOps },
-          messages: msgs,
-          metadata: (val: { title?: string; metadata?: Record<string, any> }) =>
-            Effect.gen(function* () {
-              const baseMetadata = "metadata" in part.state && part.state.metadata ? part.state.metadata : {}
-              const nextState =
-                part.state.status === "pending"
-                  ? {
-                      status: "running" as const,
-                      input: part.state.input,
-                      title: val.title,
-                      metadata: {
-                        sessionId: assistantMessage.sessionID,
-                        model: requestedModel,
-                        ...baseMetadata,
-                        ...val.metadata,
-                      },
-                      time: { start: Date.now() },
-                    }
-                  : {
-                      ...part.state,
-                      ...val,
-                      metadata: {
-                        sessionId: assistantMessage.sessionID,
-                        model: requestedModel,
-                        ...baseMetadata,
-                        ...val.metadata,
-                      },
-                    }
-              part = yield* sessions.updatePart({
-                ...part,
-                type: "tool",
-                state: nextState,
-              } satisfies MessageV2.ToolPart)
-            }),
-          ask: (req: any) =>
-            permission
-              .ask({
-                ...req,
-                sessionID,
-                ruleset: Permission.merge(taskAgent.permission, session.permission ?? []),
-              })
-              .pipe(Effect.orDie),
-        })
-        const exit = yield* execution.pipe(Effect.exit)
-        if (Exit.isSuccess(exit)) return exit.value
-        const defect = Cause.squash(exit.cause)
-        error = defect instanceof Error ? defect : new Error(String(defect))
-        log.error("subtask execution failed", { error, agent: task.agent, description: task.description })
-        return undefined
-      }).pipe(
-        Effect.onInterrupt(() =>
-          Effect.gen(function* () {
-            taskAbort.abort()
-            assistantMessage.finish = "tool-calls"
-            assistantMessage.time.completed = Date.now()
-            yield* sessions.updateMessage(assistantMessage)
-            if (part.state.status === "running") {
-              yield* sessions.updatePart({
-                ...part,
-                state: {
-                  status: "error",
-                  error: "Cancelled",
-                  time: { start: part.state.time.start, end: Date.now() },
-                  metadata: part.state.metadata,
-                  input: part.state.input,
-                },
-              } satisfies MessageV2.ToolPart)
-            }
-          }),
-        ),
-      )
-
-      const attachments: MessageV2.FilePart[] | undefined = result?.attachments?.map((attachment) => ({
-        id: PartID.ascending(),
-        sessionID,
-        messageID: assistantMessage.id,
-        type: "file" as const,
-        mime: attachment.mime ?? "application/octet-stream",
-        filename: attachment.filename,
-        url: attachment.url ?? "",
-      }))
-
-      yield* plugin.trigger(
-        "tool.execute.after",
-        { tool: TaskTool.id, sessionID, callID: part.id, args: taskArgs },
-        result,
-      )
-
-      assistantMessage.finish = "tool-calls"
-      assistantMessage.time.completed = Date.now()
-      yield* sessions.updateMessage(assistantMessage)
-
-      if (result && part.state.status === "running") {
-        yield* sessions.updatePart({
-          ...part,
-          state: {
-            status: "completed",
-            input: part.state.input,
-            title: result.title,
-            metadata: result.metadata,
-            output: result.output,
-            attachments,
-            time: { ...part.state.time, end: Date.now() },
-          },
-        } satisfies MessageV2.ToolPart)
-      }
-
-      if (!result) {
-        yield* sessions.updatePart({
-          ...part,
-          state: {
-            status: "error",
-            error: error ? `Tool execution failed: ${error.message}` : "Tool execution failed",
-            time: {
-              start: part.state.status === "running" ? part.state.time.start : Date.now(),
-              end: Date.now(),
-            },
-            metadata: part.state.status === "pending" ? undefined : part.state.metadata,
-            input: part.state.input,
-          },
-        } satisfies MessageV2.ToolPart)
-      }
-
-      if (!task.command) return
-
-      const summaryUserMsg: MessageV2.User = {
-        id: MessageID.ascending(),
-        sessionID,
-        role: "user",
-        time: { created: Date.now() },
-        agent: lastUser.agent,
-        model: lastUser.model,
-      }
-      yield* sessions.updateMessage(summaryUserMsg)
-      yield* sessions.updatePart({
-        id: PartID.ascending(),
-        messageID: summaryUserMsg.id,
-        sessionID,
-        type: "text",
-        text: "Summarize the task tool output above and continue with your task.",
-        synthetic: true,
-      } satisfies MessageV2.TextPart)
+        input,
+      ).run()
     })
 
     const shellImpl = Effect.fn("SessionPrompt.shellImpl")(function* (input: ShellInput) {
