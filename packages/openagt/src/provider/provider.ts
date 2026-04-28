@@ -33,7 +33,15 @@ import { applyModelCatalogPolicy } from "./model-catalog-policy"
 import { defaultModelIDs, parseModel, sort } from "./model-selection"
 import { extendCatalogWithConfigProviders } from "./config-provider-catalog"
 import { BundledProviderRegistry, type BundledSDK } from "./bundled-provider-registry"
-import { shouldUseCopilotResponsesApi, useLanguageModel } from "./custom-loader-helpers"
+import { useLanguageModel } from "./custom-loader-helpers"
+import { coreCustomLoaders } from "./custom-loaders-core"
+import type {
+  CustomDep,
+  CustomDiscoverModels,
+  CustomLoader,
+  CustomModelLoader,
+  CustomVarsLoader,
+} from "./custom-loader-types"
 
 export { defaultModelIDs, parseModel, sort } from "./model-selection"
 
@@ -87,126 +95,9 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   })
 }
 
-type CustomModelLoader = (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
-type CustomVarsLoader = (options: Record<string, any>) => Record<string, string>
-type CustomDiscoverModels = () => Promise<Record<string, Model>>
-type CustomLoader = (provider: Info) => Effect.Effect<{
-  autoload: boolean
-  getModel?: CustomModelLoader
-  vars?: CustomVarsLoader
-  options?: Record<string, any>
-  discoverModels?: CustomDiscoverModels
-}>
-
-type CustomDep = {
-  auth: (id: string) => Effect.Effect<Auth.Info | undefined>
-  config: () => Effect.Effect<Config.Info>
-  env: () => Effect.Effect<Record<string, string | undefined>>
-  get: (key: string) => Effect.Effect<string | undefined>
-}
-
 function custom(dep: CustomDep): Record<string, CustomLoader> {
   return {
-    anthropic: () =>
-      Effect.succeed({
-        autoload: false,
-        options: {
-          headers: {
-            "anthropic-beta": "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14",
-          },
-        },
-      }),
-    opencode: Effect.fnUntraced(function* (input: Info) {
-      const env = yield* dep.env()
-      const hasKey = iife(() => {
-        if (input.env.some((item) => env[item])) return true
-        return false
-      })
-      const ok =
-        hasKey ||
-        Boolean(yield* dep.auth(input.id)) ||
-        Boolean((yield* dep.config()).provider?.["opencode"]?.options?.apiKey)
-
-      if (!ok) {
-        for (const [key, value] of Object.entries(input.models)) {
-          if (value.cost.input === 0) continue
-          delete input.models[key]
-        }
-      }
-
-      return {
-        autoload: Object.keys(input.models).length > 0,
-        options: ok ? {} : { apiKey: "public" },
-      }
-    }),
-    openai: () =>
-      Effect.succeed({
-        autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          return sdk.responses(modelID)
-        },
-        options: {},
-      }),
-    xai: () =>
-      Effect.succeed({
-        autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          return sdk.responses(modelID)
-        },
-        options: {},
-      }),
-    "github-copilot": () =>
-      Effect.succeed({
-        autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
-          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
-          return shouldUseCopilotResponsesApi(modelID) ? sdk.responses(modelID) : sdk.chat(modelID)
-        },
-        options: {},
-      }),
-    azure: Effect.fnUntraced(function* (provider: Info) {
-      const env = yield* dep.env()
-      const resource = iife(() => {
-        const name = provider.options?.resourceName
-        if (typeof name === "string" && name.trim() !== "") return name
-        return env["AZURE_RESOURCE_NAME"]
-      })
-
-      return {
-        autoload: false,
-        async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
-          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
-          if (options?.["useCompletionUrls"]) {
-            return sdk.chat(modelID)
-          } else {
-            return sdk.responses(modelID)
-          }
-        },
-        options: {},
-        vars(_options) {
-          return {
-            ...(resource && { AZURE_RESOURCE_NAME: resource }),
-          }
-        },
-      }
-    }),
-    "azure-cognitive-services": Effect.fnUntraced(function* () {
-      const resourceName = yield* dep.get("AZURE_COGNITIVE_SERVICES_RESOURCE_NAME")
-      return {
-        autoload: false,
-        async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
-          if (useLanguageModel(sdk)) return sdk.languageModel(modelID)
-          if (options?.["useCompletionUrls"]) {
-            return sdk.chat(modelID)
-          } else {
-            return sdk.responses(modelID)
-          }
-        },
-        options: {
-          baseURL: resourceName ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
-        },
-      }
-    }),
+    ...coreCustomLoaders(dep),
     "amazon-bedrock": Effect.fnUntraced(function* () {
       const providerConfig = (yield* dep.config()).provider?.["amazon-bedrock"]
       const auth = yield* dep.auth("amazon-bedrock")
