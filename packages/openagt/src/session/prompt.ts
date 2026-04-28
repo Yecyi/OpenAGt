@@ -57,6 +57,7 @@ import { createToolScheduler } from "./prompt/tool-resolution"
 import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
 import { mcpToolOutputParts } from "./prompt/mcp-output"
+import { readToolCallPart, readToolFailurePart, syntheticTextPart } from "./prompt/read-parts"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
 import { createStructuredOutputTool, STRUCTURED_OUTPUT_SYSTEM_PROMPT } from "./prompt/structured-output"
 import { effectiveMaxSteps, promptStepTimeoutMs } from "./prompt/step-policy"
@@ -1109,20 +1110,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               if (part.mime === "text/plain") {
                 const safeData = yield* guardInjectedContent(part.filename ?? "data-url", decodeDataUrl(part.url))
                 return [
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `Called the Read tool with the following input: ${JSON.stringify({ filePath: part.filename })}`,
-                  },
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: safeData,
-                  },
+                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, { filePath: part.filename }),
+                  syntheticTextPart({ messageID: info.id, sessionID: input.sessionID }, safeData),
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
@@ -1160,13 +1149,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     error: new NamedError.Unknown({ message }).toObject(),
                   })
                   return [
-                    {
-                      messageID: info.id,
-                      sessionID: input.sessionID,
-                      type: "text",
-                      synthetic: true,
-                      text: `Read tool failed to read ${filepath} with the following error: ${message}`,
-                    },
+                    readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message),
                   ] satisfies Draft<MessageV2.Part>[]
                 }
                 if ("start" in range && range.start !== undefined) {
@@ -1192,13 +1175,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 }
                 const args = { filePath: filepath, offset, limit }
                 const pieces: Draft<MessageV2.Part>[] = [
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `Called the Read tool with the following input: ${JSON.stringify(args)}`,
-                  },
+                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, args),
                 ]
                 const exit = yield* provider.getModel(info.model.providerID, info.model.modelID).pipe(
                   Effect.flatMap((mdl) => execRead(args, { model: mdl })),
@@ -1207,13 +1184,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 if (Exit.isSuccess(exit)) {
                   const result = exit.value
                   const safeOutput = yield* guardInjectedContent(filepath, result.output)
-                  pieces.push({
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: safeOutput,
-                  })
+                  pieces.push(syntheticTextPart({ messageID: info.id, sessionID: input.sessionID }, safeOutput))
                   if (result.attachments?.length) {
                     pieces.push(
                       ...result.attachments.map((a) => ({
@@ -1235,13 +1206,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     sessionID: input.sessionID,
                     error: new NamedError.Unknown({ message }).toObject(),
                   })
-                  pieces.push({
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `Read tool failed to read ${filepath} with the following error: ${message}`,
-                  })
+                  pieces.push(readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message))
                 }
                 return pieces
               }
@@ -1258,30 +1223,15 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     error: new NamedError.Unknown({ message }).toObject(),
                   })
                   return [
-                    {
-                      messageID: info.id,
-                      sessionID: input.sessionID,
-                      type: "text",
-                      synthetic: true,
-                      text: `Read tool failed to read ${filepath} with the following error: ${message}`,
-                    },
+                    readToolFailurePart({ messageID: info.id, sessionID: input.sessionID }, filepath, message),
                   ]
                 }
                 return [
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `Called the Read tool with the following input: ${JSON.stringify(args)}`,
-                  },
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: yield* guardInjectedContent(filepath, exit.value.output),
-                  },
+                  readToolCallPart({ messageID: info.id, sessionID: input.sessionID }, args),
+                  syntheticTextPart(
+                    { messageID: info.id, sessionID: input.sessionID },
+                    yield* guardInjectedContent(filepath, exit.value.output),
+                  ),
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
               }
