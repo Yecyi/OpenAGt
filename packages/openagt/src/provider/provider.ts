@@ -29,6 +29,7 @@ import { withProcessEnv } from "@/util/process-env"
 
 import * as ProviderTransform from "./transform"
 import { ModelID, ProviderID } from "./schema"
+import { applyModelCatalogPolicy } from "./model-catalog-policy"
 import { defaultModelIDs, parseModel, sort } from "./model-selection"
 
 export { defaultModelIDs, parseModel, sort } from "./model-selection"
@@ -1326,32 +1327,12 @@ const layer: Layer.Layer<
 
           const configProvider = cfg.provider?.[providerID]
 
-          for (const [modelID, model] of Object.entries(provider.models)) {
-            model.api.id = model.api.id ?? model.id ?? modelID
-            if (
-              modelID === "gpt-5-chat-latest" ||
-              (providerID === ProviderID.openrouter && modelID === "openai/gpt-5-chat")
-            )
-              delete provider.models[modelID]
-            if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete provider.models[modelID]
-            if (model.status === "deprecated") delete provider.models[modelID]
-            if (
-              (configProvider?.blacklist && configProvider.blacklist.includes(modelID)) ||
-              (configProvider?.whitelist && !configProvider.whitelist.includes(modelID))
-            )
-              delete provider.models[modelID]
-
-            model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
-
-            const configVariants = configProvider?.models?.[modelID]?.variants
-            if (configVariants && model.variants) {
-              const merged = mergeDeep(model.variants, configVariants)
-              model.variants = mapValues(
-                pickBy(merged, (v) => !v.disabled),
-                (v) => omit(v, ["disabled"]),
-              )
-            }
-          }
+          applyModelCatalogPolicy({
+            providerID,
+            provider,
+            configProvider,
+            experimentalModels: Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS,
+          })
 
           if (Object.keys(provider.models).length === 0) {
             delete providers[providerID]
