@@ -29,6 +29,7 @@ import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { checkToolsQuality } from "./tool-quality"
 import { convertMcpTool, sanitizeMcpName } from "./tool-adapter"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
+import { closeTransportIfSupported } from "./transport-utils"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
@@ -116,19 +117,6 @@ export type Status = z.infer<typeof Status>
 // Store transports for OAuth servers to allow finishing auth
 type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
 const pendingOAuthTransports = new Map<string, TransportWithAuth>()
-
-type ClosableTransport = { close: () => void | Promise<void> }
-
-function isClosableTransport(transport: unknown): transport is ClosableTransport {
-  return !!transport && typeof transport === "object" && "close" in transport && typeof transport.close === "function"
-}
-
-function closeTransportIfSupported(transport: unknown) {
-  if (!isClosableTransport(transport)) return Effect.void
-  return Effect.tryPromise(async () => {
-    await transport.close()
-  }).pipe(Effect.ignore)
-}
 
 // Prompt cache types
 type PromptInfo = Awaited<ReturnType<MCPClient["listPrompts"]>>["prompts"][number]
