@@ -56,6 +56,7 @@ import { addReminder, getReminders, clearReminders } from "./prompt/reminder"
 import { createToolScheduler } from "./prompt/tool-resolution"
 import { parseFilePartRange } from "./prompt/file-range"
 import { computeSHA256 } from "./prompt/hash"
+import { mcpResourceBinaryPart, mcpResourceFailurePart, mcpResourceReadPart } from "./prompt/mcp-resource-parts"
 import { mcpToolOutputParts } from "./prompt/mcp-output"
 import { readToolCallPart, readToolFailurePart, syntheticTextPart } from "./prompt/read-parts"
 import { promptReferenceFilePart, promptReferencePath } from "./prompt/reference-parts"
@@ -1055,13 +1056,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             const { clientName, uri } = part.source
             log.info("mcp resource", { clientName, uri, mime: part.mime })
             const pieces: Draft<MessageV2.Part>[] = [
-              {
-                messageID: info.id,
-                sessionID: input.sessionID,
-                type: "text",
-                synthetic: true,
-                text: `Reading MCP resource: ${part.filename} (${uri})`,
-              },
+              mcpResourceReadPart({ messageID: info.id, sessionID: input.sessionID }, part.filename, uri),
             ]
             const exit = yield* mcp.readResource(clientName, uri).pipe(Effect.exit)
             if (Exit.isSuccess(exit)) {
@@ -1080,13 +1075,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   })
                 } else if ("blob" in c && c.blob) {
                   const mime = "mimeType" in c ? c.mimeType : part.mime
-                  pieces.push({
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `[Binary content: ${mime}]`,
-                  })
+                  pieces.push(mcpResourceBinaryPart({ messageID: info.id, sessionID: input.sessionID }, mime))
                 }
               }
               pieces.push({ ...part, messageID: info.id, sessionID: input.sessionID })
@@ -1094,13 +1083,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               const error = Cause.squash(exit.cause)
               log.error("failed to read MCP resource", { error, clientName, uri })
               const message = error instanceof Error ? error.message : String(error)
-              pieces.push({
-                messageID: info.id,
-                sessionID: input.sessionID,
-                type: "text",
-                synthetic: true,
-                text: `Failed to read MCP resource ${part.filename}: ${message}`,
-              })
+              pieces.push(
+                mcpResourceFailurePart({ messageID: info.id, sessionID: input.sessionID }, part.filename, message),
+              )
             }
             return pieces
           }
