@@ -1,7 +1,6 @@
 import { Cause, Duration, Effect, Layer, Schedule, Semaphore, Context, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import path from "path"
-import z from "zod"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
@@ -10,32 +9,11 @@ import { Config } from "../config"
 import { Global } from "../global"
 import { Log } from "../util"
 import { buildFileDiff, filterIgnoredRows, parseNameStatus, parseNumstatRows, type SnapshotDiffRow } from "./diff-rows"
-
-export const Patch = z.object({
-  hash: z.string(),
-  files: z.string().array(),
-})
-export type Patch = z.infer<typeof Patch>
-
-export const FileDiff = z
-  .object({
-    file: z.string(),
-    patch: z.string(),
-    additions: z.number(),
-    deletions: z.number(),
-    status: z.enum(["added", "deleted", "modified"]).optional(),
-  })
-  .meta({
-    ref: "SnapshotFileDiff",
-  })
-export type FileDiff = z.infer<typeof FileDiff>
+import { cfg, core, limit, prune, quote } from "./git-constants"
+export { FileDiff, Patch } from "./schema"
+import type { FileDiff, Patch } from "./schema"
 
 const log = Log.create({ service: "snapshot" })
-const prune = "7.days"
-const limit = 2 * 1024 * 1024
-const core = ["-c", "core.longpaths=true", "-c", "core.symlinks=true"]
-const cfg = ["-c", "core.autocrlf=false", ...core]
-const quote = [...cfg, "-c", "core.quotepath=false"]
 interface GitResult {
   readonly code: ChildProcessSpawner.ExitCode
   readonly text: string
