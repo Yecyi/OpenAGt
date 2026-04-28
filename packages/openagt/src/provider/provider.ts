@@ -2,10 +2,8 @@ import z from "zod"
 import fuzzysort from "fuzzysort"
 import { Config } from "../config"
 import { mapValues, mergeDeep, omit, pickBy } from "remeda"
-import { NoSuchModelError, type Provider as SDK } from "ai"
+import { NoSuchModelError } from "ai"
 import { Log } from "../util"
-import { Npm } from "../npm"
-import { Hash } from "@openagt/shared/util/hash"
 import { Plugin } from "../plugin"
 import { NamedError } from "@openagt/shared/util/error"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
@@ -14,7 +12,6 @@ import { Auth } from "../auth"
 import { Env } from "../env"
 import { Flag } from "../flag/flag"
 import { zod } from "@/util/effect-zod"
-import { iife } from "@/util/iife"
 import { Global } from "../global"
 import path from "path"
 import { Effect, Layer, Context, Schema, Types } from "effect"
@@ -30,6 +27,7 @@ import { applyModelCatalogPolicy } from "./model-catalog-policy"
 import { defaultModelIDs, parseModel, sort } from "./model-selection"
 import { extendCatalogWithConfigProviders } from "./config-provider-catalog"
 import { BundledProviderRegistry, type BundledSDK } from "./bundled-provider-registry"
+import { resolveProviderSDK } from "./sdk-runtime"
 import { useLanguageModel } from "./custom-loader-helpers"
 import { bedrockCustomLoader } from "./custom-loaders-bedrock"
 import { cloudflareCustomLoaders } from "./custom-loaders-cloudflare"
@@ -49,54 +47,6 @@ import type {
 export { defaultModelIDs, parseModel, sort } from "./model-selection"
 
 const log = Log.create({ service: "provider" })
-
-function wrapSSE(res: Response, ms: number, ctl: AbortController) {
-  if (typeof ms !== "number" || ms <= 0) return res
-  if (!res.body) return res
-  if (!res.headers.get("content-type")?.includes("text/event-stream")) return res
-
-  const reader = res.body.getReader()
-  const body = new ReadableStream<Uint8Array>({
-    async pull(ctrl) {
-      const part = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
-        const id = setTimeout(() => {
-          const err = new Error("SSE read timed out")
-          ctl.abort(err)
-          void reader.cancel(err)
-          reject(err)
-        }, ms)
-
-        reader.read().then(
-          (part) => {
-            clearTimeout(id)
-            resolve(part)
-          },
-          (err) => {
-            clearTimeout(id)
-            reject(err)
-          },
-        )
-      })
-
-      if (part.done) {
-        ctrl.close()
-        return
-      }
-
-      ctrl.enqueue(part.value)
-    },
-    async cancel(reason) {
-      ctl.abort(reason)
-      await reader.cancel(reason)
-    },
-  })
-
-  return new Response(body, {
-    headers: new Headers(res.headers),
-    status: res.status,
-    statusText: res.statusText,
-  })
-}
 
 function custom(dep: CustomDep): Record<string, CustomLoader> {
   return {
@@ -570,143 +520,6 @@ const layer: Layer.Layer<
 
     const list = Effect.fn("Provider.list")(() => InstanceState.use(state, (s) => s.providers))
 
-    async function resolveSDK(model: Model, s: State, envs: Record<string, string | undefined>) {
-      try {
-        using _ = log.time("getSDK", {
-          providerID: model.providerID,
-        })
-        const provider = s.providers[model.providerID]
-        const options = { ...provider.options }
-
-        if (model.providerID === "google-vertex" && !model.api.npm.includes("@ai-sdk/openai-compatible")) {
-          delete options.fetch
-        }
-
-        if (model.api.npm.includes("@ai-sdk/openai-compatible") && options["includeUsage"] !== false) {
-          options["includeUsage"] = true
-        }
-
-        const baseURL = iife(() => {
-          let url =
-            typeof options["baseURL"] === "string" && options["baseURL"] !== "" ? options["baseURL"] : model.api.url
-          if (!url) return
-
-          const loader = s.varsLoaders[model.providerID]
-          if (loader) {
-            const vars = loader(options)
-            for (const [key, value] of Object.entries(vars)) {
-              const field = "${" + key + "}"
-              url = url.replaceAll(field, value)
-            }
-          }
-
-          url = url.replace(/\$\{([^}]+)\}/g, (item, key) => {
-            const val = envs[String(key)]
-            return val ?? item
-          })
-          return url
-        })
-
-        if (baseURL !== undefined) options["baseURL"] = baseURL
-        if (options["apiKey"] === undefined && provider.key) options["apiKey"] = provider.key
-        if (model.headers)
-          options["headers"] = {
-            ...options["headers"],
-            ...model.headers,
-          }
-
-        const key = Hash.fast(
-          JSON.stringify({
-            providerID: model.providerID,
-            npm: model.api.npm,
-            options,
-          }),
-        )
-        const existing = s.sdk.get(key)
-        if (existing) return existing
-
-        const customFetch = options["fetch"]
-        const chunkTimeout = options["chunkTimeout"]
-        delete options["chunkTimeout"]
-
-        options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-          const fetchFn = customFetch ?? fetch
-          const opts = init ?? {}
-          const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
-          const signals: AbortSignal[] = []
-
-          if (opts.signal) signals.push(opts.signal)
-          if (chunkAbortCtl) signals.push(chunkAbortCtl.signal)
-          if (options["timeout"] !== undefined && options["timeout"] !== null && options["timeout"] !== false)
-            signals.push(AbortSignal.timeout(options["timeout"]))
-
-          const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
-          if (combined) opts.signal = combined
-
-          // Strip openai itemId metadata following what codex does
-          if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
-            const body = JSON.parse(opts.body as string)
-            const isAzure = model.providerID.includes("azure")
-            const keepIds = isAzure && body.store === true
-            if (!keepIds && Array.isArray(body.input)) {
-              for (const item of body.input) {
-                if ("id" in item) {
-                  delete item.id
-                }
-              }
-              opts.body = JSON.stringify(body)
-            }
-          }
-
-          const res = await fetchFn(input, {
-            ...opts,
-            // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
-            timeout: false,
-          })
-
-          if (!chunkAbortCtl) return res
-          return wrapSSE(res, chunkTimeout, chunkAbortCtl)
-        }
-
-        const bundledLoader = bundledProviders.loader(model.api.npm)
-        if (bundledLoader) {
-          log.info("using bundled provider", {
-            providerID: model.providerID,
-            pkg: model.api.npm,
-          })
-          const factory = await bundledLoader()
-          const loaded = factory({
-            name: model.providerID,
-            ...options,
-          })
-          s.sdk.set(key, loaded)
-          return loaded as SDK
-        }
-
-        let installedPath: string
-        if (!model.api.npm.startsWith("file://")) {
-          const item = await Npm.add(model.api.npm)
-          if (!item.entrypoint) throw new Error(`Package ${model.api.npm} has no import entrypoint`)
-          installedPath = item.entrypoint
-        } else {
-          log.info("loading local provider", { pkg: model.api.npm })
-          installedPath = model.api.npm
-        }
-
-        const mod = await import(installedPath)
-
-        const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
-        const loaded = fn({
-          name: model.providerID,
-          ...options,
-        })
-        s.sdk.set(key, loaded)
-        return loaded as SDK
-      } catch (e) {
-        throw new InitError({ providerID: model.providerID }, { cause: e })
-      }
-    }
-
     const getProvider = Effect.fn("Provider.getProvider")((providerID: ProviderID) =>
       InstanceState.use(state, (s) => s.providers[providerID]),
     )
@@ -737,7 +550,14 @@ const layer: Layer.Layer<
 
       return yield* Effect.promise(async () => {
         const provider = s.providers[model.providerID]
-        const sdk = await resolveSDK(model, s, envs)
+        const sdk = await resolveProviderSDK({
+          model,
+          state: s,
+          envs,
+          bundledProviders,
+          log,
+          initError: (providerID, cause) => new InitError({ providerID }, { cause }),
+        })
 
         try {
           const language = s.modelLoaders[model.providerID]
