@@ -28,7 +28,7 @@ export function formatTranscript(
   messages: MessageWithParts[],
   options: TranscriptOptions,
 ): string {
-  const providers = Model.index(options.providers)
+  const providers = Model.indexProviders(options.providers)
   let transcript = `# ${session.title}\n\n`
   transcript += `**Session ID:** ${session.id}\n`
   transcript += `**Created:** ${new Date(session.time.created).toLocaleString()}\n`
@@ -76,7 +76,7 @@ export function formatAssistantHeader(
   const duration =
     msg.time.completed && msg.time.created ? ((msg.time.completed - msg.time.created) / 1000).toFixed(1) + "s" : ""
 
-  const modelName = Model.name(providers, msg.providerID, msg.modelID)
+  const modelName = Model.getProviderModelName(providers, msg.providerID, msg.modelID)
 
   return `## Assistant (${Locale.titlecase(msg.agent)} 路 ${modelName}${duration ? ` 路 ${duration}` : ""})\n\n`
 }
