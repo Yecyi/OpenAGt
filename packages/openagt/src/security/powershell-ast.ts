@@ -7,65 +7,30 @@
  */
 
 import { Effect, Layer, Context } from "effect"
+import {
+  expandAliases,
+  PATTERN_DANGERS,
+  STRUCTURED_DANGEROUS_CMDLETS,
+} from "./powershell-ast-patterns"
+import { analyzeObfuscation } from "./powershell-obfuscation"
+import type {
+  AstNode,
+  AstNodeType,
+  CommandInfo,
+  DangerousNode,
+  PowerShellAstResult,
+} from "./powershell-ast-contracts"
 
-export type AstNodeType =
-  | "program"
-  | "command_invocation"
-  | "command_parameter"
-  | "expression"
-  | "string_literal"
-  | "expandable_string"
-  | "script_block"
-  | "subexpression"
-  | "pipeline"
-  | "comment"
+export type {
+  AstNode,
+  AstNodeType,
+  CommandInfo,
+  DangerousNode,
+  ObfuscationReport,
+  PowerShellAstResult,
+} from "./powershell-ast-contracts"
 
-export interface AstNode {
-  type: AstNodeType
-  value?: string
-  children?: AstNode[]
-  start: number
-  end: number
-}
-
-export interface CommandInfo {
-  name: string
-  position: { start: number; end: number }
-  arguments: Array<{
-    type: "parameter" | "value"
-    name?: string
-    value: string
-    position: { start: number; end: number }
-  }>
-  isScriptBlock: boolean
-  hasPipeline: boolean
-  nested: CommandInfo[]
-}
-
-export interface DangerousNode {
-  nodeType: AstNodeType
-  reason: string
-  severity: "high" | "medium" | "low"
-  position: { start: number; end: number }
-  source: "ast" | "pattern"
-}
-
-export interface PowerShellAstResult {
-  valid: boolean
-  ast: AstNode | null
-  commands: CommandInfo[]
-  dangerousNodes: DangerousNode[]
-  warnings: string[]
-  obfuscationReport?: ObfuscationReport
-}
-
-export interface ObfuscationReport {
-  aliasesExpanded: string[]
-  indirectCallsDetected: string[]
-  base64Attempts: number
-  base64Decoded?: string
-  overallRisk: "low" | "medium" | "high"
-}
+export { STRUCTURED_DANGEROUS_CMDLETS } from "./powershell-ast-patterns"
 
 type TokenType =
   | "word"
@@ -98,233 +63,6 @@ const VALUE_TOKEN_TYPES = new Set<TokenType>([
   "subexpression",
   "script_block",
 ])
-
-export const STRUCTURED_DANGEROUS_CMDLETS: Record<string, { severity: "high" | "medium"; reason: string }> = {
-  "invoke-expression": { severity: "high", reason: "Dynamic code execution" },
-  iex: { severity: "high", reason: "Invoke-Expression alias - dynamic code execution" },
-  "invoke-command": { severity: "high", reason: "Remote command execution" },
-  "invoke-webrequest": { severity: "medium", reason: "Network request - potential C2" },
-  iwr: { severity: "medium", reason: "Invoke-WebRequest alias - potential C2" },
-  "invoke-restmethod": { severity: "medium", reason: "REST API call" },
-  "start-process": { severity: "medium", reason: "Process creation" },
-  "new-service": { severity: "high", reason: "Service creation - persistence" },
-  "set-service": { severity: "medium", reason: "Service modification" },
-  "register-scheduledtask": { severity: "high", reason: "Scheduled task - persistence" },
-  "schtasks.exe": { severity: "high", reason: "Scheduled task creation - persistence" },
-  "set-executionpolicy": { severity: "medium", reason: "Execution policy change" },
-  "new-item": { severity: "medium", reason: "New item creation" },
-  "remove-item": { severity: "medium", reason: "Item deletion" },
-  "convertto-securestring": { severity: "medium", reason: "Credential conversion" },
-  "convertfrom-securestring": { severity: "high", reason: "Credential extraction" },
-  "get-content": { severity: "medium", reason: "File content reading" },
-  "set-content": { severity: "medium", reason: "File content writing" },
-  "out-file": { severity: "medium", reason: "File output" },
-  "add-type": { severity: "high", reason: "Dynamic type loading" },
-}
-
-const PATTERN_DANGERS: Array<{ pattern: RegExp; reason: string; severity: "high" | "medium"; nodeType: AstNodeType }> =
-  [
-    {
-      pattern: /-enc(?:odedCommand)?\s+\S+/i,
-      reason: "Encoded command detected",
-      severity: "high",
-      nodeType: "expression",
-    },
-    { pattern: /FromBase64String/i, reason: "Encoded command detected", severity: "high", nodeType: "expression" },
-    { pattern: /\[Ref\]\.Assembly\.GetType/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
-    { pattern: /AmsiUtils/i, reason: "AMSI bypass attempt", severity: "high", nodeType: "expression" },
-    {
-      pattern: /rundll32(?:\.exe)?/i,
-      reason: "rundll32 Living-off-the-land binary usage",
-      severity: "high",
-      nodeType: "expression",
-    },
-    {
-      pattern: /regsvr32(?:\.exe)?/i,
-      reason: "regsvr32 Living-off-the-land binary usage",
-      severity: "high",
-      nodeType: "expression",
-    },
-    {
-      pattern: /mshta(?:\.exe)?/i,
-      reason: "mshta Living-off-the-land binary usage",
-      severity: "high",
-      nodeType: "expression",
-    },
-    {
-      pattern: /cscript(?:\.exe)?/i,
-      reason: "cscript Living-off-the-land binary usage",
-      severity: "high",
-      nodeType: "expression",
-    },
-    {
-      pattern: /wscript(?:\.exe)?/i,
-      reason: "wscript Living-off-the-land binary usage",
-      severity: "high",
-      nodeType: "expression",
-    },
-  ]
-
-/**
- * PowerShell common aliases
- */
-const POWERSHELL_ALIASES: Record<string, string> = {
-  "%": "ForEach-Object",
-  "?": "Where-Object",
-  iex: "Invoke-Expression",
-  irm: "Invoke-RestMethod",
-  iwr: "Invoke-WebRequest",
-  ipmo: "Import-Module",
-  gp: "Get-ItemProperty",
-  curl: "Invoke-WebRequest",
-  wget: "Invoke-WebRequest",
-  curliex: "Invoke-WebRequest",
-  hk: "Get-Help",
-  gci: "Get-ChildItem",
-  ls: "Get-ChildItem",
-  dir: "Get-ChildItem",
-  gc: "Get-Content",
-  cat: "Get-Content",
-  type: "Get-Content",
-  ni: "New-Item",
-  md: "New-Item",
-  rm: "Remove-Item",
-  rd: "Remove-Item",
-  cp: "Copy-Item",
-  copy: "Copy-Item",
-  mv: "Move-Item",
-  move: "Move-Item",
-  ac: "Add-Content",
-  sl: "Set-Location",
-  cd: "Set-Location",
-  pwd: "Get-Location",
-  gl: "Get-Location",
-  echo: "Write-Output",
-  write: "Write-Output",
-  diff: "Compare-Object",
-  select: "Select-Object",
-  sort: "Sort-Object",
-  wv: "Where-Object",
-  fl: "Format-List",
-  ft: "Format-Table",
-  gm: "Get-Member",
-  gdr: "Get-PSDrive",
-  gwmi: "Get-WmiObject",
-  icm: "Invoke-Command",
-  clc: "Clear-Content",
-  del: "Remove-Item",
-  ri: "Remove-Item",
-  sc: "Set-Content",
-  sp: "Set-Item",
-  sv: "Set-Variable",
-  si: "Set-Item",
-  gi: "Get-Item",
-}
-
-function expandAliases(cmdName: string): string {
-  const lower = cmdName.toLowerCase()
-  return POWERSHELL_ALIASES[lower] ?? cmdName
-}
-
-function tryDecodeBase64(input: string): { decoded: string | null; depth: number } {
-  let current = input
-  let depth = 0
-  const maxDepth = 3
-
-  while (depth < maxDepth) {
-    const trimmed = current.trim()
-    if (!/^[A-Za-z0-9+/=]+$/.test(trimmed) || trimmed.length < 4) {
-      break
-    }
-    try {
-      const decoded = Buffer.from(trimmed, "base64").toString("utf-8")
-      if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(decoded)) break
-      const nextDecoded = decoded.replace(/[\r\n]+/g, " ").trim()
-      if (nextDecoded.length < 4) break
-      current = nextDecoded
-      depth++
-    } catch {
-      break
-    }
-  }
-
-  return depth > 0 ? { decoded: current, depth } : { decoded: null, depth: 0 }
-}
-
-function detectIndirectCalls(input: string): string[] {
-  const detected: string[] = []
-  const indirectPattern = /\$\w+\s*=\s*["'][^"']+["']\s*;?\s*&\s*\$/g
-  let match
-  while ((match = indirectPattern.exec(input)) !== null) {
-    detected.push(match[0]!)
-  }
-
-  const variableCallPattern = /\$[a-zA-Z_]\w*\s*=\s*"([^"]+)"\s*;?\s*&\s*\$[a-zA-Z_]\w*/gi
-  while ((match = variableCallPattern.exec(input)) !== null) {
-    detected.push(match[0]!)
-  }
-
-  return detected
-}
-
-function analyzeObfuscation(input: string): ObfuscationReport {
-  const aliasesExpanded: string[] = []
-  const indirectCalls = detectIndirectCalls(input)
-
-  const words = input.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) ?? []
-  for (const word of words) {
-    const expanded = expandAliases(word)
-    if (expanded !== word) {
-      aliasesExpanded.push(`${word} -> ${expanded}`)
-    }
-  }
-
-  const base64Pattern = /-enc(?:odedCommand)?\s+([A-Za-z0-9+/=]+)/i
-  const base64Match = base64Pattern.exec(input)
-  let base64Decoded: string | undefined
-  let base64Attempts = 0
-
-  if (base64Match) {
-    base64Attempts++
-    const decoded = tryDecodeBase64(base64Match[1]!)
-    if (decoded.decoded) {
-      base64Decoded = decoded.decoded
-    }
-  }
-
-  const b64InSubexpr = input.match(/\$\(([^)]+)\)/g)
-  if (b64InSubexpr) {
-    for (const subexpr of b64InSubexpr) {
-      if (/FromBase64String/i.test(subexpr)) {
-        base64Attempts++
-        const inner = subexpr.match(/\$?\(([^)]+)\)/)?.[1]
-        if (inner) {
-          const decoded = tryDecodeBase64(inner)
-          if (decoded.decoded) {
-            base64Decoded = decoded.decoded
-          }
-        }
-      }
-    }
-  }
-
-  let overallRisk: "low" | "medium" | "high" = "low"
-  if (indirectCalls.length > 0) {
-    overallRisk = "high"
-  } else if (base64Attempts > 0 && base64Decoded && base64Decoded.length >= 4) {
-    overallRisk = "high"
-  } else if (aliasesExpanded.length > 3) {
-    overallRisk = "medium"
-  }
-
-  return {
-    aliasesExpanded,
-    indirectCallsDetected: indirectCalls,
-    base64Attempts,
-    base64Decoded,
-    overallRisk,
-  }
-}
 
 function readQuoted(input: string, start: number, quote: "'" | '"') {
   let pos = start + 1
