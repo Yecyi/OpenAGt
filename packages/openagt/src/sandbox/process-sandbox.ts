@@ -8,8 +8,8 @@
 import { spawn } from "bun"
 import { Effect, Layer, Context } from "effect"
 import { spawn as nodeSpawn } from "child_process"
-import { Shell } from "@/shell/shell"
 import { Log } from "../util"
+import { applySandboxResourceLimits, buildSandboxArgs } from "./process-sandbox-command"
 
 type BunChildProcess = {
   pid?: number
@@ -58,9 +58,6 @@ export interface ProcessSandboxStats {
 
 const log = Log.create({ service: "process-sandbox" })
 
-const DEFAULT_CMD = "C:\\WINDOWS\\system32\\cmd.exe"
-const DEFAULT_POWERSHELL = "powershell.exe"
-
 const stats: ProcessSandboxStats = {
   totalSpawned: 0,
   totalKilled: 0,
@@ -79,48 +76,6 @@ export function resetSandboxStats(): void {
   stats.totalTimeouts = 0
   stats.totalKilledByResourceLimit = 0
   stats.currentRunning = 0
-}
-
-function shellKind(shell?: string) {
-  if (process.platform !== "win32") return "posix" as const
-  const name = shell ? Shell.name(shell) : "cmd"
-  if (name === "powershell" || name === "pwsh") return "powershell" as const
-  if (Shell.posix(shell || "")) return "posix" as const
-  return "cmd" as const
-}
-
-function buildArgs(command: string, shell?: string): [string, string[]] {
-  if (process.platform === "win32") {
-    if (shellKind(shell) === "powershell") {
-      return [shell || DEFAULT_POWERSHELL, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]]
-    }
-    if (shellKind(shell) === "posix") {
-      return [shell || "/bin/sh", [Shell.login(shell || "") ? "-lc" : "-c", command]]
-    }
-    return [shell || DEFAULT_CMD, ["/d", "/s", "/c", command]]
-  }
-  return [shell || "/bin/sh", ["-c", command]]
-}
-
-function applyResourceLimits(options: ProcessSandboxOptions): Record<string, string> {
-  const env: Record<string, string> = {}
-  const existingNodeOptions = options.env?.NODE_OPTIONS?.trim()
-  const limits = options.limits
-  const nodeOptions = [existingNodeOptions].filter(Boolean)
-
-  if (limits?.maxMemory) {
-    nodeOptions.push(`--max-old-space-size=${Math.max(1, Math.floor(limits.maxMemory / 1024 / 1024))}`)
-  }
-
-  if (limits?.maxStack) {
-    nodeOptions.push(`--stack-size=${Math.max(1, Math.floor(limits.maxStack / 1024))}`)
-  }
-
-  if (nodeOptions.length > 0) {
-    env.NODE_OPTIONS = nodeOptions.join(" ")
-  }
-
-  return env
 }
 
 async function collectStream(stream: ReadableStream<Uint8Array> | null, maxSize?: number) {
@@ -228,8 +183,8 @@ export async function spawnWithSandbox(
   stats.totalSpawned++
   stats.currentRunning++
 
-  const [cmd, args] = buildArgs(command, shell)
-  const mergedEnv = { ...env, ...applyResourceLimits(options) }
+  const [cmd, args] = buildSandboxArgs(command, shell)
+  const mergedEnv = { ...env, ...applySandboxResourceLimits(options) }
 
   let timedOut = false
   let killed = false
@@ -306,8 +261,8 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
   stats.currentRunning++
 
   const { spawnSync } = require("child_process")
-  const [cmd, args] = buildArgs(command, shell)
-  const mergedEnv = { ...env, ...applyResourceLimits(options) }
+  const [cmd, args] = buildSandboxArgs(command, shell)
+  const mergedEnv = { ...env, ...applySandboxResourceLimits(options) }
   const result = spawnSync(cmd, args, {
     cwd,
     env: mergedEnv,
