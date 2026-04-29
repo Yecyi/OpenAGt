@@ -1,7 +1,6 @@
 import { type Tool } from "ai"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -29,6 +28,7 @@ import { closeTransportIfSupported } from "./transport-utils"
 import { BrowserOpenFailed, ToolsChanged } from "./events"
 import { McpPendingOAuthTransports, type TransportWithAuth } from "./pending-oauth-transports"
 import { computeMcpBackoff, connectMcpTransport, sleep, type MCPTransport } from "./connection-runtime"
+import { createLocalTransport, remoteTransportCandidates } from "./transport-factory"
 import type { Status } from "./schema"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
@@ -163,24 +163,10 @@ export const layer = Layer.effect(
         )
       }
 
-      const transports: Array<{ name: string; create: () => TransportWithAuth }> = [
-        {
-          name: "StreamableHTTP",
-          create: () =>
-            new StreamableHTTPClientTransport(new URL(mcp.url), {
-              authProvider,
-              requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-            }),
-        },
-        {
-          name: "SSE",
-          create: () =>
-            new SSEClientTransport(new URL(mcp.url), {
-              authProvider,
-              requestInit: mcp.headers ? { headers: mcp.headers } : undefined,
-            }),
-        },
-      ]
+      const transports: Array<{ name: string; create: () => TransportWithAuth }> = remoteTransportCandidates(
+        mcp,
+        authProvider,
+      )
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       const deadline = Date.now() + connectTimeout
@@ -318,19 +304,14 @@ export const layer = Layer.effect(
     ) {
       const [cmd, ...args] = mcp.command
       const cwd = yield* InstanceState.directory
-      const transport = new StdioClientTransport({
-        stderr: "pipe",
+      const transport = createLocalTransport({
         command: cmd,
         args,
         cwd,
-        env: {
-          ...process.env,
-          ...(cmd === "opencode" ? { BUN_BE_BUN: "1" } : {}),
-          ...mcp.environment,
+        environment: mcp.environment,
+        onStderr: (chunk) => {
+          log.info(`mcp stderr: ${chunk.toString()}`, { key })
         },
-      })
-      transport.stderr?.on("data", (chunk: Buffer) => {
-        log.info(`mcp stderr: ${chunk.toString()}`, { key })
       })
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
