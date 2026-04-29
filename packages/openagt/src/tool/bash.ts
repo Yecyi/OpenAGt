@@ -33,6 +33,7 @@ import {
   type BashMetadata,
 } from "./bash-metadata"
 import { BashExecutionPlanner } from "./bash-execution-plan"
+import { chooseShell, DEFAULT_TIMEOUT, isPowerShellName } from "./bash-shell"
 import {
   CWD,
   FILES,
@@ -49,27 +50,6 @@ import {
   type Part,
   type Scan,
 } from "./bash-path-analysis"
-
-const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
-const PS = new Set(["powershell", "pwsh"])
-const PS_TOKENS = [
-  "$env:",
-  "${env:",
-  "$pshome",
-  "$pwd",
-  "write-host",
-  "write-output",
-  "get-content",
-  "set-content",
-  "copy-item",
-  "move-item",
-  "remove-item",
-  "new-item",
-  "set-location",
-  "push-location",
-  "pop-location",
-  "if ($?",
-]
 
 const Parameters = z.object({
   command: z.string().describe("The command to execute"),
@@ -94,23 +74,6 @@ const resolveWasm = (asset: string) => {
   if (asset.startsWith("/") || /^[a-z]:/i.test(asset)) return asset
   const url = new URL(asset, import.meta.url)
   return fileURLToPath(url)
-}
-
-function chooseShell(command: string) {
-  const acceptable = Shell.acceptable()
-  if (process.platform !== "win32") return acceptable
-  const text = command.trim().toLowerCase()
-  const hasPowerShellSyntax = PS_TOKENS.some((item) => text.includes(item)) || /(^|[\s;(])&\s+["'a-z_$({]/i.test(text)
-  if (hasPowerShellSyntax) {
-    const preferred = Shell.preferred()
-    const name = Shell.name(preferred)
-    if (PS.has(name)) return preferred
-    const pwsh = Bun.which("pwsh")
-    if (pwsh) return pwsh
-    const powershell = Bun.which("powershell")
-    if (powershell) return powershell
-  }
-  return acceptable
 }
 
 const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolean) {
@@ -377,7 +340,7 @@ export const BashTool = Tool.define(
           }
 
           const timeout = params.timeout ?? DEFAULT_TIMEOUT
-          const ps = PS.has(name)
+          const ps = isPowerShellName(name)
           const root = yield* parse(params.command, ps)
           const scan = yield* collect(root, cwd, ps, shell)
           if (!Instance.containsPath(cwd, instance)) scan.dirs.add(cwd)
