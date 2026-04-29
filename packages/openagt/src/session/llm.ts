@@ -3,7 +3,6 @@ import { Log } from "@/util"
 import { Context, Effect, Layer } from "effect"
 import * as Stream from "effect/Stream"
 import { streamText, wrapLanguageModel, type ModelMessage, type Tool } from "ai"
-import { mergeDeep, pipe } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider"
 import { Config } from "@/config"
@@ -11,7 +10,6 @@ import { Instance } from "@/project/instance"
 import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
-import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
@@ -25,21 +23,17 @@ import { EffectBridge } from "@/effect"
 import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { createNoopTool, resolveTools, shouldInjectNoopTool } from "./llm-tool-compat"
+import {
+  buildInitialSystemPrompt,
+  buildModelMessages,
+  buildModelOptions,
+  collapseSystemPromptForCaching,
+  staticBlocksHash,
+} from "./llm-request"
 
 const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 type Result = Awaited<ReturnType<typeof streamText>>
-
-async function computeSHA256(text: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 8)
-}
 
 export type StreamInput = {
   user: MessageV2.User
@@ -108,14 +102,7 @@ const live: Layer.Layer<
       // TODO: move this to a proper hook
       const isOpenaiOauth = item.id === "openai" && info?.type === "oauth"
 
-      const system = [
-        // use agent prompt otherwise provider prompt
-        ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-        // any custom prompt passed into this call
-        ...input.system,
-        // any custom prompt from last user message
-        ...(input.user.system ? [input.user.system] : []),
-      ].filter((x) => x)
+      const system = buildInitialSystemPrompt(input)
 
       const header = system[0]
       yield* plugin.trigger(
@@ -124,56 +111,20 @@ const live: Layer.Layer<
         { system },
       )
       // rejoin to maintain 2-part structure for caching if header unchanged
-      if (system.length > 2 && system[0] === header) {
-        const rest = system.slice(1)
-        system.length = 0
-        system.push(header, rest.join("\n"))
-      }
+      collapseSystemPromptForCaching(system, header)
 
       // B-P2-1: Compute static blocks hash for cache key salting
-      const staticBlocksHash = yield* Effect.promise(() => computeSHA256(input.system.join("")))
-
-      const variant =
-        !input.small && input.model.variants && input.user.model.variant
-          ? input.model.variants[input.user.model.variant]
-          : {}
-      const base = input.small
-        ? ProviderTransform.smallOptions(input.model)
-        : ProviderTransform.options({
-            model: input.model,
-            sessionID: input.sessionID,
-            providerOptions: item.options,
-            staticBlocksHash,
-          })
-      const options: Record<string, any> = pipe(
-        base,
-        mergeDeep(input.model.options),
-        mergeDeep(input.agent.options),
-        mergeDeep(variant),
-      )
+      const options = buildModelOptions({
+        ...input,
+        providerOptions: item.options,
+        staticBlocksHash: yield* Effect.promise(() => staticBlocksHash(input.system)),
+      })
       if (isOpenaiOauth) {
         options.instructions = system.join("\n")
       }
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
-      const messages = isOpenaiOauth
-        ? input.messages
-        : isWorkflow
-          ? input.messages
-          : [
-              ...system.map(
-                (x, index): ModelMessage => ({
-                  role: "system",
-                  content: x,
-                  providerOptions: {
-                    openagt: {
-                      cacheZone: index <= 1 ? "static" : index === 2 ? "semiStatic" : "dynamic",
-                    },
-                  },
-                }),
-              ),
-              ...input.messages,
-            ]
+      const messages = buildModelMessages({ messages: input.messages, system, isOpenaiOauth, isWorkflow })
 
       const params = yield* plugin.trigger(
         "chat.params",
