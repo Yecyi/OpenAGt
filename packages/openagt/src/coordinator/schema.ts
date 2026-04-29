@@ -19,8 +19,9 @@ import {
   TaskType,
 } from "./schema-enums"
 import { BudgetProfile, BudgetState, ContinuationRequest, ProgressSnapshot } from "./schema-budget"
+import { CheckpointMemorySummary, MemoryContext } from "./schema-memory"
 import { QualityGate, RevisePoint } from "./schema-review"
-import { TimelineTodo, TodoTimeline } from "./schema-timeline"
+import { TodoTimeline } from "./schema-timeline"
 export {
   AutoContinuePolicy,
   BudgetScale,
@@ -46,6 +47,7 @@ export {
   ProgressSnapshot,
   ResourceLimit,
 } from "./schema-budget"
+export { CheckpointMemorySummary, MemoryContext } from "./schema-memory"
 export { CriticalReviewVerdict, QualityGate, RevisePoint } from "./schema-review"
 export { TimelinePhase, TimelineTodo, TodoStage, TodoStatus, TodoTimeline } from "./schema-timeline"
 
@@ -112,20 +114,6 @@ export const LongTaskProfile = z.object({
 })
 export type LongTaskProfile = z.infer<typeof LongTaskProfile>
 
-export const CheckpointMemorySummary = z.object({
-  run_id: z.string().optional(),
-  checkpoint_id: z.string().optional(),
-  todo_state: z.array(TimelineTodo).default([]),
-  completed_artifacts: z.array(z.string()).default([]),
-  evidence_index: z.array(z.string()).default([]),
-  unresolved_claims: z.array(z.string()).default([]),
-  blocked_reasons: z.array(z.string()).default([]),
-  quality_scores: z.record(z.string(), z.number()).default({}),
-  next_recommended_todos: z.array(z.string()).default([]),
-  compressed_context: z.string().default(""),
-})
-export type CheckpointMemorySummary = z.infer<typeof CheckpointMemorySummary>
-
 export const defaultEffortProfile = {
   planning_rounds: 1,
   expert_count_min: 1,
@@ -167,16 +155,6 @@ export const ExpertLane = z.object({
   memory_namespace: z.string(),
 })
 export type ExpertLane = z.infer<typeof ExpertLane>
-
-export const MemoryContext = z.object({
-  scopes: z
-    .array(z.enum(["profile", "workspace", "session", "semantic", "procedural"]))
-    .default(["profile", "workspace"]),
-  workflow_tags: z.array(z.string()).default([]),
-  expert_tags: z.array(z.string()).default([]),
-  note_ids: z.array(z.string()).default([]),
-})
-export type MemoryContext = z.infer<typeof MemoryContext>
 
 export const CoordinatorNode = z.object({
   id: z.string(),
