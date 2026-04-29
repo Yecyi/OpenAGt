@@ -1,8 +1,6 @@
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
-import { InstanceState } from "@/effect"
-import { attachWith } from "@/effect/run-service"
 import { SessionPrompt } from "@/session/prompt"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
@@ -47,6 +45,7 @@ import { CoordinatorTaskExecutor } from "./task-executor"
 import { CoordinatorRunFactory } from "./run-factory"
 import { CoordinatorOutcomeRecorder } from "./outcome-recorder"
 import { CoordinatorRunStore } from "./run-store"
+import { CoordinatorSubscriptionManager } from "./subscription-manager"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -335,33 +334,14 @@ export const layer = Layer.effect(
       dispatchLoop.dispatchReady(id),
     )
 
-    const subscriptionStops = new Map<string, () => void>()
+    const subscriptionManager = new CoordinatorSubscriptionManager(bus, dispatchReady)
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        for (const stop of subscriptionStops.values()) stop()
-        subscriptionStops.clear()
+        subscriptionManager.clear()
       }),
     )
 
-    const ensureSubscribed: () => Effect.Effect<void, Error> = Effect.fn("Coordinator.ensureSubscribed")(function* () {
-      const instance = yield* InstanceState.context
-      if (subscriptionStops.has(instance.directory)) return
-      const workspace = yield* InstanceState.workspaceID
-      const stopTaskSubscription = yield* bus.subscribeCallback(TaskRuntime.Event.Updated, (event) => {
-        if (!event.properties.result.group_id) return
-        const runID = event.properties.result.group_id as CoordinatorRunIDType
-        void Effect.runPromise(
-          attachWith(dispatchReady(runID), {
-            instance,
-            workspace,
-          }).pipe(Effect.catchCause(() => Effect.void)),
-        )
-      })
-      subscriptionStops.set(instance.directory, () => {
-        stopTaskSubscription()
-        subscriptionStops.delete(instance.directory)
-      })
-    })
+    const ensureSubscribed: () => Effect.Effect<void, Error> = () => subscriptionManager.ensureSubscribed()
 
     const run: Interface["run"] = Effect.fn("Coordinator.run")(function* (input) {
       yield* ensureSubscribed()
