@@ -16,11 +16,9 @@ import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider"
-import { Question } from "@/question"
 import { Log } from "@/util"
 import { errorMessage } from "@/util/error"
-import { isRecord } from "@/util/record"
-import { completeInterruptedBashFor, isAbortLikeError, isShellRunnerBash } from "./processor-helpers"
+import { ProcessorToolCalls, type ProcessorToolCall } from "./processor-tool-calls"
 
 const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
@@ -58,15 +56,8 @@ export interface Interface {
   readonly create: (input: Input) => Effect.Effect<Handle>
 }
 
-type ToolCall = {
-  partID: MessageV2.ToolPart["id"]
-  messageID: MessageV2.ToolPart["messageID"]
-  sessionID: MessageV2.ToolPart["sessionID"]
-  done: Deferred.Deferred<void>
-}
-
 interface ProcessorContext extends Input {
-  toolcalls: Record<string, ToolCall>
+  toolcalls: Record<string, ProcessorToolCall>
   shouldBreak: boolean
   snapshot: string | undefined
   blocked: boolean
@@ -132,102 +123,25 @@ export const layer: Layer.Layer<
           providerID: input.model.providerID,
           aborted,
         })
-      const completeInterruptedBash = completeInterruptedBashFor({ updatePart: session.updatePart })
-
-      const settleToolCall = Effect.fn("SessionProcessor.settleToolCall")(function* (toolCallID: string) {
-        const done = ctx.toolcalls[toolCallID]?.done
-        delete ctx.toolcalls[toolCallID]
-        if (done) yield* Deferred.succeed(done, undefined).pipe(Effect.ignore)
-      })
-
-      const readToolCall = Effect.fn("SessionProcessor.readToolCall")(function* (toolCallID: string) {
-        const call = ctx.toolcalls[toolCallID]
-        if (!call) return
-        const part = yield* session.getPart({
-          partID: call.partID,
-          messageID: call.messageID,
-          sessionID: call.sessionID,
-        })
-        if (!part || part.type !== "tool") {
-          delete ctx.toolcalls[toolCallID]
-          return
-        }
-        return { call, part }
-      })
-
-      const updateToolCall = Effect.fn("SessionProcessor.updateToolCall")(function* (
-        toolCallID: string,
-        update: (part: MessageV2.ToolPart) => MessageV2.ToolPart,
-      ) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return
-        const part = yield* session.updatePart(update(match.part))
-        ctx.toolcalls[toolCallID] = {
-          ...match.call,
-          partID: part.id,
-          messageID: part.messageID,
-          sessionID: part.sessionID,
-        }
-        return part
-      })
-
-      const completeToolCall = Effect.fn("SessionProcessor.completeToolCall")(function* (
-        toolCallID: string,
-        output: {
-          title: string
-          metadata: Record<string, any>
-          output: string
-          attachments?: MessageV2.FilePart[]
-        },
-      ) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return
-        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return
-        const end = Date.now()
-        yield* session.updatePart({
-          ...match.part,
-          state: {
-            status: "completed",
-            input: match.part.state.input,
-            output: output.output,
-            metadata: output.metadata,
-            title: output.title,
-            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
-            attachments: output.attachments,
+      const toolCalls = new ProcessorToolCalls({ context: ctx, isAborted: () => aborted, session })
+      const updateToolCall = Effect.fn("SessionProcessor.updateToolCall")(
+        (toolCallID: string, update: (part: MessageV2.ToolPart) => MessageV2.ToolPart) =>
+          toolCalls.update(toolCallID, update),
+      )
+      const completeToolCall = Effect.fn("SessionProcessor.completeToolCall")(
+        (
+          toolCallID: string,
+          output: {
+            title: string
+            metadata: Record<string, any>
+            output: string
+            attachments?: MessageV2.FilePart[]
           },
-        })
-        yield* settleToolCall(toolCallID)
-      })
-
-      const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return false
-        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return false
-        const end = Date.now()
-        const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : undefined
-        const metadataRecord = metadata ?? {}
-        const output = typeof metadataRecord.output === "string" ? metadataRecord.output : ""
-        if ((aborted || isAbortLikeError(error)) && isShellRunnerBash(match.part, metadataRecord, output)) {
-          yield* completeInterruptedBash(match.part, metadataRecord, output, end)
-          yield* settleToolCall(toolCallID)
-          return true
-        }
-        yield* session.updatePart({
-          ...match.part,
-          state: {
-            status: "error",
-            input: match.part.state.input,
-            error: errorMessage(error),
-            metadata,
-            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
-          },
-        })
-        if (error instanceof Permission.RejectedError || error instanceof Question.RejectedError) {
-          ctx.blocked = ctx.shouldBreak
-        }
-        yield* settleToolCall(toolCallID)
-        return true
-      })
+        ) => toolCalls.complete(toolCallID, output),
+      )
+      const failToolCall = Effect.fn("SessionProcessor.failToolCall")((toolCallID: string, error: unknown) =>
+        toolCalls.fail(toolCallID, error),
+      )
 
       const handleEvent = Effect.fnUntraced(function* (value: StreamEvent) {
         switch (value.type) {
@@ -510,42 +424,8 @@ export const layer: Layer.Layer<
         }
         ctx.reasoningMap = {}
 
-        yield* Effect.forEach(
-          Object.values(ctx.toolcalls),
-          (call) => Deferred.await(call.done).pipe(Effect.timeout("5 seconds"), Effect.ignore),
-          { concurrency: "unbounded" },
-        )
-
-        for (const toolCallID of Object.keys(ctx.toolcalls)) {
-          const match = yield* readToolCall(toolCallID)
-          if (!match) continue
-          const part = match.part
-          const end = Date.now()
-          const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
-          const output = typeof metadata.output === "string" ? metadata.output : ""
-          if (isShellRunnerBash(part, metadata, output)) {
-            yield* completeInterruptedBash(part, metadata, output, end)
-            yield* settleToolCall(toolCallID)
-            continue
-          }
-          yield* session.updatePart({
-            ...part,
-            state: {
-              ...part.state,
-              status: "error",
-              error: "Tool execution interrupted during session cleanup",
-              metadata: {
-                ...metadata,
-                interrupted: true,
-                interruption_origin: "session_cleanup",
-                root_cause: "tool_result_missing_after_session_interrupt",
-                active_tool: part.tool,
-              },
-              time: { start: "time" in part.state ? part.state.time.start : end, end },
-            },
-          })
-        }
-        ctx.toolcalls = {}
+        yield* toolCalls.waitForPending()
+        yield* toolCalls.cleanupInterrupted()
         ctx.assistantMessage.time.completed = Date.now()
         yield* session.updateMessage(ctx.assistantMessage)
       })
