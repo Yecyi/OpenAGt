@@ -21,7 +21,6 @@ import { AppFileSystem } from "@openagt/shared/filesystem"
 import { InstanceState } from "@/effect"
 import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
 import { EffectFlock } from "@openagt/shared/util/effect-flock"
-import { InstanceRef } from "@/effect/instance-ref"
 import { zod } from "@/util/effect-zod"
 import { ConfigAgent } from "./agent"
 import { ConfigExpert } from "./expert"
@@ -41,6 +40,7 @@ import { ConfigProvider } from "./provider"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigVariable } from "./variable"
+import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
@@ -246,39 +246,23 @@ export const layer = Layer.effect(
         let result: Info = {}
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
-
-        const pluginScopeForSource = Effect.fnUntraced(function* (source: string) {
-          if (source.startsWith("http://") || source.startsWith("https://")) return "global"
-          if (source === "OPENCODE_CONFIG_CONTENT") return "local"
-          if (yield* InstanceRef.use((ctx) => Effect.succeed(Instance.containsPath(source, ctx)))) return "local"
-          return "global"
-        })
+        const pluginOrigins = new ConfigPluginOriginMerger(result)
 
         const mergePluginOrigins = Effect.fnUntraced(function* (
           source: string,
-          // mergePluginOrigins receives raw Specs from one config source, before provenance for this merge step
-          // is attached.
           list: ConfigPlugin.Spec[] | undefined,
-          // Scope can be inferred from the source path, but some callers already know whether the config should
-          // behave as global or local and can pass that explicitly.
           kind?: ConfigPlugin.Scope,
         ) {
-          if (!list?.length) return
-          const hit = kind ?? (yield* pluginScopeForSource(source))
-          // Merge newly seen plugin origins with previously collected ones, then dedupe by plugin identity while
-          // keeping the winning source/scope metadata for downstream installs, writes, and diagnostics.
-          const plugins = ConfigPlugin.deduplicatePluginOrigins([
-            ...(result.plugin_origins ?? []),
-            ...list.map((spec) => ({ spec, source, scope: hit })),
-          ])
-          result.plugin = plugins.map((item) => item.spec)
-          result.plugin_origins = plugins
+          pluginOrigins.result = result
+          yield* pluginOrigins.mergePluginOrigins(source, list, kind)
+          result = pluginOrigins.result
         })
 
-        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
-          result = mergeConfigConcatArrays(result, next)
-          return mergePluginOrigins(source, next.plugin, kind)
-        }
+        const merge = Effect.fnUntraced(function* (source: string, next: Info, kind?: ConfigPlugin.Scope) {
+          pluginOrigins.result = result
+          yield* pluginOrigins.merge(source, next, kind)
+          result = pluginOrigins.result
+        })
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
