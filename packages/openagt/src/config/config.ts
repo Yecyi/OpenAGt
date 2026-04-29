@@ -30,7 +30,6 @@ import { ConfigLSP } from "./lsp"
 import { ConfigManaged } from "./managed"
 import { ConfigMCP } from "./mcp"
 import { ConfigModelID } from "./model-id"
-import { ConfigParse } from "./parse"
 import { ConfigPaths } from "./paths"
 import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
@@ -39,21 +38,16 @@ import { ConfigSkills } from "./skills"
 import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
 import { ConfigGlobalLoader } from "./global-loader"
 import { ConfigInstanceMergePipeline } from "./instance-merge-pipeline"
+import { ConfigWriter } from "./writer"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
-import { Info as ConfigInfo } from "./info"
 import type { Info } from "./info"
 export { Info } from "./info"
 
 const log = Log.create({ service: "config" })
 
-import {
-  globalConfigFile,
-  mergeConfigConcatArrays,
-  patchJsonc,
-  writable,
-} from "./utils"
+import { mergeConfigConcatArrays } from "./utils"
 
 export const Server = ConfigServer.Server.zod
 export const Layout = ConfigLayout.Layout.zod
@@ -99,7 +93,7 @@ export const layer = Layer.effect(
     const npmSvc = yield* Npm.Service
     const fileLoader = new ConfigFileLoader(fs, log)
     const globalLoader = new ConfigGlobalLoader(fileLoader)
-    const readConfigFile = (filepath: string) => fileLoader.readConfigFile(filepath)
+    const writer = new ConfigWriter(fs, fileLoader)
     const loadConfig = (text: string, options: { path: string } | { dir: string; source: string }) =>
       fileLoader.loadConfig(text, options)
     const loadFile = (filepath: string) => fileLoader.loadFile(filepath)
@@ -398,10 +392,7 @@ export const layer = Layer.effect(
     const update = Effect.fn("Config.update")(function* (config: Info) {
       const dir = yield* InstanceState.directory
       const file = path.join(dir, "config.json")
-      const existing = yield* loadFile(file)
-      yield* fs
-        .writeFileString(file, JSON.stringify(mergeDeep(writable(existing), writable(config)), null, 2))
-        .pipe(Effect.orDie)
+      yield* writer.updateInstanceFile(file, config)
       yield* invalidate()
     })
 
@@ -427,21 +418,7 @@ export const layer = Layer.effect(
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
-      const file = globalConfigFile()
-      const before = (yield* readConfigFile(file)) ?? "{}"
-
-      let next: Info
-      if (!file.endsWith(".jsonc")) {
-        const existing = ConfigParse.schema(ConfigInfo, ConfigParse.jsonc(before, file), file)
-        const merged = mergeDeep(writable(existing), writable(config))
-        yield* fs.writeFileString(file, JSON.stringify(merged, null, 2)).pipe(Effect.orDie)
-        next = merged
-      } else {
-        const updated = patchJsonc(before, writable(config))
-        next = ConfigParse.schema(ConfigInfo, ConfigParse.jsonc(updated, file), file)
-        yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
-      }
-
+      const next = yield* writer.updateGlobal(config)
       yield* invalidate()
       return next
     })
