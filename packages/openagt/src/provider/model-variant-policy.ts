@@ -3,6 +3,7 @@
 
 import { iife } from "@/util/iife"
 import type * as Provider from "./provider"
+import { anthropicAdaptiveEfforts, OPENAI_EFFORTS, WIDELY_SUPPORTED_EFFORTS } from "./model-reasoning-efforts"
 
 export function temperature(model: Provider.Model) {
   const id = model.id.toLowerCase()
@@ -39,19 +40,6 @@ export function topK(model: Provider.Model) {
   }
   if (id.includes("gemini")) return 64
   return undefined
-}
-
-const WIDELY_SUPPORTED_EFFORTS = ["low", "medium", "high"]
-const OPENAI_EFFORTS = ["none", "minimal", ...WIDELY_SUPPORTED_EFFORTS, "xhigh"]
-
-function anthropicAdaptiveEfforts(apiId: string): string[] | null {
-  if (["opus-4-7", "opus-4.7"].some((v) => apiId.includes(v))) {
-    return ["low", "medium", "high", "xhigh", "max"]
-  }
-  if (["opus-4-6", "opus-4.6", "sonnet-4-6", "sonnet-4.6"].some((v) => apiId.includes(v))) {
-    return ["low", "medium", "high", "max"]
-  }
-  return null
 }
 
 /**
