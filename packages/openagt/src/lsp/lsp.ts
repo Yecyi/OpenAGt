@@ -1,11 +1,9 @@
-import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import { Log } from "../util"
 import * as LSPClient from "./client"
 import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
 import * as LSPServer from "./server"
-import z from "zod"
 import { Config } from "../config"
 import { Flag } from "@/flag/flag"
 import { Process } from "../util"
@@ -13,107 +11,10 @@ import { spawn as lspspawn } from "./launch"
 import { Effect, Layer, Context } from "effect"
 import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
+import { DocumentSymbol, Event, isWorkspaceSymbolKind, Status, Symbol } from "./lsp-contracts"
+export * from "./lsp-contracts"
 
 const log = Log.create({ service: "lsp" })
-
-export const Event = {
-  Updated: BusEvent.define("lsp.updated", z.object({})),
-}
-
-export const Range = z
-  .object({
-    start: z.object({
-      line: z.number(),
-      character: z.number(),
-    }),
-    end: z.object({
-      line: z.number(),
-      character: z.number(),
-    }),
-  })
-  .meta({
-    ref: "Range",
-  })
-export type Range = z.infer<typeof Range>
-
-export const Symbol = z
-  .object({
-    name: z.string(),
-    kind: z.number(),
-    location: z.object({
-      uri: z.string(),
-      range: Range,
-    }),
-  })
-  .meta({
-    ref: "Symbol",
-  })
-export type Symbol = z.infer<typeof Symbol>
-
-export const DocumentSymbol = z
-  .object({
-    name: z.string(),
-    detail: z.string().optional(),
-    kind: z.number(),
-    range: Range,
-    selectionRange: Range,
-  })
-  .meta({
-    ref: "DocumentSymbol",
-  })
-export type DocumentSymbol = z.infer<typeof DocumentSymbol>
-
-export const Status = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    root: z.string(),
-    status: z.union([z.literal("connected"), z.literal("error")]),
-  })
-  .meta({
-    ref: "LSPStatus",
-  })
-export type Status = z.infer<typeof Status>
-
-enum SymbolKind {
-  File = 1,
-  Module = 2,
-  Namespace = 3,
-  Package = 4,
-  Class = 5,
-  Method = 6,
-  Property = 7,
-  Field = 8,
-  Constructor = 9,
-  Enum = 10,
-  Interface = 11,
-  Function = 12,
-  Variable = 13,
-  Constant = 14,
-  String = 15,
-  Number = 16,
-  Boolean = 17,
-  Array = 18,
-  Object = 19,
-  Key = 20,
-  Null = 21,
-  EnumMember = 22,
-  Struct = 23,
-  Event = 24,
-  Operator = 25,
-  TypeParameter = 26,
-}
-
-const kinds = [
-  SymbolKind.Class,
-  SymbolKind.Function,
-  SymbolKind.Method,
-  SymbolKind.Interface,
-  SymbolKind.Variable,
-  SymbolKind.Constant,
-  SymbolKind.Struct,
-  SymbolKind.Enum,
-]
 
 const filterExperimentalServers = (servers: Record<string, LSPServer.Info>) => {
   if (Flag.OPENCODE_EXPERIMENTAL_LSP_TY) {
@@ -452,7 +353,7 @@ export const layer = Layer.effect(
       const results = yield* runAll((client) =>
         client.connection
           .sendRequest<Symbol[]>("workspace/symbol", { query })
-          .then((result) => result.filter((x) => kinds.includes(x.kind)).slice(0, 10))
+          .then((result) => result.filter((x) => isWorkspaceSymbolKind(x.kind)).slice(0, 10))
           .catch(() => [] as Symbol[]),
       )
       return results.flat()
