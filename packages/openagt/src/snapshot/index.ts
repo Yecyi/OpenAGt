@@ -1,4 +1,4 @@
-import { Cause, Duration, Effect, Layer, Schedule, Semaphore, Context } from "effect"
+import { Cause, Duration, Effect, Layer, Schedule, Context } from "effect"
 import { ChildProcessSpawner } from "effect/unstable/process"
 import path from "path"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
@@ -19,6 +19,7 @@ import { cfg, core, limit, prune, quote } from "./git-constants"
 import { SnapshotGitRunner, type SnapshotGitOptions } from "./git-runner"
 import { SnapshotReverter } from "./revert-runner"
 import { buildSnapshotState } from "./snapshot-state"
+import { SnapshotLockRegistry } from "./lock-registry"
 export { FileDiff, Patch } from "./schema"
 import type { FileDiff, Patch } from "./schema"
 import type { Interface } from "./snapshot-contracts"
@@ -40,16 +41,7 @@ export const layer: Layer.Layer<
     const fs = yield* AppFileSystem.Service
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const config = yield* Config.Service
-    const locks = new Map<string, Semaphore.Semaphore>()
-
-    const lock = (key: string) => {
-      const hit = locks.get(key)
-      if (hit) return hit
-
-      const next = Semaphore.makeUnsafe(1)
-      locks.set(key, next)
-      return next
-    }
+    const locks = new SnapshotLockRegistry()
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Snapshot.state")(function* (ctx) {
@@ -116,7 +108,7 @@ export const layer: Layer.Layer<
         const exists = (file: string) => fs.exists(file).pipe(Effect.orDie)
         const read = (file: string) => fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed("")))
         const remove = (file: string) => fs.remove(file).pipe(Effect.catch(() => Effect.void))
-        const locked = <A, E, R>(fx: Effect.Effect<A, E, R>) => lock(state.gitdir).withPermits(1)(fx)
+        const locked = <A, E, R>(fx: Effect.Effect<A, E, R>) => locks.lock(state.gitdir).withPermits(1)(fx)
 
         const enabled = Effect.fnUntraced(function* () {
           if (state.vcs !== "git") return false
