@@ -36,6 +36,22 @@ const config = Layer.succeed(
           },
         },
       }),
+    effective: () =>
+      Effect.succeed({
+        config: {
+          experimental: {
+            sandbox: {
+              enabled: true,
+              backend: "process",
+              failure_policy: "fallback",
+              report_only: false,
+              broker_idle_ttl_ms: 300_000,
+            },
+          },
+        },
+        sources: [],
+        field_sources: {} as any,
+      }),
     getGlobal: () => Effect.succeed({}),
     getConsoleState: () =>
       Effect.succeed({
@@ -252,6 +268,22 @@ describe("tool.bash", () => {
                     },
                   },
                 }),
+              effective: () =>
+                Effect.succeed({
+                  config: {
+                    experimental: {
+                      sandbox: {
+                        enabled: true,
+                        backend: "auto",
+                        failure_policy: "closed",
+                        report_only: false,
+                        broker_idle_ttl_ms: 300_000,
+                      },
+                    },
+                  },
+                  sources: [],
+                  field_sources: {} as any,
+                }),
               getGlobal: () => Effect.succeed({}),
               getConsoleState: () =>
                 Effect.succeed({
@@ -371,6 +403,31 @@ describe("tool.bash permissions", () => {
                     broker_idle_ttl_ms: 300_000,
                   },
                 },
+              }),
+            effective: () =>
+              Effect.succeed({
+                config: {
+                  exec_policy: {
+                    rules: [
+                      {
+                        pattern: [["curl", "wget"]],
+                        decision: "confirm",
+                        justification: "Remote downloads require confirmation.",
+                      },
+                    ],
+                  },
+                  experimental: {
+                    sandbox: {
+                      enabled: true,
+                      backend: "process",
+                      failure_policy: "fallback",
+                      report_only: false,
+                      broker_idle_ttl_ms: 300_000,
+                    },
+                  },
+                },
+                sources: [],
+                field_sources: {} as any,
               }),
             getGlobal: () => Effect.succeed({}),
             getConsoleState: () =>
@@ -559,6 +616,22 @@ describe("tool.bash permissions", () => {
                     broker_idle_ttl_ms: 300_000,
                   },
                 },
+              }),
+            effective: () =>
+              Effect.succeed({
+                config: {
+                  experimental: {
+                    sandbox: {
+                      enabled: true,
+                      backend: unavailableBackend,
+                      failure_policy: "confirm_downgrade",
+                      report_only: false,
+                      broker_idle_ttl_ms: 300_000,
+                    },
+                  },
+                },
+                sources: [],
+                field_sources: {} as any,
               }),
             getGlobal: () => Effect.succeed({}),
             getConsoleState: () =>

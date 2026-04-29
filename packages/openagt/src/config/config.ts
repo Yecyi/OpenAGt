@@ -39,11 +39,13 @@ import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
 import { ConfigGlobalLoader } from "./global-loader"
 import { ConfigInstanceMergePipeline } from "./instance-merge-pipeline"
 import { ConfigWriter } from "./writer"
+import { EffectiveConfigSnapshot, type EffectiveConfigSnapshot as EffectiveConfigSnapshotType } from "./effective-config"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
 import type { Info } from "./info"
 export { Info } from "./info"
+export { ConfigSource, ConfigSourceScope, EffectiveConfigField, EffectiveConfigSnapshot } from "./effective-config"
 
 const log = Log.create({ service: "config" })
 
@@ -55,6 +57,7 @@ export type Layout = ConfigLayout.Layout
 
 type State = {
   config: Info
+  effective: EffectiveConfigSnapshotType
   directories: string[]
   deps: Fiber.Fiber<void, never>[]
   consoleState: ConsoleState
@@ -62,6 +65,7 @@ type State = {
 
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
+  readonly effective: () => Effect.Effect<EffectiveConfigSnapshotType>
   readonly getGlobal: () => Effect.Effect<Info>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
@@ -338,6 +342,7 @@ export const layer = Layer.effect(
 
         if (Flag.OPENCODE_PERMISSION) {
           pipeline.result.permission = mergeDeep(pipeline.result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+          pipeline.recordField("permission", "OPENCODE_PERMISSION", "flag")
         }
 
         pipeline.applyToolsPermissionCompatibility()
@@ -346,13 +351,16 @@ export const layer = Layer.effect(
 
         if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
           pipeline.result.compaction = { ...pipeline.result.compaction, auto: false }
+          pipeline.recordField("compaction", "OPENCODE_DISABLE_AUTOCOMPACT", "flag")
         }
         if (Flag.OPENCODE_DISABLE_PRUNE) {
           pipeline.result.compaction = { ...pipeline.result.compaction, prune: false }
+          pipeline.recordField("compaction", "OPENCODE_DISABLE_PRUNE", "flag")
         }
 
         return {
           config: pipeline.result,
+          effective: pipeline.snapshot(),
           directories,
           deps,
           consoleState: {
@@ -373,6 +381,10 @@ export const layer = Layer.effect(
 
     const get = Effect.fn("Config.get")(function* () {
       return yield* InstanceState.use(state, (s) => s.config)
+    })
+
+    const effective = Effect.fn("Config.effective")(function* () {
+      return yield* InstanceState.use(state, (s) => s.effective)
     })
 
     const directories = Effect.fn("Config.directories")(function* () {
@@ -425,6 +437,7 @@ export const layer = Layer.effect(
 
     return Service.of({
       get,
+      effective,
       getGlobal,
       getConsoleState,
       update,

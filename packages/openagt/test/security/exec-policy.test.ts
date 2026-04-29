@@ -14,6 +14,8 @@ const config = (
     Config.Service,
     Config.Service.of({
       get: () => Effect.succeed(rules ? { exec_policy: { rules } } : {}),
+      effective: () =>
+        Effect.succeed({ config: rules ? { exec_policy: { rules } } : {}, sources: [], field_sources: {} as any }),
       getGlobal: () => Effect.succeed({}),
       getConsoleState: () =>
         Effect.succeed({
