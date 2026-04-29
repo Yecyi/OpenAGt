@@ -4,9 +4,7 @@ import path from "path"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
-import { Hash } from "@openagt/shared/util/hash"
 import { Config } from "../config"
-import { Global } from "../global"
 import { Log } from "../util"
 import { catFileRefs, parseCatFileBatchOutput } from "./cat-file-batch"
 import { buildFileDiff, filterIgnoredRows, parseNameStatus, parseNumstatRows, type SnapshotDiffRow } from "./diff-rows"
@@ -20,6 +18,7 @@ import {
 import { cfg, core, limit, prune, quote } from "./git-constants"
 import { SnapshotGitRunner, type SnapshotGitOptions } from "./git-runner"
 import { SnapshotReverter } from "./revert-runner"
+import { buildSnapshotState } from "./snapshot-state"
 export { FileDiff, Patch } from "./schema"
 import type { FileDiff, Patch } from "./schema"
 import type { Interface } from "./snapshot-contracts"
@@ -54,12 +53,7 @@ export const layer: Layer.Layer<
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Snapshot.state")(function* (ctx) {
-        const state = {
-          directory: ctx.directory,
-          worktree: ctx.worktree,
-          gitdir: path.join(Global.Path.data, "snapshot", ctx.project.id, Hash.fast(ctx.worktree)),
-          vcs: ctx.project.vcs,
-        }
+        const state = buildSnapshotState(ctx)
 
         const gitRunner = new SnapshotGitRunner(spawner, state)
         const args = (cmd: string[]) => gitRunner.args(cmd)
