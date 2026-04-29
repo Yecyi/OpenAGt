@@ -10,14 +10,12 @@ import { NamedError } from "@openagt/shared/util/error"
 import { Flag } from "../flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
-import { applyEdits, modify } from "jsonc-parser"
 import { Instance, type InstanceContext } from "../project/instance"
 import { InstallationLocal, InstallationVersion } from "@/installation/version"
 import { existsSync } from "fs"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
 import { Account } from "@/account/account"
-import { isRecord } from "@/util/record"
 import type { ConsoleState } from "./console-state"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { InstanceState } from "@/effect"
@@ -49,34 +47,14 @@ import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/t
 
 const log = Log.create({ service: "config" })
 
-// Custom merge function that concatenates array fields instead of replacing them
-function mergeConfigConcatArrays(target: Info, source: Info): Info {
-  const merged = mergeDeep(target, source)
-  merged.instructions = Array.from(new Set([...(target.instructions ?? []), ...(source.instructions ?? [])]))
-  return merged
-}
-
-function normalizeLoadedConfig(data: unknown, source: string) {
-  if (!isRecord(data)) return data
-  const copy = { ...data }
-  const hadLegacy = "theme" in copy || "keybinds" in copy || "tui" in copy
-  if (!hadLegacy) return copy
-  delete copy.theme
-  delete copy.keybinds
-  delete copy.tui
-  log.warn("tui keys in openagt config are deprecated; move them to tui.json", { path: source })
-  return copy
-}
-
-async function resolveLoadedPlugins<T extends { plugin?: ConfigPlugin.Spec[] }>(config: T, filepath: string) {
-  if (!config.plugin) return config
-  for (let i = 0; i < config.plugin.length; i++) {
-    // Normalize path-like plugin specs while we still know which config file declared them.
-    // This prevents `./plugin.ts` from being reinterpreted relative to some later merge location.
-    config.plugin[i] = await ConfigPlugin.resolvePluginSpec(config.plugin[i], filepath)
-  }
-  return config
-}
+import {
+  globalConfigFile,
+  mergeConfigConcatArrays,
+  normalizeLoadedConfig,
+  patchJsonc,
+  resolveLoadedPlugins,
+  writable,
+} from "./utils"
 
 export const Server = ConfigServer.Server.zod
 export const Layout = ConfigLayout.Layout.zod
@@ -139,38 +117,6 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Config") {}
-
-function globalConfigFile() {
-  const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
-    path.join(Global.Path.config, file),
-  )
-  for (const file of candidates) {
-    if (existsSync(file)) return file
-  }
-  return candidates[0]
-}
-
-function patchJsonc(input: string, patch: unknown, path: string[] = []): string {
-  if (!isRecord(patch)) {
-    const edits = modify(input, path, patch, {
-      formattingOptions: {
-        insertSpaces: true,
-        tabSize: 2,
-      },
-    })
-    return applyEdits(input, edits)
-  }
-
-  return Object.entries(patch).reduce((result, [key, value]) => {
-    if (value === undefined) return result
-    return patchJsonc(result, value, [...path, key])
-  }, input)
-}
-
-function writable(info: Info) {
-  const { plugin_origins: _plugin_origins, ...next } = info
-  return next
-}
 
 export const ConfigDirectoryTypoError = NamedError.create(
   "ConfigDirectoryTypoError",
