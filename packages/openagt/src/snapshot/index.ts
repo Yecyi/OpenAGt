@@ -1,5 +1,5 @@
-import { Cause, Duration, Effect, Layer, Schedule, Semaphore, Context, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
+import { Cause, Duration, Effect, Layer, Schedule, Semaphore, Context } from "effect"
+import { ChildProcessSpawner } from "effect/unstable/process"
 import path from "path"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { InstanceState } from "@/effect"
@@ -17,15 +17,11 @@ import {
   splitNulList,
 } from "./file-selection"
 import { cfg, core, limit, prune, quote } from "./git-constants"
+import { SnapshotGitRunner, type SnapshotGitOptions } from "./git-runner"
 export { FileDiff, Patch } from "./schema"
 import type { FileDiff, Patch } from "./schema"
 
 const log = Log.create({ service: "snapshot" })
-interface GitResult {
-  readonly code: ChildProcessSpawner.ExitCode
-  readonly text: string
-  readonly stderr: string
-}
 
 type State = Omit<Interface, "init">
 
@@ -72,39 +68,10 @@ export const layer: Layer.Layer<
           vcs: ctx.project.vcs,
         }
 
-        const args = (cmd: string[]) => ["--git-dir", state.gitdir, "--work-tree", state.worktree, ...cmd]
-
-        const enc = new TextEncoder()
-        const feed = (list: string[]) => Stream.make(enc.encode(list.join("\0") + "\0"))
-
-        const git = Effect.fnUntraced(
-          function* (
-            cmd: string[],
-            opts?: { cwd?: string; env?: Record<string, string>; stdin?: ChildProcess.CommandInput },
-          ) {
-            const proc = ChildProcess.make("git", cmd, {
-              cwd: opts?.cwd,
-              env: opts?.env,
-              extendEnv: true,
-              stdin: opts?.stdin,
-            })
-            const handle = yield* spawner.spawn(proc)
-            const [text, stderr] = yield* Effect.all(
-              [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr))],
-              { concurrency: 2 },
-            )
-            const code = yield* handle.exitCode
-            return { code, text, stderr } satisfies GitResult
-          },
-          Effect.scoped,
-          Effect.catch((err) =>
-            Effect.succeed({
-              code: ChildProcessSpawner.ExitCode(1),
-              text: "",
-              stderr: err instanceof Error ? err.message : String(err),
-            }),
-          ),
-        )
+        const gitRunner = new SnapshotGitRunner(spawner, state)
+        const args = (cmd: string[]) => gitRunner.args(cmd)
+        const feed = (list: string[]) => gitRunner.feed(list)
+        const git = (cmd: string[], opts?: SnapshotGitOptions) => gitRunner.git(cmd, opts)
 
         const ignore = Effect.fnUntraced(function* (files: string[]) {
           if (!files.length) return new Set<string>()
@@ -537,20 +504,10 @@ export const layer: Layer.Layer<
                   })
                   if (!refs.length) return new Map<string, { before: string; after: string }>()
 
-                  const proc = ChildProcess.make("git", [...cfg, ...args(["cat-file", "--batch"])], {
-                    cwd: state.directory,
-                    extendEnv: true,
-                    stdin: Stream.make(new TextEncoder().encode(refs.map((item) => item.ref).join("\n") + "\n")),
-                  })
-                  const handle = yield* spawner.spawn(proc)
-                  const [out, err] = yield* Effect.all(
-                    [Stream.mkUint8Array(handle.stdout), Stream.mkString(Stream.decodeText(handle.stderr))],
-                    { concurrency: 2 },
-                  )
-                  const code = yield* handle.exitCode
-                  if (code !== 0) {
+                  const batch = yield* gitRunner.catFileBatch(refs)
+                  if (batch.code !== 0) {
                     log.info("git cat-file --batch failed during snapshot diff, falling back to per-file git show", {
-                      stderr: err,
+                      stderr: batch.stderr,
                       refs: refs.length,
                     })
                     return
@@ -566,14 +523,14 @@ export const layer: Layer.Layer<
                   let i = 0
                   for (const ref of refs) {
                     let end = i
-                    while (end < out.length && out[end] !== 10) end += 1
-                    if (end >= out.length) {
+                    while (end < batch.out.length && batch.out[end] !== 10) end += 1
+                    if (end >= batch.out.length) {
                       return fail(
                         "git cat-file --batch returned a truncated header during snapshot diff, falling back to per-file git show",
                       )
                     }
 
-                    const head = dec.decode(out.slice(i, end))
+                    const head = dec.decode(batch.out.slice(i, end))
                     i = end + 1
                     const hit = map.get(ref.file) ?? { before: "", after: "" }
                     if (head.endsWith(" missing")) {
@@ -590,21 +547,26 @@ export const layer: Layer.Layer<
                     }
 
                     const size = Number(match[1])
-                    if (!Number.isInteger(size) || size < 0 || i + size >= out.length || out[i + size] !== 10) {
+                    if (
+                      !Number.isInteger(size) ||
+                      size < 0 ||
+                      i + size >= batch.out.length ||
+                      batch.out[i + size] !== 10
+                    ) {
                       return fail(
                         "git cat-file --batch returned truncated content during snapshot diff, falling back to per-file git show",
                         { head },
                       )
                     }
 
-                    const text = dec.decode(out.slice(i, i + size))
+                    const text = dec.decode(batch.out.slice(i, i + size))
                     if (ref.side === "before") hit.before = text
                     if (ref.side === "after") hit.after = text
                     map.set(ref.file, hit)
                     i += size + 1
                   }
 
-                  if (i !== out.length) {
+                  if (i !== batch.out.length) {
                     return fail(
                       "git cat-file --batch returned trailing data during snapshot diff, falling back to per-file git show",
                     )
