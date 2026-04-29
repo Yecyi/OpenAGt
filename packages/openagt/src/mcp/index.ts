@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
-import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
+import { type Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "../config"
 import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
@@ -22,6 +22,7 @@ import { McpConnectionFactory } from "./connection-factory"
 import type { Status } from "./schema"
 import { isMcpConfigured, type Interface, type MCPClient, type State } from "./contracts"
 import { mcpProcessDescendants } from "./process-descendants"
+import { McpClientStateStore } from "./client-state"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
 export type { AuthStatus } from "./auth-flow-controller"
@@ -68,23 +69,7 @@ export const layer = Layer.effect(
     const cfgSvc = yield* Config.Service
 
     const descendants = (pid: number) => mcpProcessDescendants(spawner, pid)
-
-    function watch(s: State, name: string, client: MCPClient, bridge: EffectBridge.Shape, timeout?: number) {
-      // Note: This handler runs asynchronously outside the Effect context.
-      // The guard checks (s.clients[name] !== client) ensure stale callbacks are ignored.
-      // This is a known limitation when bridging async callbacks with Effect state.
-      client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
-        log.info("tools list changed notification received", { server: name })
-        if (s.clients[name] !== client || s.status[name]?.status !== "connected") return
-
-        const listed = await bridge.promise(defs(name, client, timeout))
-        if (!listed) return
-        if (s.clients[name] !== client || s.status[name]?.status !== "connected") return
-
-        s.defs[name] = listed
-        await bridge.promise(bus.publish(ToolsChanged, { server: name }).pipe(Effect.ignore))
-      })
-    }
+    const clientStore = new McpClientStateStore({ bus, defs, log })
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("MCP.state")(function* () {
@@ -118,7 +103,7 @@ export const layer = Layer.effect(
               if (result.mcpClient) {
                 s.clients[key] = result.mcpClient
                 s.defs[key] = result.defs!
-                watch(s, key, result.mcpClient, bridge, mcp.timeout)
+                clientStore.watch(s, key, result.mcpClient, bridge, mcp.timeout)
               }
             }),
           { concurrency: "unbounded" },
@@ -151,28 +136,9 @@ export const layer = Layer.effect(
       }),
     )
 
-    function closeClient(s: State, name: string) {
-      const client = s.clients[name]
-      delete s.defs[name]
-      if (!client) return Effect.void
-      return Effect.tryPromise(() => client.close()).pipe(Effect.ignore)
-    }
-
-    const storeClient = Effect.fnUntraced(function* (
-      s: State,
-      name: string,
-      client: MCPClient,
-      listed: MCPToolDef[],
-      timeout?: number,
-    ) {
-      const bridge = yield* EffectBridge.make()
-      yield* closeClient(s, name)
-      s.status[name] = { status: "connected" }
-      s.clients[name] = client
-      s.defs[name] = listed
-      watch(s, name, client, bridge, timeout)
-      return s.status[name]
-    })
+    const closeClient = (s: State, name: string) => clientStore.closeClient(s, name)
+    const storeClient = (s: State, name: string, client: MCPClient, listed: MCPToolDef[], timeout?: number) =>
+      clientStore.storeClient(s, name, client, listed, timeout)
 
     const status = Effect.fn("MCP.status")(function* () {
       const s = yield* InstanceState.get(state)
