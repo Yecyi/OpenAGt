@@ -22,6 +22,7 @@ import { AppRuntime } from "@/effect/app-runtime"
 import { waitEvent } from "./util"
 import { WorkspaceContext } from "./workspace-context"
 import { ConnectionStatus, CreateInput, Event, fromRow, type Info, SessionRestoreInput } from "./workspace-contracts"
+import { WorkspaceSyncRegistry } from "./workspace-sync-registry"
 export * from "./workspace-contracts"
 
 export const create = fn(CreateInput, async (input) => {
@@ -272,32 +273,15 @@ export const remove = fn(WorkspaceID.zod, async (id) => {
   }
 })
 
-const connections = new Map<WorkspaceID, ConnectionStatus>()
-const aborts = new Map<WorkspaceID, AbortController>()
+const syncRegistry = new WorkspaceSyncRegistry()
 const TIMEOUT = 5000
 
 function setStatus(id: WorkspaceID, status: ConnectionStatus["status"]) {
-  const prev = connections.get(id)
-  if (prev?.status === status) return
-  const next = { workspaceID: id, status }
-  connections.set(id, next)
-
-  if (status === "error") {
-    aborts.delete(id)
-  }
-
-  GlobalBus.emit("event", {
-    directory: "global",
-    workspace: id,
-    payload: {
-      type: Event.Status.type,
-      properties: next,
-    },
-  })
+  syncRegistry.setStatus(id, status)
 }
 
 export function status(): ConnectionStatus[] {
-  return [...connections.values()]
+  return syncRegistry.status()
 }
 
 function synced(state: Record<string, number>) {
@@ -323,7 +307,7 @@ function synced(state: Record<string, number>) {
 }
 
 export async function isSyncing(workspaceID: WorkspaceID) {
-  return aborts.has(workspaceID)
+  return syncRegistry.isSyncing(workspaceID)
 }
 
 export async function waitForSync(workspaceID: WorkspaceID, state: Record<string, number>, signal?: AbortSignal) {
@@ -511,15 +495,15 @@ async function startSync(space: Info) {
     return
   }
 
-  if (aborts.has(space.id)) return true
+  if (syncRegistry.hasAbort(space.id)) return true
 
   setStatus(space.id, "disconnected")
 
   const abort = new AbortController()
-  aborts.set(space.id, abort)
+  syncRegistry.setAbort(space.id, abort)
 
   void syncWorkspaceLoop(space, abort.signal).catch((error) => {
-    aborts.delete(space.id)
+    syncRegistry.deleteAbort(space.id)
 
     setStatus(space.id, "error")
     log.warn("workspace listener failed", {
@@ -530,9 +514,7 @@ async function startSync(space: Info) {
 }
 
 function stopSync(id: WorkspaceID) {
-  aborts.get(id)?.abort()
-  aborts.delete(id)
-  connections.delete(id)
+  syncRegistry.stop(id)
 }
 
 export function startWorkspaceSyncing(projectID: ProjectID) {
