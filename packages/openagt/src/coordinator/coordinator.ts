@@ -49,6 +49,7 @@ import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import { CoordinatorDispatchLoop } from "./dispatch-loop"
 import { CoordinatorTaskExecutor } from "./task-executor"
+import { CoordinatorRunFactory } from "./run-factory"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -247,6 +248,13 @@ export const layer = Layer.effect(
       }
     })
 
+    const runFactory = new CoordinatorRunFactory({
+      tasks,
+      taskSessionFactory,
+      now,
+      promptTemplateSelection,
+    })
+
     const recordPromptOutcome = (record: TaskRuntime.TaskRecord, success: boolean) => {
       if (Option.isNone(promptTemplates)) return Effect.void
       const role =
@@ -424,105 +432,15 @@ export const layer = Layer.effect(
           ? "active"
           : "awaiting_approval"
       const runID = CoordinatorRunID.ascending()
-      const nodeTaskIDs = new Map<string, SessionID>()
-      for (const node of planned.nodes) {
-        const session = yield* taskSessionFactory.create({ sessionID: input.sessionID, node })
-        nodeTaskIDs.set(node.id, session.id)
-      }
-      for (const node of planned.nodes) {
-        const taskID = nodeTaskIDs.get(node.id)
-        if (!taskID) continue
-        const selectedPrompt = yield* promptTemplateSelection(runID, node)
-        yield* tasks.create({
-          parentSessionID: input.sessionID,
-          childSessionID: taskID,
-          groupID: runID,
-          strategy: "mixed",
-          taskKind: node.task_kind,
-          subagentType: node.subagent_type,
-          description: node.description,
-          prompt: selectedPrompt.prompt,
-          dependsOn: node.depends_on.flatMap((item) => {
-            const dependency = nodeTaskIDs.get(item)
-            return dependency ? [dependency] : []
-          }),
-          metadata: {
-            prompt: selectedPrompt.prompt,
-            prompt_template_id: node.prompt_template_id,
-            prompt_template_role: selectedPrompt.prompt_template_role,
-            prompt_template_variant: selectedPrompt.prompt_template_variant,
-            write_scope: node.write_scope,
-            read_scope: node.read_scope,
-            acceptance_checks: node.acceptance_checks,
-            priority: node.priority,
-            origin: node.origin,
-            coordinator_node_id: node.id,
-            coordinator_run_id: runID,
-            role: node.role,
-            model: node.model,
-            risk: node.risk,
-            parallel_group: node.parallel_group,
-            assigned_scope: node.assigned_scope,
-            excluded_scope: node.excluded_scope,
-            merge_status: node.merge_status,
-            conflicts: node.conflicts,
-            output_schema: node.output_schema,
-            requires_user_input: node.requires_user_input,
-            effort: planned.effort,
-            effort_profile: planned.effort_profile,
-            long_task: planned.long_task,
-            todo_timeline: planned.todo_timeline,
-            budget_profile: planned.budget_profile,
-            expert_id: node.expert_id,
-            expert_role: node.expert_role,
-            workflow: node.workflow ?? planned.workflow,
-            artifact_type: node.artifact_type,
-            artifact_id: node.artifact_id,
-            revision_of: node.revision_of,
-            quality_gate_id: node.quality_gate_id,
-            mpacr_role: node.mpacr_role,
-            mpacr_perspective: node.mpacr_perspective,
-            mpacr_quorum: node.mpacr_quorum,
-            mpacr_critic_node_ids: node.mpacr_critic_node_ids,
-            mpacr_per_critic_timeout_ms: node.mpacr_per_critic_timeout_ms,
-            mpacr_degraded: node.mpacr_degraded,
-            memory_namespace: node.memory_namespace,
-            confidence: node.confidence,
-            revise_policy: node.revise_policy,
-            intent,
-            mode,
-          },
-          writeScope: node.write_scope,
-          readScope: node.read_scope,
-          acceptanceChecks: node.acceptance_checks,
-          priority: node.priority,
-          origin: node.origin,
-        })
-      }
-      const timestamp = now()
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .insert(CoordinatorRunTable)
-            .values({
-              id: runID,
-              session_id: input.sessionID,
-              goal: input.goal,
-              intent,
-              mode,
-              workflow: intent.workflow,
-              state,
-              plan: planned,
-              task_ids: [...nodeTaskIDs.values()],
-              time_created: timestamp,
-              time_updated: timestamp,
-            })
-            .run(),
-        ),
-      )
-      const created = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, runID)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const created = yield* runFactory.create({
+        runID,
+        sessionID: input.sessionID,
+        goal: input.goal,
+        intent,
+        mode,
+        state,
+        planned,
+      })
       yield* publish(Event.Created, created)
       if (created.state === "active") yield* dispatchReady(created.id)
       return created
