@@ -22,21 +22,12 @@ import { SnapshotGitRunner, type SnapshotGitOptions } from "./git-runner"
 import { SnapshotReverter } from "./revert-runner"
 export { FileDiff, Patch } from "./schema"
 import type { FileDiff, Patch } from "./schema"
+import type { Interface } from "./snapshot-contracts"
+export type { Interface } from "./snapshot-contracts"
 
 const log = Log.create({ service: "snapshot" })
 
 type State = Omit<Interface, "init">
-
-export interface Interface {
-  readonly init: () => Effect.Effect<void>
-  readonly cleanup: () => Effect.Effect<void>
-  readonly track: () => Effect.Effect<string | undefined>
-  readonly patch: (hash: string) => Effect.Effect<Patch>
-  readonly restore: (snapshot: string) => Effect.Effect<void>
-  readonly revert: (patches: Patch[]) => Effect.Effect<void>
-  readonly diff: (hash: string) => Effect.Effect<string>
-  readonly diffFull: (from: string, to: string) => Effect.Effect<FileDiff[]>
-}
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Snapshot") {}
 
