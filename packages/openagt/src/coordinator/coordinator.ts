@@ -58,6 +58,7 @@ import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-sign
 import { buildCoordinatorProjection, type CoordinatorProjection } from "./projection"
 import { buildCoordinatorSummary } from "./summary"
 import { runFromRow } from "./run-row"
+import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -1315,6 +1316,7 @@ export const layer = Layer.effect(
     const calibration = yield* Effect.serviceOption(Calibration.Service)
     const promptTemplates = yield* Effect.serviceOption(PromptTemplates.Service)
     const scope = yield* Scope.Scope
+    const taskSessionFactory = new CoordinatorTaskSessionFactory(agents, sessions)
 
     const publish = (
       def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed,
@@ -1375,19 +1377,6 @@ export const layer = Layer.effect(
         Effect.catch(() => Effect.succeed(enriched)),
       )
       return finalPlan
-    })
-
-    const createTaskSession = Effect.fn("Coordinator.createTaskSession")(function* (input: {
-      sessionID: SessionID
-      node: CoordinatorNodeType
-    }) {
-      const fallback = input.node.task_kind === "research" ? "explore" : "general"
-      const agent = (yield* agents.get(input.node.subagent_type)) ?? (yield* agents.get(fallback))
-      if (!agent) throw new Error(`Coordinator could not resolve subagent ${input.node.subagent_type}`)
-      return yield* sessions.create({
-        parentID: input.sessionID,
-        title: `${input.node.description} (@${agent.name} subagent)`,
-      })
     })
 
     const promptTemplateSelection = Effect.fn("Coordinator.promptTemplateSelection")(function* (
@@ -1814,7 +1803,7 @@ export const layer = Layer.effect(
       const runID = CoordinatorRunID.ascending()
       const nodeTaskIDs = new Map<string, SessionID>()
       for (const node of planned.nodes) {
-        const session = yield* createTaskSession({ sessionID: input.sessionID, node })
+        const session = yield* taskSessionFactory.create({ sessionID: input.sessionID, node })
         nodeTaskIDs.set(node.id, session.id)
       }
       for (const node of planned.nodes) {
