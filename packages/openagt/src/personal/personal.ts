@@ -17,7 +17,6 @@ import {
   InboxItem,
   InboxItemID,
   InboxSource,
-  InboxState,
   MemoryNote,
   MemoryNoteID,
   MemoryScope,
@@ -33,117 +32,11 @@ import {
   type ScheduledWakeup as ScheduledWakeupType,
   type WorkPriority as WorkPriorityType,
 } from "./schema"
-
-// Scope-weight ordering reflects retrieval-priority: session is the freshest
-// context; semantic/procedural are long-lived knowledge so they outrank
-// workspace/profile but stay below the live session.
-const scopeWeight = {
-  session: 30,
-  semantic: 25,
-  procedural: 22,
-  workspace: 20,
-  profile: 10,
-} as const satisfies Record<MemoryScopeType, number>
-
-function normalizeInboxState(state: string): InboxStateType {
-  if (state === "pending") return "queued"
-  if (state === "processing") return "active"
-  if (state === "completed") return "done"
-  return InboxState.parse(state)
-}
+import { inboxFromRow, memoryFromRow, normalizeInboxState, wakeupFromRow } from "./row-mappers"
+import { escapeFts, lexicalScore, recencyScore, scopeWeight, tagScore } from "./scoring"
 
 function now() {
   return Date.now()
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value))
-}
-
-function lexicalScore(text: string, query: string) {
-  if (!query.trim()) return 0
-  const haystack = text.toLowerCase()
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .reduce((score, token) => score + (haystack.includes(token) ? 3 : 0), 0)
-}
-
-function recencyScore(updatedAt: number) {
-  const ageHours = Math.max(0, (Date.now() - updatedAt) / 3_600_000)
-  return clamp(10 - ageHours / 24, 0, 10)
-}
-
-function escapeFts(query: string) {
-  return query
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => `"${token.replaceAll('"', '""')}"`)
-    .join(" ")
-}
-
-function memoryFromRow(row: typeof PersonalMemoryNoteTable.$inferSelect) {
-  return MemoryNote.parse({
-    id: row.id,
-    scope: row.scope,
-    projectID: row.project_id ?? undefined,
-    sessionID: row.session_id ?? undefined,
-    title: row.title,
-    content: row.content,
-    tags: row.tags,
-    metadata: row.metadata ?? {},
-    source: row.source,
-    importance: row.importance,
-    pinned: Boolean(row.pinned),
-    time: {
-      created: row.time_created,
-      updated: row.time_updated,
-    },
-  })
-}
-
-function inboxFromRow(row: typeof InboxItemTable.$inferSelect) {
-  return InboxItem.parse({
-    id: row.id,
-    projectID: row.project_id,
-    sessionID: row.session_id ?? undefined,
-    source: row.source,
-    scope: row.scope,
-    goal: row.goal,
-    context_refs: row.context_refs,
-    priority: row.priority,
-    state: normalizeInboxState(row.state),
-    scheduled_for: row.scheduled_for ?? undefined,
-    payload: row.payload ?? undefined,
-    time: {
-      created: row.time_created,
-      updated: row.time_updated,
-      completed: row.time_completed ?? undefined,
-    },
-  })
-}
-
-function wakeupFromRow(row: typeof ScheduledWakeupTable.$inferSelect) {
-  return ScheduledWakeup.parse({
-    id: row.id,
-    projectID: row.project_id,
-    sessionID: row.session_id ?? undefined,
-    goal: row.goal,
-    context_refs: row.context_refs,
-    priority: row.priority,
-    scheduled_for: row.scheduled_for,
-    state: row.state,
-    payload: row.payload ?? undefined,
-    inbox_item_id: row.inbox_item_id ?? undefined,
-    time: {
-      created: row.time_created,
-      updated: row.time_updated,
-      fired: row.time_fired ?? undefined,
-      completed: row.time_completed ?? undefined,
-    },
-  })
 }
 
 function memoryTags(input: {
@@ -172,25 +65,6 @@ function privacySafeContent(content: string) {
     /password\s*[:=]/i,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   ].some((pattern) => pattern.test(content))
-}
-
-function tagScore(
-  tags: string[],
-  input: {
-    workflow?: string
-    expertID?: string
-    role?: string
-    artifactType?: string
-    includeFailurePatterns?: boolean
-  },
-) {
-  return (
-    (input.expertID && tags.includes(`expert:${input.expertID}`) ? 40 : 0) +
-    (input.workflow && tags.includes(`workflow:${input.workflow}`) ? 30 : 0) +
-    (input.role && tags.includes(`role:${input.role}`) ? 20 : 0) +
-    (input.artifactType && tags.includes(`artifact:${input.artifactType}`) ? 15 : 0) +
-    (input.includeFailurePatterns && tags.includes("failure-pattern") ? 12 : 0)
-  )
 }
 
 export const Event = {
