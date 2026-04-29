@@ -14,6 +14,14 @@ import {
   type TodoTimeline as TodoTimelineType,
 } from "./schema"
 import type { WorkspaceSignals } from "./workspace-signals"
+import {
+  absoluteBaseLimit,
+  autoContinueForEffort,
+  budgetScaleMultiplier,
+  capResourceLimit,
+  taskSizeMultiplier,
+  workflowBudgetMultiplier,
+} from "./budget-policy"
 
 // Budget and long-task governance for coordinator plans.
 // This module is pure policy math; it does not mutate runs or execute tasks.
@@ -38,17 +46,6 @@ export function scaleResourceLimit(limit: ResourceLimitType, multiplier: number)
   })
 }
 
-function capResourceLimit(limit: ResourceLimitType, cap: ResourceLimitType) {
-  return ResourceLimit.parse({
-    max_rounds: Math.min(limit.max_rounds, cap.max_rounds),
-    max_model_calls: Math.min(limit.max_model_calls, cap.max_model_calls),
-    max_tool_calls: Math.min(limit.max_tool_calls, cap.max_tool_calls),
-    max_subagents: Math.min(limit.max_subagents, cap.max_subagents),
-    max_wallclock_ms: Math.min(limit.max_wallclock_ms, cap.max_wallclock_ms),
-    max_estimated_tokens: Math.min(limit.max_estimated_tokens, cap.max_estimated_tokens),
-  })
-}
-
 export function addResourceLimit(limit: ResourceLimitType, delta?: Partial<ResourceLimitType>) {
   return ResourceLimit.parse({
     max_rounds: Math.min(10_000, limit.max_rounds + Math.max(0, delta?.max_rounds ?? 0)),
@@ -64,31 +61,6 @@ export function addResourceLimit(limit: ResourceLimitType, delta?: Partial<Resou
       limit.max_estimated_tokens + Math.max(0, delta?.max_estimated_tokens ?? 0),
     ),
   })
-}
-
-function taskSizeMultiplier(size: LongTaskProfileType["task_size"]) {
-  if (size === "huge") return 8
-  if (size === "large") return 4
-  if (size === "medium") return 2
-  return 1
-}
-
-function workflowBudgetMultiplier(workflow: TaskTypeType) {
-  if (workflow === "coding" || workflow === "debugging" || workflow === "research") return 1.25
-  if (workflow === "data-analysis" || workflow === "environment-audit") return 1.15
-  if (workflow === "personal-admin" || workflow === "file-data-organization") return 0.85
-  return 1
-}
-
-function budgetScaleMultiplier(scale: BudgetScaleType) {
-  if (scale === "max") return 2.5
-  if (scale === "large") return 1.75
-  if (scale === "small") return 0.5
-  return 1
-}
-
-function absoluteBaseLimit(effort: EffortLevelType) {
-  return ResourceLimit.parse(BudgetTuning.resourceLimit[effort] ?? BudgetTuning.resourceLimit.medium)
 }
 
 export function longTaskProfileFor(input: {
@@ -168,8 +140,7 @@ export function budgetProfileFor(input: {
   const totalWeight = input.todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
   return BudgetProfile.parse({
     scale,
-    auto_continue:
-      input.autoContinue ?? (input.effort === "low" ? "never" : input.effort === "medium" ? "checkpoint" : "safe"),
+    auto_continue: autoContinueForEffort(input.effort, input.autoContinue),
     mission_ceiling,
     phase_ceiling,
     todo_budget: Object.fromEntries(
