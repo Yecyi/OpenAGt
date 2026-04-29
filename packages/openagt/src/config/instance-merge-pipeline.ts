@@ -4,6 +4,7 @@ import { ConfigPermission } from "./permission"
 import { ConfigPlugin } from "./plugin"
 import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
 import { EffectiveConfigTracker, type ConfigSourceScope, type EffectiveConfigSnapshot } from "./effective-config"
+import { mergeConfigConcatArrays } from "./utils"
 import type { Info } from "./info"
 
 export class ConfigInstanceMergePipeline {
@@ -30,12 +31,18 @@ export class ConfigInstanceMergePipeline {
     source: string,
     next: Info,
     kind?: ConfigPlugin.Scope,
+    sourceScope?: ConfigSourceScope,
   ) {
-    this.effective.recordConfig(source, kind ?? "unknown", next)
+    this.effective.recordConfig(source, sourceScope ?? kind ?? "unknown", next)
     this.pluginOrigins.result = this.result
     yield* this.pluginOrigins.merge(source, next, kind)
     this.result = this.pluginOrigins.result
   })
+
+  mergeConfigOnly(source: string, next: Info, scope: ConfigSourceScope) {
+    this.effective.recordConfigOnly(source, scope, next)
+    this.result = mergeConfigConcatArrays(this.result, next)
+  }
 
   applyToolsPermissionCompatibility() {
     if (!this.result.tools) return
@@ -50,7 +57,7 @@ export class ConfigInstanceMergePipeline {
       perms[tool] = action
     }
     this.result.permission = mergeDeep(perms, this.result.permission ?? {})
-    this.effective.recordField("permission", "tools", "derived")
+    this.effective.recordFieldIfMissing("permission", "tools", "derived")
   }
 
   recordField(field: Parameters<EffectiveConfigTracker["recordField"]>[0], source: string, scope: ConfigSourceScope) {

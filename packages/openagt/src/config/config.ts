@@ -55,8 +55,6 @@ export {
 
 const log = Log.create({ service: "config" })
 
-import { mergeConfigConcatArrays } from "./utils"
-
 export const Server = ConfigServer.Server.zod
 export const Layout = ConfigLayout.Layout.zod
 export type Layout = ConfigLayout.Layout
@@ -321,19 +319,20 @@ export const layer = Layer.effect(
         if (existsSync(managedDir)) {
           for (const file of ["opencode.json", "opencode.jsonc"]) {
             const source = path.join(managedDir, file)
-            yield* pipeline.merge(source, yield* loadFile(source), "global")
+            yield* pipeline.merge(source, yield* loadFile(source), "global", "managed")
           }
         }
 
         // macOS managed preferences (.mobileconfig deployed via MDM) override everything
         const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
         if (managed) {
-          pipeline.result = mergeConfigConcatArrays(
-            pipeline.result,
+          pipeline.mergeConfigOnly(
+            managed.source,
             yield* loadConfig(managed.text, {
               dir: path.dirname(managed.source),
               source: managed.source,
             }),
+            "managed",
           )
         }
 

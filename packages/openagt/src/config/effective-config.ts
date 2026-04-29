@@ -28,7 +28,7 @@ export type ConfigSource = z.infer<typeof ConfigSource>
 export const EffectiveConfigSnapshot = z.object({
   config: ConfigInfo,
   sources: z.array(ConfigSource),
-  field_sources: z.record(EffectiveConfigField, ConfigSource),
+  field_sources: z.partialRecord(EffectiveConfigField, ConfigSource),
 })
 export type EffectiveConfigSnapshot = z.infer<typeof EffectiveConfigSnapshot>
 
@@ -80,11 +80,20 @@ export class EffectiveConfigTracker {
     this.fieldSources.set(field, this.source(source, scope))
   }
 
+  recordFieldIfMissing(field: EffectiveConfigField, source: string, scope: ConfigSourceScope) {
+    if (this.fieldSources.has(field)) return
+    this.recordField(field, source, scope)
+  }
+
+  recordConfigOnly(source: string, scope: ConfigSourceScope, config: Info) {
+    this.recordConfig(source, scope, config)
+  }
+
   snapshot(config: Info): EffectiveConfigSnapshot {
     return {
       config,
       sources: Array.from(this.sources.values()).sort((a, b) => a.order - b.order),
-      field_sources: Object.fromEntries(this.fieldSources) as Record<EffectiveConfigField, ConfigSource>,
+      field_sources: Object.fromEntries(this.fieldSources) as Partial<Record<EffectiveConfigField, ConfigSource>>,
     }
   }
 
