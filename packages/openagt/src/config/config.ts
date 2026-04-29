@@ -19,9 +19,8 @@ import { Account } from "@/account/account"
 import type { ConsoleState } from "./console-state"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { InstanceState } from "@/effect"
-import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
+import { Context, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { EffectFlock } from "@openagt/shared/util/effect-flock"
-import { zod } from "@/util/effect-zod"
 import { ConfigAgent } from "./agent"
 import { ConfigExpert } from "./expert"
 import { ConfigCommand } from "./command"
@@ -44,6 +43,9 @@ import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
+import { Info as ConfigInfo } from "./info"
+import type { Info } from "./info"
+export { Info } from "./info"
 
 const log = Log.create({ service: "config" })
 
@@ -59,43 +61,6 @@ import {
 export const Server = ConfigServer.Server.zod
 export const Layout = ConfigLayout.Layout.zod
 export type Layout = ConfigLayout.Layout
-
-import { InfoSchema } from "./info-schema"
-
-
-// Schema.Struct produces readonly types by default, but the service code
-// below mutates Info objects directly (e.g. `config.mode = ...`). Strip the
-// readonly recursively so callers get the same mutable shape zod inferred.
-//
-// `Types.DeepMutable` from effect-smol would be a drop-in, but its fallback
-// branch `{ -readonly [K in keyof T]: ... }` collapses `unknown` to `{}`
-// (since `keyof unknown = never`), which widens `Record<string, unknown>`
-// fields like `ConfigPlugin.Options`. The local version gates on
-// `extends object` so `unknown` passes through.
-//
-// Tuple branch preserves `ConfigPlugin.Spec`'s `readonly [string, Options]`
-// shape (otherwise the general array branch widens it to an array).
-type DeepMutable<T> = T extends readonly [unknown, ...unknown[]]
-  ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
-  : T extends readonly (infer U)[]
-    ? DeepMutable<U>[]
-    : T extends object
-      ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
-      : T
-
-// The walker emits `z.object({...})` which is non-strict by default. Config
-// historically uses `.strict()` (additionalProperties: false in openapi.json),
-// so layer that on after derivation.  Re-apply the Config ref afterward
-// since `.strict()` strips the walker's meta annotation.
-export const Info = (zod(InfoSchema) as unknown as z.ZodObject<any>)
-  .strict()
-  .meta({ ref: "Config" }) as unknown as z.ZodType<DeepMutable<Schema.Schema.Type<typeof InfoSchema>>>
-
-export type Info = z.output<typeof Info> & {
-  // plugin_origins is derived state, not a persisted config field. It keeps each winning plugin spec together
-  // with the file and scope it came from so later runtime code can make location-sensitive decisions.
-  plugin_origins?: ConfigPlugin.Origin[]
-}
 
 type State = {
   config: Info
@@ -157,7 +122,7 @@ export const layer = Layer.effect(
         ),
       )
       const parsed = ConfigParse.jsonc(expanded, source)
-      const data = ConfigParse.schema(Info, normalizeLoadedConfig(parsed, source), source)
+      const data = ConfigParse.schema(ConfigInfo, normalizeLoadedConfig(parsed, source), source)
       if (!("path" in options)) return data
 
       yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
@@ -550,13 +515,13 @@ export const layer = Layer.effect(
 
       let next: Info
       if (!file.endsWith(".jsonc")) {
-        const existing = ConfigParse.schema(Info, ConfigParse.jsonc(before, file), file)
+        const existing = ConfigParse.schema(ConfigInfo, ConfigParse.jsonc(before, file), file)
         const merged = mergeDeep(writable(existing), writable(config))
         yield* fs.writeFileString(file, JSON.stringify(merged, null, 2)).pipe(Effect.orDie)
         next = merged
       } else {
         const updated = patchJsonc(before, writable(config))
-        next = ConfigParse.schema(Info, ConfigParse.jsonc(updated, file), file)
+        next = ConfigParse.schema(ConfigInfo, ConfigParse.jsonc(updated, file), file)
         yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
       }
 
