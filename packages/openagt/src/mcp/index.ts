@@ -22,13 +22,13 @@ import { InstanceState } from "@/effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { checkToolsQuality } from "./tool-quality"
-import { convertMcpTool, sanitizeMcpName } from "./tool-adapter"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
 import { closeTransportIfSupported } from "./transport-utils"
 import { BrowserOpenFailed, ToolsChanged } from "./events"
 import { McpPendingOAuthTransports, type TransportWithAuth } from "./pending-oauth-transports"
 import { computeMcpBackoff, connectMcpTransport, sleep, type MCPTransport } from "./connection-runtime"
 import { createLocalTransport, remoteTransportCandidates } from "./transport-factory"
+import { aggregateMcpTools, collectNamedFromConnected } from "./catalog-aggregation"
 import type { Status } from "./schema"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
@@ -542,64 +542,34 @@ export const layer = Layer.effect(
     })
 
     const tools = Effect.fn("MCP.tools")(function* () {
-      const result: Record<string, Tool> = {}
       const s = yield* InstanceState.get(state)
-
       const cfg = yield* cfgSvc.get()
-      const config = cfg.mcp ?? {}
-      const defaultTimeout = cfg.experimental?.mcp_timeout
-
-      const connectedClients = Object.entries(s.clients).filter(
-        ([clientName]) => s.status[clientName]?.status === "connected",
-      )
-
-      yield* Effect.forEach(
-        connectedClients,
-        ([clientName, client]) =>
-          Effect.gen(function* () {
-            const mcpConfig = config[clientName]
-            const entry = mcpConfig && isMcpConfigured(mcpConfig) ? mcpConfig : undefined
-
-            const listed = s.defs[clientName]
-            if (!listed) {
-              log.warn("missing cached tools for connected server", { clientName })
-              return
-            }
-
-            const timeout = entry?.timeout ?? defaultTimeout
-            for (const mcpTool of listed) {
-              const tool = convertMcpTool({ mcpTool, client, timeout, log })
-              if (tool) {
-                result[sanitizeMcpName(clientName) + "_" + sanitizeMcpName(mcpTool.name)] = tool
-              }
-            }
-          }),
-        { concurrency: "unbounded" },
-      )
-      return result
+      return aggregateMcpTools({
+        state: s,
+        config: cfg.mcp ?? {},
+        defaultTimeout: cfg.experimental?.mcp_timeout,
+        log,
+      })
     })
-
-    function collectFromConnected<T extends { name: string }>(
-      s: State,
-      listFn: (c: Client) => Promise<T[]>,
-      label: string,
-    ) {
-      return Effect.forEach(
-        Object.entries(s.clients).filter(([name]) => s.status[name]?.status === "connected"),
-        ([clientName, client]) =>
-          fetchFromClient(clientName, client, listFn, label).pipe(Effect.map((items) => Object.entries(items ?? {}))),
-        { concurrency: "unbounded" },
-      ).pipe(Effect.map((results) => Object.fromEntries<T & { client: string }>(results.flat())))
-    }
 
     const prompts = Effect.fn("MCP.prompts")(function* () {
       const s = yield* InstanceState.get(state)
-      return yield* collectFromConnected(s, (c) => c.listPrompts().then((r) => r.prompts), "prompts")
+      return yield* collectNamedFromConnected({
+        state: s,
+        listFn: (c) => c.listPrompts().then((r) => r.prompts),
+        label: "prompts",
+        fetch: fetchFromClient,
+      })
     })
 
     const resources = Effect.fn("MCP.resources")(function* () {
       const s = yield* InstanceState.get(state)
-      return yield* collectFromConnected(s, (c) => c.listResources().then((r) => r.resources), "resources")
+      return yield* collectNamedFromConnected({
+        state: s,
+        listFn: (c) => c.listResources().then((r) => r.resources),
+        label: "resources",
+        fetch: fetchFromClient,
+      })
     })
 
     const withClient = Effect.fnUntraced(function* <A>(
