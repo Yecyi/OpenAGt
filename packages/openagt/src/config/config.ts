@@ -32,14 +32,13 @@ import { ConfigMCP } from "./mcp"
 import { ConfigModelID } from "./model-id"
 import { ConfigParse } from "./parse"
 import { ConfigPaths } from "./paths"
-import { ConfigPermission } from "./permission"
 import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
-import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
 import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
 import { ConfigGlobalLoader } from "./global-loader"
+import { ConfigInstanceMergePipeline } from "./instance-merge-pipeline"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
@@ -142,26 +141,9 @@ export const layer = Layer.effect(
       function* (ctx: InstanceContext) {
         const auth = yield* authSvc.all().pipe(Effect.orDie)
 
-        let result: Info = {}
+        const pipeline = new ConfigInstanceMergePipeline()
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
-        const pluginOrigins = new ConfigPluginOriginMerger(result)
-
-        const mergePluginOrigins = Effect.fnUntraced(function* (
-          source: string,
-          list: ConfigPlugin.Spec[] | undefined,
-          kind?: ConfigPlugin.Scope,
-        ) {
-          pluginOrigins.result = result
-          yield* pluginOrigins.mergePluginOrigins(source, list, kind)
-          result = pluginOrigins.result
-        })
-
-        const merge = Effect.fnUntraced(function* (source: string, next: Info, kind?: ConfigPlugin.Scope) {
-          pluginOrigins.result = result
-          yield* pluginOrigins.merge(source, next, kind)
-          result = pluginOrigins.result
-        })
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
@@ -184,7 +166,7 @@ export const layer = Layer.effect(
                   dir: path.dirname(source),
                   source,
                 })
-                yield* merge(source, next, "global")
+                yield* pipeline.merge(source, next, "global")
                 log.debug("loaded remote config from well-known", { url })
               }),
             )
@@ -192,22 +174,22 @@ export const layer = Layer.effect(
         }
 
         const global = yield* getGlobal()
-        yield* merge(Global.Path.config, global, "global")
+        yield* pipeline.merge(Global.Path.config, global, "global")
 
         if (Flag.OPENCODE_CONFIG) {
-          yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
+          yield* pipeline.merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
           log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
         }
 
         if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
           for (const file of yield* ConfigPaths.files("opencode", ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
-            yield* merge(file, yield* loadFile(file), "local")
+            yield* pipeline.merge(file, yield* loadFile(file), "local")
           }
         }
 
-        result.agent = result.agent || {}
-        result.mode = result.mode || {}
-        result.plugin = result.plugin || []
+        pipeline.result.agent = pipeline.result.agent || {}
+        pipeline.result.mode = pipeline.result.mode || {}
+        pipeline.result.plugin = pipeline.result.plugin || []
 
         const directories = yield* ConfigPaths.directories(ctx.directory, ctx.worktree)
 
@@ -222,10 +204,10 @@ export const layer = Layer.effect(
             for (const file of ["opencode.json", "opencode.jsonc"]) {
               const source = path.join(dir, file)
               log.debug(`loading config from ${source}`)
-              yield* merge(source, yield* loadFile(source))
-              result.agent ??= {}
-              result.mode ??= {}
-              result.plugin ??= []
+              yield* pipeline.merge(source, yield* loadFile(source))
+              pipeline.result.agent ??= {}
+              pipeline.result.mode ??= {}
+              pipeline.result.plugin ??= []
             }
           }
 
@@ -254,15 +236,27 @@ export const layer = Layer.effect(
             )
           deps.push(dep)
 
-          result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => ConfigCommand.load(dir)))
-          result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.load(dir)))
-          result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.loadMode(dir)))
+          pipeline.result.command = mergeDeep(
+            pipeline.result.command ?? {},
+            yield* Effect.promise(() => ConfigCommand.load(dir)),
+          )
+          pipeline.result.agent = mergeDeep(
+            pipeline.result.agent ?? {},
+            yield* Effect.promise(() => ConfigAgent.load(dir)),
+          )
+          pipeline.result.agent = mergeDeep(
+            pipeline.result.agent ?? {},
+            yield* Effect.promise(() => ConfigAgent.loadMode(dir)),
+          )
           // C.1 — load .opencode/experts/*.md the same way as agents/commands.
-          result.expert = mergeDeep(result.expert ?? {}, yield* Effect.promise(() => ConfigExpert.load(dir)))
+          pipeline.result.expert = mergeDeep(
+            pipeline.result.expert ?? {},
+            yield* Effect.promise(() => ConfigExpert.load(dir)),
+          )
           // Auto-discovered plugins under `.opencode/plugin(s)` are already local files, so ConfigPlugin.load
           // returns normalized Specs and we only need to attach origin metadata here.
           const list = yield* Effect.promise(() => ConfigPlugin.load(dir))
-          yield* mergePluginOrigins(dir, list)
+          yield* pipeline.mergePluginOrigins(dir, list)
         }
 
         if (process.env.OPENCODE_CONFIG_CONTENT) {
@@ -271,7 +265,7 @@ export const layer = Layer.effect(
             dir: ctx.directory,
             source,
           })
-          yield* merge(source, next, "local")
+          yield* pipeline.merge(source, next, "local")
           log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
         }
 
@@ -299,7 +293,7 @@ export const layer = Layer.effect(
                 for (const providerID of Object.keys(next.provider ?? {})) {
                   consoleManagedProviders.add(providerID)
                 }
-                yield* merge(source, next, "global")
+                yield* pipeline.merge(source, next, "global")
               }
             })
 
@@ -323,15 +317,15 @@ export const layer = Layer.effect(
         if (existsSync(managedDir)) {
           for (const file of ["opencode.json", "opencode.jsonc"]) {
             const source = path.join(managedDir, file)
-            yield* merge(source, yield* loadFile(source), "global")
+            yield* pipeline.merge(source, yield* loadFile(source), "global")
           }
         }
 
         // macOS managed preferences (.mobileconfig deployed via MDM) override everything
         const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
         if (managed) {
-          result = mergeConfigConcatArrays(
-            result,
+          pipeline.result = mergeConfigConcatArrays(
+            pipeline.result,
             yield* loadConfig(managed.text, {
               dir: path.dirname(managed.source),
               source: managed.source,
@@ -339,8 +333,8 @@ export const layer = Layer.effect(
           )
         }
 
-        for (const [name, mode] of Object.entries(result.mode ?? {})) {
-          result.agent = mergeDeep(result.agent ?? {}, {
+        for (const [name, mode] of Object.entries(pipeline.result.mode ?? {})) {
+          pipeline.result.agent = mergeDeep(pipeline.result.agent ?? {}, {
             [name]: {
               ...mode,
               mode: "primary" as const,
@@ -349,33 +343,22 @@ export const layer = Layer.effect(
         }
 
         if (Flag.OPENCODE_PERMISSION) {
-          result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+          pipeline.result.permission = mergeDeep(pipeline.result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
         }
 
-        if (result.tools) {
-          const perms: Record<string, ConfigPermission.Action> = {}
-          for (const [tool, enabled] of Object.entries(result.tools)) {
-            const action: ConfigPermission.Action = enabled ? "allow" : "deny"
-            if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") {
-              perms.edit = action
-              continue
-            }
-            perms[tool] = action
-          }
-          result.permission = mergeDeep(perms, result.permission ?? {})
-        }
+        pipeline.applyToolsPermissionCompatibility()
 
-        if (!result.username) result.username = os.userInfo().username
+        if (!pipeline.result.username) pipeline.result.username = os.userInfo().username
 
         if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
-          result.compaction = { ...result.compaction, auto: false }
+          pipeline.result.compaction = { ...pipeline.result.compaction, auto: false }
         }
         if (Flag.OPENCODE_DISABLE_PRUNE) {
-          result.compaction = { ...result.compaction, prune: false }
+          pipeline.result.compaction = { ...pipeline.result.compaction, prune: false }
         }
 
         return {
-          config: result,
+          config: pipeline.result,
           directories,
           deps,
           consoleState: {
