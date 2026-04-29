@@ -1,9 +1,8 @@
 import { Log } from "../util"
 import path from "path"
-import { pathToFileURL } from "url"
 import os from "os"
 import z from "zod"
-import { mergeDeep, pipe } from "remeda"
+import { mergeDeep } from "remeda"
 import { Global } from "../global"
 import fsNode from "fs/promises"
 import { NamedError } from "@openagt/shared/util/error"
@@ -40,6 +39,7 @@ import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
 import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
 import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
+import { ConfigGlobalLoader } from "./global-loader"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
@@ -99,40 +99,14 @@ export const layer = Layer.effect(
     const env = yield* Env.Service
     const npmSvc = yield* Npm.Service
     const fileLoader = new ConfigFileLoader(fs, log)
+    const globalLoader = new ConfigGlobalLoader(fileLoader)
     const readConfigFile = (filepath: string) => fileLoader.readConfigFile(filepath)
     const loadConfig = (text: string, options: { path: string } | { dir: string; source: string }) =>
       fileLoader.loadConfig(text, options)
     const loadFile = (filepath: string) => fileLoader.loadFile(filepath)
 
-    const loadGlobal = Effect.fnUntraced(function* () {
-      let result: Info = pipe(
-        {},
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "config.json"))),
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "opencode.json"))),
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "opencode.jsonc"))),
-      )
-
-      const legacy = path.join(Global.Path.config, "config")
-      if (existsSync(legacy)) {
-        yield* Effect.promise(() =>
-          import(pathToFileURL(legacy).href, { with: { type: "toml" } })
-            .then(async (mod) => {
-              const { provider, model, ...rest } = mod.default
-              if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = CONFIG_SCHEMA_URL
-              result = mergeDeep(result, rest)
-              await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
-              await fsNode.unlink(legacy)
-            })
-            .catch(() => {}),
-        )
-      }
-
-      return result
-    })
-
     const [cachedGlobal, invalidateGlobal] = yield* Effect.cachedInvalidateWithTTL(
-      loadGlobal().pipe(
+      globalLoader.loadGlobal().pipe(
         Effect.tapError((error) =>
           Effect.sync(() => log.error("failed to load global config, using defaults", { error: String(error) })),
         ),
