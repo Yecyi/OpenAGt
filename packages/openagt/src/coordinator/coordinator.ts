@@ -27,7 +27,6 @@ import {
   scaleResourceLimit,
   type BudgetOptions,
 } from "./budget-governance"
-import { dispatchSelectionFor } from "./dispatch-selection"
 import { effortProfileFor } from "./effort-profile"
 import {
   isMpacrCriticTask,
@@ -43,10 +42,7 @@ import {
 } from "./review-verdict"
 import {
   planWithRuntimeState,
-  resourceLimitSlots,
-  resourceUsageFor,
   runtimeStateFor,
-  subtractResourceLimit,
 } from "./runtime-state"
 import { settleIntentProfile } from "./intent-profile"
 import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./task-record"
@@ -59,6 +55,7 @@ import { buildCoordinatorProjection, type CoordinatorProjection } from "./projec
 import { buildCoordinatorSummary } from "./summary"
 import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
+import { CoordinatorDispatchLoop } from "./dispatch-loop"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -527,85 +524,18 @@ export const layer = Layer.effect(
       return
     })
 
-    const dispatchReady: Interface["dispatch"] = Effect.fn("Coordinator.dispatchReady")(function* (id) {
-      const instance = yield* InstanceState.context
-      const workspace = yield* InstanceState.workspaceID
-      const runOpt = yield* get(id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      const run = runOpt.value
-      if (run.state !== "active") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot dispatch from state: ${run.state}`))
-      }
-      const allTasks = yield* relevantTasks(run)
-      const pending = allTasks.filter((item) => item.status === "pending")
-      const ready = (yield* Effect.forEach(
-        pending,
-        (item) =>
-          tasks
-            .canRun({
-              parentSessionID: SessionID.make(run.sessionID),
-              task: item,
-            })
-            .pipe(Effect.map((allowed) => (allowed ? item : undefined))),
-        {
-          concurrency: BudgetTuning.concurrency.storageRead,
-        },
-      )).filter((item): item is TaskRuntime.TaskRecord => Boolean(item))
-      const runtime = runtimeStateFor(run, allTasks)
-      const checkpointReady = ready.find((item) => item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis")
-      const ceilingHit = runtime.budget_state.ceiling_hit
-      const softBudgetHit = runtime.budget_state.soft_budget_used >= 1
-      const usage = resourceUsageFor(run, allTasks)
-      const normalAbsoluteLimit = subtractResourceLimit(
-        run.plan.budget_profile.absolute_ceiling,
-        run.plan.budget_profile.checkpoint_reserve,
-      )
-      const checkpointSlots = resourceLimitSlots(usage, run.plan.budget_profile.absolute_ceiling)
-      if (ceilingHit || checkpointSlots === 0) {
-        const blocked = yield* blockRunForBudget(run, "absolute")
-        return {
-          run: blocked,
-          dispatched: 0,
-        }
-      }
-      if (softBudgetHit && !checkpointReady) {
-        const blocked = yield* blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
-        return {
-          run: blocked,
-          dispatched: 0,
-        }
-      }
-      const selection = dispatchSelectionFor({
-        run,
-        allTasks,
-        ready,
-        checkpointReady,
-        usage,
-        normalAbsoluteLimit,
-        checkpointSlots,
-        ceilingHit,
-        softBudgetHit,
-      })
-      if (selection.budgetSlots === 0 && selection.orderedReady.length > 0) {
-        const blocked = yield* blockRunForBudget(run, "absolute")
-        return {
-          run: blocked,
-          dispatched: 0,
-        }
-      }
-      yield* Effect.forEach(
-        selection.selected,
-        (item) => attachWith(executeTask(item), { instance, workspace }).pipe(Effect.forkIn(scope)),
-        {
-          concurrency: BudgetTuning.concurrency.storageRead,
-        },
-      )
-      if (selection.selected.length === 0) yield* summarize(id).pipe(Effect.ignore)
-      return {
-        run,
-        dispatched: selection.selected.length,
-      }
+    const dispatchLoop = new CoordinatorDispatchLoop({
+      tasks,
+      scope,
+      get: (id) => get(id),
+      relevantTasks,
+      blockRunForBudget,
+      summarize: (id) => summarize(id),
+      executeTask,
     })
+    const dispatchReady: Interface["dispatch"] = Effect.fn("Coordinator.dispatchReady")((id) =>
+      dispatchLoop.dispatchReady(id),
+    )
 
     const subscriptionStops = new Map<string, () => void>()
     yield* Effect.addFinalizer(() =>
