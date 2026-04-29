@@ -1,4 +1,3 @@
-import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect"
 
 import { AppFileSystem } from "@openagt/shared/filesystem"
@@ -9,7 +8,6 @@ import { formatPatch, structuredPatch } from "diff"
 import fuzzysort from "fuzzysort"
 import ignore from "ignore"
 import path from "path"
-import z from "zod"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { Log } from "../util"
@@ -23,72 +21,8 @@ import {
 } from "./content-type"
 import { Protected } from "./protected"
 import { Ripgrep } from "./ripgrep"
-
-export const Info = z
-  .object({
-    path: z.string(),
-    added: z.number().int(),
-    removed: z.number().int(),
-    status: z.enum(["added", "deleted", "modified"]),
-  })
-  .meta({
-    ref: "File",
-  })
-
-export type Info = z.infer<typeof Info>
-
-export const Node = z
-  .object({
-    name: z.string(),
-    path: z.string(),
-    absolute: z.string(),
-    type: z.enum(["file", "directory"]),
-    ignored: z.boolean(),
-  })
-  .meta({
-    ref: "FileNode",
-  })
-export type Node = z.infer<typeof Node>
-
-export const Content = z
-  .object({
-    type: z.enum(["text", "binary"]),
-    content: z.string(),
-    diff: z.string().optional(),
-    patch: z
-      .object({
-        oldFileName: z.string(),
-        newFileName: z.string(),
-        oldHeader: z.string().optional(),
-        newHeader: z.string().optional(),
-        hunks: z.array(
-          z.object({
-            oldStart: z.number(),
-            oldLines: z.number(),
-            newStart: z.number(),
-            newLines: z.number(),
-            lines: z.array(z.string()),
-          }),
-        ),
-        index: z.string().optional(),
-      })
-      .optional(),
-    encoding: z.literal("base64").optional(),
-    mimeType: z.string().optional(),
-  })
-  .meta({
-    ref: "FileContent",
-  })
-export type Content = z.infer<typeof Content>
-
-export const Event = {
-  Edited: BusEvent.define(
-    "file.edited",
-    z.object({
-      file: z.string(),
-    }),
-  ),
-}
+import { type Content, type Info, type Interface, type Node } from "./file-contracts"
+export * from "./file-contracts"
 
 const log = Log.create({ service: "file" })
 const MAX_ENCODE_BYTES = 5 * 1024 * 1024
@@ -119,19 +53,6 @@ const sortHiddenLast = (items: string[], prefer: boolean) => {
 
 interface State {
   cache: Entry
-}
-
-export interface Interface {
-  readonly init: () => Effect.Effect<void>
-  readonly status: () => Effect.Effect<Info[]>
-  readonly read: (file: string) => Effect.Effect<Content>
-  readonly list: (dir?: string) => Effect.Effect<Node[]>
-  readonly search: (input: {
-    query: string
-    limit?: number
-    dirs?: boolean
-    type?: "file" | "directory"
-  }) => Effect.Effect<string[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/File") {}
