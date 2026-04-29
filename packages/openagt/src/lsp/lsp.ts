@@ -5,29 +5,15 @@ import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
 import * as LSPServer from "./server"
 import { Config } from "../config"
-import { Flag } from "@/flag/flag"
 import { Process } from "../util"
-import { spawn as lspspawn } from "./launch"
 import { Effect, Layer, Context } from "effect"
 import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { DocumentSymbol, Event, isWorkspaceSymbolKind, Status, Symbol } from "./lsp-contracts"
+import { buildServerRegistry } from "./server-registry"
 export * from "./lsp-contracts"
 
 const log = Log.create({ service: "lsp" })
-
-const filterExperimentalServers = (servers: Record<string, LSPServer.Info>) => {
-  if (Flag.OPENCODE_EXPERIMENTAL_LSP_TY) {
-    if (servers["pyright"]) {
-      log.info("LSP server pyright is disabled because OPENCODE_EXPERIMENTAL_LSP_TY is enabled")
-      delete servers["pyright"]
-    }
-  } else {
-    if (servers["ty"]) {
-      delete servers["ty"]
-    }
-  }
-}
 
 type LocInput = { file: string; line: number; character: number }
 
@@ -65,48 +51,7 @@ export const layer = Layer.effect(
     const state = yield* InstanceState.make<State>(
       Effect.fn("LSP.state")(function* (ctx) {
         const cfg = yield* config.get()
-
-        const servers: Record<string, LSPServer.Info> = {}
-
-        if (!cfg.lsp) {
-          log.info("all LSPs are disabled")
-        } else {
-          for (const server of Object.values(LSPServer)) {
-            servers[server.id] = server
-          }
-
-          filterExperimentalServers(servers)
-
-          if (cfg.lsp !== true) {
-            for (const [name, item] of Object.entries(cfg.lsp)) {
-              const existing = servers[name]
-              if (item.disabled) {
-                log.info(`LSP server ${name} is disabled`)
-                delete servers[name]
-                continue
-              }
-              servers[name] = {
-                ...existing,
-                id: name,
-                root: existing?.root ?? (async (_file, ctx) => ctx.directory),
-                extensions: item.extensions ?? existing?.extensions ?? [],
-                spawn: async (root) => ({
-                  process: lspspawn(item.command[0], item.command.slice(1), {
-                    cwd: root,
-                    env: { ...process.env, ...item.env },
-                  }),
-                  initialization: item.initialization,
-                }),
-              }
-            }
-          }
-
-          log.info("enabled LSP servers", {
-            serverIds: Object.values(servers)
-              .map((server) => server.id)
-              .join(", "),
-          })
-        }
+        const servers = buildServerRegistry(cfg.lsp)
 
         const s: State = {
           clients: [],
