@@ -6,6 +6,16 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { MessageV2 } from "./message-v2"
 import { BudgetTuning } from "@/agent/budget-tuning"
+import {
+  fullMessageText,
+  groupState,
+  normalizedUsage,
+  promptHash,
+  resultFromRecord,
+  scopeOverlap,
+  scopedReadOverlap,
+  summarizeMessage,
+} from "./task-runtime-helpers"
 
 export const TaskStatus = z.enum(["pending", "running", "completed", "partial", "failed", "cancelled"])
 export type TaskStatus = z.infer<typeof TaskStatus>
@@ -112,120 +122,6 @@ function cancelHandlerKey(parentSessionID: SessionID, taskID: SessionID) {
 
 function groupKey(parentSessionID: SessionID, groupID: string) {
   return ["task_group", parentSessionID, groupID]
-}
-
-function summarizeMessage(text: string | undefined) {
-  if (!text) return ""
-  const line = text
-    .replace(/<\/?task_result(?:\s[^>]*)?>/g, "")
-    .split("\n")
-    .map((item) => item.trim())
-    .find(Boolean)
-  return line ? Array.from(line).slice(0, 400).join("") : ""
-}
-
-function fullMessageText(text: string | undefined) {
-  if (!text) return ""
-  return text.replace(/<\/?task_result(?:\s[^>]*)?>/g, "").trim()
-}
-
-function promptHash(prompt: string) {
-  return Bun.hash(prompt).toString(36)
-}
-
-function normalizedUsage(info: Extract<MessageV2.Info, { role: "assistant" }>) {
-  const provider = String(info.providerID)
-  const totalTokens =
-    info.tokens.total ??
-    (provider.includes("anthropic")
-      ? info.tokens.input + info.tokens.output + info.tokens.reasoning
-      : info.tokens.input + info.tokens.output + info.tokens.reasoning + info.tokens.cache.read + info.tokens.cache.write)
-  return {
-    totalTokens,
-    inputTokens: info.tokens.input,
-    outputTokens: info.tokens.output,
-    reasoningTokens: info.tokens.reasoning,
-  }
-}
-
-function resultFromRecord(record: TaskRecord): TaskResult {
-  const metadata = record.metadata
-    ? Object.fromEntries(
-        [
-          "coordinator_node_id",
-          "coordinator_run_id",
-          "role",
-          "expert_id",
-          "expert_role",
-          "workflow",
-          "effort",
-          "artifact_type",
-          "artifact_id",
-          "revision_of",
-          "quality_gate_id",
-          "memory_namespace",
-          "confidence",
-          "revise_policy",
-          "output_schema",
-          "parallel_group",
-          "partial",
-          "retryable",
-          "limit_reason",
-          "partial_summary",
-          "result_text",
-          "remaining_scope",
-          "requested_step_budget",
-          "effective_step_budget",
-          "requested_timeout_ms",
-          "effective_timeout_ms",
-          "timeout_limit_reason",
-          "broad_task",
-          "classification_confidence",
-          "classification_reasons",
-          "matched_terms",
-          "fallback_used",
-        ].flatMap((key) => (key in record.metadata! ? [[key, record.metadata![key]] as const] : [])),
-      )
-    : undefined
-  return {
-    task_id: record.task_id,
-    status: record.status,
-    summary: record.result_summary ?? record.error_summary ?? `Task ${record.status}`,
-    child_session_id: record.child_session_id,
-    usage: record.usage,
-    result_excerpt: record.result_summary,
-    error_excerpt: record.error_summary,
-    group_id: record.group_id,
-    task_kind: record.task_kind,
-    subagent_type: record.subagent_type,
-    description: record.description,
-    write_scope: record.write_scope,
-    read_scope: record.read_scope,
-    acceptance_checks: record.acceptance_checks,
-    priority: record.priority,
-    origin: record.origin,
-    metadata,
-  }
-}
-
-function groupState(records: TaskRecord[]) {
-  if (records.some((item) => item.status === "failed")) return "failed"
-  if (records.some((item) => item.status === "cancelled")) return "cancelled"
-  if (records.some((item) => item.status === "partial")) return "partial"
-  if (records.every((item) => item.status === "completed")) return "completed"
-  if (records.some((item) => item.status === "running")) return "running"
-  return "pending"
-}
-
-function scopeOverlap(left: string[], right: string[]) {
-  if (left.length === 0 || right.length === 0) return true
-  return left.some((item) =>
-    right.some((other) => item === other || item.startsWith(other + "/") || other.startsWith(item + "/")),
-  )
-}
-
-function scopedReadOverlap(left: string[], right: string[]) {
-  return left.length > 0 && right.length > 0 && scopeOverlap(left, right)
 }
 
 export interface Interface {
