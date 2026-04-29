@@ -1,8 +1,8 @@
 import { Provider } from "@/provider"
 import { Log } from "@/util"
-import { Context, Effect, Layer, Record } from "effect"
+import { Context, Effect, Layer } from "effect"
 import * as Stream from "effect/Stream"
-import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
+import { streamText, wrapLanguageModel, type ModelMessage, type Tool } from "ai"
 import { mergeDeep, pipe } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider"
@@ -24,6 +24,7 @@ import { InstallationVersion } from "@/installation/version"
 import { EffectBridge } from "@/effect"
 import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
+import { createNoopTool, resolveTools, shouldInjectNoopTool } from "./llm-tool-compat"
 
 const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
@@ -216,30 +217,12 @@ const live: Layer.Layer<
       // This is enabled for:
       // 1. Providers with "litellm" in their ID or API ID (auto-detected)
       // 2. Providers with explicit "litellmProxy: true" option (opt-in for custom gateways)
-      const isLiteLLMProxy =
-        item.options?.["litellmProxy"] === true ||
-        input.model.providerID.toLowerCase().includes("litellm") ||
-        input.model.api.id.toLowerCase().includes("litellm")
-
       // LiteLLM/Bedrock rejects requests where the message history contains tool
       // calls but no tools param is present. When there are no active tools (e.g.
       // during compaction), inject a stub tool to satisfy the validation requirement.
       // The stub description explicitly tells the model not to call it.
-      if (
-        (isLiteLLMProxy || input.model.providerID.includes("github-copilot")) &&
-        Object.keys(tools).length === 0 &&
-        hasToolCalls(input.messages)
-      ) {
-        tools["_noop"] = tool({
-          description: "Do not call this tool. It exists only for API compatibility and must never be invoked.",
-          inputSchema: jsonSchema({
-            type: "object",
-            properties: {
-              reason: { type: "string", description: "Unused" },
-            },
-          }),
-          execute: async () => ({ output: "", title: "", metadata: {} }),
-        })
+      if (shouldInjectNoopTool({ model: input.model, providerOptions: item.options, tools, messages: input.messages })) {
+        tools["_noop"] = createNoopTool()
       }
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
@@ -458,24 +441,5 @@ export const defaultLayer = Layer.suspend(() =>
   ),
 )
 
-function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">) {
-  const disabled = Permission.disabled(
-    Object.keys(input.tools),
-    Permission.merge(input.agent.permission, input.permission ?? []),
-  )
-  return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
-}
-
-// Check if messages contain any tool-call content
-// Used to determine if a dummy tool should be added for LiteLLM proxy compatibility
-export function hasToolCalls(messages: ModelMessage[]): boolean {
-  for (const msg of messages) {
-    if (!Array.isArray(msg.content)) continue
-    for (const part of msg.content) {
-      if (part.type === "tool-call" || part.type === "tool-result") return true
-    }
-  }
-  return false
-}
-
+export { hasToolCalls } from "./llm-tool-compat"
 export * as LLM from "./llm"
