@@ -38,8 +38,8 @@ import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
-import { ConfigVariable } from "./variable"
 import { ConfigPluginOriginMerger } from "./plugin-origin-merger"
+import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
@@ -52,9 +52,7 @@ const log = Log.create({ service: "config" })
 import {
   globalConfigFile,
   mergeConfigConcatArrays,
-  normalizeLoadedConfig,
   patchJsonc,
-  resolveLoadedPlugins,
   writable,
 } from "./utils"
 
@@ -100,49 +98,11 @@ export const layer = Layer.effect(
     const accountSvc = yield* Account.Service
     const env = yield* Env.Service
     const npmSvc = yield* Npm.Service
-
-    const readConfigFile = Effect.fnUntraced(function* (filepath: string) {
-      return yield* fs.readFileString(filepath).pipe(
-        Effect.catchIf(
-          (e) => e.reason._tag === "NotFound",
-          () => Effect.succeed(undefined),
-        ),
-        Effect.orDie,
-      )
-    })
-
-    const loadConfig = Effect.fnUntraced(function* (
-      text: string,
-      options: { path: string } | { dir: string; source: string },
-    ) {
-      const source = "path" in options ? options.path : options.source
-      const expanded = yield* Effect.promise(() =>
-        ConfigVariable.substitute(
-          "path" in options ? { text, type: "path", path: options.path } : { text, type: "virtual", ...options },
-        ),
-      )
-      const parsed = ConfigParse.jsonc(expanded, source)
-      const data = ConfigParse.schema(ConfigInfo, normalizeLoadedConfig(parsed, source), source)
-      if (!("path" in options)) return data
-
-      yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
-      if (!data.$schema) {
-        data.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
-        const updated = text.replace(
-          /^\s*\{/,
-          '{\n  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json",',
-        )
-        yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
-      }
-      return data
-    })
-
-    const loadFile = Effect.fnUntraced(function* (filepath: string) {
-      log.info("loading", { path: filepath })
-      const text = yield* readConfigFile(filepath)
-      if (!text) return {} as Info
-      return yield* loadConfig(text, { path: filepath })
-    })
+    const fileLoader = new ConfigFileLoader(fs, log)
+    const readConfigFile = (filepath: string) => fileLoader.readConfigFile(filepath)
+    const loadConfig = (text: string, options: { path: string } | { dir: string; source: string }) =>
+      fileLoader.loadConfig(text, options)
+    const loadFile = (filepath: string) => fileLoader.loadFile(filepath)
 
     const loadGlobal = Effect.fnUntraced(function* () {
       let result: Info = pipe(
@@ -159,7 +119,7 @@ export const layer = Layer.effect(
             .then(async (mod) => {
               const { provider, model, ...rest } = mod.default
               if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
+              result["$schema"] = CONFIG_SCHEMA_URL
               result = mergeDeep(result, rest)
               await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
               await fsNode.unlink(legacy)
@@ -243,7 +203,7 @@ export const layer = Layer.effect(
                 const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
                 const remoteConfig = wellknown.config ?? {}
                 if (!remoteConfig.$schema) {
-                  remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
+                  remoteConfig.$schema = CONFIG_SCHEMA_URL
                 }
                 const source = `${url}/.well-known/opencode`
                 const next = yield* loadConfig(JSON.stringify(remoteConfig), {
