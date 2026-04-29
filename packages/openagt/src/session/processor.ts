@@ -1,7 +1,5 @@
 import { Cause, Deferred, Effect, Layer, Context, Scope } from "effect"
 import * as Stream from "effect/Stream"
-import os from "os"
-import path from "path"
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Config } from "@/config"
@@ -19,10 +17,10 @@ import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider"
 import { Question } from "@/question"
-import * as Truncate from "@/tool/truncate"
-import { errorMessage } from "@/util/error"
 import { Log } from "@/util"
+import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
+import { completeInterruptedBashFor, isAbortLikeError, isShellRunnerBash } from "./processor-helpers"
 
 const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
@@ -134,62 +132,7 @@ export const layer: Layer.Layer<
           providerID: input.model.providerID,
           aborted,
         })
-      const isAbortLikeError = (error: unknown) => {
-        const message = errorMessage(error).toLowerCase()
-        return message.includes("abort") || message.includes("cancel") || message.includes("interrupt")
-      }
-      const isShellRunnerBash = (part: MessageV2.ToolPart, metadata: Record<string, unknown>, output: string) => {
-        const partInput = isRecord(part.state.input) ? part.state.input : {}
-        return (
-          part.tool === "bash" &&
-          (typeof partInput.command === "string" ||
-            typeof partInput.description === "string" ||
-            typeof partInput.timeout === "number" ||
-            typeof partInput.workdir === "string" ||
-            output.length > 0 ||
-            typeof metadata.description === "string" ||
-            typeof metadata.backendPreference === "string" ||
-            typeof metadata.enforcement === "string")
-        )
-      }
-      const completeInterruptedBash = Effect.fn("SessionProcessor.completeInterruptedBash")(function* (
-        part: MessageV2.ToolPart,
-        metadata: Record<string, unknown>,
-        output: string,
-        end: number,
-      ) {
-        const captured = output || "(no output captured before abort)"
-        const truncated =
-          metadata.truncated === true ||
-          output.length === 0 ||
-          captured.startsWith("...\n\n") ||
-          Buffer.byteLength(captured, "utf-8") > Truncate.MAX_BYTES
-        const outputPath = truncated ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`) : undefined
-        if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, captured))
-        yield* session.updatePart({
-          ...part,
-          state: {
-            status: "completed",
-            input: part.state.input,
-            output:
-              (truncated && outputPath
-                ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${captured}`
-                : captured) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
-            metadata: {
-              ...metadata,
-              output: captured,
-              truncated,
-              ...(outputPath ? { outputPath } : {}),
-              terminationReason: "abort",
-              interrupted: true,
-              interruption_origin: "session_cleanup",
-              root_cause: "bash_result_missing_after_session_interrupt",
-            },
-            title: typeof metadata.description === "string" ? metadata.description : "Shell command",
-            time: { start: "time" in part.state ? part.state.time.start : end, end },
-          },
-        })
-      })
+      const completeInterruptedBash = completeInterruptedBashFor({ updatePart: session.updatePart })
 
       const settleToolCall = Effect.fn("SessionProcessor.settleToolCall")(function* (toolCallID: string) {
         const done = ctx.toolcalls[toolCallID]?.done
