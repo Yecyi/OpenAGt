@@ -1,11 +1,8 @@
-import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "../provider"
 import { MessageV2 } from "./message-v2"
-import z from "zod"
-import { Token } from "../util"
 import { Log } from "../util"
 import { SessionProcessor } from "./processor"
 import { Agent } from "@/agent/agent"
@@ -16,49 +13,20 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Effect, Layer, Context, Option } from "effect"
 import { InstanceState } from "@/effect"
 import { isOverflow as overflow } from "./overflow"
-import { MICRO_COMPACT_TIME_THRESHOLD_MS, applyMicroCompact, summarizeToolResult } from "./compaction/micro"
-import { DEFAULT_AUTO_COMPACT_CONFIG, needsAutoCompact, findToolPartsToCompact } from "./compaction/auto"
+import { summarizeToolResult } from "./compaction/micro"
 import { buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
-import { compactionCoordinator, needsCompaction, getRecommendedLayer } from "./compaction/coordinator"
+import { compactionCoordinator } from "./compaction/coordinator"
 import { compressionTracker } from "./compaction/metrics"
+import {
+  COMPACTION_CIRCUIT_FAILURES,
+  Event,
+  PRUNE_MINIMUM,
+  PRUNE_PROTECTED_TOOLS,
+  type Interface,
+} from "./compaction-contracts"
+export * from "./compaction-contracts"
 
 const log = Log.create({ service: "session.compaction" })
-const COMPACTION_CIRCUIT_FAILURES = 3
-
-export const Event = {
-  Compacted: BusEvent.define(
-    "session.compacted",
-    z.object({
-      sessionID: SessionID.zod,
-    }),
-  ),
-}
-
-export const PRUNE_MINIMUM = 20_000
-export const PRUNE_PROTECT = 40_000
-const PRUNE_PROTECTED_TOOLS = ["skill"]
-
-export interface Interface {
-  readonly isOverflow: (input: {
-    tokens: MessageV2.Assistant["tokens"]
-    model: Provider.Model
-  }) => Effect.Effect<boolean>
-  readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<void>
-  readonly process: (input: {
-    parentID: MessageID
-    messages: MessageV2.WithParts[]
-    sessionID: SessionID
-    auto: boolean
-    overflow?: boolean
-  }) => Effect.Effect<"continue" | "stop">
-  readonly create: (input: {
-    sessionID: SessionID
-    agent: string
-    model: { providerID: ProviderID; modelID: ModelID }
-    auto: boolean
-    overflow?: boolean
-  }) => Effect.Effect<void>
-}
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
 
