@@ -2,7 +2,7 @@ import { BusEvent } from "@/bus/bus-event"
 import { SessionID, MessageID, PartID } from "./schema"
 import z from "zod"
 import { NamedError } from "@openagt/shared/util/error"
-import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
+import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai"
 import {
   AbortedError,
   APIError,
@@ -24,22 +24,12 @@ import { Snapshot } from "@/snapshot"
 import { SyncEvent } from "../sync"
 import { Database, NotFoundError, and, desc, eq, inArray, lt, or } from "@/storage"
 import { MessageTable, PartTable, SessionTable } from "./session.sql"
-import { ProviderError } from "@/provider"
 import { iife } from "@/util/iife"
-import { errorMessage } from "@/util/error"
 import { isMedia } from "@/util/media"
-import type { SystemError } from "bun"
 import type { Provider } from "@/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { Effect } from "effect"
 import { EffectLogger } from "@/effect"
-
-/** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
-interface FetchDecompressionError extends Error {
-  code: "ZlibError"
-  errno: number
-  path: string
-}
 
 export const SYNTHETIC_ATTACHMENT_PROMPT = "Attached image(s) from tool result:"
 export { isMedia }
@@ -937,113 +927,6 @@ export const filterCompactedEffect = Effect.fnUntraced(function* (sessionID: Ses
   return filterCompacted(stream(sessionID))
 })
 
-export function fromError(
-  e: unknown,
-  ctx: { providerID: ProviderID; aborted?: boolean },
-): NonNullable<Assistant["error"]> {
-  switch (true) {
-    case e instanceof DOMException && e.name === "AbortError":
-      return new AbortedError(
-        { message: e.message },
-        {
-          cause: e,
-        },
-      ).toObject()
-    case OutputLengthError.isInstance(e):
-      return e
-    case LoadAPIKeyError.isInstance(e):
-      return new AuthError(
-        {
-          providerID: ctx.providerID,
-          message: e.message,
-        },
-        { cause: e },
-      ).toObject()
-    case (e as SystemError)?.code === "ECONNRESET":
-      return new APIError(
-        {
-          message: "Connection reset by server",
-          isRetryable: true,
-          metadata: {
-            code: (e as SystemError).code ?? "",
-            syscall: (e as SystemError).syscall ?? "",
-            message: (e as SystemError).message ?? "",
-          },
-        },
-        { cause: e },
-      ).toObject()
-    case e instanceof Error && (e as FetchDecompressionError).code === "ZlibError":
-      if (ctx.aborted) {
-        return new AbortedError({ message: e.message }, { cause: e }).toObject()
-      }
-      return new APIError(
-        {
-          message: "Response decompression failed",
-          isRetryable: true,
-          metadata: {
-            code: (e as FetchDecompressionError).code,
-            message: e.message,
-          },
-        },
-        { cause: e },
-      ).toObject()
-    case APICallError.isInstance(e):
-      const parsed = ProviderError.parseAPICallError({
-        providerID: ctx.providerID,
-        error: e,
-      })
-      if (parsed.type === "context_overflow") {
-        return new ContextOverflowError(
-          {
-            message: parsed.message,
-            responseBody: parsed.responseBody,
-          },
-          { cause: e },
-        ).toObject()
-      }
-
-      return new APIError(
-        {
-          message: parsed.message,
-          statusCode: parsed.statusCode,
-          isRetryable: parsed.isRetryable,
-          responseHeaders: parsed.responseHeaders,
-          responseBody: parsed.responseBody,
-          metadata: parsed.metadata,
-        },
-        { cause: e },
-      ).toObject()
-    case e instanceof Error:
-      return new NamedError.Unknown({ message: errorMessage(e) }, { cause: e }).toObject()
-    default:
-      try {
-        const parsed = ProviderError.parseStreamError(e)
-        if (parsed) {
-          if (parsed.type === "context_overflow") {
-            return new ContextOverflowError(
-              {
-                message: parsed.message,
-                responseBody: parsed.responseBody,
-              },
-              { cause: e },
-            ).toObject()
-          }
-          return new APIError(
-            {
-              message: parsed.message,
-              isRetryable: parsed.isRetryable,
-              responseBody: parsed.responseBody,
-            },
-            {
-              cause: e,
-            },
-          ).toObject()
-        }
-      } catch (err) {
-        console.error("[message-v2] error formatting structured error:", err)
-      }
-      return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
-  }
-}
+export { fromError } from "./message-from-error"
 
 export * as MessageV2 from "./message-v2"
