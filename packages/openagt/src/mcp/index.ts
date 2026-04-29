@@ -1,4 +1,3 @@
-import { type Tool } from "ai"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -21,25 +20,16 @@ import { aggregateMcpTools, collectNamedFromConnected } from "./catalog-aggregat
 import { McpAuthFlowController, type AuthStatus } from "./auth-flow-controller"
 import { McpConnectionFactory } from "./connection-factory"
 import type { Status } from "./schema"
+import { isMcpConfigured, type Interface, type MCPClient, type State } from "./contracts"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
 export type { AuthStatus } from "./auth-flow-controller"
+export type { Interface, MCPClient, PromptInfo, ResourceInfo, ToolQualityReport } from "./contracts"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
 
-type MCPClient = Client
-
 const pendingOAuthTransports = new McpPendingOAuthTransports()
-
-// Prompt cache types
-type PromptInfo = Awaited<ReturnType<MCPClient["listPrompts"]>>["prompts"][number]
-type ResourceInfo = Awaited<ReturnType<MCPClient["listResources"]>>["resources"][number]
-type McpEntry = NonNullable<Config.Info["mcp"]>[string]
-
-function isMcpConfigured(entry: McpEntry): entry is ConfigMCP.Info {
-  return typeof entry === "object" && entry !== null && "type" in entry
-}
 
 function defs(key: string, client: MCPClient, timeout?: number) {
   return listToolDefinitions({ key, client, timeout, defaultTimeout: DEFAULT_TIMEOUT, log })
@@ -55,47 +45,6 @@ function fetchFromClient<T extends { name: string }>(
 }
 
 // --- Effect Service ---
-
-interface State {
-  status: Record<string, Status>
-  clients: Record<string, MCPClient>
-  defs: Record<string, MCPToolDef[]>
-}
-
-export interface Interface {
-  readonly status: () => Effect.Effect<Record<string, Status>>
-  readonly clients: () => Effect.Effect<Record<string, MCPClient>>
-  readonly tools: () => Effect.Effect<Record<string, Tool>>
-  readonly prompts: () => Effect.Effect<Record<string, PromptInfo & { client: string }>>
-  readonly resources: () => Effect.Effect<Record<string, ResourceInfo & { client: string }>>
-  readonly add: (name: string, mcp: ConfigMCP.Info) => Effect.Effect<{ status: Record<string, Status> | Status }>
-  readonly connect: (name: string) => Effect.Effect<void>
-  readonly disconnect: (name: string) => Effect.Effect<void>
-  readonly getPrompt: (
-    clientName: string,
-    name: string,
-    args?: Record<string, string>,
-  ) => Effect.Effect<Awaited<ReturnType<MCPClient["getPrompt"]>> | undefined>
-  readonly readResource: (
-    clientName: string,
-    resourceUri: string,
-  ) => Effect.Effect<Awaited<ReturnType<MCPClient["readResource"]>> | undefined>
-  readonly startAuth: (mcpName: string) => Effect.Effect<{ authorizationUrl: string; oauthState: string }>
-  readonly authenticate: (mcpName: string) => Effect.Effect<Status>
-  readonly finishAuth: (mcpName: string, authorizationCode: string) => Effect.Effect<Status>
-  readonly removeAuth: (mcpName: string) => Effect.Effect<void>
-  readonly supportsOAuth: (mcpName: string) => Effect.Effect<boolean>
-  readonly hasStoredTokens: (mcpName: string) => Effect.Effect<boolean>
-  readonly getAuthStatus: (mcpName: string) => Effect.Effect<AuthStatus>
-  readonly checkToolQualityReport: () => Effect.Effect<ToolQualityReport | undefined>
-}
-
-interface ToolQualityReport {
-  serverCount: number
-  toolCount: number
-  averageScore: number
-  lowQualityTools: string[]
-}
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/MCP") {}
 
