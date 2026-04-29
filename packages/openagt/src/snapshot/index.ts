@@ -8,6 +8,7 @@ import { Hash } from "@openagt/shared/util/hash"
 import { Config } from "../config"
 import { Global } from "../global"
 import { Log } from "../util"
+import { catFileRefs, parseCatFileBatchOutput } from "./cat-file-batch"
 import { buildFileDiff, filterIgnoredRows, parseNameStatus, parseNumstatRows, type SnapshotDiffRow } from "./diff-rows"
 import {
   blockedLargeUntracked,
@@ -457,12 +458,6 @@ export const layer: Layer.Layer<
         const diffFull = Effect.fnUntraced(function* (from: string, to: string) {
           return yield* locked(
             Effect.gen(function* () {
-              type Ref = {
-                file: string
-                side: "before" | "after"
-                ref: string
-              }
-
               const show = Effect.fnUntraced(function* (row: SnapshotDiffRow) {
                 if (row.binary) return ["", ""]
                 if (row.status === "added") {
@@ -490,18 +485,7 @@ export const layer: Layer.Layer<
 
               const load = Effect.fnUntraced(
                 function* (rows: SnapshotDiffRow[]) {
-                  const refs = rows.flatMap((row) => {
-                    if (row.binary) return []
-                    if (row.status === "added")
-                      return [{ file: row.file, side: "after", ref: `${to}:${row.file}` } satisfies Ref]
-                    if (row.status === "deleted") {
-                      return [{ file: row.file, side: "before", ref: `${from}:${row.file}` } satisfies Ref]
-                    }
-                    return [
-                      { file: row.file, side: "before", ref: `${from}:${row.file}` } satisfies Ref,
-                      { file: row.file, side: "after", ref: `${to}:${row.file}` } satisfies Ref,
-                    ]
-                  })
+                  const refs = catFileRefs(rows, from, to)
                   if (!refs.length) return new Map<string, { before: string; after: string }>()
 
                   const batch = yield* gitRunner.catFileBatch(refs)
@@ -518,61 +502,9 @@ export const layer: Layer.Layer<
                     return undefined
                   }
 
-                  const map = new Map<string, { before: string; after: string }>()
-                  const dec = new TextDecoder()
-                  let i = 0
-                  for (const ref of refs) {
-                    let end = i
-                    while (end < batch.out.length && batch.out[end] !== 10) end += 1
-                    if (end >= batch.out.length) {
-                      return fail(
-                        "git cat-file --batch returned a truncated header during snapshot diff, falling back to per-file git show",
-                      )
-                    }
-
-                    const head = dec.decode(batch.out.slice(i, end))
-                    i = end + 1
-                    const hit = map.get(ref.file) ?? { before: "", after: "" }
-                    if (head.endsWith(" missing")) {
-                      map.set(ref.file, hit)
-                      continue
-                    }
-
-                    const match = head.match(/^[0-9a-f]+ blob (\d+)$/)
-                    if (!match) {
-                      return fail(
-                        "git cat-file --batch returned an unexpected header during snapshot diff, falling back to per-file git show",
-                        { head },
-                      )
-                    }
-
-                    const size = Number(match[1])
-                    if (
-                      !Number.isInteger(size) ||
-                      size < 0 ||
-                      i + size >= batch.out.length ||
-                      batch.out[i + size] !== 10
-                    ) {
-                      return fail(
-                        "git cat-file --batch returned truncated content during snapshot diff, falling back to per-file git show",
-                        { head },
-                      )
-                    }
-
-                    const text = dec.decode(batch.out.slice(i, i + size))
-                    if (ref.side === "before") hit.before = text
-                    if (ref.side === "after") hit.after = text
-                    map.set(ref.file, hit)
-                    i += size + 1
-                  }
-
-                  if (i !== batch.out.length) {
-                    return fail(
-                      "git cat-file --batch returned trailing data during snapshot diff, falling back to per-file git show",
-                    )
-                  }
-
-                  return map
+                  const parsed = parseCatFileBatchOutput(refs, batch.out)
+                  if (!parsed.ok) return fail(parsed.message, parsed.extra)
+                  return parsed.map
                 },
                 Effect.scoped,
                 Effect.catch(() =>
