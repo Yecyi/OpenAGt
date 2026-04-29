@@ -9,7 +9,7 @@ import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
-import { Database, desc, eq } from "@/storage"
+import { Database, eq } from "@/storage"
 import { Context, Effect, Layer, Option, Scope } from "effect"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
@@ -41,12 +41,12 @@ import { expandVerifyNodes, orderPlan, validatePlan } from "./plan-ordering"
 import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
 import { buildCoordinatorProjection, type CoordinatorProjection } from "./projection"
 import { buildCoordinatorSummary } from "./summary"
-import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import { CoordinatorDispatchLoop } from "./dispatch-loop"
 import { CoordinatorTaskExecutor } from "./task-executor"
 import { CoordinatorRunFactory } from "./run-factory"
 import { CoordinatorOutcomeRecorder } from "./outcome-recorder"
+import { CoordinatorRunStore } from "./run-store"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -167,6 +167,7 @@ export const layer = Layer.effect(
     const scope = yield* Scope.Scope
     const taskSessionFactory = new CoordinatorTaskSessionFactory(agents, sessions)
     const outcomeRecorder = new CoordinatorOutcomeRecorder({ calibration, promptTemplates })
+    const runStore = new CoordinatorRunStore()
 
     const publish = (
       def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed,
@@ -273,9 +274,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, run.id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(run.id)
       yield* publish(Event.Updated, updated)
       return updated
     })
@@ -305,9 +304,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, run.id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(run.id)
       yield* publish(Event.Updated, updated)
       return updated
     })
@@ -410,25 +407,12 @@ export const layer = Layer.effect(
 
     const get: Interface["get"] = Effect.fn("Coordinator.get")(function* (id) {
       yield* ensureSubscribed()
-      const row = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
-      )
-      return row ? Option.some(runFromRow(row)) : Option.none()
+      return yield* runStore.get(id)
     })
 
     const list: Interface["list"] = Effect.fn("Coordinator.list")(function* (sessionID) {
       yield* ensureSubscribed()
-      const rows = yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .select()
-            .from(CoordinatorRunTable)
-            .where(eq(CoordinatorRunTable.session_id, sessionID))
-            .orderBy(desc(CoordinatorRunTable.time_created))
-            .all(),
-        ),
-      )
-      return rows.map(runFromRow)
+      return yield* runStore.list(sessionID)
     })
 
     const projection: Interface["projection"] = Effect.fn("Coordinator.projection")(function* (id) {
@@ -468,9 +452,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(id)
       yield* publish(state === "completed" ? Event.Completed : Event.Updated, updated)
       return summary
     })
@@ -494,9 +476,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(id)
       yield* publish(Event.Updated, updated)
       return updated
     })
@@ -556,9 +536,7 @@ export const layer = Layer.effect(
           concurrency: BudgetTuning.concurrency.storageRead,
         },
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(id)
       yield* publish(Event.Updated, updated)
       return updated
     })
@@ -605,9 +583,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, input.id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(input.id)
       yield* publish(Event.Updated, updated)
       yield* dispatchReady(input.id).pipe(Effect.ignore)
       const refreshed = yield* get(input.id)
@@ -674,9 +650,7 @@ export const layer = Layer.effect(
             .run(),
         ),
       )
-      const updated = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, input.id)).get()),
-      ).pipe(Effect.map((row) => runFromRow(row!)))
+      const updated = yield* runStore.readAfterUpdate(input.id)
       yield* publish(Event.Updated, updated)
       yield* dispatchReady(input.id).pipe(Effect.ignore)
       const refreshed = yield* get(input.id)
