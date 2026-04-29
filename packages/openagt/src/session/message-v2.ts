@@ -2,7 +2,6 @@ import { BusEvent } from "@/bus/bus-event"
 import { SessionID, MessageID, PartID } from "./schema"
 import z from "zod"
 import { NamedError } from "@openagt/shared/util/error"
-import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai"
 import {
   AbortedError,
   APIError,
@@ -25,15 +24,6 @@ import { SyncEvent } from "../sync"
 import { isMedia } from "@/util/media"
 import type { Provider } from "@/provider"
 import { ModelID, ProviderID } from "@/provider/schema"
-import { Effect } from "effect"
-import { EffectLogger } from "@/effect"
-import {
-  convertAssistantMessage,
-  convertUserMessage,
-  supportsMediaInToolResults,
-  synthesizeMediaMessage,
-  toModelOutput,
-} from "./to-model-messages"
 
 export const SYNTHETIC_ATTACHMENT_PROMPT = "Attached image(s) from tool result:"
 export { isMedia }
@@ -504,55 +494,7 @@ export const WithParts = z.object({
 })
 export type WithParts = z.infer<typeof WithParts>
 
-export const toModelMessagesEffect = Effect.fnUntraced(function* (
-  input: WithParts[],
-  model: Provider.Model,
-  options?: { stripMedia?: boolean },
-) {
-  const result: UIMessage[] = []
-  const toolNames = new Set<string>()
-  const supportsMedia = supportsMediaInToolResults(model)
-
-  for (const msg of input) {
-    if (msg.parts.length === 0) continue
-
-    if (msg.info.role === "user") {
-      const userMessage = convertUserMessage(msg, options)
-      if (userMessage) result.push(userMessage)
-    }
-
-    if (msg.info.role === "assistant") {
-      const converted = convertAssistantMessage(msg, model, supportsMedia, options)
-      if (converted) {
-        result.push(converted.uiMessage)
-        for (const t of converted.addedTools) toolNames.add(t)
-        if (converted.media.length > 0) {
-          result.push(synthesizeMediaMessage(converted.media))
-        }
-      }
-    }
-  }
-
-  const tools = Object.fromEntries(Array.from(toolNames).map((toolName) => [toolName, { toModelOutput }]))
-
-  return yield* Effect.promise(() =>
-    convertToModelMessages(
-      result.filter((msg) => msg.parts.some((part) => part.type !== "step-start")),
-      {
-        // @ts-expect-error -- convertToModelMessages expects ToolSet but only actually needs tools[name]?.toModelOutput
-        tools,
-      },
-    ),
-  )
-})
-
-export function toModelMessages(
-  input: WithParts[],
-  model: Provider.Model,
-  options?: { stripMedia?: boolean },
-): Promise<ModelMessage[]> {
-  return Effect.runPromise(toModelMessagesEffect(input, model, options).pipe(Effect.provide(EffectLogger.layer)))
-}
+export { toModelMessages, toModelMessagesEffect } from "./message-v2-model"
 
 export { cursor, page, stream, parts, get, filterCompacted, filterCompactedEffect } from "./message-v2-store"
 
