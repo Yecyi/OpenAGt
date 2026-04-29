@@ -25,19 +25,14 @@ import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { formatShellSafety, isPrivilegeEscalationCommand, ShellSecurity } from "../security/shell-security"
+import { ShellSecurity } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
-import { resolveExecutionDecision, strictestDecision } from "@/security/decision-pipeline"
-import type {
-  SandboxBackendStatus,
-} from "@/sandbox/types"
 import {
   addShellReviewMetadata,
   buildBlockedCommandResult,
-  buildNetworkPermissionMetadata,
-  buildShellPermissionMetadata,
   type BashMetadata,
 } from "./bash-metadata"
+import { BashExecutionPlanner } from "./bash-execution-plan"
 import {
   CWD,
   FILES,
@@ -387,130 +382,42 @@ export const BashTool = Tool.define(
           const scan = yield* collect(root, cwd, ps, shell)
           if (!Instance.containsPath(cwd, instance)) scan.dirs.add(cwd)
 
-          const security = yield* shellSecurity.analyze({
+          const externalPaths = Array.from(scan.dirs)
+          const executionPlan = yield* new BashExecutionPlanner({
+            execPolicy,
+            log,
+            sandboxBroker,
+            sandboxPolicy,
+            shellSecurity,
+          }).plan({
             command: params.command,
             shell,
             cwd,
-          })
-          const policyDecision = yield* execPolicy.evaluate({
-            command: security.normalized_command || params.command,
-            shellFamily: security.shell_family,
-          })
-          const externalPaths = Array.from(scan.dirs)
-          const permissionMetadata = shellSecurity.createPermissionMetadata({
-            result: security,
-            description: params.description ?? "Shell command",
-            workdir: cwd,
+            description: params.description,
             externalPaths,
-          })
-          const preliminaryDecision = strictestDecision(security.decision, policyDecision.decision)
-          const preliminaryPolicy = yield* sandboxPolicy.resolve({
-            result: security,
-            decision: preliminaryDecision,
-            cwd,
-            externalPaths,
-          })
-          const capabilities = yield* sandboxBroker.capabilities().pipe(
-            Effect.catchCause((cause) =>
-              Effect.sync(() => {
-                log.warn("sandbox capabilities unavailable", { cause })
-                return [] satisfies SandboxBackendStatus[]
-              }),
-            ),
-          )
-          const privilegeEscalation = isPrivilegeEscalationCommand(security.normalized_command || params.command)
-          const decision = resolveExecutionDecision({
-            securityDecision: security.decision,
-            securityReason: security.explanation,
-            riskLevel: security.risk_level,
-            policyDecision,
-            policy: preliminaryPolicy,
-            capabilities,
-            privilegeEscalation,
-          })
-          const finalDecision = decision.finalDecision
-          const finalReason = decision.finalReason
-          const matchedRules = decision.matchedRules
-          const policy =
-            finalDecision === preliminaryDecision
-              ? preliminaryPolicy
-              : yield* sandboxPolicy.resolve({
-                  result: security,
-                  decision: finalDecision,
-                  cwd,
-                  externalPaths,
-                })
-          const backendAvailabilitySummary = decision.backendAvailability
-          const shellSafety = formatShellSafety({
-            decision: finalDecision,
-            riskLevel: security.risk_level,
-            reason: finalReason,
-            approvalKind: decision.approvalKind,
-            approvalRequired: finalDecision !== "allow" || policy.needs_network_permission,
-            policySource: decision.policySource,
-            backendPreference: policy.backend_preference,
-            enforcement: policy.enforcement,
-            filesystemPolicy: policy.filesystem_policy,
-            networkPolicy: policy.network_policy,
-            backendAvailability: backendAvailabilitySummary,
-            policyReason: finalReason,
-            matchedRules,
-          })
-          const networkReason = "Command requires network access."
-          const networkShellSafety = policy.needs_network_permission
-            ? formatShellSafety({
-                decision: "confirm",
-                riskLevel: security.risk_level,
-                reason: networkReason,
-                approvalKind: "network_access",
-                approvalRequired: true,
-                policySource: "sandbox_policy",
-                backendPreference: policy.backend_preference,
-                enforcement: policy.enforcement,
-                filesystemPolicy: policy.filesystem_policy,
-                networkPolicy: policy.network_policy,
-                backendAvailability: backendAvailabilitySummary,
-                policyReason: finalReason,
-                matchedRules,
-              })
-            : undefined
-          const metadata = buildShellPermissionMetadata({
-            permissionMetadata,
-            finalDecision,
-            finalReason,
-            policy,
-            backendAvailabilitySummary,
-            policyDecision,
-            matchedRules,
-            shellSafety,
-          })
-          const networkMetadata = buildNetworkPermissionMetadata({
-            metadata,
-            networkShellSafety,
-            networkReason,
           })
 
-          if (finalDecision === "block") {
+          if (executionPlan.finalDecision === "block") {
             return buildBlockedCommandResult({
               description: params.description ?? "",
-              security,
-              decision,
-              policyDecision,
-              shellSafety,
+              security: executionPlan.security,
+              decision: executionPlan.decision,
+              policyDecision: executionPlan.policyDecision,
+              shellSafety: executionPlan.shellSafety,
             })
           }
 
-          yield* ask(ctx, scan, metadata)
-          if (finalDecision === "confirm") {
+          yield* ask(ctx, scan, executionPlan.metadata)
+          if (executionPlan.finalDecision === "confirm") {
             yield* askShellExecute(ctx, {
-              patterns: [security.normalized_command || params.command],
-              metadata,
+              patterns: [executionPlan.security.normalized_command || params.command],
+              metadata: executionPlan.metadata,
             })
           }
-          if (policy.needs_network_permission) {
+          if (executionPlan.policy.needs_network_permission) {
             yield* askShellNetwork(ctx, {
-              patterns: [security.normalized_command || params.command],
-              metadata: networkMetadata,
+              patterns: [executionPlan.security.normalized_command || params.command],
+              metadata: executionPlan.networkMetadata,
             })
           }
 
@@ -519,28 +426,35 @@ export const BashTool = Tool.define(
             .run(
               {
                 shell,
-                shellFamily: security.shell_family,
+                shellFamily: executionPlan.security.shell_family,
                 command: params.command,
                 cwd,
                 env,
                 timeout,
                 description: params.description ?? "Shell command",
-                enforcement: policy.enforcement,
-                backendPreference: policy.backend_preference,
-                filesystemPolicy: policy.filesystem_policy,
-                allowedPaths: policy.allowed_paths,
-                writablePaths: policy.writable_paths,
-                networkPolicy: policy.network_policy,
-                reportOnly: policy.sandbox.report_only,
-                failurePolicy: policy.sandbox.failure_policy,
-                riskLevel: security.risk_level,
+                enforcement: executionPlan.policy.enforcement,
+                backendPreference: executionPlan.policy.backend_preference,
+                filesystemPolicy: executionPlan.policy.filesystem_policy,
+                allowedPaths: executionPlan.policy.allowed_paths,
+                writablePaths: executionPlan.policy.writable_paths,
+                networkPolicy: executionPlan.policy.network_policy,
+                reportOnly: executionPlan.policy.sandbox.report_only,
+                failurePolicy: executionPlan.policy.sandbox.failure_policy,
+                riskLevel: executionPlan.security.risk_level,
               },
               ctx,
             )
             .pipe(
               Effect.uninterruptible,
               Effect.map((result) =>
-                addShellReviewMetadata({ result, security, finalDecision, policyDecision, matchedRules, shellSafety }),
+                addShellReviewMetadata({
+                  result,
+                  security: executionPlan.security,
+                  finalDecision: executionPlan.finalDecision,
+                  policyDecision: executionPlan.policyDecision,
+                  matchedRules: executionPlan.matchedRules,
+                  shellSafety: executionPlan.shellSafety,
+                }),
               ),
             )
         }),
