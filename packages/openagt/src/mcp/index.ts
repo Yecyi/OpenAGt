@@ -1,6 +1,5 @@
 import { type Tool } from "ai"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js"
 import { type Tool as MCPToolDef, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -8,30 +7,28 @@ import { Config } from "../config"
 import { ConfigMCP } from "../config/mcp"
 import { Log } from "../util"
 import { Installation } from "../installation"
-import { InstallationVersion } from "../installation/version"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { McpOAuthProvider } from "./oauth-provider"
-import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
 import { Bus } from "@/bus"
 import { TuiEvent } from "@/cli/cmd/tui/event"
-import open from "open"
-import { Effect, Layer, Option, Context, Stream } from "effect"
+import { Effect, Layer, Context, Stream } from "effect"
 import { EffectBridge } from "@/effect"
 import { InstanceState } from "@/effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { checkToolsQuality } from "./tool-quality"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
-import { closeTransportIfSupported } from "./transport-utils"
-import { BrowserOpenFailed, ToolsChanged } from "./events"
+import { ToolsChanged } from "./events"
 import { McpPendingOAuthTransports, type TransportWithAuth } from "./pending-oauth-transports"
 import { computeMcpBackoff, connectMcpTransport, sleep, type MCPTransport } from "./connection-runtime"
 import { createLocalTransport, remoteTransportCandidates } from "./transport-factory"
 import { aggregateMcpTools, collectNamedFromConnected } from "./catalog-aggregation"
+import { McpAuthFlowController, type AuthStatus } from "./auth-flow-controller"
 import type { Status } from "./schema"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
+export type { AuthStatus } from "./auth-flow-controller"
 
 const log = Log.create({ service: "mcp" })
 const DEFAULT_TIMEOUT = 30_000
@@ -66,12 +63,6 @@ interface CreateResult {
   mcpClient?: MCPClient
   status: Status
   defs?: MCPToolDef[]
-}
-
-interface AuthResult {
-  authorizationUrl: string
-  oauthState: string
-  client?: MCPClient
 }
 
 // --- Effect Service ---
@@ -131,8 +122,6 @@ export const layer = Layer.effect(
     const MCP_CB_THRESHOLD = 5
     const MCP_CB_RESET_MS = 60_000
     const MCP_RETRY_ATTEMPTS = 3
-
-    const clearPendingOAuthTransport = (mcpName: string) => pendingOAuthTransports.clearOne(mcpName)
 
     const DISABLED_RESULT: CreateResult = { status: { status: "disabled" } }
 
@@ -616,173 +605,16 @@ export const layer = Layer.effect(
       return mcpConfig
     })
 
-    const startAuth = Effect.fn("MCP.startAuth")(function* (mcpName: string) {
-      const mcpConfig = yield* getMcpConfig(mcpName)
-      if (!mcpConfig) throw new Error(`MCP server ${mcpName} not found or disabled`)
-      if (mcpConfig.type !== "remote") throw new Error(`MCP server ${mcpName} is not a remote server`)
-      if (mcpConfig.oauth === false) throw new Error(`MCP server ${mcpName} has OAuth explicitly disabled`)
-
-      // OAuth config is optional - if not provided, we'll use auto-discovery
-      const oauthConfig = typeof mcpConfig.oauth === "object" ? mcpConfig.oauth : undefined
-
-      // Start the callback server with custom redirectUri if configured
-      yield* Effect.promise(() => McpOAuthCallback.ensureRunning(oauthConfig?.redirectUri))
-
-      const oauthState = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")
-      yield* auth.updateOAuthState(mcpName, oauthState)
-      let capturedUrl: URL | undefined
-      const authProvider = new McpOAuthProvider(
-        mcpName,
-        mcpConfig.url,
-        {
-          clientId: oauthConfig?.clientId,
-          clientSecret: oauthConfig?.clientSecret,
-          scope: oauthConfig?.scope,
-          redirectUri: oauthConfig?.redirectUri,
-        },
-        {
-          onRedirect: async (url) => {
-            capturedUrl = url
-          },
-        },
-        auth,
-      )
-
-      const transport = new StreamableHTTPClientTransport(new URL(mcpConfig.url), { authProvider })
-
-      return yield* Effect.tryPromise({
-        try: () => {
-          const client = new Client({ name: "opencode", version: InstallationVersion })
-          return client
-            .connect(transport)
-            .then(() => ({ authorizationUrl: "", oauthState, client }) satisfies AuthResult)
-        },
-        catch: (error) => error,
-      }).pipe(
-        Effect.catch((error) => {
-          if (error instanceof UnauthorizedError && capturedUrl) {
-            const authorizationUrl = capturedUrl.toString()
-            return Effect.gen(function* () {
-              yield* pendingOAuthTransports.replace(mcpName, transport)
-              return { authorizationUrl, oauthState } satisfies AuthResult
-            })
-          }
-          return Effect.die(error)
-        }),
-      )
-    })
-
-    const authenticate = Effect.fn("MCP.authenticate")(function* (mcpName: string) {
-      const result = yield* startAuth(mcpName)
-      if (!result.authorizationUrl) {
-        const client = "client" in result ? result.client : undefined
-        const mcpConfig = yield* getMcpConfig(mcpName)
-        if (!mcpConfig) {
-          yield* Effect.tryPromise(() => client?.close() ?? Promise.resolve()).pipe(Effect.ignore)
-          yield* clearPendingOAuthTransport(mcpName)
-          return { status: "failed", error: "MCP config not found after auth" } as Status
-        }
-
-        const listed = client ? yield* defs(mcpName, client, mcpConfig.timeout) : undefined
-        if (!client || !listed) {
-          yield* Effect.tryPromise(() => client?.close() ?? Promise.resolve()).pipe(Effect.ignore)
-          yield* clearPendingOAuthTransport(mcpName)
-          return { status: "failed", error: "Failed to get tools" } as Status
-        }
-
-        const s = yield* InstanceState.get(state)
-        yield* auth.clearOAuthState(mcpName)
-        yield* clearPendingOAuthTransport(mcpName)
-        return yield* storeClient(s, mcpName, client, listed, mcpConfig.timeout)
-      }
-
-      log.info("opening browser for oauth", { mcpName, hasAuthorizationUrl: !!result.authorizationUrl })
-
-      const callbackPromise = McpOAuthCallback.waitForCallback(result.oauthState, mcpName)
-
-      yield* Effect.tryPromise(() => open(result.authorizationUrl)).pipe(
-        Effect.flatMap((subprocess) =>
-          Effect.callback<void, Error>((resume) => {
-            const timer = setTimeout(() => resume(Effect.void), 500)
-            subprocess.on("error", (err) => {
-              clearTimeout(timer)
-              resume(Effect.fail(err))
-            })
-            subprocess.on("exit", (code) => {
-              if (code !== null && code !== 0) {
-                clearTimeout(timer)
-                resume(Effect.fail(new Error(`Browser open failed with exit code ${code}`)))
-              }
-            })
-          }),
-        ),
-        Effect.catch(() => {
-          log.warn("failed to open browser, user must open URL manually", { mcpName })
-          return bus.publish(BrowserOpenFailed, { mcpName, url: result.authorizationUrl }).pipe(Effect.ignore)
-        }),
-      )
-
-      const code = yield* Effect.promise(() => callbackPromise)
-
-      const storedState = yield* auth.getOAuthState(mcpName)
-      if (storedState !== result.oauthState) {
-        yield* auth.clearOAuthState(mcpName)
-        throw new Error("OAuth state mismatch - potential CSRF attack")
-      }
-      yield* auth.clearOAuthState(mcpName)
-      return yield* finishAuth(mcpName, code)
-    })
-
-    const finishAuth = Effect.fn("MCP.finishAuth")(function* (mcpName: string, authorizationCode: string) {
-      const transport = pendingOAuthTransports.get(mcpName)
-      if (!transport) throw new Error(`No pending OAuth flow for MCP server: ${mcpName}`)
-
-      const result = yield* Effect.tryPromise({
-        try: () => transport.finishAuth(authorizationCode).then(() => true as const),
-        catch: (error) => {
-          log.error("failed to finish oauth", { mcpName, error })
-          return error
-        },
-      }).pipe(Effect.option)
-
-      if (Option.isNone(result)) {
-        return { status: "failed", error: "OAuth completion failed" } as Status
-      }
-
-      yield* auth.clearCodeVerifier(mcpName)
-      yield* clearPendingOAuthTransport(mcpName)
-
-      const mcpConfig = yield* getMcpConfig(mcpName)
-      if (!mcpConfig) return { status: "failed", error: "MCP config not found after auth" } as Status
-
-      return yield* createAndStore(mcpName, mcpConfig)
-    })
-
-    const removeAuth = Effect.fn("MCP.removeAuth")(function* (mcpName: string) {
-      yield* auth.remove(mcpName)
-      McpOAuthCallback.cancelPending(mcpName)
-      yield* clearPendingOAuthTransport(mcpName)
-      log.info("removed oauth credentials", { mcpName })
-    })
-
-    const supportsOAuth = Effect.fn("MCP.supportsOAuth")(function* (mcpName: string) {
-      const mcpConfig = yield* getMcpConfig(mcpName)
-      if (!mcpConfig) return false
-      return mcpConfig.type === "remote" && mcpConfig.oauth !== false
-    })
-
-    const hasStoredTokens = Effect.fn("MCP.hasStoredTokens")(function* (mcpName: string) {
-      const entry = yield* auth.get(mcpName)
-      return !!entry?.tokens
-    })
-
-    const getAuthStatus = Effect.fn("MCP.getAuthStatus")(function* (mcpName: string) {
-      const entry = yield* auth.get(mcpName)
-      if (!entry?.tokens) return "not_authenticated" as AuthStatus
-      const expired = yield* auth.isTokenExpired(mcpName)
-      return (expired ? "expired" : "authenticated") as AuthStatus
+    const authFlow = new McpAuthFlowController({
+      auth,
+      bus,
+      log,
+      pendingOAuthTransports,
+      getMcpConfig,
+      getState: () => InstanceState.get(state),
+      defs,
+      storeClient,
+      createAndStore,
     })
 
     return Service.of({
@@ -796,13 +628,13 @@ export const layer = Layer.effect(
       disconnect,
       getPrompt,
       readResource,
-      startAuth,
-      authenticate,
-      finishAuth,
-      removeAuth,
-      supportsOAuth,
-      hasStoredTokens,
-      getAuthStatus,
+      startAuth: (name) => authFlow.startAuth(name),
+      authenticate: (name) => authFlow.authenticate(name),
+      finishAuth: (name, authorizationCode) => authFlow.finishAuth(name, authorizationCode),
+      removeAuth: (name) => authFlow.removeAuth(name),
+      supportsOAuth: (name) => authFlow.supportsOAuth(name),
+      hasStoredTokens: (name) => authFlow.hasStoredTokens(name),
+      getAuthStatus: (name) => authFlow.getAuthStatus(name),
       checkToolQualityReport: Effect.fn("MCP.checkToolQualityReport")(function* () {
         const s = yield* InstanceState.get(state)
         const allTools = Object.entries(s.defs).flatMap(([clientName, tools]) =>
@@ -822,8 +654,6 @@ export const layer = Layer.effect(
     })
   }),
 )
-
-export type AuthStatus = "authenticated" | "expired" | "not_authenticated"
 
 // --- Per-service runtime ---
 
