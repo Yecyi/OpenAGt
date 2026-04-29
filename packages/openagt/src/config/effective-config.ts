@@ -32,6 +32,31 @@ export const EffectiveConfigSnapshot = z.object({
 })
 export type EffectiveConfigSnapshot = z.infer<typeof EffectiveConfigSnapshot>
 
+const globalPatchFields = new Set(["permission", "exec_policy", "experimental", "compaction", "tools", "mcp"])
+
+export const AdvancedGlobalConfigPatch = ConfigInfo.superRefine((config, ctx) => {
+  for (const key of Object.keys(config)) {
+    if (!globalPatchFields.has(key)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: "Field cannot be updated through the advanced global config endpoint",
+      })
+    }
+  }
+
+  for (const key of Object.keys(config.experimental ?? {})) {
+    if (key !== "sandbox") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["experimental", key],
+        message: "Only experimental.sandbox can be updated through the advanced global config endpoint",
+      })
+    }
+  }
+})
+export type AdvancedGlobalConfigPatch = z.output<typeof AdvancedGlobalConfigPatch>
+
 const fields = EffectiveConfigField.options
 
 const hasField = (config: Info, field: EffectiveConfigField) => {

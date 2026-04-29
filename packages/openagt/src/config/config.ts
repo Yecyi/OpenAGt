@@ -45,7 +45,13 @@ import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
 import type { Info } from "./info"
 export { Info } from "./info"
-export { ConfigSource, ConfigSourceScope, EffectiveConfigField, EffectiveConfigSnapshot } from "./effective-config"
+export {
+  AdvancedGlobalConfigPatch,
+  ConfigSource,
+  ConfigSourceScope,
+  EffectiveConfigField,
+  EffectiveConfigSnapshot,
+} from "./effective-config"
 
 const log = Log.create({ service: "config" })
 
