@@ -17,6 +17,7 @@ import { summarizeToolResult } from "./compaction/micro"
 import { buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
 import { compactionCoordinator } from "./compaction/coordinator"
 import { compressionTracker } from "./compaction/metrics"
+import { autoContinueText, replayPartForCompaction, selectOverflowReplay } from "./compaction-replay"
 import {
   COMPACTION_CIRCUIT_FAILURES,
   Event,
@@ -188,30 +189,9 @@ export const layer: Layer.Layer<
       }
       const userMessage = parent.info
 
-      let messages = input.messages
-      let replay:
-        | {
-            info: MessageV2.User
-            parts: MessageV2.Part[]
-          }
-        | undefined
-      if (input.overflow) {
-        const idx = input.messages.findIndex((m) => m.info.id === input.parentID)
-        for (let i = idx - 1; i >= 0; i--) {
-          const msg = input.messages[i]
-          if (msg.info.role === "user" && !msg.parts.some((p) => p.type === "compaction")) {
-            replay = { info: msg.info, parts: msg.parts }
-            messages = input.messages.slice(0, i)
-            break
-          }
-        }
-        const hasContent =
-          replay && messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
-        if (!hasContent) {
-          replay = undefined
-          messages = input.messages
-        }
-      }
+      const replaySelection = selectOverflowReplay(input)
+      const messages = replaySelection.messages
+      const replay = replaySelection.replay
 
       const agent = yield* agents.get("compaction")
       const model = agent.model
@@ -315,10 +295,7 @@ export const layer: Layer.Layer<
           })
           for (const part of replay.parts) {
             if (part.type === "compaction") continue
-            const replayPart =
-              part.type === "file" && MessageV2.isMedia(part.mime)
-                ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
-                : part
+            const replayPart = replayPartForCompaction(part)
             yield* session.updatePart({
               ...replayPart,
               id: PartID.ascending(),
@@ -356,11 +333,6 @@ export const layer: Layer.Layer<
               agent: userMessage.agent,
               model: userMessage.model,
             })
-            const text =
-              (input.overflow
-                ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
-                : "") +
-              "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
             yield* session.updatePart({
               id: PartID.ascending(),
               messageID: continueMsg.id,
@@ -371,7 +343,7 @@ export const layer: Layer.Layer<
               // This is not a stable plugin contract and may change or disappear.
               metadata: { compaction_continue: true },
               synthetic: true,
-              text,
+              text: autoContinueText(input.overflow === true),
               time: {
                 start: Date.now(),
                 end: Date.now(),
