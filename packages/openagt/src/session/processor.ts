@@ -1,4 +1,4 @@
-import { Cause, Deferred, Effect, Layer, Context, Scope } from "effect"
+import { Cause, Effect, Layer, Context, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
@@ -9,7 +9,6 @@ import { Snapshot } from "@/snapshot"
 import * as Session from "./session"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
-import { isOverflow } from "./overflow"
 import { PartID } from "./schema"
 import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
@@ -18,9 +17,9 @@ import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider"
 import { Log } from "@/util"
 import { errorMessage } from "@/util/error"
-import { ProcessorToolCalls, type ProcessorToolCall } from "./processor-tool-calls"
+import { ProcessorEventHandler, type ProcessorContext } from "./processor-event-handler"
+import { ProcessorToolCalls } from "./processor-tool-calls"
 
-const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
 
 export type Result = "compact" | "stop" | "continue"
@@ -55,18 +54,6 @@ type Input = {
 export interface Interface {
   readonly create: (input: Input) => Effect.Effect<Handle>
 }
-
-interface ProcessorContext extends Input {
-  toolcalls: Record<string, ProcessorToolCall>
-  shouldBreak: boolean
-  snapshot: string | undefined
-  blocked: boolean
-  needsCompaction: boolean
-  currentText: MessageV2.TextPart | undefined
-  reasoningMap: Record<string, MessageV2.ReasoningPart>
-}
-
-type StreamEvent = Event
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionProcessor") {}
 
@@ -143,255 +130,23 @@ export const layer: Layer.Layer<
         toolCalls.fail(toolCallID, error),
       )
 
-      const handleEvent = Effect.fnUntraced(function* (value: StreamEvent) {
-        switch (value.type) {
-          case "start":
-            yield* status.set(ctx.sessionID, { type: "busy" })
-            return
-
-          case "reasoning-start":
-            if (value.id in ctx.reasoningMap) return
-            ctx.reasoningMap[value.id] = {
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "reasoning",
-              text: "",
-              time: { start: Date.now() },
-              metadata: value.providerMetadata,
-            }
-            yield* session.updatePart(ctx.reasoningMap[value.id])
-            return
-
-          case "reasoning-delta":
-            if (!(value.id in ctx.reasoningMap)) return
-            ctx.reasoningMap[value.id].text += value.text
-            if (value.providerMetadata) ctx.reasoningMap[value.id].metadata = value.providerMetadata
-            yield* session.updatePartDelta({
-              sessionID: ctx.reasoningMap[value.id].sessionID,
-              messageID: ctx.reasoningMap[value.id].messageID,
-              partID: ctx.reasoningMap[value.id].id,
-              field: "text",
-              delta: value.text,
-            })
-            return
-
-          case "reasoning-end":
-            if (!(value.id in ctx.reasoningMap)) return
-            ctx.reasoningMap[value.id].time = { ...ctx.reasoningMap[value.id].time, end: Date.now() }
-            if (value.providerMetadata) ctx.reasoningMap[value.id].metadata = value.providerMetadata
-            yield* session.updatePart(ctx.reasoningMap[value.id])
-            delete ctx.reasoningMap[value.id]
-            return
-
-          case "tool-input-start":
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
-            const part = yield* session.updatePart({
-              id: ctx.toolcalls[value.id]?.partID ?? PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "tool",
-              tool: value.toolName,
-              callID: value.id,
-              state: { status: "pending", input: {}, raw: "" },
-              metadata: value.providerExecuted ? { providerExecuted: true } : undefined,
-            } satisfies MessageV2.ToolPart)
-            ctx.toolcalls[value.id] = {
-              done: yield* Deferred.make<void>(),
-              partID: part.id,
-              messageID: part.messageID,
-              sessionID: part.sessionID,
-            }
-            return
-
-          case "tool-input-delta":
-            return
-
-          case "tool-input-end":
-            return
-
-          case "tool-call": {
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
-            yield* updateToolCall(value.toolCallId, (match) => ({
-              ...match,
-              tool: value.toolName,
-              state: {
-                ...match.state,
-                status: "running",
-                input: value.input,
-                time: { start: Date.now() },
-              },
-              metadata: match.metadata?.providerExecuted
-                ? { ...value.providerMetadata, providerExecuted: true }
-                : value.providerMetadata,
-            }))
-
-            const parts = MessageV2.parts(ctx.assistantMessage.id)
-            const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
-
-            if (
-              recentParts.length !== DOOM_LOOP_THRESHOLD ||
-              !recentParts.every(
-                (part) =>
-                  part.type === "tool" &&
-                  part.tool === value.toolName &&
-                  part.state.status !== "pending" &&
-                  JSON.stringify(part.state.input) === JSON.stringify(value.input),
-              )
-            ) {
-              return
-            }
-
-            const agent = yield* agents.get(ctx.assistantMessage.agent)
-            yield* permission.ask({
-              permission: "doom_loop",
-              patterns: [value.toolName],
-              sessionID: ctx.assistantMessage.sessionID,
-              metadata: { tool: value.toolName, input: value.input },
-              always: [value.toolName],
-              ruleset: agent.permission,
-            })
-            return
-          }
-
-          case "tool-result": {
-            yield* completeToolCall(value.toolCallId, value.output)
-            return
-          }
-
-          case "tool-error": {
-            yield* failToolCall(value.toolCallId, value.error)
-            return
-          }
-
-          case "error": {
-            const handled = yield* Effect.all(
-              Object.keys(ctx.toolcalls).map((toolCallID) => failToolCall(toolCallID, value.error)),
-              { concurrency: "unbounded" },
-            )
-            if (handled.some(Boolean)) return
-            throw value.error
-          }
-
-          case "start-step":
-            if (!ctx.assistantMessage.summary && !ctx.snapshot) ctx.snapshot = yield* snapshot.track()
-            yield* session.updatePart({
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.sessionID,
-              snapshot: ctx.snapshot,
-              type: "step-start",
-            })
-            return
-
-          case "finish-step": {
-            const usage = Session.getUsage({
-              model: ctx.model,
-              usage: value.usage,
-              metadata: value.providerMetadata,
-            })
-            ctx.assistantMessage.finish = value.finishReason
-            ctx.assistantMessage.cost += usage.cost
-            ctx.assistantMessage.tokens = usage.tokens
-            yield* session.updatePart({
-              id: PartID.ascending(),
-              reason: value.finishReason,
-              snapshot: ctx.assistantMessage.summary ? undefined : yield* snapshot.track(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "step-finish",
-              tokens: usage.tokens,
-              cost: usage.cost,
-            })
-            yield* session.updateMessage(ctx.assistantMessage)
-            if (ctx.snapshot) {
-              const patch = yield* snapshot.patch(ctx.snapshot)
-              if (patch.files.length) {
-                yield* session.updatePart({
-                  id: PartID.ascending(),
-                  messageID: ctx.assistantMessage.id,
-                  sessionID: ctx.sessionID,
-                  type: "patch",
-                  hash: patch.hash,
-                  files: patch.files,
-                })
-              }
-              ctx.snapshot = undefined
-            }
-            yield* summary
-              .summarize({
-                sessionID: ctx.sessionID,
-                messageID: ctx.assistantMessage.parentID,
-              })
-              .pipe(Effect.ignore, Effect.forkIn(scope))
-            if (
-              !ctx.assistantMessage.summary &&
-              isOverflow({ cfg: yield* config.get(), tokens: usage.tokens, model: ctx.model })
-            ) {
-              ctx.needsCompaction = true
-            }
-            return
-          }
-
-          case "text-start":
-            ctx.currentText = {
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "text",
-              text: "",
-              time: { start: Date.now() },
-              metadata: value.providerMetadata,
-            }
-            yield* session.updatePart(ctx.currentText)
-            return
-
-          case "text-delta":
-            if (!ctx.currentText) return
-            ctx.currentText.text += value.text
-            if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
-            yield* session.updatePartDelta({
-              sessionID: ctx.currentText.sessionID,
-              messageID: ctx.currentText.messageID,
-              partID: ctx.currentText.id,
-              field: "text",
-              delta: value.text,
-            })
-            return
-
-          case "text-end":
-            if (!ctx.currentText) return
-            ctx.currentText.text = (yield* plugin.trigger(
-              "experimental.text.complete",
-              {
-                sessionID: ctx.sessionID,
-                messageID: ctx.assistantMessage.id,
-                partID: ctx.currentText.id,
-              },
-              { text: ctx.currentText.text },
-            )).text
-            {
-              const end = Date.now()
-              ctx.currentText.time = { start: ctx.currentText.time?.start ?? end, end }
-            }
-            if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
-            yield* session.updatePart(ctx.currentText)
-            ctx.currentText = undefined
-            return
-
-          case "finish":
-            return
-
-          default:
-            slog.info("unhandled", { event: value.type, value })
-            return
-        }
+      const eventHandler = new ProcessorEventHandler({
+        context: ctx,
+        session,
+        status,
+        snapshot,
+        agents,
+        permission,
+        summary,
+        config,
+        plugin,
+        scope,
+        log: slog,
+        updateToolCall,
+        completeToolCall,
+        failToolCall,
       })
-
+      const handleEvent = (value: Event) => eventHandler.handle(value)
       const cleanup = Effect.fn("SessionProcessor.cleanup")(function* () {
         if (ctx.snapshot) {
           const patch = yield* snapshot.patch(ctx.snapshot)
