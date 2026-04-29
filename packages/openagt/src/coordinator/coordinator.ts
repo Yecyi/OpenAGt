@@ -27,11 +27,7 @@ import {
   type BudgetOptions,
 } from "./budget-governance"
 import { effortProfileFor } from "./effort-profile"
-import {
-  outcomeForVerdict,
-  posteriorForVerdict,
-  reviewVerdictFromText,
-} from "./review-verdict"
+import { reviewVerdictFromText } from "./review-verdict"
 import {
   planWithRuntimeState,
   runtimeStateFor,
@@ -50,6 +46,7 @@ import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import { CoordinatorDispatchLoop } from "./dispatch-loop"
 import { CoordinatorTaskExecutor } from "./task-executor"
 import { CoordinatorRunFactory } from "./run-factory"
+import { CoordinatorOutcomeRecorder } from "./outcome-recorder"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -82,7 +79,6 @@ import {
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
   type CoordinatorRunID as CoordinatorRunIDType,
-  type CriticalReviewVerdict as CriticalReviewVerdictType,
   type IntentProfile as IntentProfileType,
   type ParallelExecutionPolicy as ParallelExecutionPolicyType,
   type ResourceLimit as ResourceLimitType,
@@ -170,6 +166,7 @@ export const layer = Layer.effect(
     const promptTemplates = yield* Effect.serviceOption(PromptTemplates.Service)
     const scope = yield* Scope.Scope
     const taskSessionFactory = new CoordinatorTaskSessionFactory(agents, sessions)
+    const outcomeRecorder = new CoordinatorOutcomeRecorder({ calibration, promptTemplates })
 
     const publish = (
       def: typeof Event.Created | typeof Event.Updated | typeof Event.Completed,
@@ -255,41 +252,6 @@ export const layer = Layer.effect(
       promptTemplateSelection,
     })
 
-    const recordPromptOutcome = (record: TaskRuntime.TaskRecord, success: boolean) => {
-      if (Option.isNone(promptTemplates)) return Effect.void
-      const role =
-        typeof record.metadata?.prompt_template_role === "string" ? record.metadata.prompt_template_role : undefined
-      const variant =
-        typeof record.metadata?.prompt_template_variant === "string"
-          ? record.metadata.prompt_template_variant
-          : undefined
-      if (!role || !variant) return Effect.void
-      return promptTemplates.value.recordOutcome({
-        role,
-        variant,
-        success,
-        task_id: record.task_id,
-        expert_id: typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : undefined,
-        duration_ms:
-          record.started_at && record.finished_at ? Math.max(0, record.finished_at - record.started_at) : undefined,
-      }).pipe(Effect.ignore)
-    }
-
-    const recordCalibrationOutcome = (record: TaskRuntime.TaskRecord, verdict: CriticalReviewVerdictType | undefined) => {
-      if (!verdict || Option.isNone(calibration)) return Effect.void
-      const expertID = typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : record.subagent_type
-      const workflow = typeof record.metadata?.workflow === "string" ? record.metadata.workflow : "general-operations"
-      return calibration.value
-        .record({
-          expert_id: expertID,
-          workflow,
-          prior: 0.5,
-          posterior: posteriorForVerdict(verdict),
-          outcome: outcomeForVerdict(verdict),
-        })
-        .pipe(Effect.ignore)
-    }
-
     const relevantTasks = Effect.fn("Coordinator.relevantTasks")(function* (run: CoordinatorRunType) {
       const all = yield* tasks.list(SessionID.make(run.sessionID))
       const taskIDs = new Set(run.task_ids.map((item) => SessionID.make(item)))
@@ -356,8 +318,8 @@ export const layer = Layer.effect(
       get: (id) => get(id),
       persistRuntimeState,
       dispatchReady: (id) => dispatchReady(id),
-      recordPromptOutcome,
-      recordCalibrationOutcome,
+      recordPromptOutcome: (record, success) => outcomeRecorder.recordPromptOutcome(record, success),
+      recordCalibrationOutcome: (record, verdict) => outcomeRecorder.recordCalibrationOutcome(record, verdict),
     })
     const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn(
       "Coordinator.executeTask",
