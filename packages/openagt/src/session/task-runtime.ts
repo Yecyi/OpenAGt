@@ -7,15 +7,11 @@ import { BusEvent } from "@/bus/bus-event"
 import { MessageV2 } from "./message-v2"
 import { BudgetTuning } from "@/agent/budget-tuning"
 import {
-  fullMessageText,
-  groupState,
-  normalizedUsage,
-  promptHash,
   resultFromRecord,
   scopeOverlap,
   scopedReadOverlap,
-  summarizeMessage,
 } from "./task-runtime-helpers"
+import { createTaskWriteOps } from "./task-runtime-write-ops"
 
 export const TaskStatus = z.enum(["pending", "running", "completed", "partial", "failed", "cancelled"])
 export type TaskStatus = z.infer<typeof TaskStatus>
@@ -203,265 +199,16 @@ export const layer = Layer.effect(
     const bus = yield* Bus.Service
     const cancelHandlers = new Map<string, () => void>()
 
-    const publishUpdate = Effect.fn("TaskRuntime.publishUpdate")(function* (record: TaskRecord) {
-      yield* bus.publish(Event.Updated, {
-        parent_session_id: record.parent_session_id,
-        result: resultFromRecord(record),
-      })
-    })
-
-    const refreshGroup = Effect.fn("TaskRuntime.refreshGroup")(function* (record: TaskRecord) {
-      if (!record.group_id) return
-      const tasks = yield* storage.list(["task", record.parent_session_id])
-      const records = yield* Effect.all(
-        tasks.map((key) =>
-          storage
-            .read<TaskRecord>(taskKey(record.parent_session_id, key[key.length - 1] as SessionID))
-            .pipe(Effect.option),
-        ),
-        { concurrency: BudgetTuning.concurrency.storageRead },
-      )
-      const all = records
-        .filter(Option.isSome)
-        .map((item) => item.value)
-        .filter((item) => item.group_id === record.group_id)
-      const group = yield* storage
-        .read<TaskGroup>(groupKey(record.parent_session_id, record.group_id))
-        .pipe(Effect.option)
-      if (Option.isNone(group)) return
-      yield* storage.write(groupKey(record.parent_session_id, record.group_id), {
-        ...group.value,
-        summary_state: groupState(all),
-      })
-    })
-
-    const create: Interface["create"] = Effect.fn("TaskRuntime.create")(function* (input) {
-      const now = Date.now()
-      const current = yield* storage.read<TaskRecord>(taskKey(input.parentSessionID, input.childSessionID)).pipe(Effect.option)
-      if (Option.isSome(current)) {
-        return yield* Effect.fail(new Error(`Task already exists: ${input.childSessionID}`))
-      }
-      const record: TaskRecord = {
-        task_id: input.childSessionID,
-        group_id: input.groupID,
-        parent_session_id: input.parentSessionID,
-        child_session_id: input.childSessionID,
-        status: "pending",
-        task_kind: input.taskKind,
-        subagent_type: input.subagentType,
-        description: input.description,
-        prompt_hash: promptHash(input.prompt),
-        depends_on: input.dependsOn,
-        write_scope: input.writeScope ?? [],
-        read_scope: input.readScope ?? [],
-        acceptance_checks: input.acceptanceChecks ?? [],
-        priority: input.priority ?? "normal",
-        origin: input.origin ?? "user",
-        metadata: input.metadata,
-        created_at: now,
-      }
-      const existing = yield* list(input.parentSessionID)
-      const known = new Set(existing.map((item) => item.task_id))
-      for (const dependency of input.dependsOn) {
-        if (!known.has(dependency)) {
-          return yield* Effect.fail(new Error(`Task dependency not found: ${dependency}`))
-        }
-      }
-      yield* storage.write(taskKey(input.parentSessionID, input.childSessionID), record)
-      if (input.groupID) {
-        const existing = yield* storage
-          .read<TaskGroup>(groupKey(input.parentSessionID, input.groupID))
-          .pipe(Effect.option)
-        if (Option.isNone(existing)) {
-          yield* storage.write(groupKey(input.parentSessionID, input.groupID), {
-            group_id: input.groupID,
-            parent_session_id: input.parentSessionID,
-            strategy: input.strategy ?? "parallel",
-            created_at: now,
-            summary_state: "pending",
-          } satisfies TaskGroup)
-        }
-      }
-      return record
-    })
-
     const get: Interface["get"] = Effect.fn("TaskRuntime.get")(function* (input) {
       return yield* storage.read<TaskRecord>(taskKey(input.parentSessionID, input.taskID)).pipe(Effect.option)
     })
 
-    const update = (
-      parentSessionID: SessionID,
-      taskID: SessionID,
-      fn: (draft: TaskRecord) => void,
-    ): Effect.Effect<TaskRecord, Error> =>
-      Effect.gen(function* () {
-        const before = yield* storage.read<TaskRecord>(taskKey(parentSessionID, taskID)).pipe(Effect.option)
-        const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), fn)
-        const beforeStatus = Option.isSome(before) ? before.value.status : undefined
-        const groupStateChanged =
-          Option.isNone(before) ||
-          before.value.group_id !== record.group_id ||
-          beforeStatus !== record.status
-        if (groupStateChanged) {
-          yield* refreshGroup(record)
-        }
-        yield* publishUpdate(record)
-        return record
-      })
-
-    const setRunning: Interface["setRunning"] = Effect.fn("TaskRuntime.setRunning")(
-      function* (taskID, parentSessionID) {
-        return yield* update(parentSessionID, taskID, (draft) => {
-          draft.status = "running"
-          draft.started_at = draft.started_at ?? Date.now()
-        })
-      },
-    )
-
-    const tryStartPending: Interface["tryStartPending"] = Effect.fn("TaskRuntime.tryStartPending")(
-      function* (taskID, parentSessionID) {
-        const started = { value: false }
-        const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), (draft) => {
-          if (draft.status !== "pending") return
-          started.value = true
-          draft.status = "running"
-          draft.started_at = draft.started_at ?? Date.now()
-        })
-        if (!started.value) return
-        yield* refreshGroup(record)
-        yield* publishUpdate(record)
-        return record
-      },
-    )
-
-    const registerCancelHandler: Interface["registerCancelHandler"] = Effect.fn("TaskRuntime.registerCancelHandler")(
-      function* (input) {
-        const key = cancelHandlerKey(input.parentSessionID, input.taskID)
-        return yield* Effect.sync(() => {
-          cancelHandlers.set(key, input.cancel)
-          return () => {
-            cancelHandlers.delete(key)
-          }
-        })
-      },
-    )
-
-    const complete: Interface["complete"] = Effect.fn("TaskRuntime.complete")(function* (input) {
-      return yield* update(input.parentSessionID, input.taskID, (draft) => {
-        const text = input.output ?? input.result?.parts.findLast((item) => item.type === "text")?.text
-        draft.status = "completed"
-        draft.finished_at = Date.now()
-        draft.result_summary = summarizeMessage(text)
-        draft.error_summary = undefined
-        draft.metadata = {
-          ...(draft.metadata ?? {}),
-          ...(input.metadata ?? {}),
-          result_text: fullMessageText(text),
-        }
-        if (draft.metadata?.output_schema === "revise" || draft.metadata?.role === "reviser") {
-          draft.metadata = {
-            ...draft.metadata,
-            review_text: fullMessageText(text),
-          }
-        }
-        if (input.result?.info.role === "assistant") {
-          const usage = normalizedUsage(input.result.info)
-          draft.usage = {
-            ...usage,
-            durationMs:
-              draft.started_at && input.result.info.time.created
-                ? Math.max(0, input.result.info.time.created - draft.started_at)
-                : undefined,
-          }
-        }
-      })
-    })
-
-    const partial: Interface["partial"] = Effect.fn("TaskRuntime.partial")(function* (input) {
-      return yield* update(input.parentSessionID, input.taskID, (draft) => {
-        const text = input.output ?? input.result?.parts.findLast((item) => item.type === "text")?.text
-        draft.status = "partial"
-        draft.finished_at = Date.now()
-        draft.result_summary = summarizeMessage(text)
-        draft.error_summary = undefined
-        draft.stop_reason = input.reason
-        draft.metadata = {
-          ...(draft.metadata ?? {}),
-          partial: true,
-          retryable: input.retryable ?? true,
-          limit_reason: input.reason,
-          partial_summary: fullMessageText(text),
-          result_text: fullMessageText(text),
-          remaining_scope: input.remainingScope ?? draft.acceptance_checks ?? draft.read_scope ?? draft.write_scope,
-        }
-        if (input.result?.info.role === "assistant") {
-          const usage = normalizedUsage(input.result.info)
-          draft.usage = {
-            ...usage,
-            durationMs:
-              draft.started_at && input.result.info.time.created
-                ? Math.max(0, input.result.info.time.created - draft.started_at)
-                : undefined,
-          }
-        }
-      })
-    })
-
-    const fail: Interface["fail"] = Effect.fn("TaskRuntime.fail")(function* (input) {
-      return yield* update(input.parentSessionID, input.taskID, (draft) => {
-        draft.status = "failed"
-        draft.finished_at = Date.now()
-        draft.error_summary = input.error.slice(0, 400)
-        draft.metadata = {
-          ...(draft.metadata ?? {}),
-          ...(input.metadata ?? {}),
-        }
-      })
-    })
-
-    const cancel: Interface["cancel"] = Effect.fn("TaskRuntime.cancel")(function* (input) {
-      const record = yield* update(input.parentSessionID, input.taskID, (draft) => {
-        draft.status = "cancelled"
-        draft.finished_at = Date.now()
-        draft.stop_reason = input.reason
-        draft.error_summary = input.reason?.slice(0, 400) ?? "Task cancelled"
-      })
-      yield* Effect.sync(() => {
-        const key = cancelHandlerKey(input.parentSessionID, input.taskID)
-        const handler = cancelHandlers.get(key)
-        cancelHandlers.delete(key)
-        handler?.()
-      })
-      return record
-    })
-
-    const retry: Interface["retry"] = Effect.fn("TaskRuntime.retry")(function* (input) {
-      const current = yield* get({ taskID: input.taskID, parentSessionID: input.parentSessionID })
-      if (Option.isNone(current)) return yield* Effect.fail(new Error(`Task not found: ${input.taskID}`))
-      if (current.value.status !== "failed" && current.value.status !== "cancelled" && current.value.status !== "partial") {
-        return yield* Effect.fail(new Error(`Task cannot be retried from state: ${current.value.status}`))
-      }
-      return yield* update(input.parentSessionID, input.taskID, (draft) => {
-        draft.status = "pending"
-        draft.started_at = undefined
-        draft.finished_at = undefined
-        draft.result_summary = undefined
-        draft.error_summary = undefined
-        draft.stop_reason = undefined
-        draft.usage = undefined
-        if (draft.metadata) {
-          draft.metadata = {
-            ...draft.metadata,
-            partial: undefined,
-            retryable: undefined,
-            limit_reason: undefined,
-            partial_summary: undefined,
-            result_text: undefined,
-            remaining_scope: undefined,
-            review_text: undefined,
-          }
-        }
-      })
+    const writeOps = createTaskWriteOps({
+      storage,
+      bus,
+      cancelHandlers,
+      TaskUpdated: Event.Updated,
+      get,
     })
 
     const list: Interface["list"] = Effect.fn("TaskRuntime.list")(function* (parentSessionID) {
@@ -537,19 +284,19 @@ export const layer = Layer.effect(
     })
 
     return Service.of({
-      create,
-      setRunning,
-      tryStartPending,
-      registerCancelHandler,
-      complete,
-      partial,
-      fail,
-      cancel,
+      create: writeOps.create,
+      setRunning: writeOps.setRunning,
+      tryStartPending: writeOps.tryStartPending,
+      registerCancelHandler: writeOps.registerCancelHandler,
+      complete: writeOps.complete,
+      partial: writeOps.partial,
+      fail: writeOps.fail,
+      cancel: writeOps.cancel,
+      retry: writeOps.retry,
       get,
       list,
       wait,
       canRun,
-      retry,
     })
   }),
 )
