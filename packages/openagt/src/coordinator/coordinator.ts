@@ -18,10 +18,8 @@ import { ThreeLayerMemory } from "@/personal/three-layer"
 import { ExpertRegistry } from "./expert-registry"
 import { BudgetTuning } from "@/agent/budget-tuning"
 import {
-  addResourceLimit,
   budgetProfileFor,
   longTaskProfileFor,
-  scaleResourceLimit,
   type BudgetOptions,
 } from "./budget-governance"
 import { effortProfileFor } from "./effort-profile"
@@ -45,6 +43,7 @@ import { CoordinatorTaskExecutor } from "./task-executor"
 import { CoordinatorRunFactory } from "./run-factory"
 import { CoordinatorOutcomeRecorder } from "./outcome-recorder"
 import { CoordinatorRunStore } from "./run-store"
+import { CoordinatorRunMutations } from "./run-mutations"
 import { CoordinatorSubscriptionManager } from "./subscription-manager"
 import {
   CoordinatorNode,
@@ -59,12 +58,9 @@ import {
   RevisePoint,
   IntentProfile,
   TodoTimeline,
-  BudgetProfile,
-  BudgetState,
   ProgressSnapshot,
   CheckpointMemorySummary,
   ContinuationRequest,
-  ResourceLimit,
   type CoordinatorNode as CoordinatorNodeType,
   type CoordinatorNodeInput,
   type AutoContinuePolicy as AutoContinuePolicyType,
@@ -437,221 +433,21 @@ export const layer = Layer.effect(
       return summary
     })
 
-    const activateRun = Effect.fn("Coordinator.activateRun")(function* (id: CoordinatorRunIDType) {
-      const runOpt = yield* get(id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled")
-        return runOpt.value
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .update(CoordinatorRunTable)
-            .set({
-              state: "active",
-              summary: "Coordinator run active",
-              time_updated: now(),
-              time_finished: null,
-            })
-            .where(eq(CoordinatorRunTable.id, id))
-            .run(),
-        ),
-      )
-      const updated = yield* runStore.readAfterUpdate(id)
-      yield* publish(Event.Updated, updated)
-      return updated
+    const runMutations = new CoordinatorRunMutations({
+      tasks,
+      runStore,
+      now,
+      ensureSubscribed,
+      get,
+      relevantTasks,
+      dispatchReady: (id) => dispatchReady(id).pipe(Effect.asVoid),
+      publishUpdated: (run) => publish(Event.Updated, run).pipe(Effect.asVoid),
     })
-
-    const approve: Interface["approve"] = Effect.fn("Coordinator.approve")(function* (id) {
-      yield* ensureSubscribed()
-      const current = yield* get(id)
-      if (Option.isNone(current)) throw new Error(`Coordinator run not found: ${id}`)
-      if (current.value.state !== "awaiting_approval" && current.value.state !== "planned") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot be approved from state: ${current.value.state}`))
-      }
-      const activated = yield* activateRun(id)
-      if (activated.state === "active") yield* dispatchReady(id)
-      const runOpt = yield* get(id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      return runOpt.value
-    })
-
-    const cancel: Interface["cancel"] = Effect.fn("Coordinator.cancel")(function* (id) {
-      yield* ensureSubscribed()
-      const runOpt = yield* get(id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot be cancelled from state: ${runOpt.value.state}`))
-      }
-      const taskList = yield* relevantTasks(runOpt.value)
-      const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
-      const timestamp = now()
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .update(CoordinatorRunTable)
-            .set({
-              state: "cancelled",
-              summary: "Coordinator run cancelled",
-              time_updated: timestamp,
-              time_finished: timestamp,
-            })
-            .where(eq(CoordinatorRunTable.id, id))
-            .run(),
-        ),
-      )
-      yield* Effect.forEach(
-        taskList.filter((item) => item.status === "pending" || item.status === "running"),
-        (item) =>
-          Effect.gen(function* () {
-            if (item.status === "running" && Option.isSome(prompt)) {
-              yield* prompt.value.cancel(item.child_session_id).pipe(Effect.ignore)
-            }
-            yield* tasks.cancel({
-              taskID: item.task_id,
-              parentSessionID: item.parent_session_id,
-              reason: "Coordinator run cancelled",
-            })
-          }),
-        {
-          concurrency: BudgetTuning.concurrency.storageRead,
-        },
-      )
-      const updated = yield* runStore.readAfterUpdate(id)
-      yield* publish(Event.Updated, updated)
-      return updated
-    })
-
-    const retry: Interface["retry"] = Effect.fn("Coordinator.retry")(function* (input) {
-      yield* ensureSubscribed()
-      const runOpt = yield* get(input.id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${input.id}`)
-      if (runOpt.value.state === "active" || runOpt.value.state === "awaiting_approval") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot be retried from state: ${runOpt.value.state}`))
-      }
-      const taskList = yield* relevantTasks(runOpt.value)
-      const retryable = taskList
-        .filter((item) => item.status === "failed" || item.status === "cancelled" || item.status === "partial")
-        .filter((item) => {
-          if (input.taskID) return item.task_id === input.taskID
-          if (input.nodeID) return item.metadata?.coordinator_node_id === input.nodeID
-          return true
-        })
-      if (retryable.length === 0) return yield* Effect.fail(new Error("No retryable coordinator tasks matched"))
-      yield* Effect.forEach(
-        retryable,
-        (item) =>
-          tasks.retry({
-            taskID: item.task_id,
-            parentSessionID: item.parent_session_id,
-          }),
-        {
-          concurrency: BudgetTuning.concurrency.storageRead,
-          discard: true,
-        },
-      )
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .update(CoordinatorRunTable)
-            .set({
-              state: "active",
-              summary: "Coordinator run retrying",
-              time_updated: now(),
-              time_finished: null,
-            })
-            .where(eq(CoordinatorRunTable.id, input.id))
-            .run(),
-        ),
-      )
-      const updated = yield* runStore.readAfterUpdate(input.id)
-      yield* publish(Event.Updated, updated)
-      yield* dispatchReady(input.id).pipe(Effect.ignore)
-      const refreshed = yield* get(input.id)
-      if (Option.isNone(refreshed)) throw new Error(`Coordinator run not found: ${input.id}`)
-      return refreshed.value
-    })
-
-    const continueRun: Interface["continueRun"] = Effect.fn("Coordinator.continueRun")(function* (input) {
-      yield* ensureSubscribed()
-      const runOpt = yield* get(input.id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${input.id}`)
-      if (runOpt.value.state !== "blocked" && runOpt.value.state !== "active") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot continue from state: ${runOpt.value.state}`))
-      }
-      const taskList = yield* relevantTasks(runOpt.value)
-      const runtime = runtimeStateFor(runOpt.value, taskList)
-      const requested = input.budgetDelta ?? runtime.continuation_request?.requested_budget_delta
-      if (!requested) {
-        return yield* Effect.fail(
-          new Error("Coordinator continue requires an active continuation request or explicit budgetDelta"),
-        )
-      }
-      const delta = requested
-      const fullDelta = ResourceLimit.parse({
-        max_rounds: delta.max_rounds ?? 0,
-        max_model_calls: delta.max_model_calls ?? 0,
-        max_tool_calls: delta.max_tool_calls ?? 0,
-        max_subagents: delta.max_subagents ?? 0,
-        max_wallclock_ms: delta.max_wallclock_ms ?? 0,
-        max_estimated_tokens: delta.max_estimated_tokens ?? 0,
-      })
-      const budget_profile = BudgetProfile.parse({
-        ...runOpt.value.plan.budget_profile,
-        auto_continue: input.autoContinue ?? runOpt.value.plan.budget_profile.auto_continue,
-        mission_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.mission_ceiling, delta),
-        absolute_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.absolute_ceiling, delta),
-        phase_ceiling: addResourceLimit(
-          runOpt.value.plan.budget_profile.phase_ceiling,
-          scaleResourceLimit(fullDelta, 0.5),
-        ),
-        checkpoint_reserve: addResourceLimit(
-          runOpt.value.plan.budget_profile.checkpoint_reserve,
-          scaleResourceLimit(fullDelta, 0.1),
-        ),
-      })
-      const plan = CoordinatorPlan.parse({
-        ...planWithRuntimeState(runOpt.value.plan, runtime),
-        budget_profile,
-        budget_state: BudgetState.parse({}),
-        continuation_request: undefined,
-      })
-      yield* Effect.sync(() =>
-        Database.use((db) =>
-          db
-            .update(CoordinatorRunTable)
-            .set({
-              state: "active",
-              summary: "Coordinator run continued with approved budget",
-              plan,
-              time_updated: now(),
-              time_finished: null,
-            })
-            .where(eq(CoordinatorRunTable.id, input.id))
-            .run(),
-        ),
-      )
-      const updated = yield* runStore.readAfterUpdate(input.id)
-      yield* publish(Event.Updated, updated)
-      yield* dispatchReady(input.id).pipe(Effect.ignore)
-      const refreshed = yield* get(input.id)
-      if (Option.isNone(refreshed)) throw new Error(`Coordinator run not found: ${input.id}`)
-      return refreshed.value
-    })
-
-    const resume: Interface["resume"] = Effect.fn("Coordinator.resume")(function* (id) {
-      yield* ensureSubscribed()
-      const current = yield* get(id)
-      if (Option.isNone(current)) throw new Error(`Coordinator run not found: ${id}`)
-      if (current.value.state !== "blocked" && current.value.state !== "active") {
-        return yield* Effect.fail(new Error(`Coordinator run cannot be resumed from state: ${current.value.state}`))
-      }
-      const activated = yield* activateRun(id)
-      if (activated.state !== "active") return activated
-      yield* dispatchReady(id).pipe(Effect.ignore)
-      const runOpt = yield* get(id)
-      if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
-      return runOpt.value
-    })
+    const approve: Interface["approve"] = (id) => runMutations.approve(id)
+    const cancel: Interface["cancel"] = (id) => runMutations.cancel(id)
+    const retry: Interface["retry"] = (input) => runMutations.retry(input)
+    const continueRun: Interface["continueRun"] = (input) => runMutations.continueRun(input)
+    const resume: Interface["resume"] = (id) => runMutations.resume(id)
 
     return Service.of({
       settleIntent,
