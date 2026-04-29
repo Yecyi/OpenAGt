@@ -7,10 +7,10 @@ import { Log } from "../util"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { McpAuth } from "./auth"
 import { Bus } from "@/bus"
-import { Effect, Layer, Context, Stream } from "effect"
+import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect"
 import { InstanceState } from "@/effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
+import { ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { checkToolsQuality } from "./tool-quality"
 import { fetchNamedItemsFromClient, listToolDefinitions } from "./client-listing"
@@ -21,6 +21,7 @@ import { McpAuthFlowController, type AuthStatus } from "./auth-flow-controller"
 import { McpConnectionFactory } from "./connection-factory"
 import type { Status } from "./schema"
 import { isMcpConfigured, type Interface, type MCPClient, type State } from "./contracts"
+import { mcpProcessDescendants } from "./process-descendants"
 export { BrowserOpenFailed, Failed, ToolsChanged } from "./events"
 export { Resource, Status } from "./schema"
 export type { AuthStatus } from "./auth-flow-controller"
@@ -66,29 +67,7 @@ export const layer = Layer.effect(
     const create = Effect.fn("MCP.create")((key: string, mcp: ConfigMCP.Info) => connectionFactory.create(key, mcp))
     const cfgSvc = yield* Config.Service
 
-    const descendants = Effect.fnUntraced(
-      function* (pid: number) {
-        if (process.platform === "win32") return [] as number[]
-        const pids: number[] = []
-        const queue = [pid]
-        while (queue.length > 0) {
-          const current = queue.shift()!
-          const handle = yield* spawner.spawn(ChildProcess.make("pgrep", ["-P", String(current)], { stdin: "ignore" }))
-          const text = yield* Stream.mkString(Stream.decodeText(handle.stdout))
-          yield* handle.exitCode
-          for (const tok of text.split("\n")) {
-            const cpid = parseInt(tok, 10)
-            if (!isNaN(cpid) && !pids.includes(cpid)) {
-              pids.push(cpid)
-              queue.push(cpid)
-            }
-          }
-        }
-        return pids
-      },
-      Effect.scoped,
-      Effect.catch(() => Effect.succeed([] as number[])),
-    )
+    const descendants = (pid: number) => mcpProcessDescendants(spawner, pid)
 
     function watch(s: State, name: string, client: MCPClient, bridge: EffectBridge.Shape, timeout?: number) {
       // Note: This handler runs asynchronously outside the Effect context.
