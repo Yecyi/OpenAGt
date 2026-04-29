@@ -3,7 +3,6 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect"
 import { attachWith } from "@/effect/run-service"
-import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
@@ -11,7 +10,7 @@ import { TaskRuntime } from "@/session/task-runtime"
 import { ModelID, ProviderID } from "@/provider/schema"
 import { Provider } from "@/provider"
 import { Database, desc, eq } from "@/storage"
-import { Cause, Context, Effect, Layer, Option, Scope } from "effect"
+import { Context, Effect, Layer, Option, Scope } from "effect"
 import z from "zod"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { buildDebate, buildDegraded } from "./mpacr"
@@ -29,24 +28,17 @@ import {
 } from "./budget-governance"
 import { effortProfileFor } from "./effort-profile"
 import {
-  isMpacrCriticTask,
-  isMpacrReviewTask,
-  mpacrQuorumEscalation,
-  mpacrVerdictMetadata,
   outcomeForVerdict,
   posteriorForVerdict,
-  reviewFailureMessage,
-  reviewVerdictForMessage,
   reviewVerdictFromText,
-  skippedReviewVerdict,
 } from "./review-verdict"
 import {
   planWithRuntimeState,
   runtimeStateFor,
 } from "./runtime-state"
 import { settleIntentProfile } from "./intent-profile"
-import { mpacrCriticTimeoutMs, nodeIDForTask, taskModel, taskVariant } from "./task-record"
-import { buildTaskPrompt, messageText, promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
+import { nodeIDForTask } from "./task-record"
+import { promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
 import { checkpointNode, node, plannerNode, reviseNode, withExpertHarness } from "./plan-node-factory"
 import { parallelResearchStage, parallelVerificationStage, researcher } from "./plan-stages"
 import { expandVerifyNodes, orderPlan, validatePlan } from "./plan-ordering"
@@ -56,6 +48,7 @@ import { buildCoordinatorSummary } from "./summary"
 import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import { CoordinatorDispatchLoop } from "./dispatch-loop"
+import { CoordinatorTaskExecutor } from "./task-executor"
 import {
   CoordinatorNode,
   CoordinatorPlan,
@@ -289,23 +282,6 @@ export const layer = Layer.effect(
         .pipe(Effect.ignore)
     }
 
-    const completeMpacrCriticAsSkipped = (
-      record: TaskRuntime.TaskRecord,
-      reason: string,
-    ): Effect.Effect<void, Error> =>
-      Effect.gen(function* () {
-        const completed = yield* tasks.complete({
-          taskID: record.task_id,
-          parentSessionID: record.parent_session_id,
-          output: JSON.stringify(skippedReviewVerdict(reason)),
-          metadata: {
-            mpacr_skipped: true,
-            mpacr_skip_reason: reason,
-          },
-        })
-        yield* recordPromptOutcome(completed, false)
-      })
-
     const relevantTasks = Effect.fn("Coordinator.relevantTasks")(function* (run: CoordinatorRunType) {
       const all = yield* tasks.list(SessionID.make(run.sessionID))
       const taskIDs = new Set(run.task_ids.map((item) => SessionID.make(item)))
@@ -366,163 +342,18 @@ export const layer = Layer.effect(
       return updated
     })
 
+    const taskExecutor = new CoordinatorTaskExecutor({
+      tasks,
+      getPrompt: () => Effect.serviceOption(SessionPrompt.Service),
+      get: (id) => get(id),
+      persistRuntimeState,
+      dispatchReady: (id) => dispatchReady(id),
+      recordPromptOutcome,
+      recordCalibrationOutcome,
+    })
     const executeTask: (record: TaskRuntime.TaskRecord) => Effect.Effect<void, Error> = Effect.fn(
       "Coordinator.executeTask",
-    )(function* (record) {
-      const prompt = yield* Effect.serviceOption(SessionPrompt.Service)
-      const continueGroup = () =>
-        record.group_id
-          ? Effect.gen(function* () {
-              const runOpt = yield* get(record.group_id as CoordinatorRunIDType)
-              if (Option.isSome(runOpt)) yield* persistRuntimeState(runOpt.value).pipe(Effect.ignore)
-              yield* dispatchReady(record.group_id as CoordinatorRunIDType).pipe(Effect.ignore)
-            })
-          : Effect.void
-      const started = yield* tasks.tryStartPending(record.task_id, record.parent_session_id)
-      if (!started) return
-      const dependencies = (yield* tasks.list(started.parent_session_id)).filter((item) =>
-        started.depends_on.includes(item.task_id),
-      )
-      const quorumEscalation = mpacrQuorumEscalation(started, dependencies)
-      if (quorumEscalation) {
-        const failed = yield* tasks.fail({
-          taskID: started.task_id,
-          parentSessionID: started.parent_session_id,
-          error: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
-          metadata: mpacrVerdictMetadata(quorumEscalation.verdict, {
-            mpacr_quorum_escalated: true,
-            mpacr_quorum_required: quorumEscalation.quorum,
-            mpacr_quorum_substantive_count: quorumEscalation.substantive,
-            mpacr_missing_critic_node_ids: quorumEscalation.missing,
-          }),
-        })
-        yield* recordCalibrationOutcome(failed, quorumEscalation.verdict)
-        yield* recordPromptOutcome(failed, false)
-        yield* continueGroup()
-        return
-      }
-      if (Option.isNone(prompt)) {
-        if (isMpacrCriticTask(started.metadata)) {
-          yield* completeMpacrCriticAsSkipped(
-            started,
-            "Coordinator executor unavailable: SessionPrompt.Service is not available",
-          )
-          yield* continueGroup()
-          return
-        }
-        const failed = yield* tasks.fail({
-          taskID: started.task_id,
-          parentSessionID: started.parent_session_id,
-          error: "Coordinator executor unavailable: SessionPrompt.Service is not available",
-        })
-        yield* recordPromptOutcome(failed, false)
-        yield* continueGroup()
-        return
-      }
-      const basePrompt = buildTaskPrompt(started, dependencies)
-      const promptOnce = (text: string) => {
-        const effect = prompt.value.prompt({
-          sessionID: started.child_session_id,
-          agent: started.subagent_type,
-          model: taskModel(started.metadata ?? {}),
-          variant: taskVariant(started.metadata ?? {}),
-          parts: [
-            {
-              type: "text",
-              text,
-            },
-          ],
-        })
-        if (!isMpacrCriticTask(started.metadata)) return effect
-        const timeoutMs = mpacrCriticTimeoutMs(started.metadata)
-        return effect.pipe(
-          Effect.timeout(`${timeoutMs} millis`),
-          Effect.catchTag("TimeoutError", () =>
-            Effect.fail(new Error(`MPACR critic timed out after ${timeoutMs}ms`)),
-          ),
-        )
-      }
-      yield* promptOnce(basePrompt)
-        .pipe(
-          Effect.tap((message: MessageV2.WithParts) =>
-            Effect.gen(function* () {
-              const firstReview = reviewVerdictForMessage(started.metadata, messageText(message), basePrompt, 0)
-              const final = yield* firstReview.retryPrompt
-                ? promptOnce(firstReview.retryPrompt).pipe(
-                    Effect.map((retryMessage) => ({
-                      message: retryMessage,
-                      verdict: reviewVerdictForMessage(started.metadata, messageText(retryMessage), basePrompt, 1)
-                        .verdict,
-                    })),
-                  )
-                : Effect.succeed({ message, verdict: firstReview.verdict })
-              const reviewFailure = isMpacrCriticTask(started.metadata)
-                ? undefined
-                : reviewFailureMessage(final.verdict)
-              yield* recordCalibrationOutcome(started, final.verdict)
-              if (reviewFailure) {
-                const failed = yield* tasks.fail({
-                  taskID: started.task_id,
-                  parentSessionID: started.parent_session_id,
-                  error: reviewFailure,
-                  metadata:
-                    final.verdict && isMpacrReviewTask(started.metadata)
-                      ? mpacrVerdictMetadata(final.verdict)
-                      : undefined,
-                })
-                yield* recordPromptOutcome(failed, false)
-                return
-              }
-              if (isMpacrCriticTask(started.metadata) && final.verdict?.verdict === "skipped") {
-                const completed = yield* tasks.complete({
-                  taskID: started.task_id,
-                  parentSessionID: started.parent_session_id,
-                  output: JSON.stringify(final.verdict),
-                  metadata: {
-                    mpacr_skipped: true,
-                    mpacr_skip_reason: final.verdict.unsupported_claims.join("; ") || "MPACR critic skipped",
-                  },
-                })
-                yield* recordPromptOutcome(completed, false)
-                return
-              }
-              const completed = yield* tasks.complete(
-                final.verdict && isMpacrReviewTask(started.metadata)
-                  ? {
-                      taskID: started.task_id,
-                      parentSessionID: started.parent_session_id,
-                      output: JSON.stringify(final.verdict),
-                      metadata: mpacrVerdictMetadata(final.verdict),
-                    }
-                  : {
-                      taskID: started.task_id,
-                      parentSessionID: started.parent_session_id,
-                      result: final.message,
-                    },
-              )
-              yield* recordPromptOutcome(completed, true)
-            }),
-          ),
-          Effect.catchCause((cause) => {
-            const error = Cause.squash(cause)
-            return Effect.gen(function* () {
-              const reason = error instanceof Error ? error.message : String(error)
-              if (isMpacrCriticTask(started.metadata)) {
-                yield* completeMpacrCriticAsSkipped(started, reason)
-                return
-              }
-              const failed = yield* tasks.fail({
-                taskID: started.task_id,
-                parentSessionID: started.parent_session_id,
-                error: reason,
-              })
-              yield* recordPromptOutcome(failed, false)
-            })
-          }),
-          Effect.tap(continueGroup),
-        )
-      return
-    })
+    )((record) => taskExecutor.execute(record))
 
     const dispatchLoop = new CoordinatorDispatchLoop({
       tasks,
