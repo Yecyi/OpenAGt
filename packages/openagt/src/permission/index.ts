@@ -1,131 +1,17 @@
 import { Bus } from "@/bus"
-import { BusEvent } from "@/bus/bus-event"
-import { ConfigPermission } from "@/config/permission"
 import { InstanceState } from "@/effect"
-import { ProjectID } from "@/project/schema"
-import { MessageID, SessionID } from "@/session/schema"
 import { PermissionTable } from "@/session/session.sql"
 import { Database, eq } from "@/storage"
-import { zod } from "@/util/effect-zod"
-import { Log } from "@/util"
-import { withStatics } from "@/util/schema"
-import { Wildcard } from "@/util"
-import { Deferred, Effect, Layer, Schema, Context } from "effect"
-import os from "os"
+import { Log, Wildcard } from "@/util"
+import { Context, Deferred, Effect, Layer, Schema } from "effect"
+import { truncateForAudit, writeAuditLog } from "./audit"
+import { CorrectedError, DeniedError, RejectedError, Request } from "./contracts"
+import type { AskInput, Error, ReplyInput, Rule, Ruleset } from "./contracts"
+import { Event } from "./events"
 import { evaluate as evalRule } from "./evaluate"
 import { PermissionID } from "./schema"
 
 const log = Log.create({ service: "permission" })
-
-export const Action = Schema.Literals(["allow", "deny", "ask"])
-  .annotate({ identifier: "PermissionAction" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type Action = Schema.Schema.Type<typeof Action>
-
-export class Rule extends Schema.Class<Rule>("PermissionRule")({
-  permission: Schema.String,
-  pattern: Schema.String,
-  action: Action,
-}) {
-  static readonly zod = zod(this)
-}
-
-export const Ruleset = Schema.mutable(Schema.Array(Rule))
-  .annotate({ identifier: "PermissionRuleset" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type Ruleset = Schema.Schema.Type<typeof Ruleset>
-
-export class Request extends Schema.Class<Request>("PermissionRequest")({
-  id: PermissionID,
-  sessionID: SessionID,
-  permission: Schema.String,
-  patterns: Schema.Array(Schema.String),
-  metadata: Schema.Record(Schema.String, Schema.Unknown),
-  always: Schema.Array(Schema.String),
-  tool: Schema.optional(
-    Schema.Struct({
-      messageID: MessageID,
-      callID: Schema.String,
-    }),
-  ),
-}) {
-  static readonly zod = zod(this)
-}
-
-export const Reply = Schema.Literals(["once", "always", "reject"]).pipe(withStatics((s) => ({ zod: zod(s) })))
-export type Reply = Schema.Schema.Type<typeof Reply>
-
-const reply = {
-  reply: Reply,
-  message: Schema.optional(Schema.String),
-}
-
-export const ReplyBody = Schema.Struct(reply)
-  .annotate({ identifier: "PermissionReplyBody" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type ReplyBody = Schema.Schema.Type<typeof ReplyBody>
-
-export class Approval extends Schema.Class<Approval>("PermissionApproval")({
-  projectID: ProjectID,
-  patterns: Schema.Array(Schema.String),
-}) {
-  static readonly zod = zod(this)
-}
-
-export const Event = {
-  Asked: BusEvent.define("permission.asked", Request.zod),
-  Replied: BusEvent.define(
-    "permission.replied",
-    zod(
-      Schema.Struct({
-        sessionID: SessionID,
-        requestID: PermissionID,
-        reply: Reply,
-      }),
-    ),
-  ),
-}
-
-export class RejectedError extends Schema.TaggedErrorClass<RejectedError>()("PermissionRejectedError", {}) {
-  override get message() {
-    return "The user rejected permission to use this specific tool call."
-  }
-}
-
-export class CorrectedError extends Schema.TaggedErrorClass<CorrectedError>()("PermissionCorrectedError", {
-  feedback: Schema.String,
-}) {
-  override get message() {
-    return `The user rejected permission to use this specific tool call with the following feedback: ${this.feedback}`
-  }
-}
-
-export class DeniedError extends Schema.TaggedErrorClass<DeniedError>()("PermissionDeniedError", {
-  ruleset: Schema.Any,
-}) {
-  override get message() {
-    return `The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules ${JSON.stringify(this.ruleset)}`
-  }
-}
-
-export type Error = DeniedError | RejectedError | CorrectedError
-
-export const AskInput = Schema.Struct({
-  ...Request.fields,
-  id: Schema.optional(PermissionID),
-  ruleset: Ruleset,
-})
-  .annotate({ identifier: "PermissionAskInput" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type AskInput = Schema.Schema.Type<typeof AskInput>
-
-export const ReplyInput = Schema.Struct({
-  requestID: PermissionID,
-  ...reply,
-})
-  .annotate({ identifier: "PermissionReplyInput" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type ReplyInput = Schema.Schema.Type<typeof ReplyInput>
 
 export interface Interface {
   readonly ask: (input: AskInput) => Effect.Effect<void, Error>
@@ -248,14 +134,12 @@ export const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
-      // B-P1-3: Record "always" approvals to persistent audit log
       for (const pattern of existing.info.always) {
         approved.push({
           permission: existing.info.permission,
           pattern,
           action: "allow",
         })
-        // Record to audit log
         yield* Effect.promise(() =>
           writeAuditLog({
             timestamp: Date.now(),
@@ -294,131 +178,9 @@ export const layer = Layer.effect(
   }),
 )
 
-function expand(pattern: string): string {
-  if (pattern.startsWith("~/")) return os.homedir() + pattern.slice(1)
-  if (pattern === "~") return os.homedir()
-  if (pattern.startsWith("$HOME/")) return os.homedir() + pattern.slice(5)
-  if (pattern.startsWith("$HOME")) return os.homedir() + pattern.slice(5)
-  return pattern
-}
-
-export function fromConfig(permission: ConfigPermission.Info) {
-  const ruleset: Ruleset = []
-  for (const [key, value] of Object.entries(permission)) {
-    if (typeof value === "string") {
-      // B-P1-2: Validate bare "*" patterns - reject in strict mode, warn in warn mode
-      const validation = validatePattern("*", "warn")
-      if (!validation.valid) {
-        log.warn("permission_pattern_validation", { pattern: "*", warning: validation.message })
-      }
-      ruleset.push({ permission: key, action: value, pattern: "*" })
-      continue
-    }
-    for (const [pattern, action] of Object.entries(value)) {
-      const validation = validatePattern(pattern, "warn")
-      if (!validation.valid) {
-        log.warn("permission_pattern_validation", { pattern, warning: validation.message })
-      }
-      ruleset.push({ permission: key, pattern: expand(pattern), action })
-    }
-  }
-  return ruleset
-}
-
-/**
- * B-P1-2: Validate permission patterns for security
- * Reject patterns that are bare `*` or contain `**` without anchors.
- * Require ≥1 literal alphanum before the first `*`.
- */
-function validatePattern(pattern: string, strictMode: "strict" | "warn"): { valid: boolean; message?: string } {
-  // Bare "*" is dangerous
-  if (pattern === "*") {
-    return {
-      valid: false,
-      message: "Bare '*' pattern is too permissive. Use specific patterns like 'npm *' or 'git *'.",
-    }
-  }
-
-  // Pattern with ** but no anchors is dangerous
-  if (pattern.includes("**") && !pattern.startsWith("**") && !pattern.endsWith("**")) {
-    return { valid: false, message: "Pattern '**' must be anchored (start or end of pattern)." }
-  }
-
-  // Check for literal alphanum before first *
-  const starIndex = pattern.indexOf("*")
-  if (starIndex > 0) {
-    const beforeStar = pattern.slice(0, starIndex)
-    // Require at least one literal alphanumeric character before the first *
-    if (!/[a-zA-Z0-9]/.test(beforeStar)) {
-      return {
-        valid: false,
-        message: "Pattern must have at least one literal character before '*'. For example: 'npm *' not '*install'.",
-      }
-    }
-  }
-
-  // Pattern ending with ** without proper context
-  if (pattern.endsWith("**") && !pattern.endsWith("/**")) {
-    return {
-      valid: false,
-      message: "Pattern ending with '**' should be '/**' for directory matching.",
-    }
-  }
-
-  return { valid: true }
-}
-
-export function merge(...rulesets: Ruleset[]): Ruleset {
-  return rulesets.flat()
-}
-
-const EDIT_TOOLS = ["edit", "write", "apply_patch", "multiedit"]
-
-export function disabled(tools: string[], ruleset: Ruleset): Set<string> {
-  const result = new Set<string>()
-  for (const tool of tools) {
-    const permission = EDIT_TOOLS.includes(tool) ? "edit" : tool
-    const rule = ruleset.findLast((rule) => Wildcard.match(permission, rule.permission))
-    if (!rule) continue
-    if (rule.pattern === "*" && rule.action === "deny") result.add(tool)
-  }
-  return result
-}
-
-// ============================================================
-// B-P1-3: Persistent Audit Log
-// ============================================================
-
-interface AuditLogEntry {
-  timestamp: number
-  sessionID: string
-  agent?: string
-  pattern: string
-  riskLevel?: string
-  commandSample?: string
-}
-
-const AUDIT_LOG_MAX_SIZE = 10_000
-const auditLogCache: AuditLogEntry[] = []
-let auditLogCursor = 0
-
-async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
-  if (auditLogCache.length < AUDIT_LOG_MAX_SIZE) {
-    auditLogCache.push(entry)
-  } else {
-    auditLogCache[auditLogCursor] = entry
-    auditLogCursor = (auditLogCursor + 1) % AUDIT_LOG_MAX_SIZE
-  }
-  // In production, this would write to $XDG_STATE_HOME/opencode/permissions.audit.jsonl
-  log.info("permission_audit", { entry: JSON.stringify(entry) })
-}
-
-function truncateForAudit(text: string | undefined, maxLength = 256): string | undefined {
-  if (!text) return undefined
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength) + "...[truncated]"
-}
-
 export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))
 
+export * from "./config-rules"
+export * from "./contracts"
+export * from "./events"
 export * as Permission from "."

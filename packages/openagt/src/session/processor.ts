@@ -1,7 +1,5 @@
-import { Cause, Deferred, Effect, Layer, Context, Scope } from "effect"
+import { Cause, Effect, Layer, Context, Scope } from "effect"
 import * as Stream from "effect/Stream"
-import os from "os"
-import path from "path"
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Config } from "@/config"
@@ -11,20 +9,17 @@ import { Snapshot } from "@/snapshot"
 import * as Session from "./session"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
-import { isOverflow } from "./overflow"
 import { PartID } from "./schema"
 import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 import type { Provider } from "@/provider"
-import { Question } from "@/question"
-import * as Truncate from "@/tool/truncate"
-import { errorMessage } from "@/util/error"
 import { Log } from "@/util"
-import { isRecord } from "@/util/record"
+import { errorMessage } from "@/util/error"
+import { ProcessorEventHandler, type ProcessorContext } from "./processor-event-handler"
+import { ProcessorToolCalls } from "./processor-tool-calls"
 
-const DOOM_LOOP_THRESHOLD = 3
 const log = Log.create({ service: "session.processor" })
 
 export type Result = "compact" | "stop" | "continue"
@@ -59,25 +54,6 @@ type Input = {
 export interface Interface {
   readonly create: (input: Input) => Effect.Effect<Handle>
 }
-
-type ToolCall = {
-  partID: MessageV2.ToolPart["id"]
-  messageID: MessageV2.ToolPart["messageID"]
-  sessionID: MessageV2.ToolPart["sessionID"]
-  done: Deferred.Deferred<void>
-}
-
-interface ProcessorContext extends Input {
-  toolcalls: Record<string, ToolCall>
-  shouldBreak: boolean
-  snapshot: string | undefined
-  blocked: boolean
-  needsCompaction: boolean
-  currentText: MessageV2.TextPart | undefined
-  reasoningMap: Record<string, MessageV2.ReasoningPart>
-}
-
-type StreamEvent = Event
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionProcessor") {}
 
@@ -134,407 +110,43 @@ export const layer: Layer.Layer<
           providerID: input.model.providerID,
           aborted,
         })
-      const isAbortLikeError = (error: unknown) => {
-        const message = errorMessage(error).toLowerCase()
-        return message.includes("abort") || message.includes("cancel") || message.includes("interrupt")
-      }
-      const isShellRunnerBash = (part: MessageV2.ToolPart, metadata: Record<string, unknown>, output: string) => {
-        const partInput = isRecord(part.state.input) ? part.state.input : {}
-        return (
-          part.tool === "bash" &&
-          (typeof partInput.command === "string" ||
-            typeof partInput.description === "string" ||
-            typeof partInput.timeout === "number" ||
-            typeof partInput.workdir === "string" ||
-            output.length > 0 ||
-            typeof metadata.description === "string" ||
-            typeof metadata.backendPreference === "string" ||
-            typeof metadata.enforcement === "string")
-        )
-      }
-      const completeInterruptedBash = Effect.fn("SessionProcessor.completeInterruptedBash")(function* (
-        part: MessageV2.ToolPart,
-        metadata: Record<string, unknown>,
-        output: string,
-        end: number,
-      ) {
-        const captured = output || "(no output captured before abort)"
-        const truncated =
-          metadata.truncated === true ||
-          output.length === 0 ||
-          captured.startsWith("...\n\n") ||
-          Buffer.byteLength(captured, "utf-8") > Truncate.MAX_BYTES
-        const outputPath = truncated ? path.join(os.tmpdir(), `openagt-bash-output-${Date.now()}-${part.id}.txt`) : undefined
-        if (outputPath) yield* Effect.promise(() => Bun.write(outputPath, captured))
-        yield* session.updatePart({
-          ...part,
-          state: {
-            status: "completed",
-            input: part.state.input,
-            output:
-              (truncated && outputPath
-                ? `...output truncated...\n\nFull output saved to: ${outputPath}\n\n${captured}`
-                : captured) + "\n\n<bash_metadata>\nUser aborted the command\n</bash_metadata>",
-            metadata: {
-              ...metadata,
-              output: captured,
-              truncated,
-              ...(outputPath ? { outputPath } : {}),
-              terminationReason: "abort",
-              interrupted: true,
-              interruption_origin: "session_cleanup",
-              root_cause: "bash_result_missing_after_session_interrupt",
-            },
-            title: typeof metadata.description === "string" ? metadata.description : "Shell command",
-            time: { start: "time" in part.state ? part.state.time.start : end, end },
+      const toolCalls = new ProcessorToolCalls({ context: ctx, isAborted: () => aborted, session })
+      const updateToolCall = Effect.fn("SessionProcessor.updateToolCall")(
+        (toolCallID: string, update: (part: MessageV2.ToolPart) => MessageV2.ToolPart) =>
+          toolCalls.update(toolCallID, update),
+      )
+      const completeToolCall = Effect.fn("SessionProcessor.completeToolCall")(
+        (
+          toolCallID: string,
+          output: {
+            title: string
+            metadata: Record<string, any>
+            output: string
+            attachments?: MessageV2.FilePart[]
           },
-        })
+        ) => toolCalls.complete(toolCallID, output),
+      )
+      const failToolCall = Effect.fn("SessionProcessor.failToolCall")((toolCallID: string, error: unknown) =>
+        toolCalls.fail(toolCallID, error),
+      )
+
+      const eventHandler = new ProcessorEventHandler({
+        context: ctx,
+        session,
+        status,
+        snapshot,
+        agents,
+        permission,
+        summary,
+        config,
+        plugin,
+        scope,
+        log: slog,
+        updateToolCall,
+        completeToolCall,
+        failToolCall,
       })
-
-      const settleToolCall = Effect.fn("SessionProcessor.settleToolCall")(function* (toolCallID: string) {
-        const done = ctx.toolcalls[toolCallID]?.done
-        delete ctx.toolcalls[toolCallID]
-        if (done) yield* Deferred.succeed(done, undefined).pipe(Effect.ignore)
-      })
-
-      const readToolCall = Effect.fn("SessionProcessor.readToolCall")(function* (toolCallID: string) {
-        const call = ctx.toolcalls[toolCallID]
-        if (!call) return
-        const part = yield* session.getPart({
-          partID: call.partID,
-          messageID: call.messageID,
-          sessionID: call.sessionID,
-        })
-        if (!part || part.type !== "tool") {
-          delete ctx.toolcalls[toolCallID]
-          return
-        }
-        return { call, part }
-      })
-
-      const updateToolCall = Effect.fn("SessionProcessor.updateToolCall")(function* (
-        toolCallID: string,
-        update: (part: MessageV2.ToolPart) => MessageV2.ToolPart,
-      ) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return
-        const part = yield* session.updatePart(update(match.part))
-        ctx.toolcalls[toolCallID] = {
-          ...match.call,
-          partID: part.id,
-          messageID: part.messageID,
-          sessionID: part.sessionID,
-        }
-        return part
-      })
-
-      const completeToolCall = Effect.fn("SessionProcessor.completeToolCall")(function* (
-        toolCallID: string,
-        output: {
-          title: string
-          metadata: Record<string, any>
-          output: string
-          attachments?: MessageV2.FilePart[]
-        },
-      ) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return
-        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return
-        const end = Date.now()
-        yield* session.updatePart({
-          ...match.part,
-          state: {
-            status: "completed",
-            input: match.part.state.input,
-            output: output.output,
-            metadata: output.metadata,
-            title: output.title,
-            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
-            attachments: output.attachments,
-          },
-        })
-        yield* settleToolCall(toolCallID)
-      })
-
-      const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
-        const match = yield* readToolCall(toolCallID)
-        if (!match) return false
-        if (match.part.state.status !== "running" && match.part.state.status !== "pending") return false
-        const end = Date.now()
-        const metadata = "metadata" in match.part.state && isRecord(match.part.state.metadata) ? match.part.state.metadata : undefined
-        const metadataRecord = metadata ?? {}
-        const output = typeof metadataRecord.output === "string" ? metadataRecord.output : ""
-        if ((aborted || isAbortLikeError(error)) && isShellRunnerBash(match.part, metadataRecord, output)) {
-          yield* completeInterruptedBash(match.part, metadataRecord, output, end)
-          yield* settleToolCall(toolCallID)
-          return true
-        }
-        yield* session.updatePart({
-          ...match.part,
-          state: {
-            status: "error",
-            input: match.part.state.input,
-            error: errorMessage(error),
-            metadata,
-            time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
-          },
-        })
-        if (error instanceof Permission.RejectedError || error instanceof Question.RejectedError) {
-          ctx.blocked = ctx.shouldBreak
-        }
-        yield* settleToolCall(toolCallID)
-        return true
-      })
-
-      const handleEvent = Effect.fnUntraced(function* (value: StreamEvent) {
-        switch (value.type) {
-          case "start":
-            yield* status.set(ctx.sessionID, { type: "busy" })
-            return
-
-          case "reasoning-start":
-            if (value.id in ctx.reasoningMap) return
-            ctx.reasoningMap[value.id] = {
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "reasoning",
-              text: "",
-              time: { start: Date.now() },
-              metadata: value.providerMetadata,
-            }
-            yield* session.updatePart(ctx.reasoningMap[value.id])
-            return
-
-          case "reasoning-delta":
-            if (!(value.id in ctx.reasoningMap)) return
-            ctx.reasoningMap[value.id].text += value.text
-            if (value.providerMetadata) ctx.reasoningMap[value.id].metadata = value.providerMetadata
-            yield* session.updatePartDelta({
-              sessionID: ctx.reasoningMap[value.id].sessionID,
-              messageID: ctx.reasoningMap[value.id].messageID,
-              partID: ctx.reasoningMap[value.id].id,
-              field: "text",
-              delta: value.text,
-            })
-            return
-
-          case "reasoning-end":
-            if (!(value.id in ctx.reasoningMap)) return
-            ctx.reasoningMap[value.id].time = { ...ctx.reasoningMap[value.id].time, end: Date.now() }
-            if (value.providerMetadata) ctx.reasoningMap[value.id].metadata = value.providerMetadata
-            yield* session.updatePart(ctx.reasoningMap[value.id])
-            delete ctx.reasoningMap[value.id]
-            return
-
-          case "tool-input-start":
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
-            const part = yield* session.updatePart({
-              id: ctx.toolcalls[value.id]?.partID ?? PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "tool",
-              tool: value.toolName,
-              callID: value.id,
-              state: { status: "pending", input: {}, raw: "" },
-              metadata: value.providerExecuted ? { providerExecuted: true } : undefined,
-            } satisfies MessageV2.ToolPart)
-            ctx.toolcalls[value.id] = {
-              done: yield* Deferred.make<void>(),
-              partID: part.id,
-              messageID: part.messageID,
-              sessionID: part.sessionID,
-            }
-            return
-
-          case "tool-input-delta":
-            return
-
-          case "tool-input-end":
-            return
-
-          case "tool-call": {
-            if (ctx.assistantMessage.summary) {
-              throw new Error(`Tool call not allowed while generating summary: ${value.toolName}`)
-            }
-            yield* updateToolCall(value.toolCallId, (match) => ({
-              ...match,
-              tool: value.toolName,
-              state: {
-                ...match.state,
-                status: "running",
-                input: value.input,
-                time: { start: Date.now() },
-              },
-              metadata: match.metadata?.providerExecuted
-                ? { ...value.providerMetadata, providerExecuted: true }
-                : value.providerMetadata,
-            }))
-
-            const parts = MessageV2.parts(ctx.assistantMessage.id)
-            const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
-
-            if (
-              recentParts.length !== DOOM_LOOP_THRESHOLD ||
-              !recentParts.every(
-                (part) =>
-                  part.type === "tool" &&
-                  part.tool === value.toolName &&
-                  part.state.status !== "pending" &&
-                  JSON.stringify(part.state.input) === JSON.stringify(value.input),
-              )
-            ) {
-              return
-            }
-
-            const agent = yield* agents.get(ctx.assistantMessage.agent)
-            yield* permission.ask({
-              permission: "doom_loop",
-              patterns: [value.toolName],
-              sessionID: ctx.assistantMessage.sessionID,
-              metadata: { tool: value.toolName, input: value.input },
-              always: [value.toolName],
-              ruleset: agent.permission,
-            })
-            return
-          }
-
-          case "tool-result": {
-            yield* completeToolCall(value.toolCallId, value.output)
-            return
-          }
-
-          case "tool-error": {
-            yield* failToolCall(value.toolCallId, value.error)
-            return
-          }
-
-          case "error": {
-            const handled = yield* Effect.all(
-              Object.keys(ctx.toolcalls).map((toolCallID) => failToolCall(toolCallID, value.error)),
-              { concurrency: "unbounded" },
-            )
-            if (handled.some(Boolean)) return
-            throw value.error
-          }
-
-          case "start-step":
-            if (!ctx.assistantMessage.summary && !ctx.snapshot) ctx.snapshot = yield* snapshot.track()
-            yield* session.updatePart({
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.sessionID,
-              snapshot: ctx.snapshot,
-              type: "step-start",
-            })
-            return
-
-          case "finish-step": {
-            const usage = Session.getUsage({
-              model: ctx.model,
-              usage: value.usage,
-              metadata: value.providerMetadata,
-            })
-            ctx.assistantMessage.finish = value.finishReason
-            ctx.assistantMessage.cost += usage.cost
-            ctx.assistantMessage.tokens = usage.tokens
-            yield* session.updatePart({
-              id: PartID.ascending(),
-              reason: value.finishReason,
-              snapshot: ctx.assistantMessage.summary ? undefined : yield* snapshot.track(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "step-finish",
-              tokens: usage.tokens,
-              cost: usage.cost,
-            })
-            yield* session.updateMessage(ctx.assistantMessage)
-            if (ctx.snapshot) {
-              const patch = yield* snapshot.patch(ctx.snapshot)
-              if (patch.files.length) {
-                yield* session.updatePart({
-                  id: PartID.ascending(),
-                  messageID: ctx.assistantMessage.id,
-                  sessionID: ctx.sessionID,
-                  type: "patch",
-                  hash: patch.hash,
-                  files: patch.files,
-                })
-              }
-              ctx.snapshot = undefined
-            }
-            yield* summary
-              .summarize({
-                sessionID: ctx.sessionID,
-                messageID: ctx.assistantMessage.parentID,
-              })
-              .pipe(Effect.ignore, Effect.forkIn(scope))
-            if (
-              !ctx.assistantMessage.summary &&
-              isOverflow({ cfg: yield* config.get(), tokens: usage.tokens, model: ctx.model })
-            ) {
-              ctx.needsCompaction = true
-            }
-            return
-          }
-
-          case "text-start":
-            ctx.currentText = {
-              id: PartID.ascending(),
-              messageID: ctx.assistantMessage.id,
-              sessionID: ctx.assistantMessage.sessionID,
-              type: "text",
-              text: "",
-              time: { start: Date.now() },
-              metadata: value.providerMetadata,
-            }
-            yield* session.updatePart(ctx.currentText)
-            return
-
-          case "text-delta":
-            if (!ctx.currentText) return
-            ctx.currentText.text += value.text
-            if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
-            yield* session.updatePartDelta({
-              sessionID: ctx.currentText.sessionID,
-              messageID: ctx.currentText.messageID,
-              partID: ctx.currentText.id,
-              field: "text",
-              delta: value.text,
-            })
-            return
-
-          case "text-end":
-            if (!ctx.currentText) return
-            ctx.currentText.text = (yield* plugin.trigger(
-              "experimental.text.complete",
-              {
-                sessionID: ctx.sessionID,
-                messageID: ctx.assistantMessage.id,
-                partID: ctx.currentText.id,
-              },
-              { text: ctx.currentText.text },
-            )).text
-            {
-              const end = Date.now()
-              ctx.currentText.time = { start: ctx.currentText.time?.start ?? end, end }
-            }
-            if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
-            yield* session.updatePart(ctx.currentText)
-            ctx.currentText = undefined
-            return
-
-          case "finish":
-            return
-
-          default:
-            slog.info("unhandled", { event: value.type, value })
-            return
-        }
-      })
-
+      const handleEvent = (value: Event) => eventHandler.handle(value)
       const cleanup = Effect.fn("SessionProcessor.cleanup")(function* () {
         if (ctx.snapshot) {
           const patch = yield* snapshot.patch(ctx.snapshot)
@@ -567,42 +179,8 @@ export const layer: Layer.Layer<
         }
         ctx.reasoningMap = {}
 
-        yield* Effect.forEach(
-          Object.values(ctx.toolcalls),
-          (call) => Deferred.await(call.done).pipe(Effect.timeout("5 seconds"), Effect.ignore),
-          { concurrency: "unbounded" },
-        )
-
-        for (const toolCallID of Object.keys(ctx.toolcalls)) {
-          const match = yield* readToolCall(toolCallID)
-          if (!match) continue
-          const part = match.part
-          const end = Date.now()
-          const metadata = "metadata" in part.state && isRecord(part.state.metadata) ? part.state.metadata : {}
-          const output = typeof metadata.output === "string" ? metadata.output : ""
-          if (isShellRunnerBash(part, metadata, output)) {
-            yield* completeInterruptedBash(part, metadata, output, end)
-            yield* settleToolCall(toolCallID)
-            continue
-          }
-          yield* session.updatePart({
-            ...part,
-            state: {
-              ...part.state,
-              status: "error",
-              error: "Tool execution interrupted during session cleanup",
-              metadata: {
-                ...metadata,
-                interrupted: true,
-                interruption_origin: "session_cleanup",
-                root_cause: "tool_result_missing_after_session_interrupt",
-                active_tool: part.tool,
-              },
-              time: { start: "time" in part.state ? part.state.time.start : end, end },
-            },
-          })
-        }
-        ctx.toolcalls = {}
+        yield* toolCalls.waitForPending()
+        yield* toolCalls.cleanupInterrupted()
         ctx.assistantMessage.time.completed = Date.now()
         yield* session.updateMessage(ctx.assistantMessage)
       })

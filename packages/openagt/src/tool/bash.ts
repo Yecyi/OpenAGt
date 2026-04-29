@@ -25,92 +25,31 @@ import * as Stream from "effect/Stream"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 
-import { formatShellSafety, isPrivilegeEscalationCommand, ShellSecurity } from "../security/shell-security"
-import type { ShellDecision, ShellFinding, ShellRiskLevel, ShellSafety } from "../security/shell-security"
+import { ShellSecurity } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
-import type { ExecPolicyDecision } from "@/security/exec-policy"
-import { resolveExecutionDecision, strictestDecision } from "@/security/decision-pipeline"
-import type {
-  SandboxBackendStatus,
-  SandboxBackendPreference,
-  SandboxEnforcement,
-  SandboxFilesystemPolicy,
-  SandboxNetworkPolicy,
-} from "@/sandbox/types"
-
-type BashMetadata = {
-  output: string
-  exit: number | null
-  description: string
-  truncated: boolean
-  findings: ShellFinding[]
-  riskLevel: ShellRiskLevel
-  decision: ShellDecision
-  reviewApiVersion: 1
-  reviewMode: "disabled"
-  reviewStatus: "not_requested"
-  policyDecision?: ExecPolicyDecision
-  policyReason?: string
-  matchedRules?: string[]
-  shell_safety?: ShellSafety
-  safetySummary?: string
-  safetyDetails?: string[]
-  outputPath?: string
-  backendPreference?: SandboxBackendPreference
-  enforcement?: SandboxEnforcement
-  filesystemPolicy?: SandboxFilesystemPolicy
-  networkPolicy?: SandboxNetworkPolicy
-  allowedPaths?: string[]
-  writablePaths?: string[]
-  backendUsed?: string
-  terminationReason?: string
-}
-
-const DEFAULT_TIMEOUT = Flag.OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
-const PS = new Set(["powershell", "pwsh"])
-const CWD = new Set(["cd", "push-location", "set-location"])
-const FILES = new Set([
-  ...CWD,
-  "rm",
-  "cp",
-  "mv",
-  "mkdir",
-  "touch",
-  "chmod",
-  "chown",
-  "cat",
-  // Leave PowerShell aliases out for now. Common ones like cat/cp/mv/rm/mkdir
-  // already hit the entries above, and alias normalization should happen in one
-  // place later so we do not risk double-prompting.
-  "get-content",
-  "set-content",
-  "add-content",
-  "copy-item",
-  "move-item",
-  "remove-item",
-  "new-item",
-  "rename-item",
-])
-const FLAGS = new Set(["-destination", "-literalpath", "-path"])
-const SWITCHES = new Set(["-confirm", "-debug", "-force", "-nonewline", "-recurse", "-verbose", "-whatif"])
-const PS_TOKENS = [
-  "$env:",
-  "${env:",
-  "$pshome",
-  "$pwd",
-  "write-host",
-  "write-output",
-  "get-content",
-  "set-content",
-  "copy-item",
-  "move-item",
-  "remove-item",
-  "new-item",
-  "set-location",
-  "push-location",
-  "pop-location",
-  "if ($?",
-]
+import {
+  addShellReviewMetadata,
+  buildBlockedCommandResult,
+  type BashMetadata,
+} from "./bash-metadata"
+import { BashExecutionPlanner } from "./bash-execution-plan"
+import { chooseShell, DEFAULT_TIMEOUT, isPowerShellName } from "./bash-shell"
+import {
+  CWD,
+  FILES,
+  commands,
+  dynamic,
+  expand,
+  home,
+  parts,
+  pathArgs,
+  prefix,
+  provider,
+  source,
+  unquote,
+  type Part,
+  type Scan,
+} from "./bash-path-analysis"
 
 const Parameters = z.object({
   command: z.string().describe("The command to execute"),
@@ -128,17 +67,6 @@ const Parameters = z.object({
     ),
 })
 
-type Part = {
-  type: string
-  text: string
-}
-
-type Scan = {
-  dirs: Set<string>
-  patterns: Set<string>
-  always: Set<string>
-}
-
 export const log = Log.create({ service: "bash-tool" })
 
 const resolveWasm = (asset: string) => {
@@ -146,147 +74,6 @@ const resolveWasm = (asset: string) => {
   if (asset.startsWith("/") || /^[a-z]:/i.test(asset)) return asset
   const url = new URL(asset, import.meta.url)
   return fileURLToPath(url)
-}
-
-function parts(node: Node) {
-  const out: Part[] = []
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i)
-    if (!child) continue
-    if (child.type === "command_elements") {
-      for (let j = 0; j < child.childCount; j++) {
-        const item = child.child(j)
-        if (!item || item.type === "command_argument_sep" || item.type === "redirection") continue
-        out.push({ type: item.type, text: item.text })
-      }
-      continue
-    }
-    if (
-      child.type !== "command_name" &&
-      child.type !== "command_name_expr" &&
-      child.type !== "word" &&
-      child.type !== "string" &&
-      child.type !== "raw_string" &&
-      child.type !== "concatenation"
-    ) {
-      continue
-    }
-    out.push({ type: child.type, text: child.text })
-  }
-  return out
-}
-
-function source(node: Node) {
-  return (node.parent?.type === "redirected_statement" ? node.parent.text : node.text).trim()
-}
-
-function commands(node: Node) {
-  return node.descendantsOfType("command").filter((child): child is Node => Boolean(child))
-}
-
-function unquote(text: string) {
-  if (text.length < 2) return text
-  const first = text[0]
-  const last = text[text.length - 1]
-  if ((first === '"' || first === "'") && first === last) return text.slice(1, -1)
-  return text
-}
-
-function home(text: string) {
-  if (text === "~") return os.homedir()
-  if (text.startsWith("~/") || text.startsWith("~\\")) return path.join(os.homedir(), text.slice(2))
-  return text
-}
-
-function envValue(key: string) {
-  if (process.platform !== "win32") return process.env[key]
-  const name = Object.keys(process.env).find((item) => item.toLowerCase() === key.toLowerCase())
-  return name ? process.env[name] : undefined
-}
-
-function auto(key: string, cwd: string, shell: string) {
-  const name = key.toUpperCase()
-  if (name === "HOME") return os.homedir()
-  if (name === "PWD") return cwd
-  if (name === "PSHOME") return path.dirname(shell)
-}
-
-function expand(text: string, cwd: string, shell: string) {
-  const out = unquote(text)
-    .replace(/\$\{env:([^}]+)\}/gi, (_, key: string) => envValue(key) || "")
-    .replace(/\$env:([A-Za-z_][A-Za-z0-9_]*)/gi, (_, key: string) => envValue(key) || "")
-    .replace(/\$(HOME|PWD|PSHOME)(?=$|[\\/])/gi, (_, key: string) => auto(key, cwd, shell) || "")
-  return home(out)
-}
-
-function provider(text: string) {
-  const match = text.match(/^([A-Za-z]+)::(.*)$/)
-  if (match) {
-    if (match[1].toLowerCase() !== "filesystem") return
-    return match[2]
-  }
-  const prefix = text.match(/^([A-Za-z]+):(.*)$/)
-  if (!prefix) return text
-  if (prefix[1].length === 1) return text
-  return
-}
-
-function dynamic(text: string, ps: boolean) {
-  if (text.startsWith("(") || text.startsWith("@(")) return true
-  if (text.includes("$(") || text.includes("${") || text.includes("`")) return true
-  if (ps) return /\$(?!env:)/i.test(text)
-  return text.includes("$")
-}
-
-function prefix(text: string) {
-  const match = /[?*[]/.exec(text)
-  if (!match) return text
-  if (match.index === 0) return
-  return text.slice(0, match.index)
-}
-
-function pathArgs(list: Part[], ps: boolean) {
-  if (!ps) {
-    return list
-      .slice(1)
-      .filter((item) => !item.text.startsWith("-") && !(list[0]?.text === "chmod" && item.text.startsWith("+")))
-      .map((item) => item.text)
-  }
-
-  const out: string[] = []
-  let want = false
-  for (const item of list.slice(1)) {
-    if (want) {
-      out.push(item.text)
-      want = false
-      continue
-    }
-    if (item.type === "command_parameter") {
-      const flag = item.text.toLowerCase()
-      if (SWITCHES.has(flag)) continue
-      want = FLAGS.has(flag)
-      continue
-    }
-    out.push(item.text)
-  }
-  return out
-}
-
-function chooseShell(command: string) {
-  const acceptable = Shell.acceptable()
-  if (process.platform !== "win32") return acceptable
-  const text = command.trim().toLowerCase()
-  const hasPowerShellSyntax = PS_TOKENS.some((item) => text.includes(item)) || /(^|[\s;(])&\s+["'a-z_$({]/i.test(text)
-  if (hasPowerShellSyntax) {
-    const preferred = Shell.preferred()
-    const name = Shell.name(preferred)
-    if (PS.has(name)) return preferred
-    const pwsh = Bun.which("pwsh")
-    if (pwsh) return pwsh
-    const powershell = Bun.which("powershell")
-    if (powershell) return powershell
-  }
-  return acceptable
 }
 
 const parse = Effect.fn("BashTool.parse")(function* (command: string, ps: boolean) {
@@ -553,163 +340,47 @@ export const BashTool = Tool.define(
           }
 
           const timeout = params.timeout ?? DEFAULT_TIMEOUT
-          const ps = PS.has(name)
+          const ps = isPowerShellName(name)
           const root = yield* parse(params.command, ps)
           const scan = yield* collect(root, cwd, ps, shell)
           if (!Instance.containsPath(cwd, instance)) scan.dirs.add(cwd)
 
-          const security = yield* shellSecurity.analyze({
+          const externalPaths = Array.from(scan.dirs)
+          const executionPlan = yield* new BashExecutionPlanner({
+            execPolicy,
+            log,
+            sandboxBroker,
+            sandboxPolicy,
+            shellSecurity,
+          }).plan({
             command: params.command,
             shell,
             cwd,
-          })
-          const policyDecision = yield* execPolicy.evaluate({
-            command: security.normalized_command || params.command,
-            shellFamily: security.shell_family,
-          })
-          const externalPaths = Array.from(scan.dirs)
-          const permissionMetadata = shellSecurity.createPermissionMetadata({
-            result: security,
-            description: params.description ?? "Shell command",
-            workdir: cwd,
+            description: params.description,
             externalPaths,
           })
-          const preliminaryDecision = strictestDecision(security.decision, policyDecision.decision)
-          const preliminaryPolicy = yield* sandboxPolicy.resolve({
-            result: security,
-            decision: preliminaryDecision,
-            cwd,
-            externalPaths,
-          })
-          const capabilities = yield* sandboxBroker.capabilities().pipe(
-            Effect.catchCause((cause) =>
-              Effect.sync(() => {
-                log.warn("sandbox capabilities unavailable", { cause })
-                return [] satisfies SandboxBackendStatus[]
-              }),
-            ),
-          )
-          const privilegeEscalation = isPrivilegeEscalationCommand(security.normalized_command || params.command)
-          const decision = resolveExecutionDecision({
-            securityDecision: security.decision,
-            securityReason: security.explanation,
-            riskLevel: security.risk_level,
-            policyDecision,
-            policy: preliminaryPolicy,
-            capabilities,
-            privilegeEscalation,
-          })
-          const finalDecision = decision.finalDecision
-          const finalReason = decision.finalReason
-          const matchedRules = decision.matchedRules
-          const policy =
-            finalDecision === preliminaryDecision
-              ? preliminaryPolicy
-              : yield* sandboxPolicy.resolve({
-                  result: security,
-                  decision: finalDecision,
-                  cwd,
-                  externalPaths,
-                })
-          const backendAvailabilitySummary = decision.backendAvailability
-          const shellSafety = formatShellSafety({
-            decision: finalDecision,
-            riskLevel: security.risk_level,
-            reason: finalReason,
-            approvalKind: decision.approvalKind,
-            approvalRequired: finalDecision !== "allow" || policy.needs_network_permission,
-            policySource: decision.policySource,
-            backendPreference: policy.backend_preference,
-            enforcement: policy.enforcement,
-            filesystemPolicy: policy.filesystem_policy,
-            networkPolicy: policy.network_policy,
-            backendAvailability: backendAvailabilitySummary,
-            policyReason: finalReason,
-            matchedRules,
-          })
-          const networkReason = "Command requires network access."
-          const networkShellSafety = policy.needs_network_permission
-            ? formatShellSafety({
-                decision: "confirm",
-                riskLevel: security.risk_level,
-                reason: networkReason,
-                approvalKind: "network_access",
-                approvalRequired: true,
-                policySource: "sandbox_policy",
-                backendPreference: policy.backend_preference,
-                enforcement: policy.enforcement,
-                filesystemPolicy: policy.filesystem_policy,
-                networkPolicy: policy.network_policy,
-                backendAvailability: backendAvailabilitySummary,
-                policyReason: finalReason,
-                matchedRules,
-              })
-            : undefined
-          const metadata = {
-            ...permissionMetadata,
-            decision: finalDecision,
-            reason: finalReason,
-            backendPreference: policy.backend_preference,
-            enforcement: policy.enforcement,
-            filesystemPolicy: policy.filesystem_policy,
-            networkPolicy: policy.network_policy,
-            allowedPathsSummary: policy.allowed_paths,
-            backendAvailability: backendAvailabilitySummary,
-            ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-            ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-            ...(matchedRules.length > 0 ? { matchedRules } : {}),
-            shell_safety: shellSafety,
-            safetySummary: shellSafety.summary,
-            safetyDetails: shellSafety.details,
-          }
-          const networkMetadata = networkShellSafety
-            ? {
-                ...metadata,
-                decision: "confirm" as const,
-                reason: networkReason,
-                shell_safety: networkShellSafety,
-                safetySummary: networkShellSafety.summary,
-                safetyDetails: networkShellSafety.details,
-              }
-            : metadata
 
-          if (finalDecision === "block") {
-            const errorMsg = shellSafety.summary
-            return {
-              title: "Bash Command Blocked",
-              metadata: {
-                output: errorMsg,
-                exit: null as number | null,
-                description: params.description ?? "",
-                truncated: false,
-                findings: security.findings,
-                riskLevel: security.risk_level,
-                decision: finalDecision,
-                reviewApiVersion: security.review_api_version,
-                reviewMode: security.review_mode,
-                reviewStatus: security.review_status,
-                ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                shell_safety: shellSafety,
-                safetySummary: shellSafety.summary,
-                safetyDetails: shellSafety.details,
-              } satisfies BashMetadata,
-              output: errorMsg,
-            }
-          }
-
-          yield* ask(ctx, scan, metadata)
-          if (finalDecision === "confirm") {
-            yield* askShellExecute(ctx, {
-              patterns: [security.normalized_command || params.command],
-              metadata,
+          if (executionPlan.finalDecision === "block") {
+            return buildBlockedCommandResult({
+              description: params.description ?? "",
+              security: executionPlan.security,
+              decision: executionPlan.decision,
+              policyDecision: executionPlan.policyDecision,
+              shellSafety: executionPlan.shellSafety,
             })
           }
-          if (policy.needs_network_permission) {
+
+          yield* ask(ctx, scan, executionPlan.metadata)
+          if (executionPlan.finalDecision === "confirm") {
+            yield* askShellExecute(ctx, {
+              patterns: [executionPlan.security.normalized_command || params.command],
+              metadata: executionPlan.metadata,
+            })
+          }
+          if (executionPlan.policy.needs_network_permission) {
             yield* askShellNetwork(ctx, {
-              patterns: [security.normalized_command || params.command],
-              metadata: networkMetadata,
+              patterns: [executionPlan.security.normalized_command || params.command],
+              metadata: executionPlan.networkMetadata,
             })
           }
 
@@ -718,44 +389,36 @@ export const BashTool = Tool.define(
             .run(
               {
                 shell,
-                shellFamily: security.shell_family,
+                shellFamily: executionPlan.security.shell_family,
                 command: params.command,
                 cwd,
                 env,
                 timeout,
                 description: params.description ?? "Shell command",
-                enforcement: policy.enforcement,
-                backendPreference: policy.backend_preference,
-                filesystemPolicy: policy.filesystem_policy,
-                allowedPaths: policy.allowed_paths,
-                writablePaths: policy.writable_paths,
-                networkPolicy: policy.network_policy,
-                reportOnly: policy.sandbox.report_only,
-                failurePolicy: policy.sandbox.failure_policy,
-                riskLevel: security.risk_level,
+                enforcement: executionPlan.policy.enforcement,
+                backendPreference: executionPlan.policy.backend_preference,
+                filesystemPolicy: executionPlan.policy.filesystem_policy,
+                allowedPaths: executionPlan.policy.allowed_paths,
+                writablePaths: executionPlan.policy.writable_paths,
+                networkPolicy: executionPlan.policy.network_policy,
+                reportOnly: executionPlan.policy.sandbox.report_only,
+                failurePolicy: executionPlan.policy.sandbox.failure_policy,
+                riskLevel: executionPlan.security.risk_level,
               },
               ctx,
             )
             .pipe(
               Effect.uninterruptible,
-              Effect.map((result) => ({
-                ...result,
-                metadata: {
-                  ...result.metadata,
-                  findings: security.findings,
-                  riskLevel: security.risk_level,
-                  decision: finalDecision,
-                  reviewApiVersion: security.review_api_version,
-                  reviewMode: security.review_mode,
-                  reviewStatus: security.review_status,
-                  ...(policyDecision.matchedRules.length > 0 ? { policyDecision: policyDecision.decision } : {}),
-                  ...(policyDecision.matchedRules.length > 0 ? { policyReason: policyDecision.reason } : {}),
-                  ...(matchedRules.length > 0 ? { matchedRules } : {}),
-                  shell_safety: shellSafety,
-                  safetySummary: shellSafety.summary,
-                  safetyDetails: shellSafety.details,
-                },
-              })),
+              Effect.map((result) =>
+                addShellReviewMetadata({
+                  result,
+                  security: executionPlan.security,
+                  finalDecision: executionPlan.finalDecision,
+                  policyDecision: executionPlan.policyDecision,
+                  matchedRules: executionPlan.matchedRules,
+                  shellSafety: executionPlan.shellSafety,
+                }),
+              ),
             )
         }),
     }

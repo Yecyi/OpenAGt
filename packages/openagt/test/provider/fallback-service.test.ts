@@ -12,6 +12,7 @@ function createConfigLayer(config: unknown) {
     Config.Service,
     Config.Service.of({
       get: () => Effect.succeed(config as any),
+      effective: () => Effect.succeed({ config: config as any, sources: [], field_sources: {} as any }),
       getGlobal: () => Effect.succeed(config as any),
       getConsoleState: () => Effect.succeed({} as any),
       update: () => Effect.void,

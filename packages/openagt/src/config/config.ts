@@ -1,30 +1,25 @@
 import { Log } from "../util"
 import path from "path"
-import { pathToFileURL } from "url"
 import os from "os"
 import z from "zod"
-import { mergeDeep, pipe } from "remeda"
+import { mergeDeep } from "remeda"
 import { Global } from "../global"
 import fsNode from "fs/promises"
 import { NamedError } from "@openagt/shared/util/error"
 import { Flag } from "../flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
-import { applyEdits, modify } from "jsonc-parser"
 import { Instance, type InstanceContext } from "../project/instance"
 import { InstallationLocal, InstallationVersion } from "@/installation/version"
 import { existsSync } from "fs"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
 import { Account } from "@/account/account"
-import { isRecord } from "@/util/record"
 import type { ConsoleState } from "./console-state"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { InstanceState } from "@/effect"
-import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "effect"
+import { Context, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { EffectFlock } from "@openagt/shared/util/effect-flock"
-import { InstanceRef } from "@/effect/instance-ref"
-import { zod, ZodOverride } from "@/util/effect-zod"
 import { ConfigAgent } from "./agent"
 import { ConfigExpert } from "./expert"
 import { ConfigCommand } from "./command"
@@ -35,309 +30,38 @@ import { ConfigLSP } from "./lsp"
 import { ConfigManaged } from "./managed"
 import { ConfigMCP } from "./mcp"
 import { ConfigModelID } from "./model-id"
-import { ConfigParse } from "./parse"
 import { ConfigPaths } from "./paths"
-import { ConfigPermission } from "./permission"
 import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
-import { ConfigVariable } from "./variable"
+import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
+import { ConfigGlobalLoader } from "./global-loader"
+import { ConfigInstanceMergePipeline } from "./instance-merge-pipeline"
+import { ConfigWriter } from "./writer"
+import { EffectiveConfigSnapshot, type EffectiveConfigSnapshot as EffectiveConfigSnapshotType } from "./effective-config"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
+import type { Info } from "./info"
+export { Info } from "./info"
+export {
+  AdvancedGlobalConfigPatch,
+  ConfigSource,
+  ConfigSourceScope,
+  EffectiveConfigField,
+  EffectiveConfigSnapshot,
+} from "./effective-config"
 
 const log = Log.create({ service: "config" })
-
-// Custom merge function that concatenates array fields instead of replacing them
-function mergeConfigConcatArrays(target: Info, source: Info): Info {
-  const merged = mergeDeep(target, source)
-  merged.instructions = Array.from(new Set([...(target.instructions ?? []), ...(source.instructions ?? [])]))
-  return merged
-}
-
-function normalizeLoadedConfig(data: unknown, source: string) {
-  if (!isRecord(data)) return data
-  const copy = { ...data }
-  const hadLegacy = "theme" in copy || "keybinds" in copy || "tui" in copy
-  if (!hadLegacy) return copy
-  delete copy.theme
-  delete copy.keybinds
-  delete copy.tui
-  log.warn("tui keys in openagt config are deprecated; move them to tui.json", { path: source })
-  return copy
-}
-
-async function resolveLoadedPlugins<T extends { plugin?: ConfigPlugin.Spec[] }>(config: T, filepath: string) {
-  if (!config.plugin) return config
-  for (let i = 0; i < config.plugin.length; i++) {
-    // Normalize path-like plugin specs while we still know which config file declared them.
-    // This prevents `./plugin.ts` from being reinterpreted relative to some later merge location.
-    config.plugin[i] = await ConfigPlugin.resolvePluginSpec(config.plugin[i], filepath)
-  }
-  return config
-}
 
 export const Server = ConfigServer.Server.zod
 export const Layout = ConfigLayout.Layout.zod
 export type Layout = ConfigLayout.Layout
 
-// Schemas that still live at the zod layer (have .transform / .preprocess /
-// .meta not expressible in current Effect Schema) get referenced via a
-// ZodOverride-annotated Schema.Any.  Walker sees the annotation and emits the
-// exact zod directly, preserving component $refs.
-const AgentRef = Schema.Any.annotate({ [ZodOverride]: ConfigAgent.Info })
-const PermissionRef = Schema.Any.annotate({ [ZodOverride]: ConfigPermission.Info })
-const LogLevelRef = Schema.Any.annotate({ [ZodOverride]: Log.Level })
-
-const PositiveInt = Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThan(0))
-const NonNegativeInt = Schema.Number.check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))
-
-const InfoSchema = Schema.Struct({
-  $schema: Schema.optional(Schema.String).annotate({
-    description: "JSON schema reference for configuration validation",
-  }),
-  logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
-  server: Schema.optional(ConfigServer.Server).annotate({
-    description: "Server configuration for openagt serve and web commands",
-  }),
-  command: Schema.optional(Schema.Record(Schema.String, ConfigCommand.Info)).annotate({
-    description: "Command configuration",
-  }),
-  // Coordinator expert role definitions. Loaded from .opencode/experts/*.md
-  // (mirrors agent/command loaders). Each entry MUST `inherits` from a builtin
-  // CoordinatorNodeRole. Validation lives in ExpertRegistry — Config keeps the
-  // value untyped here to avoid mixing zod and Effect Schema.
-  expert: Schema.optional(Schema.Record(Schema.String, Schema.Any)).annotate({
-    description: "Coordinator expert role definitions (loaded from .opencode/experts/*.md)",
-  }),
-  skills: Schema.optional(ConfigSkills.Info).annotate({ description: "Additional skill folder paths" }),
-  watcher: Schema.optional(
-    Schema.Struct({
-      ignore: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
-    }),
-  ),
-  snapshot: Schema.optional(Schema.Boolean).annotate({
-    description:
-      "Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.",
-  }),
-  // User-facing plugin config is stored as Specs; provenance gets attached later while configs are merged.
-  plugin: Schema.optional(Schema.mutable(Schema.Array(ConfigPlugin.Spec))),
-  autoupdate: Schema.optional(Schema.Union([Schema.Boolean, Schema.Literal("notify")])).annotate({
-    description:
-      "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications",
-  }),
-  disabled_providers: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
-    description: "Disable providers that are loaded automatically",
-  }),
-  enabled_providers: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
-    description: "When set, ONLY these providers will be enabled. All other providers will be ignored",
-  }),
-  model: Schema.optional(ConfigModelID).annotate({
-    description: "Model to use in the format of provider/model, eg anthropic/claude-2",
-  }),
-  small_model: Schema.optional(ConfigModelID).annotate({
-    description: "Small model to use for tasks like title generation in the format of provider/model",
-  }),
-  default_agent: Schema.optional(Schema.String).annotate({
-    description:
-      "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
-  }),
-  username: Schema.optional(Schema.String).annotate({
-    description: "Custom username to display in conversations instead of system username",
-  }),
-  mode: Schema.optional(
-    Schema.StructWithRest(
-      Schema.Struct({
-        build: Schema.optional(AgentRef),
-        plan: Schema.optional(AgentRef),
-      }),
-      [Schema.Record(Schema.String, AgentRef)],
-    ),
-  ).annotate({ description: "@deprecated Use `agent` field instead." }),
-  agent: Schema.optional(
-    Schema.StructWithRest(
-      Schema.Struct({
-        // primary
-        plan: Schema.optional(AgentRef),
-        build: Schema.optional(AgentRef),
-        // subagent
-        general: Schema.optional(AgentRef),
-        explore: Schema.optional(AgentRef),
-        // specialized
-        title: Schema.optional(AgentRef),
-        summary: Schema.optional(AgentRef),
-        compaction: Schema.optional(AgentRef),
-      }),
-      [Schema.Record(Schema.String, AgentRef)],
-    ),
-  ).annotate({ description: "Agent configuration" }),
-  provider: Schema.optional(Schema.Record(Schema.String, ConfigProvider.Info)).annotate({
-    description: "Custom provider configurations and model overrides",
-  }),
-  mcp: Schema.optional(
-    Schema.Record(
-      Schema.String,
-      Schema.Union([
-        ConfigMCP.Info,
-        // Matches the legacy `{ enabled: false }` form used to disable a server.
-        Schema.Any.annotate({ [ZodOverride]: z.object({ enabled: z.boolean() }).strict() }),
-      ]),
-    ),
-  ).annotate({ description: "MCP (Model Context Protocol) server configurations" }),
-  formatter: Schema.optional(ConfigFormatter.Info),
-  lsp: Schema.optional(ConfigLSP.Info),
-  instructions: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
-    description: "Additional instruction files or patterns to include",
-  }),
-  layout: Schema.optional(ConfigLayout.Layout).annotate({ description: "@deprecated Always uses stretch layout." }),
-  permission: Schema.optional(PermissionRef),
-  exec_policy: Schema.optional(ConfigExecPolicy.Info).annotate({
-    description: "Prefix-based shell execution policy rules that strengthen shell approvals and blocking.",
-  }),
-  tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
-  enterprise: Schema.optional(
-    Schema.Struct({
-      url: Schema.optional(Schema.String).annotate({ description: "Enterprise URL" }),
-    }),
-  ),
-  compaction: Schema.optional(
-    Schema.Struct({
-      auto: Schema.optional(Schema.Boolean).annotate({
-        description: "Enable automatic compaction when context is full (default: true)",
-      }),
-      prune: Schema.optional(Schema.Boolean).annotate({
-        description: "Enable pruning of old tool outputs (default: true)",
-      }),
-      reserved: Schema.optional(NonNegativeInt).annotate({
-        description: "Token buffer for compaction. Leaves enough window to avoid overflow during compaction.",
-      }),
-    }),
-  ),
-  experimental: Schema.optional(
-    Schema.Struct({
-      disable_paste_summary: Schema.optional(Schema.Boolean),
-      batch_tool: Schema.optional(Schema.Boolean).annotate({ description: "Enable the batch tool" }),
-      openTelemetry: Schema.optional(Schema.Boolean).annotate({
-        description: "Enable OpenTelemetry spans for AI SDK calls (using the 'experimental_telemetry' flag)",
-      }),
-      primary_tools: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
-        description: "Tools that should only be available to primary agents.",
-      }),
-      continue_loop_on_deny: Schema.optional(Schema.Boolean).annotate({
-        description: "Continue the agent loop when a tool call is denied",
-      }),
-      mcp_timeout: Schema.optional(PositiveInt).annotate({
-        description: "Timeout in milliseconds for model context protocol (MCP) requests",
-      }),
-      sandbox: Schema.optional(
-        Schema.Struct({
-          enabled: Schema.optional(Schema.Boolean),
-          backend: Schema.optional(
-            Schema.Literals([
-              "auto",
-              "seatbelt",
-              "windows_native",
-              "landlock",
-              "process",
-            ] satisfies SandboxBackendPreference[]),
-          ),
-          failure_policy: Schema.optional(
-            Schema.Literals(["closed", "confirm_downgrade", "fallback"] satisfies SandboxFailurePolicy[]),
-          ),
-          report_only: Schema.optional(Schema.Boolean),
-          broker_idle_ttl_ms: Schema.optional(PositiveInt),
-        }),
-      ),
-      memory: Schema.optional(
-        Schema.Struct({
-          template: Schema.optional(Schema.String).annotate({ description: "Custom memory.md template path" }),
-          maxTokens: Schema.optional(PositiveInt).annotate({ description: "Max tokens for memory.md (default: 4096)" }),
-          trigger: Schema.optional(
-            Schema.Struct({
-              minimumMessageTokensToInit: Schema.optional(PositiveInt).annotate({
-                description: "Initialize memory after N tokens (default: 6000)",
-              }),
-              minimumTokensBetweenUpdate: Schema.optional(PositiveInt).annotate({
-                description: "Update memory after N additional tokens (default: 4000)",
-              }),
-              toolCallsBetweenUpdates: Schema.optional(PositiveInt).annotate({
-                description: "Update memory after N tool calls (default: 10)",
-              }),
-            }),
-          ),
-        }),
-      ).annotate({ description: "Session memory configuration" }),
-      toolQuality: Schema.optional(
-        Schema.Struct({
-          weights: Schema.optional(
-            Schema.Struct({
-              hasValidSchema: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for valid schema (default: 20)",
-              }),
-              hasDescription: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for description (default: 15)",
-              }),
-              hasParameterDescriptions: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for parameter descriptions (default: 20)",
-              }),
-              hasReturnTypeDescription: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for return type description (default: 10)",
-              }),
-              hasExamples: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for examples (default: 10)",
-              }),
-              hasVersion: Schema.optional(NonNegativeInt).annotate({ description: "Score for version (default: 5)" }),
-              isNamingConsistent: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for consistent naming (default: 10)",
-              }),
-              hasDeprecationWarning: Schema.optional(NonNegativeInt).annotate({
-                description: "Score for deprecation warning (default: 10)",
-              }),
-            }),
-          ).annotate({ description: "Quality score weights for each checklist item" }),
-        }),
-      ).annotate({ description: "MCP tool quality scoring configuration" }),
-    }),
-  ),
-})
-
-// Schema.Struct produces readonly types by default, but the service code
-// below mutates Info objects directly (e.g. `config.mode = ...`). Strip the
-// readonly recursively so callers get the same mutable shape zod inferred.
-//
-// `Types.DeepMutable` from effect-smol would be a drop-in, but its fallback
-// branch `{ -readonly [K in keyof T]: ... }` collapses `unknown` to `{}`
-// (since `keyof unknown = never`), which widens `Record<string, unknown>`
-// fields like `ConfigPlugin.Options`. The local version gates on
-// `extends object` so `unknown` passes through.
-//
-// Tuple branch preserves `ConfigPlugin.Spec`'s `readonly [string, Options]`
-// shape (otherwise the general array branch widens it to an array).
-type DeepMutable<T> = T extends readonly [unknown, ...unknown[]]
-  ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
-  : T extends readonly (infer U)[]
-    ? DeepMutable<U>[]
-    : T extends object
-      ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
-      : T
-
-// The walker emits `z.object({...})` which is non-strict by default. Config
-// historically uses `.strict()` (additionalProperties: false in openapi.json),
-// so layer that on after derivation.  Re-apply the Config ref afterward
-// since `.strict()` strips the walker's meta annotation.
-export const Info = (zod(InfoSchema) as unknown as z.ZodObject<any>)
-  .strict()
-  .meta({ ref: "Config" }) as unknown as z.ZodType<DeepMutable<Schema.Schema.Type<typeof InfoSchema>>>
-
-export type Info = z.output<typeof Info> & {
-  // plugin_origins is derived state, not a persisted config field. It keeps each winning plugin spec together
-  // with the file and scope it came from so later runtime code can make location-sensitive decisions.
-  plugin_origins?: ConfigPlugin.Origin[]
-}
-
 type State = {
   config: Info
+  effective: EffectiveConfigSnapshotType
   directories: string[]
   deps: Fiber.Fiber<void, never>[]
   consoleState: ConsoleState
@@ -345,6 +69,7 @@ type State = {
 
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
+  readonly effective: () => Effect.Effect<EffectiveConfigSnapshotType>
   readonly getGlobal: () => Effect.Effect<Info>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
@@ -356,38 +81,6 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Config") {}
-
-function globalConfigFile() {
-  const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
-    path.join(Global.Path.config, file),
-  )
-  for (const file of candidates) {
-    if (existsSync(file)) return file
-  }
-  return candidates[0]
-}
-
-function patchJsonc(input: string, patch: unknown, path: string[] = []): string {
-  if (!isRecord(patch)) {
-    const edits = modify(input, path, patch, {
-      formattingOptions: {
-        insertSpaces: true,
-        tabSize: 2,
-      },
-    })
-    return applyEdits(input, edits)
-  }
-
-  return Object.entries(patch).reduce((result, [key, value]) => {
-    if (value === undefined) return result
-    return patchJsonc(result, value, [...path, key])
-  }, input)
-}
-
-function writable(info: Info) {
-  const { plugin_origins: _plugin_origins, ...next } = info
-  return next
-}
 
 export const ConfigDirectoryTypoError = NamedError.create(
   "ConfigDirectoryTypoError",
@@ -406,79 +99,15 @@ export const layer = Layer.effect(
     const accountSvc = yield* Account.Service
     const env = yield* Env.Service
     const npmSvc = yield* Npm.Service
-
-    const readConfigFile = Effect.fnUntraced(function* (filepath: string) {
-      return yield* fs.readFileString(filepath).pipe(
-        Effect.catchIf(
-          (e) => e.reason._tag === "NotFound",
-          () => Effect.succeed(undefined),
-        ),
-        Effect.orDie,
-      )
-    })
-
-    const loadConfig = Effect.fnUntraced(function* (
-      text: string,
-      options: { path: string } | { dir: string; source: string },
-    ) {
-      const source = "path" in options ? options.path : options.source
-      const expanded = yield* Effect.promise(() =>
-        ConfigVariable.substitute(
-          "path" in options ? { text, type: "path", path: options.path } : { text, type: "virtual", ...options },
-        ),
-      )
-      const parsed = ConfigParse.jsonc(expanded, source)
-      const data = ConfigParse.schema(Info, normalizeLoadedConfig(parsed, source), source)
-      if (!("path" in options)) return data
-
-      yield* Effect.promise(() => resolveLoadedPlugins(data, options.path))
-      if (!data.$schema) {
-        data.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
-        const updated = text.replace(
-          /^\s*\{/,
-          '{\n  "$schema": "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json",',
-        )
-        yield* fs.writeFileString(options.path, updated).pipe(Effect.catch(() => Effect.void))
-      }
-      return data
-    })
-
-    const loadFile = Effect.fnUntraced(function* (filepath: string) {
-      log.info("loading", { path: filepath })
-      const text = yield* readConfigFile(filepath)
-      if (!text) return {} as Info
-      return yield* loadConfig(text, { path: filepath })
-    })
-
-    const loadGlobal = Effect.fnUntraced(function* () {
-      let result: Info = pipe(
-        {},
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "config.json"))),
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "opencode.json"))),
-        mergeDeep(yield* loadFile(path.join(Global.Path.config, "opencode.jsonc"))),
-      )
-
-      const legacy = path.join(Global.Path.config, "config")
-      if (existsSync(legacy)) {
-        yield* Effect.promise(() =>
-          import(pathToFileURL(legacy).href, { with: { type: "toml" } })
-            .then(async (mod) => {
-              const { provider, model, ...rest } = mod.default
-              if (provider && model) result.model = `${provider}/${model}`
-              result["$schema"] = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
-              result = mergeDeep(result, rest)
-              await fsNode.writeFile(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
-              await fsNode.unlink(legacy)
-            })
-            .catch(() => {}),
-        )
-      }
-
-      return result
-    })
+    const fileLoader = new ConfigFileLoader(fs, log)
+    const globalLoader = new ConfigGlobalLoader(fileLoader)
+    const writer = new ConfigWriter(fs, fileLoader)
+    const loadConfig = (text: string, options: { path: string } | { dir: string; source: string }) =>
+      fileLoader.loadConfig(text, options)
+    const loadFile = (filepath: string) => fileLoader.loadFile(filepath)
 
     const [cachedGlobal, invalidateGlobal] = yield* Effect.cachedInvalidateWithTTL(
-      loadGlobal().pipe(
+      globalLoader.loadGlobal().pipe(
         Effect.tapError((error) =>
           Effect.sync(() => log.error("failed to load global config, using defaults", { error: String(error) })),
         ),
@@ -514,42 +143,9 @@ export const layer = Layer.effect(
       function* (ctx: InstanceContext) {
         const auth = yield* authSvc.all().pipe(Effect.orDie)
 
-        let result: Info = {}
+        const pipeline = new ConfigInstanceMergePipeline()
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
-
-        const pluginScopeForSource = Effect.fnUntraced(function* (source: string) {
-          if (source.startsWith("http://") || source.startsWith("https://")) return "global"
-          if (source === "OPENCODE_CONFIG_CONTENT") return "local"
-          if (yield* InstanceRef.use((ctx) => Effect.succeed(Instance.containsPath(source, ctx)))) return "local"
-          return "global"
-        })
-
-        const mergePluginOrigins = Effect.fnUntraced(function* (
-          source: string,
-          // mergePluginOrigins receives raw Specs from one config source, before provenance for this merge step
-          // is attached.
-          list: ConfigPlugin.Spec[] | undefined,
-          // Scope can be inferred from the source path, but some callers already know whether the config should
-          // behave as global or local and can pass that explicitly.
-          kind?: ConfigPlugin.Scope,
-        ) {
-          if (!list?.length) return
-          const hit = kind ?? (yield* pluginScopeForSource(source))
-          // Merge newly seen plugin origins with previously collected ones, then dedupe by plugin identity while
-          // keeping the winning source/scope metadata for downstream installs, writes, and diagnostics.
-          const plugins = ConfigPlugin.deduplicatePluginOrigins([
-            ...(result.plugin_origins ?? []),
-            ...list.map((spec) => ({ spec, source, scope: hit })),
-          ])
-          result.plugin = plugins.map((item) => item.spec)
-          result.plugin_origins = plugins
-        })
-
-        const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
-          result = mergeConfigConcatArrays(result, next)
-          return mergePluginOrigins(source, next.plugin, kind)
-        }
 
         for (const [key, value] of Object.entries(auth)) {
           if (value.type === "wellknown") {
@@ -565,14 +161,14 @@ export const layer = Layer.effect(
                 const wellknown = (yield* Effect.promise(() => response.json())) as { config?: Record<string, unknown> }
                 const remoteConfig = wellknown.config ?? {}
                 if (!remoteConfig.$schema) {
-                  remoteConfig.$schema = "https://github.com/Yecyi/OpenAGt/raw/dev/packages/openagt/schema/config.json"
+                  remoteConfig.$schema = CONFIG_SCHEMA_URL
                 }
                 const source = `${url}/.well-known/opencode`
                 const next = yield* loadConfig(JSON.stringify(remoteConfig), {
                   dir: path.dirname(source),
                   source,
                 })
-                yield* merge(source, next, "global")
+                yield* pipeline.merge(source, next, "global")
                 log.debug("loaded remote config from well-known", { url })
               }),
             )
@@ -580,22 +176,22 @@ export const layer = Layer.effect(
         }
 
         const global = yield* getGlobal()
-        yield* merge(Global.Path.config, global, "global")
+        yield* pipeline.merge(Global.Path.config, global, "global")
 
         if (Flag.OPENCODE_CONFIG) {
-          yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
+          yield* pipeline.merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
           log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
         }
 
         if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
           for (const file of yield* ConfigPaths.files("opencode", ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
-            yield* merge(file, yield* loadFile(file), "local")
+            yield* pipeline.merge(file, yield* loadFile(file), "local")
           }
         }
 
-        result.agent = result.agent || {}
-        result.mode = result.mode || {}
-        result.plugin = result.plugin || []
+        pipeline.result.agent = pipeline.result.agent || {}
+        pipeline.result.mode = pipeline.result.mode || {}
+        pipeline.result.plugin = pipeline.result.plugin || []
 
         const directories = yield* ConfigPaths.directories(ctx.directory, ctx.worktree)
 
@@ -610,10 +206,10 @@ export const layer = Layer.effect(
             for (const file of ["opencode.json", "opencode.jsonc"]) {
               const source = path.join(dir, file)
               log.debug(`loading config from ${source}`)
-              yield* merge(source, yield* loadFile(source))
-              result.agent ??= {}
-              result.mode ??= {}
-              result.plugin ??= []
+              yield* pipeline.merge(source, yield* loadFile(source))
+              pipeline.result.agent ??= {}
+              pipeline.result.mode ??= {}
+              pipeline.result.plugin ??= []
             }
           }
 
@@ -642,15 +238,27 @@ export const layer = Layer.effect(
             )
           deps.push(dep)
 
-          result.command = mergeDeep(result.command ?? {}, yield* Effect.promise(() => ConfigCommand.load(dir)))
-          result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.load(dir)))
-          result.agent = mergeDeep(result.agent ?? {}, yield* Effect.promise(() => ConfigAgent.loadMode(dir)))
+          pipeline.result.command = mergeDeep(
+            pipeline.result.command ?? {},
+            yield* Effect.promise(() => ConfigCommand.load(dir)),
+          )
+          pipeline.result.agent = mergeDeep(
+            pipeline.result.agent ?? {},
+            yield* Effect.promise(() => ConfigAgent.load(dir)),
+          )
+          pipeline.result.agent = mergeDeep(
+            pipeline.result.agent ?? {},
+            yield* Effect.promise(() => ConfigAgent.loadMode(dir)),
+          )
           // C.1 — load .opencode/experts/*.md the same way as agents/commands.
-          result.expert = mergeDeep(result.expert ?? {}, yield* Effect.promise(() => ConfigExpert.load(dir)))
+          pipeline.result.expert = mergeDeep(
+            pipeline.result.expert ?? {},
+            yield* Effect.promise(() => ConfigExpert.load(dir)),
+          )
           // Auto-discovered plugins under `.opencode/plugin(s)` are already local files, so ConfigPlugin.load
           // returns normalized Specs and we only need to attach origin metadata here.
           const list = yield* Effect.promise(() => ConfigPlugin.load(dir))
-          yield* mergePluginOrigins(dir, list)
+          yield* pipeline.mergePluginOrigins(dir, list)
         }
 
         if (process.env.OPENCODE_CONFIG_CONTENT) {
@@ -659,7 +267,7 @@ export const layer = Layer.effect(
             dir: ctx.directory,
             source,
           })
-          yield* merge(source, next, "local")
+          yield* pipeline.merge(source, next, "local")
           log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
         }
 
@@ -687,7 +295,7 @@ export const layer = Layer.effect(
                 for (const providerID of Object.keys(next.provider ?? {})) {
                   consoleManagedProviders.add(providerID)
                 }
-                yield* merge(source, next, "global")
+                yield* pipeline.merge(source, next, "global")
               }
             })
 
@@ -711,24 +319,25 @@ export const layer = Layer.effect(
         if (existsSync(managedDir)) {
           for (const file of ["opencode.json", "opencode.jsonc"]) {
             const source = path.join(managedDir, file)
-            yield* merge(source, yield* loadFile(source), "global")
+            yield* pipeline.merge(source, yield* loadFile(source), "global", "managed")
           }
         }
 
         // macOS managed preferences (.mobileconfig deployed via MDM) override everything
         const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
         if (managed) {
-          result = mergeConfigConcatArrays(
-            result,
+          pipeline.mergeConfigOnly(
+            managed.source,
             yield* loadConfig(managed.text, {
               dir: path.dirname(managed.source),
               source: managed.source,
             }),
+            "managed",
           )
         }
 
-        for (const [name, mode] of Object.entries(result.mode ?? {})) {
-          result.agent = mergeDeep(result.agent ?? {}, {
+        for (const [name, mode] of Object.entries(pipeline.result.mode ?? {})) {
+          pipeline.result.agent = mergeDeep(pipeline.result.agent ?? {}, {
             [name]: {
               ...mode,
               mode: "primary" as const,
@@ -737,33 +346,26 @@ export const layer = Layer.effect(
         }
 
         if (Flag.OPENCODE_PERMISSION) {
-          result.permission = mergeDeep(result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+          pipeline.result.permission = mergeDeep(pipeline.result.permission ?? {}, JSON.parse(Flag.OPENCODE_PERMISSION))
+          pipeline.recordField("permission", "OPENCODE_PERMISSION", "flag")
         }
 
-        if (result.tools) {
-          const perms: Record<string, ConfigPermission.Action> = {}
-          for (const [tool, enabled] of Object.entries(result.tools)) {
-            const action: ConfigPermission.Action = enabled ? "allow" : "deny"
-            if (tool === "write" || tool === "edit" || tool === "patch" || tool === "multiedit") {
-              perms.edit = action
-              continue
-            }
-            perms[tool] = action
-          }
-          result.permission = mergeDeep(perms, result.permission ?? {})
-        }
+        pipeline.applyToolsPermissionCompatibility()
 
-        if (!result.username) result.username = os.userInfo().username
+        if (!pipeline.result.username) pipeline.result.username = os.userInfo().username
 
         if (Flag.OPENCODE_DISABLE_AUTOCOMPACT) {
-          result.compaction = { ...result.compaction, auto: false }
+          pipeline.result.compaction = { ...pipeline.result.compaction, auto: false }
+          pipeline.recordField("compaction", "OPENCODE_DISABLE_AUTOCOMPACT", "flag")
         }
         if (Flag.OPENCODE_DISABLE_PRUNE) {
-          result.compaction = { ...result.compaction, prune: false }
+          pipeline.result.compaction = { ...pipeline.result.compaction, prune: false }
+          pipeline.recordField("compaction", "OPENCODE_DISABLE_PRUNE", "flag")
         }
 
         return {
-          config: result,
+          config: pipeline.result,
+          effective: pipeline.snapshot(),
           directories,
           deps,
           consoleState: {
@@ -786,6 +388,10 @@ export const layer = Layer.effect(
       return yield* InstanceState.use(state, (s) => s.config)
     })
 
+    const effective = Effect.fn("Config.effective")(function* () {
+      return yield* InstanceState.use(state, (s) => s.effective)
+    })
+
     const directories = Effect.fn("Config.directories")(function* () {
       return yield* InstanceState.use(state, (s) => s.directories)
     })
@@ -803,10 +409,7 @@ export const layer = Layer.effect(
     const update = Effect.fn("Config.update")(function* (config: Info) {
       const dir = yield* InstanceState.directory
       const file = path.join(dir, "config.json")
-      const existing = yield* loadFile(file)
-      yield* fs
-        .writeFileString(file, JSON.stringify(mergeDeep(writable(existing), writable(config)), null, 2))
-        .pipe(Effect.orDie)
+      yield* writer.updateInstanceFile(file, config)
       yield* invalidate()
     })
 
@@ -832,27 +435,14 @@ export const layer = Layer.effect(
     })
 
     const updateGlobal = Effect.fn("Config.updateGlobal")(function* (config: Info) {
-      const file = globalConfigFile()
-      const before = (yield* readConfigFile(file)) ?? "{}"
-
-      let next: Info
-      if (!file.endsWith(".jsonc")) {
-        const existing = ConfigParse.schema(Info, ConfigParse.jsonc(before, file), file)
-        const merged = mergeDeep(writable(existing), writable(config))
-        yield* fs.writeFileString(file, JSON.stringify(merged, null, 2)).pipe(Effect.orDie)
-        next = merged
-      } else {
-        const updated = patchJsonc(before, writable(config))
-        next = ConfigParse.schema(Info, ConfigParse.jsonc(updated, file), file)
-        yield* fs.writeFileString(file, updated).pipe(Effect.orDie)
-      }
-
+      const next = yield* writer.updateGlobal(config)
       yield* invalidate()
       return next
     })
 
     return Service.of({
       get,
+      effective,
       getGlobal,
       getConsoleState,
       update,

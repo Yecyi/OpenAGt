@@ -1,5 +1,4 @@
 import { Context, Effect, Fiber, Layer, Queue } from "effect"
-import { createWriteStream } from "node:fs"
 import { EnvSanitizer } from "@/security/env-sanitizer"
 import type { ShellFamily } from "@/security/shell-security"
 import type { Tool } from "@/tool"
@@ -13,6 +12,7 @@ import type {
 } from "@/sandbox/types"
 import { autoBackendName } from "@/sandbox/backends"
 import { Log } from "@/util"
+import { ShellOutputBuffer } from "./output-buffer"
 
 const log = Log.create({ service: "shell.runner" })
 
@@ -55,28 +55,6 @@ export type RunResult = {
   }
 }
 
-const MAX_METADATA_LENGTH = 30_000
-
-function preview(text: string) {
-  if (text.length <= MAX_METADATA_LENGTH) return text
-  return "...\n\n" + text.slice(-MAX_METADATA_LENGTH)
-}
-
-function tail(text: string, maxLines: number, maxBytes: number) {
-  const lines = text.split("\n")
-  if (lines.length <= maxLines && Buffer.byteLength(text, "utf-8") <= maxBytes) return { text, cut: false }
-  const out: string[] = []
-  let bytes = 0
-  for (let i = lines.length - 1; i >= 0 && out.length < maxLines; i--) {
-    const line = lines[i]!
-    const size = Buffer.byteLength(line, "utf-8") + (out.length > 0 ? 1 : 0)
-    if (bytes + size > maxBytes) break
-    out.unshift(line)
-    bytes += size
-  }
-  return { text: out.join("\n"), cut: true }
-}
-
 function sanitizeEnv(env: NodeJS.ProcessEnv | undefined) {
   const base = Object.fromEntries(
     Object.entries(env ?? process.env).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : [])),
@@ -99,17 +77,11 @@ export const layer = Layer.effect(
       const bytes = Truncate.MAX_BYTES
       const lines = Truncate.MAX_LINES
       const keep = bytes * 2
-      let full = ""
-      let last = ""
-      let file = ""
-      let sink: ReturnType<typeof createWriteStream> | undefined
-      let cut = false
       let expired = false
       let aborted = false
       let backendUsed = ""
       let terminationReason = ""
-      let used = 0
-      const chunks: Array<{ text: string; size: number }> = []
+      const output = new ShellOutputBuffer({ bytes, lines, keep })
       const env = sanitizeEnv(input.env)
       const requestID = `${ctx.sessionID}:${ctx.callID || "shell"}:${Date.now()}`
       const capabilities = yield* broker.capabilities()
@@ -188,28 +160,9 @@ export const layer = Layer.effect(
       )
 
       const push = (text: string) => {
-        const size = Buffer.byteLength(text, "utf-8")
-        chunks.push({ text, size })
-        used += size
-        while (used > keep && chunks.length > 1) {
-          const item = chunks.shift()
-          if (!item) break
-          used -= item.size
-          cut = true
-        }
-        last = preview(last + text)
-        if (!metadataClosed) {
-          Queue.offerUnsafe(updates, last)
-        }
-        if (file) {
-          try {
-            sink?.write(text)
-          } catch (err) {
-            log.error("failed to write to sink", { error: err })
-          }
-          return
-        }
-        full += text
+        output.push(text, (preview) => {
+          if (!metadataClosed) Queue.offerUnsafe(updates, preview)
+        })
       }
 
       const result = yield* broker.exec({
@@ -247,36 +200,17 @@ export const layer = Layer.effect(
       // C-1: Emit sandbox backend_used metric
       log.info("sandbox.backend_used", { backend: result.backend_used })
 
-      const raw = chunks.map((item) => item.text).join("")
-      const end = tail(raw, lines, bytes)
-      if (end.cut) cut = true
-      if (!file && end.cut) file = yield* truncate.write(raw)
+      const formatted = yield* output.format({
+        expired,
+        aborted,
+        timeout: input.timeout,
+        writeFullOutput: (text) => truncate.write(text),
+      })
 
-      let output = end.text || "(no output)"
-      const meta: string[] = []
-      if (expired) {
-        meta.push(
-          `bash tool terminated command after exceeding timeout ${input.timeout} ms, retry with a larger timeout value in milliseconds.`,
-        )
-      }
-      if (aborted) meta.push("User aborted the command")
-      if (cut && file) output = `...output truncated...\n\nFull output saved to: ${file}\n\n${output}`
-      if (meta.length > 0) output += "\n\n<bash_metadata>\n" + meta.join("\n") + "\n</bash_metadata>"
-
-      if (sink) {
-        const stream = sink
-        yield* Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              stream.end(() => resolve())
-              stream.on("error", () => resolve())
-            }),
-        )
-      }
-      if (last) {
+      if (formatted.latest) {
         yield* ctx.metadata({
           metadata: {
-            output: last,
+            output: formatted.latest,
             description: input.description,
             backendPreference: input.backendPreference,
             enforcement: input.enforcement,
@@ -293,13 +227,13 @@ export const layer = Layer.effect(
 
       return {
         title: input.description,
-        output,
+        output: formatted.output,
         metadata: {
-          output: last || preview(output),
+          output: formatted.metadataOutput,
           exit: code,
           description: input.description,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
+          truncated: formatted.truncated,
+          ...(formatted.outputPath ? { outputPath: formatted.outputPath } : {}),
           backendPreference: input.backendPreference,
           enforcement: input.enforcement,
           filesystemPolicy: input.filesystemPolicy,

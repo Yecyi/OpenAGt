@@ -255,7 +255,7 @@ Shell permission requests also expose structured `shell_safety` metadata.
 | `packages/openagt`         | Core runtime, CLI, server, tools, session engine                    |
 | `packages/app`             | Solid/Vite web client                                               |
 | `packages/sdk/js`          | Generated JavaScript SDK                                            |
-| `packages/openagt_flutter` | Flutter mobile MVP                                                  |
+| `packages/openagt_flutter` | Deferred Flutter client placeholder                                 |
 | `packages/console/*`       | Console and control-plane packages                                  |
 | `packages/opencode`        | Compatibility leftovers, not the main runtime                       |
 | `.opencode/`               | Local examples for agents, commands, plugins, skills, tools, themes |
@@ -296,13 +296,9 @@ Web app:
 bun run --cwd packages/app dev
 ```
 
-Flutter MVP:
+Flutter client:
 
-```bash
-cd packages/openagt_flutter
-flutter pub get
-flutter run
-```
+The Flutter package is kept only as a deferred mobile control-panel placeholder. It is not part of the current stable runtime or release workflow.
 
 ### Testing
 

@@ -7,7 +7,7 @@
  * Reference: Code Reference/CC Source Code/src/tools/BashTool/bashPermissions.ts
  */
 
-import { SAFE_ENV_VARS, BINARY_HIJACK_VARS, ANT_ONLY_SAFE_ENV_VARS } from "./dangers"
+import { ANT_ONLY_SAFE_ENV_VARS, BINARY_HIJACK_VARS, SAFE_ENV_VARS } from "./danger-env"
 
 /**
  * Environment variable sanitizer for removing dangerous variables

@@ -1,12 +1,8 @@
 import z from "zod"
-import { NamedError } from "@openagt/shared/util/error"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { Project } from "../project"
-import { Database, eq } from "../storage"
-import { ProjectTable } from "../project/project.sql"
-import type { ProjectID } from "../project/schema"
 import { Log } from "../util"
 import { Slug } from "@openagt/shared/util/slug"
 import { errorMessage } from "../util/error"
@@ -20,6 +16,18 @@ import { AppFileSystem } from "@openagt/shared/filesystem"
 import { BootstrapRuntime } from "@/effect/bootstrap-runtime"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { InstanceState } from "@/effect"
+import {
+  CreateFailedError,
+  NameGenerationFailedError,
+  NotGitError,
+  RemoveFailedError,
+  ResetFailedError,
+} from "./errors"
+import { failedRemoves, parseWorktreeList, slugify } from "./git-output"
+import type { GitWorktreeListEntry } from "./git-output"
+import { createStartScripts } from "./start-scripts"
+import { Info } from "./schema"
+import type { CreateInput, RemoveInput, ResetInput } from "./schema"
 
 const log = Log.create({ service: "worktree" })
 
@@ -37,115 +45,6 @@ export const Event = {
       message: z.string(),
     }),
   ),
-}
-
-export const Info = z
-  .object({
-    name: z.string(),
-    branch: z.string(),
-    directory: z.string(),
-  })
-  .meta({
-    ref: "Worktree",
-  })
-
-export type Info = z.infer<typeof Info>
-
-export const CreateInput = z
-  .object({
-    name: z.string().optional(),
-    startCommand: z.string().optional().describe("Additional startup script to run after the project's start command"),
-  })
-  .meta({
-    ref: "WorktreeCreateInput",
-  })
-
-export type CreateInput = z.infer<typeof CreateInput>
-
-export const RemoveInput = z
-  .object({
-    directory: z.string(),
-  })
-  .meta({
-    ref: "WorktreeRemoveInput",
-  })
-
-export type RemoveInput = z.infer<typeof RemoveInput>
-
-export const ResetInput = z
-  .object({
-    directory: z.string(),
-  })
-  .meta({
-    ref: "WorktreeResetInput",
-  })
-
-export type ResetInput = z.infer<typeof ResetInput>
-
-export const NotGitError = NamedError.create(
-  "WorktreeNotGitError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-export const NameGenerationFailedError = NamedError.create(
-  "WorktreeNameGenerationFailedError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-export const CreateFailedError = NamedError.create(
-  "WorktreeCreateFailedError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-export const StartCommandFailedError = NamedError.create(
-  "WorktreeStartCommandFailedError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-export const RemoveFailedError = NamedError.create(
-  "WorktreeRemoveFailedError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-export const ResetFailedError = NamedError.create(
-  "WorktreeResetFailedError",
-  z.object({
-    message: z.string(),
-  }),
-)
-
-function slugify(input: string) {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "")
-}
-
-function failedRemoves(...chunks: string[]) {
-  return chunks.filter(Boolean).flatMap((chunk) =>
-    chunk
-      .split("\n")
-      .map((line) => line.trim())
-      .flatMap((line) => {
-        const match = line.match(/^warning:\s+failed to remove\s+(.+):\s+/i)
-        if (!match) return []
-        const value = match[1]?.trim().replace(/^['"]|['"]$/g, "")
-        if (!value) return []
-        return [value]
-      }),
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +76,7 @@ export const layer: Layer.Layer<
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const gitSvc = yield* Git.Service
     const project = yield* Project.Service
+    const runStartScripts = createStartScripts({ spawner, log })
 
     const git = Effect.fnUntraced(
       function* (args: string[], opts?: { cwd?: string }) {
@@ -315,29 +215,7 @@ export const layer: Layer.Layer<
       return process.platform === "win32" ? normalized.toLowerCase() : normalized
     })
 
-    function parseWorktreeList(text: string) {
-      return text
-        .split("\n")
-        .map((line) => line.trim())
-        .reduce<{ path?: string; branch?: string }[]>((acc, line) => {
-          if (!line) return acc
-          if (line.startsWith("worktree ")) {
-            acc.push({ path: line.slice("worktree ".length).trim() })
-            return acc
-          }
-          const current = acc[acc.length - 1]
-          if (!current) return acc
-          if (line.startsWith("branch ")) {
-            current.branch = line.slice("branch ".length).trim()
-          }
-          return acc
-        }, [])
-    }
-
-    const locateWorktree = Effect.fnUntraced(function* (
-      entries: { path?: string; branch?: string }[],
-      directory: string,
-    ) {
+    const locateWorktree = Effect.fnUntraced(function* (entries: GitWorktreeListEntry[], directory: string) {
       for (const item of entries) {
         if (!item.path) continue
         const key = yield* canonical(item.path)
@@ -428,48 +306,6 @@ export const layer: Layer.Layer<
       const result = yield* git(args, opts)
       if (result.code !== 0) throw error(result)
       return result
-    })
-
-    const runStartCommand = Effect.fnUntraced(
-      function* (directory: string, cmd: string) {
-        const [shell, args] = process.platform === "win32" ? ["cmd", ["/c", cmd]] : ["bash", ["-lc", cmd]]
-        const handle = yield* spawner.spawn(
-          ChildProcess.make(shell, args, { cwd: directory, extendEnv: true, stdin: "ignore" }),
-        )
-        // Drain stdout, capture stderr for error reporting
-        const [, stderr] = yield* Effect.all(
-          [Stream.runDrain(handle.stdout), Stream.mkString(Stream.decodeText(handle.stderr))],
-          { concurrency: 2 },
-        ).pipe(Effect.orDie)
-        const code = yield* handle.exitCode
-        return { code, stderr }
-      },
-      Effect.scoped,
-      Effect.catch(() => Effect.succeed({ code: 1, stderr: "" })),
-    )
-
-    const runStartScript = Effect.fnUntraced(function* (directory: string, cmd: string, kind: string) {
-      const text = cmd.trim()
-      if (!text) return true
-      const result = yield* runStartCommand(directory, text)
-      if (result.code === 0) return true
-      log.error("worktree start command failed", { kind, directory, message: result.stderr })
-      return false
-    })
-
-    const runStartScripts = Effect.fnUntraced(function* (
-      directory: string,
-      input: { projectID: ProjectID; extra?: string },
-    ) {
-      const row = yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, input.projectID)).get()),
-      )
-      const project = row ? Project.fromRow(row) : undefined
-      const startup = project?.commands?.start?.trim() ?? ""
-      const ok = yield* runStartScript(directory, startup, "project")
-      if (!ok) return false
-      yield* runStartScript(directory, input.extra ?? "", "worktree")
-      return true
     })
 
     const prune = Effect.fnUntraced(function* (root: string, entries: string[]) {
@@ -596,4 +432,6 @@ export const defaultLayer = layer.pipe(
   Layer.provide(NodePath.layer),
 )
 
+export * from "./schema"
+export * from "./errors"
 export * as Worktree from "."

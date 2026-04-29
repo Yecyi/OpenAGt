@@ -1,10 +1,14 @@
-import type { Provider } from "@openagt/sdk/v2"
+import type { Model, Provider } from "@openagt/sdk/v2"
 
-export function index(list: Provider[] | undefined) {
+export function indexProviders(list: Provider[] | undefined): ReadonlyMap<string, Provider> {
   return new Map((list ?? []).map((item) => [item.id, item] as const))
 }
 
-export function get(list: Provider[] | ReadonlyMap<string, Provider> | undefined, providerID: string, modelID: string) {
+export function findProviderModel(
+  list: Provider[] | ReadonlyMap<string, Provider> | undefined,
+  providerID: string,
+  modelID: string,
+): Model | undefined {
   const provider =
     list instanceof Map
       ? list.get(providerID)
@@ -14,10 +18,10 @@ export function get(list: Provider[] | ReadonlyMap<string, Provider> | undefined
   return provider?.models[modelID]
 }
 
-export function name(
+export function getProviderModelName(
   list: Provider[] | ReadonlyMap<string, Provider> | undefined,
   providerID: string,
   modelID: string,
-) {
-  return get(list, providerID, modelID)?.name ?? modelID
+): string {
+  return findProviderModel(list, providerID, modelID)?.name ?? modelID
 }

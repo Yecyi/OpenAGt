@@ -1,7 +1,6 @@
 import path from "path"
-import z from "zod"
 import { AppFileSystem } from "@openagt/shared/filesystem"
-import { Cause, Context, Effect, Fiber, Layer, Queue, Stream } from "effect"
+import { Context, Effect, Fiber, Layer, Queue, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
@@ -10,8 +9,41 @@ import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { Global } from "@/global"
 import { Log } from "@/util"
-import { sanitizedProcessEnv } from "@/util/opencode-process"
 import { which } from "@/util/which"
+import { filesArgs, searchArgs } from "./ripgrep-args"
+import {
+  Begin as BeginSchema,
+  End as EndSchema,
+  Match as MatchSchema,
+  Result as ResultSchema,
+  Summary as SummarySchema,
+} from "./ripgrep-contracts"
+import type {
+  Interface as RipgrepInterface,
+  Match as RipgrepMatch,
+  SearchInput as RipgrepSearchInput,
+  TreeInput as RipgrepTreeInput,
+} from "./ripgrep-contracts"
+import { clean, parse, row } from "./ripgrep-output"
+import { env, error, fail, raceAbort } from "./ripgrep-runtime"
+
+export const Begin = BeginSchema
+export const End = EndSchema
+export const Match = MatchSchema
+export const Result = ResultSchema
+export const Summary = SummarySchema
+export type Begin = import("./ripgrep-contracts").Begin
+export type End = import("./ripgrep-contracts").End
+export type FilesInput = import("./ripgrep-contracts").FilesInput
+export type Interface = import("./ripgrep-contracts").Interface
+export type Item = import("./ripgrep-contracts").Item
+export type Match = import("./ripgrep-contracts").Match
+export type Result = import("./ripgrep-contracts").Result
+export type Row = import("./ripgrep-contracts").Row
+export type SearchInput = import("./ripgrep-contracts").SearchInput
+export type SearchResult = import("./ripgrep-contracts").SearchResult
+export type Summary = import("./ripgrep-contracts").Summary
+export type TreeInput = import("./ripgrep-contracts").TreeInput
 
 const log = Log.create({ service: "ripgrep" })
 const VERSION = "14.1.1"
@@ -24,205 +56,7 @@ const PLATFORM = {
   "x64-win32": { platform: "x86_64-pc-windows-msvc", extension: "zip" },
 } as const
 
-const Stats = z.object({
-  elapsed: z.object({
-    secs: z.number(),
-    nanos: z.number(),
-    human: z.string(),
-  }),
-  searches: z.number(),
-  searches_with_match: z.number(),
-  bytes_searched: z.number(),
-  bytes_printed: z.number(),
-  matched_lines: z.number(),
-  matches: z.number(),
-})
-
-const Begin = z.object({
-  type: z.literal("begin"),
-  data: z.object({
-    path: z.object({
-      text: z.string(),
-    }),
-  }),
-})
-
-export const Match = z.object({
-  type: z.literal("match"),
-  data: z.object({
-    path: z.object({
-      text: z.string(),
-    }),
-    lines: z.object({
-      text: z.string(),
-    }),
-    line_number: z.number(),
-    absolute_offset: z.number(),
-    submatches: z.array(
-      z.object({
-        match: z.object({
-          text: z.string(),
-        }),
-        start: z.number(),
-        end: z.number(),
-      }),
-    ),
-  }),
-})
-
-const End = z.object({
-  type: z.literal("end"),
-  data: z.object({
-    path: z.object({
-      text: z.string(),
-    }),
-    binary_offset: z.number().nullable(),
-    stats: Stats,
-  }),
-})
-
-const Summary = z.object({
-  type: z.literal("summary"),
-  data: z.object({
-    elapsed_total: z.object({
-      human: z.string(),
-      nanos: z.number(),
-      secs: z.number(),
-    }),
-    stats: Stats,
-  }),
-})
-
-const Result = z.union([Begin, Match, End, Summary])
-
-export type Result = z.infer<typeof Result>
-export type Match = z.infer<typeof Match>
-export type Item = Match["data"]
-export type Begin = z.infer<typeof Begin>
-export type End = z.infer<typeof End>
-export type Summary = z.infer<typeof Summary>
-export type Row = Match["data"]
-
-export interface SearchResult {
-  items: Item[]
-  partial: boolean
-}
-
-export interface FilesInput {
-  cwd: string
-  glob?: string[]
-  hidden?: boolean
-  follow?: boolean
-  maxDepth?: number
-  signal?: AbortSignal
-}
-
-export interface SearchInput {
-  cwd: string
-  pattern: string
-  glob?: string[]
-  limit?: number
-  follow?: boolean
-  file?: string[]
-  signal?: AbortSignal
-}
-
-export interface TreeInput {
-  cwd: string
-  limit?: number
-  signal?: AbortSignal
-}
-
-export interface Interface {
-  readonly files: (input: FilesInput) => Stream.Stream<string, PlatformError | Error>
-  readonly tree: (input: TreeInput) => Effect.Effect<string, PlatformError | Error>
-  readonly search: (input: SearchInput) => Effect.Effect<SearchResult, PlatformError | Error>
-}
-
-export class Service extends Context.Service<Service, Interface>()("@opencode/Ripgrep") {}
-
-function env() {
-  const env = sanitizedProcessEnv()
-  delete env.RIPGREP_CONFIG_PATH
-  return env
-}
-
-function aborted(signal?: AbortSignal) {
-  const err = signal?.reason
-  if (err instanceof Error) return err
-  const out = new Error("Aborted")
-  out.name = "AbortError"
-  return out
-}
-
-function waitForAbort(signal?: AbortSignal) {
-  if (!signal) return Effect.never
-  if (signal.aborted) return Effect.fail(aborted(signal))
-  return Effect.callback<never, Error>((resume) => {
-    const onabort = () => resume(Effect.fail(aborted(signal)))
-    signal.addEventListener("abort", onabort, { once: true })
-    return Effect.sync(() => signal.removeEventListener("abort", onabort))
-  })
-}
-
-function error(stderr: string, code: number) {
-  const err = new Error(stderr.trim() || `ripgrep failed with code ${code}`)
-  err.name = "RipgrepError"
-  return err
-}
-
-function clean(file: string) {
-  return path.normalize(file.replace(/^\.[\\/]/, ""))
-}
-
-function row(data: Row): Row {
-  return {
-    ...data,
-    path: {
-      ...data.path,
-      text: clean(data.path.text),
-    },
-  }
-}
-
-function parse(line: string) {
-  return Effect.try({
-    try: () => Result.parse(JSON.parse(line)),
-    catch: (cause) => new Error("invalid ripgrep output", { cause }),
-  })
-}
-
-function fail(queue: Queue.Queue<string, PlatformError | Error | Cause.Done>, err: PlatformError | Error) {
-  Queue.failCauseUnsafe(queue, Cause.fail(err))
-}
-
-function filesArgs(input: FilesInput) {
-  const args = ["--no-config", "--files", "--glob=!.git/*"]
-  if (input.follow) args.push("--follow")
-  if (input.hidden !== false) args.push("--hidden")
-  if (input.hidden === false) args.push("--glob=!.*")
-  if (input.maxDepth !== undefined) args.push(`--max-depth=${input.maxDepth}`)
-  if (input.glob) {
-    for (const glob of input.glob) args.push(`--glob=${glob}`)
-  }
-  args.push(".")
-  return args
-}
-
-function searchArgs(input: SearchInput) {
-  const args = ["--no-config", "--json", "--hidden", "--glob=!.git/*", "--no-messages"]
-  if (input.follow) args.push("--follow")
-  if (input.glob) {
-    for (const glob of input.glob) args.push(`--glob=${glob}`)
-  }
-  if (input.limit) args.push(`--max-count=${input.limit}`)
-  args.push("--", input.pattern, ...(input.file ?? ["."]))
-  return args
-}
-
-function raceAbort<A, E, R>(effect: Effect.Effect<A, E, R>, signal?: AbortSignal) {
-  return signal ? effect.pipe(Effect.raceFirst(waitForAbort(signal))) : effect
-}
+export class Service extends Context.Service<Service, RipgrepInterface>()("@opencode/Ripgrep") {}
 
 export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildProcessSpawner | HttpClient.HttpClient> =
   Layer.effect(
@@ -364,7 +198,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         })
       })
 
-      const files: Interface["files"] = (input) =>
+      const files: RipgrepInterface["files"] = (input) =>
         Stream.callback<string, PlatformError | Error>((queue) =>
           Effect.gen(function* () {
             yield* Effect.forkScoped(
@@ -396,7 +230,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
           }),
         )
 
-      const search: Interface["search"] = Effect.fn("Ripgrep.search")(function* (input: SearchInput) {
+      const search: RipgrepInterface["search"] = Effect.fn("Ripgrep.search")(function* (input: RipgrepSearchInput) {
         yield* check(input.cwd)
 
         const program = Effect.scoped(
@@ -409,7 +243,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
                   Stream.splitLines,
                   Stream.filter((line) => line.length > 0),
                   Stream.mapEffect(parse),
-                  Stream.filter((item): item is Match => item.type === "match"),
+                  Stream.filter((item): item is RipgrepMatch => item.type === "match"),
                   Stream.map((item) => row(item.data)),
                   Stream.runCollect,
                   Effect.map((chunk) => [...chunk]),
@@ -434,7 +268,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         return yield* raceAbort(program, input.signal)
       })
 
-      const tree: Interface["tree"] = Effect.fn("Ripgrep.tree")(function* (input: TreeInput) {
+      const tree: RipgrepInterface["tree"] = Effect.fn("Ripgrep.tree")(function* (input: RipgrepTreeInput) {
         log.info("tree", input)
         const list = Array.from(yield* files({ cwd: input.cwd, signal: input.signal }).pipe(Stream.runCollect))
 

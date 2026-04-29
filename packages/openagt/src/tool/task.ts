@@ -9,9 +9,21 @@ import { Provider } from "../provider"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "../config"
 import { Cause, Effect, Exit, Option } from "effect"
-import { TaskKind, TaskRuntime, type TaskRecord } from "../session/task-runtime"
+import { TaskKind, TaskRuntime } from "../session/task-runtime"
 import { BudgetTuning, effortStepBudget, effortTimeoutFloor } from "../agent/budget-tuning"
 import { classifyGoal, effortFromMetadata, numericMetadata } from "../agent/task-classifier"
+import {
+  assistantText,
+  formatCompletedOutput,
+  formatFailedOutput,
+  formatPendingOutput,
+  formatStepBudgetPartialOutput,
+  formatStoredRecordOutput,
+  formatTimeoutPartialOutput,
+  limitReason,
+  taskPartialSummary,
+  type TaskMetadata,
+} from "./task-output"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): void
@@ -43,51 +55,6 @@ const parameters = z.object({
   metadata: z.record(z.string(), z.unknown()).describe("Optional structured metadata for scheduling").optional(),
   command: z.string().describe("The command that triggered this task").optional(),
 })
-
-type TaskMetadata = {
-  sessionId: SessionID
-  model: {
-    modelID: string
-    providerID: string
-  }
-  taskId?: SessionID
-  status?: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
-  groupId?: string
-  error?: string
-  retryable?: boolean
-  partial?: boolean
-  limitReason?: string
-  partialSummary?: string
-  resultText?: string
-  remainingScope?: string[]
-}
-
-function taskPartialSummary(messages: MessageV2.WithParts[]) {
-  const items = messages
-    .filter((message) => message.info.role === "assistant")
-    .flatMap((message) =>
-      message.parts.flatMap((part) => {
-        if (part.type === "text") return part.text.trim() ? [part.text.trim()] : []
-        if (part.type !== "tool") return []
-        if (part.state.status === "completed") {
-          return [`tool ${part.tool} completed: ${part.state.output.slice(0, 300)}`]
-        }
-        if (part.state.status === "error") return [`tool ${part.tool} error: ${part.state.error}`]
-        if (part.state.status === "running") return [`tool ${part.tool} running${part.state.title ? `: ${part.state.title}` : ""}`]
-        return [`tool ${part.tool} pending`]
-      }),
-    )
-  const finalText = items.findLast((item) => item.trim().length > 0)
-  const summary = items
-    .join("\n")
-    .trim()
-  if (!summary) return undefined
-  if (summary.length <= 4_000) return summary
-  const tail = Array.from(summary).slice(-3_600).join("")
-  return ["[truncated partial task history]", tail, finalText && !tail.includes(finalText) ? finalText : undefined]
-    .filter((item): item is string => Boolean(item))
-    .join("\n")
-}
 
 function taskStepBudget(params: z.infer<typeof parameters>, agentName: string, taskKind: z.infer<typeof TaskKind>) {
   const explicit = numericMetadata(params.metadata, "max_steps") ?? numericMetadata(params.metadata, "step_budget")
@@ -165,34 +132,6 @@ function taskTimeoutMs(
       effective_timeout_ms: value,
     },
   }
-}
-
-function assistantText(message: MessageV2.WithParts) {
-  return message.parts
-    .flatMap((part) => (part.type === "text" ? [part.text] : []))
-    .join("\n")
-    .trim()
-}
-
-function storedTaskResult(record: TaskRecord) {
-  const resultText =
-    typeof record.metadata?.result_text === "string" && record.metadata.result_text.trim()
-      ? record.metadata.result_text
-      : undefined
-  const partialSummary =
-    typeof record.metadata?.partial_summary === "string" && record.metadata.partial_summary.trim()
-      ? record.metadata.partial_summary
-      : undefined
-  return resultText ?? partialSummary ?? record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`
-}
-
-function limitReason(message: MessageV2.WithParts) {
-  if (message.info.role === "assistant" && message.info.finish === "step-budget") return "step_budget"
-  const text = assistantText(message).toLowerCase()
-  if (text.includes("step budget") && text.includes("reached")) return "step_budget"
-  if (text.includes("maximum steps") && text.includes("reached")) return "step_budget"
-  if (text.includes("max steps") && text.includes("reached")) return "step_budget"
-  return undefined
 }
 
 export const TaskTool = Tool.define(
@@ -329,57 +268,15 @@ export const TaskTool = Tool.define(
               metadata: runtimeMetadata,
             })
 
+      const target = { sessionId: nextSession.id, model }
+
       if (record.status !== "pending") {
-        return {
-          title: params.description,
-          metadata: {
-            sessionId: nextSession.id,
-            model,
-            taskId: nextSession.id,
-            status: record.status,
-            groupId: record.group_id,
-            partial: record.status === "partial" ? true : undefined,
-            retryable: record.metadata?.retryable === true ? true : undefined,
-                  limitReason: typeof record.metadata?.limit_reason === "string" ? record.metadata.limit_reason : undefined,
-                  partialSummary:
-                    typeof record.metadata?.partial_summary === "string" ? record.metadata.partial_summary : undefined,
-                  resultText: typeof record.metadata?.result_text === "string" ? record.metadata.result_text : undefined,
-                  remainingScope: Array.isArray(record.metadata?.remaining_scope)
-                    ? record.metadata.remaining_scope.filter((item): item is string => typeof item === "string")
-                    : undefined,
-                },
-          output: [
-            `task_id: ${nextSession.id} (${record.status})`,
-            "",
-            `<task_result status="${record.status}">`,
-            storedTaskResult(record),
-            "</task_result>",
-            ...(record.status === "partial"
-              ? ["", "Task is partial and retryable; retry only the missing scope if more evidence is required."]
-              : []),
-          ].join("\n"),
-        }
+        return formatStoredRecordOutput(params, target, record)
       }
 
       const canRun = yield* tasks.canRun({ parentSessionID: ctx.sessionID, task: record })
       if (!canRun) {
-        return {
-          title: params.description,
-          metadata: {
-            sessionId: nextSession.id,
-            model,
-            taskId: nextSession.id,
-            status: "pending" as const,
-            groupId: params.group_id,
-          },
-          output: [
-            `task_id: ${nextSession.id} (pending)`,
-            "",
-            "<task_result>",
-            "Task created and queued pending dependency or write-class constraints.",
-            "</task_result>",
-          ].join("\n"),
-        }
+        return formatPendingOutput(params, target)
       }
 
       function cancel() {
@@ -468,31 +365,7 @@ export const TaskTool = Tool.define(
                 remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
               })
 
-              return {
-                title: params.description,
-                metadata: {
-                  sessionId: nextSession.id,
-                  model,
-                  taskId: nextSession.id,
-                  status: "partial" as const,
-                  groupId: params.group_id,
-                  error: result.error,
-                  retryable: true,
-                  partial: true,
-                  limitReason: "timeout",
-                  partialSummary: summary,
-                  remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
-                },
-                output: [
-                  `task_id: ${nextSession.id} (partial, retryable)`,
-                  "",
-                  '<partial_task_result status="partial" reason="timeout">',
-                  summary,
-                  "",
-                  result.error,
-                  "</partial_task_result>",
-                ].join("\n"),
-              }
+              return formatTimeoutPartialOutput(params, target, summary, result.error)
             }
 
             if (result.status === "failed") {
@@ -502,29 +375,7 @@ export const TaskTool = Tool.define(
                 error: result.error,
               })
 
-              return {
-                title: params.description,
-                metadata: {
-                  sessionId: nextSession.id,
-                  model,
-                  taskId: nextSession.id,
-                  status: "failed" as const,
-                  groupId: params.group_id,
-                  error: result.error,
-                  retryable: result.retryable,
-                  partialSummary: result.partial,
-                },
-                output: [
-                  `task_id: ${nextSession.id} (failed${result.retryable ? ", retryable" : ""})`,
-                  "",
-                  '<task_result status="failed">',
-                  result.error,
-                  "</task_result>",
-                  ...(result.partial
-                    ? ["", '<partial_task_result status="partial">', result.partial, "</partial_task_result>"]
-                    : []),
-                ].join("\n"),
-              }
+              return formatFailedOutput(params, target, result.error, result.retryable, result.partial)
             }
 
             if (result.status !== "completed") {
@@ -545,31 +396,7 @@ export const TaskTool = Tool.define(
 
               const summary = assistantText(completedMessage) || "Subagent reached its step budget before returning a detailed summary."
 
-              return {
-                title: params.description,
-                metadata: {
-                  sessionId: nextSession.id,
-                  model,
-                  taskId: nextSession.id,
-                  status: "partial" as const,
-                  groupId: params.group_id,
-                  partial: true,
-                  retryable: true,
-                  limitReason: maxStepReason,
-                  partialSummary: summary,
-                  resultText: summary,
-                  remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
-                },
-                output: [
-                  `task_id: ${nextSession.id} (partial, retryable)`,
-                  "",
-                  `<partial_task_result status="partial" reason="${maxStepReason}">`,
-                  summary,
-                  "",
-                  "Remaining work: retry this subagent with narrower scope or a larger step budget if the parent still needs more evidence.",
-                  "</partial_task_result>",
-                ].join("\n"),
-              }
+              return formatStepBudgetPartialOutput(params, target, summary, maxStepReason)
             }
 
             yield* tasks.complete({
@@ -578,28 +405,7 @@ export const TaskTool = Tool.define(
               result: completedMessage,
             })
 
-            const summary = assistantText(completedMessage)
-
-            return {
-              title: params.description,
-              metadata: {
-                sessionId: nextSession.id,
-                model,
-                taskId: nextSession.id,
-                status: "completed" as const,
-                groupId: params.group_id,
-              },
-              output:
-                (params.return_mode ?? "id") === "summary"
-                  ? [
-                      `task_id: ${nextSession.id} (completed; use task_get for full result if needed)`,
-                      "",
-                      '<task_result status="completed">',
-                      summary,
-                      "</task_result>",
-                    ].join("\n")
-                  : `task_id: ${nextSession.id} (completed; use task_get for full result if needed)`,
-            }
+            return formatCompletedOutput(params, target, assistantText(completedMessage))
           }),
         (unregister) =>
           Effect.sync(() => {

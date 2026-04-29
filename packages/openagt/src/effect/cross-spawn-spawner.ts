@@ -1,6 +1,7 @@
-import type * as Arr from "effect/Array"
 import { NodeFileSystem, NodeSink, NodeStream } from "@effect/platform-node"
 import * as NodePath from "@effect/platform-node/NodePath"
+import { flatten, toError, toPlatformError } from "./cross-spawn-errors"
+import { env, fds, stdin, stdio, stdios } from "./cross-spawn-options"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -25,73 +26,6 @@ import * as NodeChildProcess from "node:child_process"
 import { PassThrough } from "node:stream"
 import launch from "cross-spawn"
 
-const toError = (err: unknown): Error => (err instanceof globalThis.Error ? err : new globalThis.Error(String(err)))
-
-const toTag = (err: NodeJS.ErrnoException): PlatformError.SystemErrorTag => {
-  switch (err.code) {
-    case "ENOENT":
-      return "NotFound"
-    case "EACCES":
-      return "PermissionDenied"
-    case "EEXIST":
-      return "AlreadyExists"
-    case "EISDIR":
-      return "BadResource"
-    case "ENOTDIR":
-      return "BadResource"
-    case "EBUSY":
-      return "Busy"
-    case "ELOOP":
-      return "BadResource"
-    default:
-      return "Unknown"
-  }
-}
-
-const flatten = (command: ChildProcess.Command) => {
-  const commands: Array<ChildProcess.StandardCommand> = []
-  const opts: Array<ChildProcess.PipeOptions> = []
-
-  const walk = (cmd: ChildProcess.Command): void => {
-    switch (cmd._tag) {
-      case "StandardCommand":
-        commands.push(cmd)
-        return
-      case "PipedCommand":
-        walk(cmd.left)
-        opts.push(cmd.options)
-        walk(cmd.right)
-        return
-    }
-  }
-
-  walk(command)
-  if (commands.length === 0) throw new Error("flatten produced empty commands array")
-  const [head, ...tail] = commands
-  return {
-    commands: [head, ...tail] as Arr.NonEmptyReadonlyArray<ChildProcess.StandardCommand>,
-    opts,
-  }
-}
-
-const toPlatformError = (
-  method: string,
-  err: NodeJS.ErrnoException,
-  command: ChildProcess.Command,
-): PlatformError.PlatformError => {
-  const cmd = flatten(command)
-    .commands.map((x) => `${x.command} ${x.args.join(" ")}`)
-    .join(" | ")
-  return PlatformError.systemError({
-    _tag: toTag(err),
-    module: "ChildProcess",
-    method,
-    pathOrDescriptor: cmd,
-    syscall: err.syscall,
-    cause: err,
-  })
-}
-
 type ExitSignal = Deferred.Deferred<readonly [code: number | null, signal: NodeJS.Signals | null]>
 
 export const make = Effect.gen(function* () {
@@ -103,65 +37,6 @@ export const make = Effect.gen(function* () {
     yield* fs.access(opts.cwd)
     return path.resolve(opts.cwd)
   })
-
-  const env = (opts: ChildProcess.CommandOptions) =>
-    opts.extendEnv ? { ...globalThis.process.env, ...opts.env } : opts.env
-
-  const input = (x: ChildProcess.CommandInput | undefined): NodeChildProcess.IOType | undefined =>
-    Stream.isStream(x) ? "pipe" : x
-
-  const output = (x: ChildProcess.CommandOutput | undefined): NodeChildProcess.IOType | undefined =>
-    Sink.isSink(x) ? "pipe" : x
-
-  const stdin = (opts: ChildProcess.CommandOptions): ChildProcess.StdinConfig => {
-    const cfg: ChildProcess.StdinConfig = { stream: "pipe", encoding: "utf-8", endOnDone: true }
-    if (Predicate.isUndefined(opts.stdin)) return cfg
-    if (typeof opts.stdin === "string") return { ...cfg, stream: opts.stdin }
-    if (Stream.isStream(opts.stdin)) return { ...cfg, stream: opts.stdin }
-    return {
-      stream: opts.stdin.stream,
-      encoding: opts.stdin.encoding ?? cfg.encoding,
-      endOnDone: opts.stdin.endOnDone ?? cfg.endOnDone,
-    }
-  }
-
-  const stdio = (opts: ChildProcess.CommandOptions, key: "stdout" | "stderr"): ChildProcess.StdoutConfig => {
-    const cfg = opts[key]
-    if (Predicate.isUndefined(cfg)) return { stream: "pipe" }
-    if (typeof cfg === "string") return { stream: cfg }
-    if (Sink.isSink(cfg)) return { stream: cfg }
-    return { stream: cfg.stream }
-  }
-
-  const fds = (opts: ChildProcess.CommandOptions) => {
-    if (Predicate.isUndefined(opts.additionalFds)) return []
-    return Object.entries(opts.additionalFds)
-      .flatMap(([name, config]) => {
-        const fd = ChildProcess.parseFdName(name)
-        return Predicate.isUndefined(fd) ? [] : [{ fd, config }]
-      })
-      .toSorted((a, b) => a.fd - b.fd)
-  }
-
-  const stdios = (
-    sin: ChildProcess.StdinConfig,
-    sout: ChildProcess.StdoutConfig,
-    serr: ChildProcess.StderrConfig,
-    extra: ReadonlyArray<{ fd: number; config: ChildProcess.AdditionalFdConfig }>,
-  ): NodeChildProcess.StdioOptions => {
-    const pipe = (x: NodeChildProcess.IOType | undefined) =>
-      process.platform === "win32" && x === "pipe" ? "overlapped" : x
-    const arr: Array<NodeChildProcess.IOType | undefined> = [
-      pipe(input(sin.stream)),
-      pipe(output(sout.stream)),
-      pipe(output(serr.stream)),
-    ]
-    if (extra.length === 0) return arr as NodeChildProcess.StdioOptions
-    const max = extra.reduce((acc, x) => Math.max(acc, x.fd), 2)
-    for (let i = 3; i <= max; i++) arr[i] = "ignore"
-    for (const x of extra) arr[x.fd] = pipe("pipe")
-    return arr as NodeChildProcess.StdioOptions
-  }
 
   const setupFds = Effect.fnUntraced(function* (
     command: ChildProcess.StandardCommand,

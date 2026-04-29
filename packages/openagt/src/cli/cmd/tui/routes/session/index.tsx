@@ -166,7 +166,7 @@ export function Session() {
   })
   const showTimestamps = createMemo(() => timestamps() === "show")
   const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
-  const providers = createMemo(() => Model.index(sync.data.provider))
+  const providers = createMemo(() => Model.indexProviders(sync.data.provider))
 
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
   const toast = useToast()
@@ -1258,7 +1258,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   const { theme } = useTheme()
   const sync = useSync()
   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
-  const model = createMemo(() => Model.name(ctx.providers(), props.message.providerID, props.message.modelID))
+  const model = createMemo(() =>
+    Model.getProviderModelName(ctx.providers(), props.message.providerID, props.message.modelID),
+  )
 
   const final = createMemo(() => {
     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)

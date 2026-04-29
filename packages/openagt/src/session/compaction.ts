@@ -1,11 +1,8 @@
-import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import * as Session from "./session"
 import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "../provider"
 import { MessageV2 } from "./message-v2"
-import z from "zod"
-import { Token } from "../util"
 import { Log } from "../util"
 import { SessionProcessor } from "./processor"
 import { Agent } from "@/agent/agent"
@@ -16,49 +13,21 @@ import { ModelID, ProviderID } from "@/provider/schema"
 import { Effect, Layer, Context, Option } from "effect"
 import { InstanceState } from "@/effect"
 import { isOverflow as overflow } from "./overflow"
-import { MICRO_COMPACT_TIME_THRESHOLD_MS, applyMicroCompact, summarizeToolResult } from "./compaction/micro"
-import { DEFAULT_AUTO_COMPACT_CONFIG, needsAutoCompact, findToolPartsToCompact } from "./compaction/auto"
+import { summarizeToolResult } from "./compaction/micro"
 import { buildCompactContext, formatCompactPrompt, DEFAULT_FULL_COMPACT_CONFIG } from "./compaction/full"
-import { compactionCoordinator, needsCompaction, getRecommendedLayer } from "./compaction/coordinator"
+import { compactionCoordinator } from "./compaction/coordinator"
 import { compressionTracker } from "./compaction/metrics"
+import { autoContinueText, replayPartForCompaction, selectOverflowReplay } from "./compaction-replay"
+import {
+  COMPACTION_CIRCUIT_FAILURES,
+  Event,
+  PRUNE_MINIMUM,
+  PRUNE_PROTECTED_TOOLS,
+  type Interface,
+} from "./compaction-contracts"
+export * from "./compaction-contracts"
 
 const log = Log.create({ service: "session.compaction" })
-const COMPACTION_CIRCUIT_FAILURES = 3
-
-export const Event = {
-  Compacted: BusEvent.define(
-    "session.compacted",
-    z.object({
-      sessionID: SessionID.zod,
-    }),
-  ),
-}
-
-export const PRUNE_MINIMUM = 20_000
-export const PRUNE_PROTECT = 40_000
-const PRUNE_PROTECTED_TOOLS = ["skill"]
-
-export interface Interface {
-  readonly isOverflow: (input: {
-    tokens: MessageV2.Assistant["tokens"]
-    model: Provider.Model
-  }) => Effect.Effect<boolean>
-  readonly prune: (input: { sessionID: SessionID }) => Effect.Effect<void>
-  readonly process: (input: {
-    parentID: MessageID
-    messages: MessageV2.WithParts[]
-    sessionID: SessionID
-    auto: boolean
-    overflow?: boolean
-  }) => Effect.Effect<"continue" | "stop">
-  readonly create: (input: {
-    sessionID: SessionID
-    agent: string
-    model: { providerID: ProviderID; modelID: ModelID }
-    auto: boolean
-    overflow?: boolean
-  }) => Effect.Effect<void>
-}
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
 
@@ -220,30 +189,9 @@ export const layer: Layer.Layer<
       }
       const userMessage = parent.info
 
-      let messages = input.messages
-      let replay:
-        | {
-            info: MessageV2.User
-            parts: MessageV2.Part[]
-          }
-        | undefined
-      if (input.overflow) {
-        const idx = input.messages.findIndex((m) => m.info.id === input.parentID)
-        for (let i = idx - 1; i >= 0; i--) {
-          const msg = input.messages[i]
-          if (msg.info.role === "user" && !msg.parts.some((p) => p.type === "compaction")) {
-            replay = { info: msg.info, parts: msg.parts }
-            messages = input.messages.slice(0, i)
-            break
-          }
-        }
-        const hasContent =
-          replay && messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
-        if (!hasContent) {
-          replay = undefined
-          messages = input.messages
-        }
-      }
+      const replaySelection = selectOverflowReplay(input)
+      const messages = replaySelection.messages
+      const replay = replaySelection.replay
 
       const agent = yield* agents.get("compaction")
       const model = agent.model
@@ -347,10 +295,7 @@ export const layer: Layer.Layer<
           })
           for (const part of replay.parts) {
             if (part.type === "compaction") continue
-            const replayPart =
-              part.type === "file" && MessageV2.isMedia(part.mime)
-                ? { type: "text" as const, text: `[Attached ${part.mime}: ${part.filename ?? "file"}]` }
-                : part
+            const replayPart = replayPartForCompaction(part)
             yield* session.updatePart({
               ...replayPart,
               id: PartID.ascending(),
@@ -388,11 +333,6 @@ export const layer: Layer.Layer<
               agent: userMessage.agent,
               model: userMessage.model,
             })
-            const text =
-              (input.overflow
-                ? "The previous request exceeded the provider's size limit due to large media attachments. The conversation was compacted and media files were removed from context. If the user was asking about attached images or files, explain that the attachments were too large to process and suggest they try again with smaller or fewer files.\n\n"
-                : "") +
-              "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
             yield* session.updatePart({
               id: PartID.ascending(),
               messageID: continueMsg.id,
@@ -403,7 +343,7 @@ export const layer: Layer.Layer<
               // This is not a stable plugin contract and may change or disappear.
               metadata: { compaction_continue: true },
               synthetic: true,
-              text,
+              text: autoContinueText(input.overflow === true),
               time: {
                 start: Date.now(),
                 end: Date.now(),

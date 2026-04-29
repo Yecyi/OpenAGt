@@ -60,6 +60,55 @@ export const ConfigRoutes = lazy(() =>
         }),
     )
     .get(
+      "/effective",
+      describeRoute({
+        summary: "Get effective configuration",
+        description: "Retrieve the current merged configuration with source metadata for advanced settings.",
+        operationId: "config.effective",
+        responses: {
+          200: {
+            description: "Get effective config snapshot",
+            content: {
+              "application/json": {
+                schema: resolver(Config.EffectiveConfigSnapshot),
+              },
+            },
+          },
+        },
+      }),
+      async (c) =>
+        jsonRequest("ConfigRoutes.effective", c, function* () {
+          const cfg = yield* Config.Service
+          return yield* cfg.effective()
+        }),
+    )
+    .patch(
+      "/global",
+      describeRoute({
+        summary: "Update advanced global configuration",
+        description: "Update the safe advanced-settings subset of the global OpenAGt configuration.",
+        operationId: "config.global.update",
+        responses: {
+          200: {
+            description: "Successfully updated global config",
+            content: {
+              "application/json": {
+                schema: resolver(Config.Info),
+              },
+            },
+          },
+          ...errors(400),
+        },
+      }),
+      validator("json", Config.AdvancedGlobalConfigPatch),
+      async (c) =>
+        jsonRequest("ConfigRoutes.global.update", c, function* () {
+          const config = c.req.valid("json")
+          const cfg = yield* Config.Service
+          return yield* cfg.updateGlobal(config)
+        }),
+    )
+    .get(
       "/providers",
       describeRoute({
         summary: "List config providers",

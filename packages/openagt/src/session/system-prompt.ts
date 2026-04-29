@@ -8,43 +8,30 @@
 
 import fs from "fs"
 import path from "path"
-import { Token } from "@/util"
+import {
+  DYNAMIC_BOUNDARY_MARKER,
+  type DynamicContext,
+  type SystemPromptCache,
+  type SystemPromptOptions,
+  type SystemPromptResult,
+} from "./system-prompt-contracts"
+import { getCache, setCache } from "./system-prompt-cache"
+import {
+  estimatePromptTokens,
+  isDynamicSegment,
+  isStaticSegment,
+  parsePromptSegments,
+} from "./system-prompt-parser"
 
-export const DYNAMIC_BOUNDARY_MARKER = "// SYSTEM_PROMPT_DYNAMIC_BOUNDARY"
-
-// ============================================================
-// Types
-// ============================================================
-
-export interface PromptSegment {
-  content: string
-  isStatic: boolean
-  cacheKey?: string
-  lastUpdated?: number
-}
-
-export interface SystemPromptCache {
-  static: string
-  dynamic: string
-  full: string
-  lastUpdated: number
-  tokenEstimate?: number
-}
-
-export interface SystemPromptOptions {
-  sessionID?: string
-  agentName?: string
-  model?: string
-  includeDynamic?: boolean
-  maxPromptTokens?: number
-}
-
-export interface SystemPromptResult {
-  prompt: string
-  truncated: boolean
-  skippedSegments: string[]
-  tokenEstimate: number
-}
+export * from "./system-prompt-contracts"
+export { clearExpiredCache, getCacheStats, invalidateCache } from "./system-prompt-cache"
+export {
+  estimatePromptTokens,
+  estimateSavings,
+  isDynamicSegment,
+  isStaticSegment,
+  parsePromptSegments,
+} from "./system-prompt-parser"
 
 // ============================================================
 // Prompt File Paths
@@ -64,70 +51,6 @@ const PROMPT_FILES: Record<string, string> = {
   copilot: "copilot-gpt-5.txt",
   plan: "plan.txt",
   common: "common.txt",
-}
-
-// ============================================================
-// Cache Implementation
-// ============================================================
-
-const cache = new Map<string, SystemPromptCache>()
-
-function getCacheKey(model?: string, agentName?: string): string {
-  return `${model ?? "default"}:${agentName ?? "default"}`
-}
-
-function getCache(model?: string, agentName?: string): SystemPromptCache | undefined {
-  return cache.get(getCacheKey(model, agentName))
-}
-
-function setCache(model: string | undefined, agentName: string | undefined, data: SystemPromptCache): void {
-  cache.set(getCacheKey(model, agentName), data)
-}
-
-function estimateTokens(text: string): number {
-  return Token.estimate(text)
-}
-
-// ============================================================
-// Prompt Parsing
-// ============================================================
-
-export function parsePromptSegments(content: string): PromptSegment[] {
-  if (!content || !content.trim()) {
-    return []
-  }
-
-  const segments: PromptSegment[] = []
-  const parts = content.split(DYNAMIC_BOUNDARY_MARKER)
-
-  if (parts.length === 1) {
-    segments.push({
-      content: content.trim(),
-      isStatic: true,
-      cacheKey: `static:${estimateTokens(content)}`,
-    })
-  } else {
-    parts.forEach((part, index) => {
-      const trimmed = part.trim()
-      if (trimmed) {
-        segments.push({
-          content: trimmed,
-          isStatic: index === 0,
-          cacheKey: `segment:${index}:${estimateTokens(trimmed)}`,
-        })
-      }
-    })
-  }
-
-  return segments
-}
-
-export function isStaticSegment(segment: PromptSegment): boolean {
-  return segment.isStatic
-}
-
-export function isDynamicSegment(segment: PromptSegment): boolean {
-  return !segment.isStatic
 }
 
 // ============================================================
@@ -163,8 +86,7 @@ export function loadPromptFileSync(filename: string): string {
 // ============================================================
 
 export async function getStaticPrompt(model?: string): Promise<string> {
-  const cacheKey = getCacheKey(model, undefined)
-  const cached = cache.get(cacheKey)
+  const cached = getCache(model, undefined)
   if (cached) return cached.static
 
   const filename = model ? (PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default) : PROMPT_FILES.default
@@ -177,8 +99,7 @@ export async function getStaticPrompt(model?: string): Promise<string> {
 }
 
 export function getStaticPromptSync(model?: string): string {
-  const cacheKey = getCacheKey(model, undefined)
-  const cached = cache.get(cacheKey)
+  const cached = getCache(model, undefined)
   if (cached) return cached.static
 
   const filename = model ? (PROMPT_FILES[model.toLowerCase()] ?? PROMPT_FILES.default) : PROMPT_FILES.default
@@ -209,7 +130,7 @@ export async function getSystemPrompt(
         prompt: cached.full,
         truncated: false,
         skippedSegments: [],
-        tokenEstimate: cached.tokenEstimate ?? estimateTokens(cached.full),
+        tokenEstimate: cached.tokenEstimate ?? estimatePromptTokens(cached.full),
       }
     }
   }
@@ -219,7 +140,7 @@ export async function getSystemPrompt(
     ? `${staticPrompt}\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n${dynamicContent}`
     : staticPrompt
 
-  const tokenEstimate = estimateTokens(fullPrompt)
+  const tokenEstimate = estimatePromptTokens(fullPrompt)
   let truncated = false
   let skippedSegments: string[] = []
   let resultPrompt = fullPrompt
@@ -229,11 +150,11 @@ export async function getSystemPrompt(
     const dynamicSegs = segments.filter(isDynamicSegment)
     const staticSegs = segments.filter(isStaticSegment)
 
-    let currentTokens = estimateTokens(staticSegs.map((s) => s.content).join("\n\n"))
+    let currentTokens = estimatePromptTokens(staticSegs.map((s) => s.content).join("\n\n"))
     const keptDynamic: string[] = []
 
     for (const seg of dynamicSegs) {
-      const segTokens = estimateTokens(seg.content)
+      const segTokens = estimatePromptTokens(seg.content)
       if (currentTokens + segTokens <= maxPromptTokens) {
         keptDynamic.push(seg.content)
         currentTokens += segTokens
@@ -275,7 +196,7 @@ export function getSystemPromptSync(
   const staticPrompt = getStaticPromptSync(model)
 
   if (!dynamicContent) {
-    const tokenEstimate = estimateTokens(staticPrompt)
+    const tokenEstimate = estimatePromptTokens(staticPrompt)
     return {
       prompt: staticPrompt,
       truncated: false,
@@ -286,7 +207,7 @@ export function getSystemPromptSync(
 
   const fullPrompt = `${staticPrompt}\n\n${DYNAMIC_BOUNDARY_MARKER}\n\n${dynamicContent}`
   const maxPromptTokens = options?.maxPromptTokens ?? 200000
-  const tokenEstimate = estimateTokens(fullPrompt)
+  const tokenEstimate = estimatePromptTokens(fullPrompt)
   let truncated = false
   let skippedSegments: string[] = []
   let resultPrompt = fullPrompt
@@ -296,11 +217,11 @@ export function getSystemPromptSync(
     const dynamicSegs = segments.filter(isDynamicSegment)
     const staticSegs = segments.filter(isStaticSegment)
 
-    let currentTokens = estimateTokens(staticSegs.map((s) => s.content).join("\n\n"))
+    let currentTokens = estimatePromptTokens(staticSegs.map((s) => s.content).join("\n\n"))
     const keptDynamic: string[] = []
 
     for (const seg of dynamicSegs) {
-      const segTokens = estimateTokens(seg.content)
+      const segTokens = estimatePromptTokens(seg.content)
       if (currentTokens + segTokens <= maxPromptTokens) {
         keptDynamic.push(seg.content)
         currentTokens += segTokens
@@ -326,74 +247,8 @@ export function getSystemPromptSync(
 }
 
 // ============================================================
-// Cache Management
-// ============================================================
-
-export function invalidateCache(model?: string, agentName?: string): void {
-  if (model && agentName) {
-    cache.delete(getCacheKey(model, agentName))
-  } else if (model) {
-    for (const key of cache.keys()) {
-      if (key.startsWith(`${model}:`)) {
-        cache.delete(key)
-      }
-    }
-  } else {
-    cache.clear()
-  }
-}
-
-export function getCacheStats(): { size: number; entries: Array<{ key: string; age: number }> } {
-  const now = Date.now()
-  const entries = Array.from(cache.entries()).map(([key, value]) => ({
-    key,
-    age: now - value.lastUpdated,
-  }))
-
-  return {
-    size: cache.size,
-    entries,
-  }
-}
-
-export function clearExpiredCache(maxAgeMs: number = 3600000): number {
-  const now = Date.now()
-  let cleared = 0
-
-  for (const [key, value] of cache.entries()) {
-    if (now - value.lastUpdated > maxAgeMs) {
-      cache.delete(key)
-      cleared++
-    }
-  }
-
-  return cleared
-}
-
-// ============================================================
-// Token Estimation
-// ============================================================
-
-export function estimatePromptTokens(prompt: string): number {
-  return estimateTokens(prompt)
-}
-
-export function estimateSavings(staticTokens: number, fullTokens: number): number {
-  if (fullTokens === 0) return 0
-  return Math.round(((fullTokens - staticTokens) / fullTokens) * 100)
-}
-
-// ============================================================
 // Dynamic Content Generation Helpers
 // ============================================================
-
-export interface DynamicContext {
-  sessionID?: string
-  workingDirectory?: string
-  recentErrors?: string[]
-  fileChanges?: string[]
-  toolUsage?: string[]
-}
 
 export function formatDynamicContext(ctx: DynamicContext): string {
   const parts: string[] = []

@@ -1,9 +1,7 @@
-import z from "zod"
 import { setTimeout as sleep } from "node:timers/promises"
 import { fn } from "@/util/fn"
 import { Database, asc, eq, inArray } from "@/storage"
 import { Project } from "@/project"
-import { BusEvent } from "@/bus/bus-event"
 import { GlobalBus } from "@/bus/global"
 import { Auth } from "@/auth"
 import { SyncEvent } from "@/sync"
@@ -15,71 +13,17 @@ import { ProjectID } from "@/project/schema"
 import { Slug } from "@openagt/shared/util/slug"
 import { WorkspaceTable } from "./workspace.sql"
 import { getAdaptor } from "./adaptors"
-import { WorkspaceInfo } from "./types"
 import { WorkspaceID } from "./schema"
 import { parseSSE } from "./sse"
 import { Session } from "@/session"
 import { SessionTable } from "@/session/session.sql"
-import { SessionID } from "@/session/schema"
 import { errorData } from "@/util/error"
 import { AppRuntime } from "@/effect/app-runtime"
 import { waitEvent } from "./util"
 import { WorkspaceContext } from "./workspace-context"
-
-export const Info = WorkspaceInfo.meta({
-  ref: "Workspace",
-})
-export type Info = z.infer<typeof Info>
-
-export const ConnectionStatus = z.object({
-  workspaceID: WorkspaceID.zod,
-  status: z.enum(["connected", "connecting", "disconnected", "error"]),
-})
-export type ConnectionStatus = z.infer<typeof ConnectionStatus>
-
-const Restore = z.object({
-  workspaceID: WorkspaceID.zod,
-  sessionID: SessionID.zod,
-  total: z.number().int().min(0),
-  step: z.number().int().min(0),
-})
-
-export const Event = {
-  Ready: BusEvent.define(
-    "workspace.ready",
-    z.object({
-      name: z.string(),
-    }),
-  ),
-  Failed: BusEvent.define(
-    "workspace.failed",
-    z.object({
-      message: z.string(),
-    }),
-  ),
-  Restore: BusEvent.define("workspace.restore", Restore),
-  Status: BusEvent.define("workspace.status", ConnectionStatus),
-}
-
-function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
-  return {
-    id: row.id,
-    type: row.type,
-    branch: row.branch,
-    name: row.name,
-    directory: row.directory,
-    extra: row.extra,
-    projectID: row.project_id,
-  }
-}
-
-const CreateInput = z.object({
-  id: WorkspaceID.zod.optional(),
-  type: Info.shape.type,
-  branch: Info.shape.branch,
-  projectID: ProjectID.zod,
-  extra: Info.shape.extra,
-})
+import { ConnectionStatus, CreateInput, Event, fromRow, type Info, SessionRestoreInput } from "./workspace-contracts"
+import { WorkspaceSyncRegistry } from "./workspace-sync-registry"
+export * from "./workspace-contracts"
 
 export const create = fn(CreateInput, async (input) => {
   const id = WorkspaceID.ascending(input.id)
@@ -135,11 +79,6 @@ export const create = fn(CreateInput, async (input) => {
   })
 
   return info
-})
-
-const SessionRestoreInput = z.object({
-  workspaceID: WorkspaceID.zod,
-  sessionID: SessionID.zod,
 })
 
 export const sessionRestore = fn(SessionRestoreInput, async (input) => {
@@ -334,32 +273,15 @@ export const remove = fn(WorkspaceID.zod, async (id) => {
   }
 })
 
-const connections = new Map<WorkspaceID, ConnectionStatus>()
-const aborts = new Map<WorkspaceID, AbortController>()
+const syncRegistry = new WorkspaceSyncRegistry()
 const TIMEOUT = 5000
 
 function setStatus(id: WorkspaceID, status: ConnectionStatus["status"]) {
-  const prev = connections.get(id)
-  if (prev?.status === status) return
-  const next = { workspaceID: id, status }
-  connections.set(id, next)
-
-  if (status === "error") {
-    aborts.delete(id)
-  }
-
-  GlobalBus.emit("event", {
-    directory: "global",
-    workspace: id,
-    payload: {
-      type: Event.Status.type,
-      properties: next,
-    },
-  })
+  syncRegistry.setStatus(id, status)
 }
 
 export function status(): ConnectionStatus[] {
-  return [...connections.values()]
+  return syncRegistry.status()
 }
 
 function synced(state: Record<string, number>) {
@@ -385,7 +307,7 @@ function synced(state: Record<string, number>) {
 }
 
 export async function isSyncing(workspaceID: WorkspaceID) {
-  return aborts.has(workspaceID)
+  return syncRegistry.isSyncing(workspaceID)
 }
 
 export async function waitForSync(workspaceID: WorkspaceID, state: Record<string, number>, signal?: AbortSignal) {
@@ -573,15 +495,15 @@ async function startSync(space: Info) {
     return
   }
 
-  if (aborts.has(space.id)) return true
+  if (syncRegistry.hasAbort(space.id)) return true
 
   setStatus(space.id, "disconnected")
 
   const abort = new AbortController()
-  aborts.set(space.id, abort)
+  syncRegistry.setAbort(space.id, abort)
 
   void syncWorkspaceLoop(space, abort.signal).catch((error) => {
-    aborts.delete(space.id)
+    syncRegistry.deleteAbort(space.id)
 
     setStatus(space.id, "error")
     log.warn("workspace listener failed", {
@@ -592,9 +514,7 @@ async function startSync(space: Info) {
 }
 
 function stopSync(id: WorkspaceID) {
-  aborts.get(id)?.abort()
-  aborts.delete(id)
-  connections.delete(id)
+  syncRegistry.stop(id)
 }
 
 export function startWorkspaceSyncing(projectID: ProjectID) {

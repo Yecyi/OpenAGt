@@ -1,9 +1,8 @@
 import { Provider } from "@/provider"
 import { Log } from "@/util"
-import { Context, Effect, Layer, Record } from "effect"
+import { Context, Effect, Layer } from "effect"
 import * as Stream from "effect/Stream"
-import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
-import { mergeDeep, pipe } from "remeda"
+import { streamText, wrapLanguageModel, type ModelMessage, type Tool } from "ai"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider"
 import { Config } from "@/config"
@@ -11,7 +10,6 @@ import { Instance } from "@/project/instance"
 import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
-import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { PermissionID } from "@/permission/schema"
@@ -24,21 +22,18 @@ import { InstallationVersion } from "@/installation/version"
 import { EffectBridge } from "@/effect"
 import * as Option from "effect/Option"
 import * as OtelTracer from "@effect/opentelemetry/Tracer"
+import { createNoopTool, resolveTools, shouldInjectNoopTool } from "./llm-tool-compat"
+import {
+  buildInitialSystemPrompt,
+  buildModelMessages,
+  buildModelOptions,
+  collapseSystemPromptForCaching,
+  staticBlocksHash,
+} from "./llm-request"
 
 const log = Log.create({ service: "llm" })
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 type Result = Awaited<ReturnType<typeof streamText>>
-
-async function computeSHA256(text: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 8)
-}
 
 export type StreamInput = {
   user: MessageV2.User
@@ -107,14 +102,7 @@ const live: Layer.Layer<
       // TODO: move this to a proper hook
       const isOpenaiOauth = item.id === "openai" && info?.type === "oauth"
 
-      const system = [
-        // use agent prompt otherwise provider prompt
-        ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
-        // any custom prompt passed into this call
-        ...input.system,
-        // any custom prompt from last user message
-        ...(input.user.system ? [input.user.system] : []),
-      ].filter((x) => x)
+      const system = buildInitialSystemPrompt(input)
 
       const header = system[0]
       yield* plugin.trigger(
@@ -123,56 +111,20 @@ const live: Layer.Layer<
         { system },
       )
       // rejoin to maintain 2-part structure for caching if header unchanged
-      if (system.length > 2 && system[0] === header) {
-        const rest = system.slice(1)
-        system.length = 0
-        system.push(header, rest.join("\n"))
-      }
+      collapseSystemPromptForCaching(system, header)
 
       // B-P2-1: Compute static blocks hash for cache key salting
-      const staticBlocksHash = yield* Effect.promise(() => computeSHA256(input.system.join("")))
-
-      const variant =
-        !input.small && input.model.variants && input.user.model.variant
-          ? input.model.variants[input.user.model.variant]
-          : {}
-      const base = input.small
-        ? ProviderTransform.smallOptions(input.model)
-        : ProviderTransform.options({
-            model: input.model,
-            sessionID: input.sessionID,
-            providerOptions: item.options,
-            staticBlocksHash,
-          })
-      const options: Record<string, any> = pipe(
-        base,
-        mergeDeep(input.model.options),
-        mergeDeep(input.agent.options),
-        mergeDeep(variant),
-      )
+      const options = buildModelOptions({
+        ...input,
+        providerOptions: item.options,
+        staticBlocksHash: yield* Effect.promise(() => staticBlocksHash(input.system)),
+      })
       if (isOpenaiOauth) {
         options.instructions = system.join("\n")
       }
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
-      const messages = isOpenaiOauth
-        ? input.messages
-        : isWorkflow
-          ? input.messages
-          : [
-              ...system.map(
-                (x, index): ModelMessage => ({
-                  role: "system",
-                  content: x,
-                  providerOptions: {
-                    openagt: {
-                      cacheZone: index <= 1 ? "static" : index === 2 ? "semiStatic" : "dynamic",
-                    },
-                  },
-                }),
-              ),
-              ...input.messages,
-            ]
+      const messages = buildModelMessages({ messages: input.messages, system, isOpenaiOauth, isWorkflow })
 
       const params = yield* plugin.trigger(
         "chat.params",
@@ -216,30 +168,12 @@ const live: Layer.Layer<
       // This is enabled for:
       // 1. Providers with "litellm" in their ID or API ID (auto-detected)
       // 2. Providers with explicit "litellmProxy: true" option (opt-in for custom gateways)
-      const isLiteLLMProxy =
-        item.options?.["litellmProxy"] === true ||
-        input.model.providerID.toLowerCase().includes("litellm") ||
-        input.model.api.id.toLowerCase().includes("litellm")
-
       // LiteLLM/Bedrock rejects requests where the message history contains tool
       // calls but no tools param is present. When there are no active tools (e.g.
       // during compaction), inject a stub tool to satisfy the validation requirement.
       // The stub description explicitly tells the model not to call it.
-      if (
-        (isLiteLLMProxy || input.model.providerID.includes("github-copilot")) &&
-        Object.keys(tools).length === 0 &&
-        hasToolCalls(input.messages)
-      ) {
-        tools["_noop"] = tool({
-          description: "Do not call this tool. It exists only for API compatibility and must never be invoked.",
-          inputSchema: jsonSchema({
-            type: "object",
-            properties: {
-              reason: { type: "string", description: "Unused" },
-            },
-          }),
-          execute: async () => ({ output: "", title: "", metadata: {} }),
-        })
+      if (shouldInjectNoopTool({ model: input.model, providerOptions: item.options, tools, messages: input.messages })) {
+        tools["_noop"] = createNoopTool()
       }
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
@@ -458,24 +392,5 @@ export const defaultLayer = Layer.suspend(() =>
   ),
 )
 
-function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">) {
-  const disabled = Permission.disabled(
-    Object.keys(input.tools),
-    Permission.merge(input.agent.permission, input.permission ?? []),
-  )
-  return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
-}
-
-// Check if messages contain any tool-call content
-// Used to determine if a dummy tool should be added for LiteLLM proxy compatibility
-export function hasToolCalls(messages: ModelMessage[]): boolean {
-  for (const msg of messages) {
-    if (!Array.isArray(msg.content)) continue
-    for (const part of msg.content) {
-      if (part.type === "tool-call" || part.type === "tool-result") return true
-    }
-  }
-  return false
-}
-
+export { hasToolCalls } from "./llm-tool-compat"
 export * as LLM from "./llm"

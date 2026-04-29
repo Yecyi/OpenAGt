@@ -364,7 +364,7 @@ sequenceDiagram
 | `packages/openagt`         | Core runtime, tools, providers, CLI, server |
 | `packages/app`             | Web client                                  |
 | `packages/sdk/js`          | Generated JavaScript SDK                    |
-| `packages/openagt_flutter` | Flutter MVP                                 |
+| `packages/openagt_flutter` | Deferred Flutter client placeholder         |
 | `packages/console/*`       | Control-plane packages                      |
 
 ## Release Architecture

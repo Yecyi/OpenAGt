@@ -8,58 +8,30 @@
 import { spawn } from "bun"
 import { Effect, Layer, Context } from "effect"
 import { spawn as nodeSpawn } from "child_process"
-import { Shell } from "@/shell/shell"
 import { Log } from "../util"
-
-type BunChildProcess = {
-  pid?: number
-  kill: () => void
-  exited: Promise<number>
-  stdout: ReadableStream<Uint8Array> | null
-  stderr: ReadableStream<Uint8Array> | null
-}
-
-export interface ResourceLimits {
-  maxMemory?: number
-  maxFileSize?: number
-  maxStack?: number
-  /** Maximum total bytes for stdout + stderr combined. Defaults to maxFileSize * 2 if maxFileSize is set. */
-  maxOutputBytes?: number
-}
-
-export interface ProcessSandboxOptions {
-  timeoutMs?: number
-  limits?: ResourceLimits
-  cwd?: string
-  env?: Record<string, string>
-  shell?: string
-  /** Grace period (ms) before SIGKILL after SIGTERM. Default 2000ms. */
-  killGraceMs?: number
-}
-
-export interface ProcessSandboxResult {
-  stdout: string
-  stderr: string
-  exitCode: number | null
-  timedOut: boolean
-  killed: boolean
-  outputTruncated?: boolean
-  /** Whether output was truncated due to maxOutputBytes limit */
-  outputBytesTruncated?: boolean
-}
-
-export interface ProcessSandboxStats {
-  totalSpawned: number
-  totalKilled: number
-  totalTimeouts: number
-  totalKilledByResourceLimit: number
-  currentRunning: number
-}
+import { applySandboxResourceLimits, buildSandboxArgs } from "./process-sandbox-command"
+import type {
+  BatchSandboxOptions,
+  BunChildProcess,
+  Interface,
+  ProcessSandboxOptions,
+  ProcessSandboxResult,
+  ProcessSandboxStats,
+  ResourceUsage,
+} from "./process-sandbox-contracts"
+export type {
+  BatchSandboxOptions,
+  BunChildProcess,
+  Interface,
+  ProcessSandboxOptions,
+  ProcessSandboxResult,
+  ProcessSandboxStats,
+  ResourceLimits,
+  ResourceUsage,
+} from "./process-sandbox-contracts"
+import { collectStream, truncateOutput } from "./process-sandbox-output"
 
 const log = Log.create({ service: "process-sandbox" })
-
-const DEFAULT_CMD = "C:\\WINDOWS\\system32\\cmd.exe"
-const DEFAULT_POWERSHELL = "powershell.exe"
 
 const stats: ProcessSandboxStats = {
   totalSpawned: 0,
@@ -79,91 +51,6 @@ export function resetSandboxStats(): void {
   stats.totalTimeouts = 0
   stats.totalKilledByResourceLimit = 0
   stats.currentRunning = 0
-}
-
-function shellKind(shell?: string) {
-  if (process.platform !== "win32") return "posix" as const
-  const name = shell ? Shell.name(shell) : "cmd"
-  if (name === "powershell" || name === "pwsh") return "powershell" as const
-  if (Shell.posix(shell || "")) return "posix" as const
-  return "cmd" as const
-}
-
-function buildArgs(command: string, shell?: string): [string, string[]] {
-  if (process.platform === "win32") {
-    if (shellKind(shell) === "powershell") {
-      return [shell || DEFAULT_POWERSHELL, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]]
-    }
-    if (shellKind(shell) === "posix") {
-      return [shell || "/bin/sh", [Shell.login(shell || "") ? "-lc" : "-c", command]]
-    }
-    return [shell || DEFAULT_CMD, ["/d", "/s", "/c", command]]
-  }
-  return [shell || "/bin/sh", ["-c", command]]
-}
-
-function applyResourceLimits(options: ProcessSandboxOptions): Record<string, string> {
-  const env: Record<string, string> = {}
-  const existingNodeOptions = options.env?.NODE_OPTIONS?.trim()
-  const limits = options.limits
-  const nodeOptions = [existingNodeOptions].filter(Boolean)
-
-  if (limits?.maxMemory) {
-    nodeOptions.push(`--max-old-space-size=${Math.max(1, Math.floor(limits.maxMemory / 1024 / 1024))}`)
-  }
-
-  if (limits?.maxStack) {
-    nodeOptions.push(`--stack-size=${Math.max(1, Math.floor(limits.maxStack / 1024))}`)
-  }
-
-  if (nodeOptions.length > 0) {
-    env.NODE_OPTIONS = nodeOptions.join(" ")
-  }
-
-  return env
-}
-
-async function collectStream(stream: ReadableStream<Uint8Array> | null, maxSize?: number) {
-  if (!stream) {
-    return { text: "", truncated: false }
-  }
-
-  const chunks: Uint8Array[] = []
-  const reader = stream.getReader()
-  let total = 0
-  let truncated = false
-
-  while (true) {
-    const next = await reader.read().catch(() => ({ done: true, value: undefined }))
-    if (next.done || !next.value) break
-
-    const chunk = next.value
-    if (!maxSize) {
-      chunks.push(chunk)
-      continue
-    }
-
-    const remaining = maxSize - total
-    if (remaining <= 0) {
-      truncated = true
-      continue
-    }
-
-    if (chunk.byteLength > remaining) {
-      chunks.push(chunk.slice(0, remaining))
-      total += remaining
-      truncated = true
-      continue
-    }
-
-    chunks.push(chunk)
-    total += chunk.byteLength
-  }
-
-  return {
-    text: new TextDecoder().decode(Bun.concatArrayBuffers(chunks)),
-    truncated,
-  }
 }
 
 async function killProcessTree(pid: number | undefined, graceMs = 2000) {
@@ -228,8 +115,8 @@ export async function spawnWithSandbox(
   stats.totalSpawned++
   stats.currentRunning++
 
-  const [cmd, args] = buildArgs(command, shell)
-  const mergedEnv = { ...env, ...applyResourceLimits(options) }
+  const [cmd, args] = buildSandboxArgs(command, shell)
+  const mergedEnv = { ...env, ...applySandboxResourceLimits(options) }
 
   let timedOut = false
   let killed = false
@@ -306,8 +193,8 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
   stats.currentRunning++
 
   const { spawnSync } = require("child_process")
-  const [cmd, args] = buildArgs(command, shell)
-  const mergedEnv = { ...env, ...applyResourceLimits(options) }
+  const [cmd, args] = buildSandboxArgs(command, shell)
+  const mergedEnv = { ...env, ...applySandboxResourceLimits(options) }
   const result = spawnSync(cmd, args, {
     cwd,
     env: mergedEnv,
@@ -324,15 +211,8 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
   if (timedOut) stats.totalTimeouts++
   if (timedOut) stats.totalKilled++
 
-  const truncate = (value: string) => {
-    if (!limits?.maxFileSize || value.length <= limits.maxFileSize) {
-      return { text: value, truncated: false }
-    }
-    return { text: value.slice(0, limits.maxFileSize), truncated: true }
-  }
-
-  const stdout = truncate(result.stdout ?? "")
-  const stderr = truncate(result.stderr ?? (result.error ? String(result.error.message) : ""))
+  const stdout = truncateOutput(result.stdout ?? "", limits?.maxFileSize)
+  const stderr = truncateOutput(result.stderr ?? (result.error ? String(result.error.message) : ""), limits?.maxFileSize)
 
   return {
     stdout: stdout.text,
@@ -343,10 +223,6 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
     outputTruncated: stdout.truncated || stderr.truncated,
     outputBytesTruncated: false,
   }
-}
-
-export interface BatchSandboxOptions extends ProcessSandboxOptions {
-  maxConcurrent?: number
 }
 
 export async function spawnBatchWithSandbox(
@@ -407,15 +283,6 @@ export function killAllProcesses(): number {
   stats.totalKilled += killed
   stats.currentRunning = 0
   return killed
-}
-
-export interface ResourceUsage {
-  pid: number
-  memoryMB?: number
-  cpuPercent?: number
-  ioReadBytes?: number
-  ioWriteBytes?: number
-  timestamp: number
 }
 
 function getWindowsResourceUsage(pid: number): ResourceUsage {
@@ -481,15 +348,6 @@ export function getResourceUsage(pid: number): ResourceUsage {
   }
 
   return usage
-}
-
-export interface Interface {
-  readonly spawn: (command: string, options?: ProcessSandboxOptions) => Effect.Effect<ProcessSandboxResult>
-  readonly spawnBatch: (commands: string[], options?: BatchSandboxOptions) => Effect.Effect<ProcessSandboxResult[]>
-  readonly kill: (pid: number) => Effect.Effect<boolean>
-  readonly killAll: Effect.Effect<number>
-  readonly getStats: Effect.Effect<ProcessSandboxStats>
-  readonly getUsage: (pid: number) => Effect.Effect<ResourceUsage>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ProcessSandbox") {}
