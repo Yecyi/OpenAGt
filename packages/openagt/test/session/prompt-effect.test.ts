@@ -341,6 +341,21 @@ const boot = Effect.fn("test.boot")(function* (input?: { title?: string }) {
   return { prompt, run, sessions, chat }
 })
 
+const waitForRunningShellTool = (sessionID: SessionID) =>
+  Effect.promise(async () => {
+    const end = Date.now() + 5_000
+    while (Date.now() < end) {
+      const msgs = await Effect.runPromise(MessageV2.filterCompactedEffect(sessionID))
+      const assistant = msgs.findLast((item) => item.info.role === "assistant" && item.info.agent === "build")
+      const tool = assistant?.parts.find(
+        (part): part is MessageV2.ToolPart => part.type === "tool" && part.tool === "bash",
+      )
+      if (tool?.state.status === "running") return
+      await new Promise((done) => setTimeout(done, 20))
+    }
+    throw new Error("timed out waiting for running shell tool")
+  })
+
 // Loop semantics
 
 it.live("loop exits immediately when last assistant has stop finish", () =>
@@ -1269,7 +1284,7 @@ unix(
             const sh = yield* prompt
               .shell({ sessionID: chat.id, agent: "build", command: "sleep 30" })
               .pipe(Effect.forkChild)
-            yield* Effect.sleep(50)
+            yield* waitForRunningShellTool(chat.id)
 
             yield* prompt.cancel(chat.id)
 
@@ -1306,7 +1321,7 @@ unix(
             const sh = yield* prompt
               .shell({ sessionID: chat.id, agent: "build", command: "trap '' TERM; sleep 30" })
               .pipe(Effect.forkChild)
-            yield* Effect.sleep(50)
+            yield* waitForRunningShellTool(chat.id)
 
             yield* prompt.cancel(chat.id)
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, ManagedRuntime } from "effect"
+import path from "path"
 import { brokerCommand } from "../../src/sandbox/broker"
 import { SandboxBroker } from "../../src/sandbox/broker"
 import { autoBackendName } from "../../src/sandbox/backends"
@@ -18,7 +19,7 @@ describe("brokerCommand", () => {
     ).toEqual([
       "C:\\Bun\\bun.exe",
       "--smol",
-      expect.stringContaining("packages\\openagt\\src\\sandbox\\broker-main.ts"),
+      expect.stringContaining(path.join("packages", "openagt", "src", "sandbox", "broker-main.ts")),
     ])
   })
 })
