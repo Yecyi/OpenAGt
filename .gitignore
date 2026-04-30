@@ -14,7 +14,6 @@ dist
 !packages/solid-start/dist/
 !packages/solid-start/dist/**
 ts-dist
-.turbo
 **/.serena
 .serena/
 /result
