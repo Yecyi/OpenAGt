@@ -145,3 +145,14 @@ describe("skippedVerdict", () => {
     expect(verdict.unsupported_claims).toContain("critic timed out at 180s")
   })
 })
+
+describe("MPACR retry prompt", () => {
+  test("contains no mojibake and keeps the evidence contract visible", () => {
+    expect(MPACR_RETRY_PROMPT_SUFFIX).not.toContain("鈥")
+    expect(MPACR_RETRY_PROMPT_SUFFIX).not.toContain("�")
+    expect(MPACR_RETRY_PROMPT_SUFFIX).toContain("Required structure - populate ALL of:")
+    expect(MPACR_RETRY_PROMPT_SUFFIX).toContain("evidence_for")
+    expect(MPACR_RETRY_PROMPT_SUFFIX).toContain("evidence_against")
+    expect(MPACR_RETRY_PROMPT_SUFFIX).toContain("Symmetry is mandatory")
+  })
+})

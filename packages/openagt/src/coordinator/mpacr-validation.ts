@@ -1,4 +1,4 @@
-// MPACR validation — A.3 of the v1.21 plan.
+// MPACR validation - A.3 of the v1.21 plan.
 //
 // Enforces the core epistemic-symmetry contract for MPACR critic and synthesis
 // outputs: every `verdict === "revise"` must carry at least one entry in
@@ -6,7 +6,7 @@
 // entry in `evidence_for`. This is the structural defense against models
 // degrading to one-sided "looks fine" / "looks bad" rubber-stamps.
 //
-// The validator does NOT score evidence quality — that's the calibrator's job
+// The validator does NOT score evidence quality - that's the calibrator's job
 // (A.4). It only enforces that the fields are populated. Models that respond
 // without evidence get one retry with a sharpened prompt; second failures
 // escalate to `verdict: "ask_user"` so a human breaks the tie.
@@ -17,7 +17,7 @@ export const MPACR_RETRY_PROMPT_SUFFIX = [
   ``,
   `Your previous response did not include enough evidence to be actionable.`,
   ``,
-  `Required structure — populate ALL of:`,
+  `Required structure - populate ALL of:`,
   `- evidence_for: at least one bullet citing why your verdict holds`,
   `- evidence_against: at least one bullet citing the strongest counter-evidence`,
   `Symmetry is mandatory: even a "pass" verdict must list what could prove you wrong.`,
