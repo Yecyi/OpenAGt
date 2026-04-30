@@ -10,15 +10,70 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+function fencedJsonCandidates(text: string) {
+  return Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)).flatMap((match) => {
+    const candidate = match[1]?.trim()
+    return candidate ? [candidate] : []
+  })
+}
+
+function balancedJsonCandidates(text: string) {
+  const candidates: string[] = []
+  let start = -1
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (start === -1) {
+      if (char === "{") {
+        start = i
+        depth = 1
+      }
+      continue
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (char === "\\") {
+        escaped = true
+        continue
+      }
+      if (char === '"') inString = false
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+      continue
+    }
+    if (char === "{") depth++
+    if (char === "}") depth--
+    if (depth === 0) {
+      candidates.push(text.slice(start, i + 1))
+      start = -1
+    }
+  }
+
+  return candidates
+}
+
+function jsonCandidates(text: string) {
+  return [...fencedJsonCandidates(text), ...balancedJsonCandidates(text)]
+}
+
 export function reviewVerdictFromText(text: string | undefined): CriticalReviewVerdictType | undefined {
   if (!text) return
-  const objectMatch = text.match(/\{[\s\S]*\}/)
-  if (objectMatch) {
+  for (const candidate of jsonCandidates(text)) {
     try {
-      const parsed = CriticalReviewVerdict.safeParse(JSON.parse(objectMatch[0]))
+      const parsed = CriticalReviewVerdict.safeParse(JSON.parse(candidate))
       if (parsed.success) return parsed.data
     } catch {
-      // Fall through to the line-oriented parser below.
+      // Keep trying bounded JSON candidates before falling through to text heuristics.
     }
   }
   const normalized = text.toLowerCase()
