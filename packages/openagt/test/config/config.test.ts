@@ -28,6 +28,7 @@ import { ProjectID } from "../../src/project/schema"
 import { Filesystem } from "../../src/util"
 import { ConfigPlugin } from "@/config/plugin"
 import { Npm } from "@/npm"
+import { Flag } from "@/flag/flag"
 
 const emptyAccount = Layer.mock(Account.Service)({
   active: () => Effect.succeed(Option.none()),
@@ -53,6 +54,8 @@ const layer = Config.layer.pipe(
 const it = testEffect(layer)
 
 const load = () => Effect.runPromise(Config.Service.use((svc) => svc.get()).pipe(Effect.scoped, Effect.provide(layer)))
+const effective = () =>
+  Effect.runPromise(Config.Service.use((svc) => svc.effective()).pipe(Effect.scoped, Effect.provide(layer)))
 const save = (config: Config.Info) =>
   Effect.runPromise(Config.Service.use((svc) => svc.update(config)).pipe(Effect.scoped, Effect.provide(layer)))
 const clear = (wait = false) =>
@@ -118,6 +121,131 @@ test("loads config with defaults when no files exist", async () => {
     fn: async () => {
       const config = await load()
       expect(config.username).toBeDefined()
+    },
+  })
+})
+
+test("effective config snapshot stays parseable with sparse field sources", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const snapshot = await effective()
+      expect(Config.EffectiveConfigSnapshot.parse(snapshot).field_sources).toEqual({})
+    },
+  })
+})
+
+test("effective config marks custom config file source as flag scoped", async () => {
+  const original = Flag.OPENCODE_CONFIG
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      const custom = path.join(dir, "custom-config.json")
+      await Filesystem.write(
+        custom,
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          model: "custom/model",
+        }),
+      )
+      return custom
+    },
+  })
+
+  ;(Flag as { OPENCODE_CONFIG?: string }).OPENCODE_CONFIG = tmp.extra
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const snapshot = await effective()
+        expect(snapshot.config.model).toBe("custom/model")
+        expect(snapshot.field_sources.model).toMatchObject({
+          id: tmp.extra,
+          scope: "flag",
+        })
+      },
+    })
+  } finally {
+    ;(Flag as { OPENCODE_CONFIG?: string }).OPENCODE_CONFIG = original
+  }
+})
+
+test("effective config marks config content aliases as env scoped", async () => {
+  const originalOpenCode = process.env.OPENCODE_CONFIG_CONTENT
+  const originalOpenAgt = process.env.OPENAGT_CONFIG_CONTENT
+  delete process.env.OPENCODE_CONFIG_CONTENT
+  process.env.OPENAGT_CONFIG_CONTENT = JSON.stringify({
+    $schema: "https://opencode.ai/config.json",
+    model: "env/model",
+  })
+
+  try {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const snapshot = await effective()
+        expect(snapshot.config.model).toBe("env/model")
+        expect(snapshot.field_sources.model).toMatchObject({
+          id: "OPENAGT_CONFIG_CONTENT",
+          scope: "env",
+        })
+      },
+    })
+  } finally {
+    if (originalOpenCode === undefined) delete process.env.OPENCODE_CONFIG_CONTENT
+    else process.env.OPENCODE_CONFIG_CONTENT = originalOpenCode
+    if (originalOpenAgt === undefined) delete process.env.OPENAGT_CONFIG_CONTENT
+    else process.env.OPENAGT_CONFIG_CONTENT = originalOpenAgt
+  }
+})
+
+test("effective config keeps explicit permission source over tools compatibility", async () => {
+  const original = Flag.OPENCODE_PERMISSION
+  ;(Flag as { OPENCODE_PERMISSION?: string }).OPENCODE_PERMISSION = JSON.stringify({ bash: "ask" })
+
+  try {
+    await using tmp = await tmpdir({
+      config: {
+        tools: { write: false },
+      },
+    })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const snapshot = await effective()
+        expect(snapshot.config.permission?.bash).toBe("ask")
+        expect(snapshot.config.permission?.edit).toBe("deny")
+        expect(snapshot.field_sources.permission).toMatchObject({
+          id: "OPENCODE_PERMISSION",
+          scope: "flag",
+        })
+      },
+    })
+  } finally {
+    ;(Flag as { OPENCODE_PERMISSION?: string }).OPENCODE_PERMISSION = original
+  }
+})
+
+test("effective config marks managed config as the winning source", async () => {
+  await writeManagedSettings({
+    $schema: "https://opencode.ai/config.json",
+    permission: { bash: "deny" },
+  })
+  await using tmp = await tmpdir({
+    config: {
+      permission: { bash: "ask" },
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const snapshot = await effective()
+      expect(snapshot.config.permission?.bash).toBe("deny")
+      expect(snapshot.field_sources.permission).toMatchObject({
+        scope: "managed",
+      })
     },
   })
 })

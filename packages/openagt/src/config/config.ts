@@ -179,7 +179,7 @@ export const layer = Layer.effect(
         yield* pipeline.merge(Global.Path.config, global, "global")
 
         if (Flag.OPENCODE_CONFIG) {
-          yield* pipeline.merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG))
+          yield* pipeline.merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG), undefined, "flag")
           log.debug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
         }
 
@@ -261,13 +261,24 @@ export const layer = Layer.effect(
           yield* pipeline.mergePluginOrigins(dir, list)
         }
 
-        if (process.env.OPENCODE_CONFIG_CONTENT) {
-          const source = "OPENCODE_CONFIG_CONTENT"
-          const next = yield* loadConfig(process.env.OPENCODE_CONFIG_CONTENT, {
+        const configContent =
+          process.env.OPENCODE_CONFIG_CONTENT
+            ? {
+                source: "OPENCODE_CONFIG_CONTENT",
+                text: process.env.OPENCODE_CONFIG_CONTENT,
+              }
+            : process.env.OPENCODE_CONFIG_CONTENT === undefined && process.env.OPENAGT_CONFIG_CONTENT
+              ? {
+                  source: "OPENAGT_CONFIG_CONTENT",
+                  text: process.env.OPENAGT_CONFIG_CONTENT,
+                }
+              : undefined
+        if (configContent) {
+          const next = yield* loadConfig(configContent.text, {
             dir: ctx.directory,
-            source,
+            source: configContent.source,
           })
-          yield* pipeline.merge(source, next, "local")
+          yield* pipeline.merge(configContent.source, next, "local", "env")
           log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
         }
 
