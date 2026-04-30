@@ -165,85 +165,90 @@ export const layer = Layer.effect(
         })
       }
 
-      const result = yield* broker.exec({
-        request: {
-          request_id: requestID,
-          command: input.command,
-          shell_family: input.shellFamily,
-          shell: input.shell,
-          cwd: input.cwd,
-          timeout_ms: input.timeout,
-          description: input.description,
-          env,
-          env_policy: "sanitize",
-          enforcement: input.enforcement,
-          backend_preference: executionBackendPreference,
-          filesystem_policy: input.filesystemPolicy,
-          allowed_paths: input.allowedPaths,
-          writable_paths: input.writablePaths,
-          network_policy: input.networkPolicy,
-        },
-        abort: ctx.abort,
-        onStdout: (text) => {
-          push(text)
-        },
-        onStderr: (text) => {
-          push(text)
-        },
-      })
-      const code = result.exit_code
-      backendUsed = result.backend_used
-      terminationReason = result.termination_reason
-      expired = result.termination_reason === "timeout"
-      aborted = result.termination_reason === "abort"
-
-      // C-1: Emit sandbox backend_used metric
-      log.info("sandbox.backend_used", { backend: result.backend_used })
-
-      const formatted = yield* output.format({
-        expired,
-        aborted,
-        timeout: input.timeout,
-        writeFullOutput: (text) => truncate.write(text),
+      const cleanupMetadata = Effect.gen(function* () {
+        metadataClosed = true
+        yield* Queue.shutdown(updates).pipe(Effect.ignore)
+        yield* Fiber.interrupt(metadataFiber).pipe(Effect.ignore)
       })
 
-      if (formatted.latest) {
-        yield* ctx.metadata({
-          metadata: {
-            output: formatted.latest,
+      return yield* Effect.gen(function* () {
+        const result = yield* broker.exec({
+          request: {
+            request_id: requestID,
+            command: input.command,
+            shell_family: input.shellFamily,
+            shell: input.shell,
+            cwd: input.cwd,
+            timeout_ms: input.timeout,
             description: input.description,
+            env,
+            env_policy: "sanitize",
+            enforcement: input.enforcement,
+            backend_preference: executionBackendPreference,
+            filesystem_policy: input.filesystemPolicy,
+            allowed_paths: input.allowedPaths,
+            writable_paths: input.writablePaths,
+            network_policy: input.networkPolicy,
+          },
+          abort: ctx.abort,
+          onStdout: (text) => {
+            push(text)
+          },
+          onStderr: (text) => {
+            push(text)
+          },
+        })
+        const code = result.exit_code
+        backendUsed = result.backend_used
+        terminationReason = result.termination_reason
+        expired = result.termination_reason === "timeout"
+        aborted = result.termination_reason === "abort"
+
+        // C-1: Emit sandbox backend_used metric
+        log.info("sandbox.backend_used", { backend: result.backend_used })
+
+        const formatted = yield* output.format({
+          expired,
+          aborted,
+          timeout: input.timeout,
+          writeFullOutput: (text) => truncate.write(text),
+        })
+
+        if (formatted.latest) {
+          yield* ctx.metadata({
+            metadata: {
+              output: formatted.latest,
+              description: input.description,
+              backendPreference: input.backendPreference,
+              enforcement: input.enforcement,
+              filesystemPolicy: input.filesystemPolicy,
+              networkPolicy: input.networkPolicy,
+              allowedPaths: input.allowedPaths,
+              writablePaths: input.writablePaths,
+            },
+          })
+        }
+
+        return {
+          title: input.description,
+          output: formatted.output,
+          metadata: {
+            output: formatted.metadataOutput,
+            exit: code,
+            description: input.description,
+            truncated: formatted.truncated,
+            ...(formatted.outputPath ? { outputPath: formatted.outputPath } : {}),
             backendPreference: input.backendPreference,
             enforcement: input.enforcement,
             filesystemPolicy: input.filesystemPolicy,
             networkPolicy: input.networkPolicy,
             allowedPaths: input.allowedPaths,
             writablePaths: input.writablePaths,
+            backendUsed,
+            terminationReason,
           },
-        })
-      }
-      metadataClosed = true
-      yield* Queue.shutdown(updates).pipe(Effect.ignore)
-      yield* Fiber.interrupt(metadataFiber).pipe(Effect.ignore)
-
-      return {
-        title: input.description,
-        output: formatted.output,
-        metadata: {
-          output: formatted.metadataOutput,
-          exit: code,
-          description: input.description,
-          truncated: formatted.truncated,
-          ...(formatted.outputPath ? { outputPath: formatted.outputPath } : {}),
-          backendPreference: input.backendPreference,
-          enforcement: input.enforcement,
-          filesystemPolicy: input.filesystemPolicy,
-          networkPolicy: input.networkPolicy,
-          allowedPaths: input.allowedPaths,
-          writablePaths: input.writablePaths,
-          backendUsed,
-          terminationReason,
-        },
-      }
+        }
+      }).pipe(Effect.ensuring(cleanupMetadata))
     })
 
     return Service.of({ run })
