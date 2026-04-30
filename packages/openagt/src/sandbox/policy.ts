@@ -54,12 +54,15 @@ function enforcement(decision: ShellDecision, risk: ShellRiskLevel): SandboxEnfo
   return "advisory"
 }
 
-function writablePaths(cwd: string, externalPaths: string[]) {
-  return normalizePaths([cwd, Instance.directory, Instance.worktree, Truncate.DIR, ...externalPaths])
-}
-
-function allowedPaths(cwd: string, externalPaths: string[]) {
-  return normalizePaths([cwd, Instance.directory, Instance.worktree, Truncate.DIR, ...externalPaths])
+export function resolvePathScopes(cwd: string, externalPaths: string[], internalPaths?: string[]) {
+  const writable = normalizePaths([cwd, ...(internalPaths ?? [Instance.directory, Instance.worktree, Truncate.DIR])])
+  const externalAllowed = normalizePaths(externalPaths)
+  const allowed = normalizePaths([...writable, ...externalAllowed])
+  return {
+    allowed,
+    writable,
+    compatWritable: allowed,
+  }
 }
 
 export interface Interface {
@@ -89,8 +92,7 @@ export const layer = Layer.effect(
     const resolve: Interface["resolve"] = Effect.fn("SandboxPolicy.resolve")(function* (input) {
       const sandbox = yield* sandboxConfig()
       const needsNetwork = inferNetwork(input.result)
-      const allowed = allowedPaths(input.cwd, input.externalPaths)
-      const writable = writablePaths(input.cwd, input.externalPaths)
+      const pathScopes = resolvePathScopes(input.cwd, input.externalPaths)
       const decision = input.decision ?? input.result.decision
       return {
         sandbox,
@@ -98,8 +100,12 @@ export const layer = Layer.effect(
         backend_preference: sandbox.backend,
         filesystem_policy: "workspace_write",
         network_policy: needsNetwork ? "full" : "none",
-        allowed_paths: allowed,
-        writable_paths: writable,
+        allowed_paths: pathScopes.allowed,
+        // Compatibility: the current process backend is advisory and existing
+        // metadata consumers expect approved external paths here. Native
+        // sandbox helpers should enforce `pathScopes.writable` after they can
+        // distinguish read-only external inputs from write targets.
+        writable_paths: pathScopes.compatWritable,
         needs_network_permission: needsNetwork,
       } satisfies ResolvedPolicy
     })
