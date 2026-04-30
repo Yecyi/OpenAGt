@@ -1,0 +1,357 @@
+/* Mock data for OpenAGt sessions, messages, files */
+
+const SESSIONS = [
+  {
+    id: "react-auth",
+    name: "React Auth Implementation",
+    glyph: "§01",
+    status: "live",
+    when: "2 min ago",
+    pill: "JWT",
+    section: "active",
+    project: "neu-dashboard",
+    branch: "feat/auth-context",
+    model: "claude-sonnet-4.5",
+    task: { step: "Step 03 of 07", name: "Implementing AuthProvider", pct: 42 },
+    files: [
+      { path: "src/App.jsx", glyph: "·", tag: null, dim: true },
+      { path: "src/context/AuthContext.jsx", glyph: "·", tag: "active", dim: false },
+      { path: "src/hooks/useAuth.js", glyph: "·", tag: "diff", dim: false },
+      { path: "package.json", glyph: "{}", tag: null, dim: true },
+      { path: "vite.config.ts", glyph: "·", tag: null, dim: true },
+    ],
+    env: [
+      ["Framework", "React 18.3"],
+      ["Build", "Vite 5.4"],
+      ["Runtime", "Node 20.11"],
+      ["Package", "bun 1.1.34"],
+    ],
+  },
+  {
+    id: "data-pipeline",
+    name: "Data Pipeline Optimization",
+    glyph: "§02",
+    status: "idle",
+    when: "1 hr ago",
+    pill: "ETL",
+    section: "active",
+    project: "warehouse-svc",
+    branch: "perf/parallel-load",
+    model: "claude-opus-4",
+    task: { step: "Step 06 of 09", name: "Benchmarking parallel reads", pct: 68 },
+    files: [
+      { path: "pipelines/load.py", glyph: "·", tag: "active", dim: false },
+      { path: "pipelines/transform.py", glyph: "·", tag: null, dim: false },
+      { path: "tests/test_load.py", glyph: "·", tag: null, dim: true },
+    ],
+    env: [
+      ["Runtime", "Python 3.12"],
+      ["Engine", "DuckDB 1.1"],
+      ["Memory", "16 GB"],
+    ],
+  },
+  {
+    id: "deploy-ci",
+    name: "Deploy Scripts CI/CD",
+    glyph: "§03",
+    status: "idle",
+    when: "Yesterday",
+    pill: "OPS",
+    section: "active",
+    project: "infra",
+    branch: "ci/release-pipeline",
+    model: "claude-sonnet-4.5",
+    task: { step: "Step 02 of 04", name: "Drafting GitHub Actions matrix", pct: 25 },
+    files: [
+      { path: ".github/workflows/release.yml", glyph: "·", tag: "active", dim: false },
+      { path: "script/sign.ts", glyph: "·", tag: null, dim: false },
+    ],
+    env: [
+      ["Runner", "ubuntu-24.04"],
+      ["Bun", "1.1.34"],
+    ],
+  },
+  {
+    id: "legacy-api",
+    name: "Legacy API Migration",
+    glyph: "§04",
+    status: "archived",
+    when: "Mar 14",
+    pill: "—",
+    section: "archive",
+    project: "core",
+    branch: "main",
+    model: "—",
+    task: { step: "Closed", name: "Migration complete", pct: 100 },
+    files: [],
+    env: [],
+  },
+  {
+    id: "obs-skills",
+    name: "Obsidian Skill Imports",
+    glyph: "§05",
+    status: "archived",
+    when: "Mar 02",
+    pill: "—",
+    section: "archive",
+    project: "skills",
+    branch: "main",
+    model: "—",
+    task: { step: "Closed", name: "Imported 14 skills", pct: 100 },
+    files: [],
+    env: [],
+  },
+];
+
+const PROVIDERS = [
+  { name: "Anthropic", status: "live", lat: "182 ms" },
+  { name: "OpenAI", status: "live", lat: "234 ms" },
+  { name: "Local · ollama", status: "idle", lat: "—" },
+];
+
+const TRANSCRIPTS = {
+  "react-auth": [
+    {
+      kind: "user",
+      who: "User",
+      sub: "S. Cyi",
+      ts: "14:02:08",
+      text: "We need a JWT-based authentication flow for the new dashboard. Outline the architecture and provide the initial context provider. We are on React 18 + Vite.",
+    },
+    {
+      kind: "monologue",
+      ts: "14:02:11",
+      text: "User wants a production-grade JWT setup. The right shape is a Context provider, a hook, secure storage with httpOnly cookies preferred over localStorage, and an Axios interceptor. I'll lead with the architecture and then write the provider.",
+    },
+    {
+      kind: "agent",
+      who: "OpenAGt · Sonnet 4.5",
+      sub: "Coordinator → Implementer",
+      ts: "14:02:13",
+      blocks: [
+        {
+          type: "p",
+          text: "To establish a robust JWT authentication flow in your React 18 application, we need a centralized state surface. The most idiomatic approach pairs React Context with a custom hook and a secure storage layer.",
+        },
+        { type: "h3", text: "Proposed Architecture" },
+        {
+          type: "ul",
+          items: [
+            ["AuthContext", "Holds global state — user, isAuthenticated, loading."],
+            ["AuthProvider", "Owns token lifecycle and decode — wraps the app."],
+            ["useAuth()", "A consumer hook with type-safe access."],
+            ["http interceptor", "Attaches the token; handles 401 refresh."],
+          ],
+        },
+      ],
+    },
+    {
+      kind: "tool",
+      ts: "14:02:14",
+      label: "Tool",
+      name: "read_file",
+      status: "ok",
+      statusLabel: "Read · 142 lines",
+      body: '<span class="c-com">// src/App.jsx — current root</span>\n<span class="c-key">import</span> { BrowserRouter } <span class="c-key">from</span> <span class="c-str">"react-router-dom"</span>;\n<span class="c-key">import</span> Dashboard <span class="c-key">from</span> <span class="c-str">"./Dashboard"</span>;\n\n<span class="c-key">export default function</span> App() {\n  <span class="c-key">return</span> (\n    &lt;BrowserRouter&gt;\n      &lt;Dashboard /&gt;\n    &lt;/BrowserRouter&gt;\n  );\n}',
+    },
+    {
+      kind: "approval",
+      ts: "14:02:16",
+      ask: "Write src/context/AuthContext.jsx · 64 new lines, no overwrites.",
+    },
+  ],
+  "data-pipeline": [
+    {
+      kind: "user",
+      who: "User",
+      sub: "S. Cyi",
+      ts: "13:01:02",
+      text: "The nightly load is taking 47 minutes. Profile the bottleneck and propose a parallelization plan that does not blow our memory budget.",
+    },
+    {
+      kind: "monologue",
+      ts: "13:01:06",
+      text: "Likely candidates: serial CSV reads, a single-threaded Pandas concat, and the type-coercion pass running per row. I'll instrument the loader and benchmark a thread-pool variant against an asyncio-fanout one.",
+    },
+    {
+      kind: "agent",
+      who: "OpenAGt · Opus 4",
+      sub: "Researcher → Implementer",
+      ts: "13:01:09",
+      blocks: [
+        { type: "p", text: "Three hot paths dominate the run: (1) sequential file enumeration, (2) per-row type coercion, and (3) a single-threaded concat. Of these, the concat is the cheapest to keep and the coercion is the most expensive to remove." },
+        { type: "h3", text: "Plan" },
+        { type: "ul", items: [
+          ["Parallel reads", "Bounded thread-pool, 8 workers, with a 2 GB watermark."],
+          ["Vectorized coerce", "Replace per-row casts with column-wise PyArrow."],
+          ["Streaming concat", "Use DuckDB to stitch shards without materializing."],
+        ]},
+      ],
+    },
+  ],
+  "deploy-ci": [
+    {
+      kind: "user", who: "User", sub: "S. Cyi", ts: "Yesterday 17:40",
+      text: "Sketch a release pipeline that signs the Windows MSI, attests the macOS archive, and pushes a SHA256SUMS file.",
+    },
+    {
+      kind: "agent", who: "OpenAGt · Sonnet 4.5", sub: "Planner", ts: "17:40:12",
+      blocks: [
+        { type: "p", text: "I'll draft a single workflow with three matrix legs: windows-2022 for signtool, macos-14 for codesign + notary, and ubuntu-24.04 for the Linux tarball and final SHA roll-up." },
+      ],
+    },
+  ],
+  "legacy-api": [
+    { kind: "user", who: "User", sub: "S. Cyi", ts: "Mar 14", text: "Close out the v0 → v1 migration; archive everything." },
+    { kind: "agent", who: "OpenAGt · Haiku", sub: "Closer", ts: "Mar 14",
+      blocks: [{ type: "p", text: "All routes migrated. 18 endpoints retired, 4 deprecated with sunset headers. Closing session and archiving artifacts." }] },
+  ],
+  "obs-skills": [
+    { kind: "user", who: "User", sub: "S. Cyi", ts: "Mar 02", text: "Bring over the Obsidian skill files." },
+    { kind: "agent", who: "OpenAGt · Sonnet", sub: "Importer", ts: "Mar 02",
+      blocks: [{ type: "p", text: "Imported 14 skills into .opencode/skills. No conflicts; vault remains source-of-truth." }] },
+  ],
+};
+
+window.AGT = { SESSIONS, PROVIDERS, TRANSCRIPTS };
+
+/* ---------- Mission Control mock ---------- */
+const MISSION = {
+  id: "mc-react-auth",
+  goal: "Implement a production-grade JWT auth flow for the dashboard",
+  workflow: "coding",
+  effort: "High",
+  status: "executing", // planning | preview | executing | reviewing | done
+  budget: { tools: { used: 18, max: 240 }, calls: { used: 4, max: 40 }, wall: { used: 3, max: 45 }, tokens: { used: 8243, max: 60000 } },
+  evidence: { coverage: "medium", confidence: "medium", review: "pending" },
+  stages: [
+    { id: "explore",   title: "Discovery",         state: "done",     ts: "00:42" },
+    { id: "plan",      title: "Coordinator Plan",  state: "done",     ts: "01:14" },
+    { id: "execute",   title: "Expert Execution",  state: "active",   ts: "—"    },
+    { id: "reduce",    title: "Reducer",           state: "pending",  ts: "—"    },
+    { id: "verify",    title: "Verifier",          state: "pending",  ts: "—"    },
+    { id: "review",    title: "Critical Review",   state: "pending",  ts: "—"    },
+    { id: "checkpoint",title: "Checkpoint Memory", state: "pending",  ts: "—"    },
+  ],
+  todos: [
+    { id: "t1", state: "done",     title: "Inspect repo structure",            owner: "explorer",  ts: "00:18" },
+    { id: "t2", state: "done",     title: "Read existing auth scaffolding",    owner: "explorer",  ts: "00:34" },
+    { id: "t3", state: "done",     title: "Draft architecture sketch",         owner: "planner",   ts: "01:02" },
+    { id: "t4", state: "active",   title: "Implement AuthContext + provider",  owner: "implementer", ts: "01:20" },
+    { id: "t5", state: "active",   title: "Wire interceptor + refresh token",  owner: "implementer", ts: "01:24" },
+    { id: "t6", state: "pending",  title: "Add unit tests for token lifecycle",owner: "tester",    ts: "—"    },
+    { id: "t7", state: "pending",  title: "Reduce + verify behavior",          owner: "reducer",   ts: "—"    },
+    { id: "t8", state: "pending",  title: "Critical review pass",              owner: "reviewer",  ts: "—"    },
+  ],
+  // DAG: nodes + edges
+  dag: {
+    nodes: [
+      { id: "explore",     label: "Explore",       lane: 0, x: 0,   state: "done"     },
+      { id: "plan",        label: "Plan",          lane: 0, x: 1,   state: "done"     },
+      { id: "ctx",         label: "Context",       lane: 1, x: 2,   state: "done"     },
+      { id: "auth-impl",   label: "Auth Provider", lane: 2, x: 2,   state: "active"   },
+      { id: "interceptor", label: "Interceptor",   lane: 3, x: 2,   state: "active"   },
+      { id: "tests",       label: "Tests",         lane: 4, x: 3,   state: "pending"  },
+      { id: "reduce",      label: "Reduce",        lane: 2, x: 4,   state: "pending"  },
+      { id: "verify",      label: "Verify",        lane: 2, x: 5,   state: "pending"  },
+      { id: "review",      label: "Review",        lane: 2, x: 6,   state: "pending"  },
+    ],
+    edges: [
+      ["explore","plan"], ["plan","ctx"], ["plan","auth-impl"], ["plan","interceptor"],
+      ["auth-impl","tests"], ["interceptor","tests"], ["ctx","auth-impl"],
+      ["tests","reduce"], ["auth-impl","reduce"], ["interceptor","reduce"],
+      ["reduce","verify"], ["verify","review"],
+    ],
+  },
+  experts: [
+    { id: "explorer",    role: "Explorer",     state: "done",    tool: "—",            scope: ["src/", "package.json"], elapsed: "1:14", steps: "8 / 12",  conf: "high",   ev: ["repo layout", "vite config", "deps map"], risks: [] },
+    { id: "planner",     role: "Planner",      state: "done",    tool: "—",            scope: ["architecture"],          elapsed: "0:48", steps: "5 / 10",  conf: "high",   ev: ["arch sketch", "module boundaries"], risks: [] },
+    { id: "implementer", role: "Implementer",  state: "running", tool: "edit_file",    scope: ["src/context", "src/hooks"], elapsed: "2:03", steps: "11 / 30", conf: "medium", ev: ["AuthContext draft"], risks: ["token storage location"] },
+    { id: "interceptor", role: "Implementer",  state: "running", tool: "edit_file",    scope: ["src/lib/http"],          elapsed: "1:42", steps: "7 / 30",  conf: "medium", ev: ["axios baseline"], risks: ["refresh race condition"] },
+    { id: "tester",      role: "Tester",       state: "idle",    tool: "—",            scope: ["src/__tests__"],         elapsed: "—",    steps: "0 / 20",  conf: "—",      ev: [], risks: [] },
+    { id: "reducer",     role: "Reducer",      state: "pending", tool: "—",            scope: ["all expert outputs"],    elapsed: "—",    steps: "0 / 8",   conf: "—",      ev: [], risks: [] },
+    { id: "verifier",    role: "Verifier",     state: "pending", tool: "—",            scope: ["acceptance criteria"],   elapsed: "—",    steps: "0 / 6",   conf: "—",      ev: [], risks: [] },
+    { id: "reviewer",    role: "Reviewer",     state: "pending", tool: "—",            scope: ["security · UX · perf"],  elapsed: "—",    steps: "0 / 4",   conf: "—",      ev: [], risks: [] },
+  ],
+  qualityGates: [
+    { id: "g1", name: "All tests pass",            state: "pending" },
+    { id: "g2", name: "Reducer reaches consensus", state: "pending" },
+    { id: "g3", name: "Verifier confidence ≥ med", state: "pending" },
+    { id: "g4", name: "Review approves diff",      state: "pending" },
+  ],
+  revisePoints: [
+    { at: "Reducer", reason: "Conflicting token-storage strategies between experts" },
+    { at: "Verifier", reason: "Refresh-token race condition unresolved" },
+  ],
+};
+
+/* ---------- Permissions queue ---------- */
+const PERMISSIONS = [
+  {
+    id: "p1",
+    kind: "exec_policy_rule",
+    title: "Run shell command",
+    summary: "bun install && bun run build",
+    risk: "medium",
+    decision: "confirm",
+    why: "Network access required to fetch packages, then writes to dist/.",
+    policy: "exec_policy_rule · matched: shell-network-write",
+    boundary: { sandbox: "workspace", filesystem: "rw within /workspace", network: "allow registry.npmjs.org · jsr.io" },
+    matched: ["shell-network-write", "package-manager-allowed"],
+    retryable: true,
+    requestedBy: "implementer",
+    sessionId: "react-auth",
+    at: "14:02:42",
+  },
+  {
+    id: "p2",
+    kind: "dangerous_command",
+    title: "Delete generated files",
+    summary: "rm -rf node_modules .turbo dist",
+    risk: "high",
+    decision: "confirm",
+    why: "Recursive delete in workspace root. Irreversible without VCS.",
+    policy: "dangerous_command · matched: rm-recursive-root",
+    boundary: { sandbox: "workspace", filesystem: "delete /workspace/{node_modules,.turbo,dist}", network: "none" },
+    matched: ["rm-recursive-root", "no-protected-paths"],
+    retryable: false,
+    requestedBy: "implementer",
+    sessionId: "react-auth",
+    at: "14:02:48",
+  },
+  {
+    id: "p3",
+    kind: "network_access",
+    title: "Network egress",
+    summary: "GET https://api.openai.com/v1/models",
+    risk: "low",
+    decision: "confirm",
+    why: "Outbound HTTPS to a non-default provider for capability probing.",
+    policy: "network_access · matched: provider-allowlist",
+    boundary: { sandbox: "workspace", filesystem: "—", network: "allow api.openai.com" },
+    matched: ["provider-allowlist"],
+    retryable: true,
+    requestedBy: "planner",
+    sessionId: "react-auth",
+    at: "14:02:55",
+  },
+  {
+    id: "p4",
+    kind: "sandbox_escalation",
+    title: "Escalate sandbox",
+    summary: "Read /etc/hosts (out-of-workspace)",
+    risk: "medium",
+    decision: "confirm",
+    why: "Crosses workspace boundary. Read-only system file inspection.",
+    policy: "sandbox_escalation · matched: readonly-system-allow",
+    boundary: { sandbox: "system-readonly", filesystem: "ro /etc/hosts", network: "none" },
+    matched: ["readonly-system-allow"],
+    retryable: true,
+    requestedBy: "explorer",
+    sessionId: "react-auth",
+    at: "14:03:01",
+  },
+];
+
+window.AGT.MISSION = MISSION;
+window.AGT.PERMISSIONS = PERMISSIONS;
