@@ -650,7 +650,7 @@ describe("MPACR skipped critic runtime contract", () => {
             parentSessionID: parent.id,
             nodeID,
             status: "completed",
-          }),
+          }).pipe(Effect.tap(() => coordinator.dispatch(run.id).pipe(Effect.ignore))),
         )
         yield* coordinator.dispatch(run.id)
 

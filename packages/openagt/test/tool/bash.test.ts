@@ -155,6 +155,11 @@ const fill = (mode: "lines" | "bytes", n: number) => {
   if (PS.has(sh())) return `& ${text}`
   return text
 }
+const stderrCommand = () => {
+  if (PS.has(sh())) return `Write-Output "stdout_msg"; [Console]::Error.WriteLine("stderr_msg")`
+  if (sh() === "cmd") return `echo stdout_msg && echo stderr_msg 1>&2`
+  return `echo stdout_msg && echo stderr_msg >&2`
+}
 const glob = (p: string) =>
   process.platform === "win32" ? Filesystem.normalizePathPattern(p) : p.replaceAll("\\", "/")
 
@@ -1586,7 +1591,7 @@ describe("tool.bash abort", () => {
     })
   }, 15_000)
 
-  test.skipIf(process.platform === "win32")("captures stderr in output", async () => {
+  test("captures stderr in output", async () => {
     await Instance.provide({
       directory: projectRoot,
       fn: async () => {
@@ -1594,7 +1599,7 @@ describe("tool.bash abort", () => {
         const result = await Effect.runPromise(
           bash.execute(
             {
-              command: `echo stdout_msg && echo stderr_msg >&2`,
+              command: stderrCommand(),
               description: "Stderr test",
             },
             ctx,
