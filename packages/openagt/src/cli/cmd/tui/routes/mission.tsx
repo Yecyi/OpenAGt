@@ -10,7 +10,7 @@ import { Spinner } from "@tui/component/spinner"
 type CoordinatorTask = {
   task_id: string
   child_session_id: string
-  status: "pending" | "running" | "completed" | "failed" | "cancelled"
+  status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
   description: string
   result_summary?: string
   error_summary?: string
@@ -80,8 +80,84 @@ type CoordinatorProjection = {
     }
   }
   tasks: CoordinatorTask[]
-  counts: Record<"pending" | "running" | "completed" | "failed" | "cancelled", number>
+  counts: Record<"pending" | "running" | "completed" | "partial" | "failed" | "cancelled", number>
   groups: CoordinatorGroup[]
+  effort_profile?: {
+    planning_rounds: number
+    verifier_count_min: number
+    revise_policy: string
+    max_revise_nodes: number
+  }
+  long_task?: {
+    is_long_task: boolean
+    task_size: string
+    execution_model?: string
+    classification?: string
+    confidence?: string
+    trigger_score?: number
+    milestone_count?: number
+    timeline_required: boolean
+    positive_signals?: string[]
+    negative_signals?: string[]
+    needs_user_confirmation?: boolean
+  }
+  todo_timeline?: {
+    current_milestone_id?: string
+    milestones: Array<{
+      id: string
+      title: string
+      status: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+      expected_artifact: string
+      budget_slice: number
+    }>
+    checkpoints: Array<{
+      id: string
+      type: string
+      milestone_id?: string
+      summary: string
+      next_recommended_action: string
+    }>
+    evidence_ledger: Array<{
+      id: string
+      source_id: string
+      milestone_id?: string
+      summary: string
+    }>
+    memory_slices: Array<{
+      id: string
+      milestone_id?: string
+      next_context: string
+    }>
+  }
+  budget_state?: {
+    budget_limited: boolean
+    ceiling_hit: boolean
+    checkpoint_count: number
+    soft_budget_used: number
+    absolute_ceiling_used: number
+  }
+  progress_snapshot?: {
+    progress_score: number
+    evidence_coverage: number
+    confidence: string
+  }
+  checkpoint_memory?: {
+    checkpoint_id?: string
+    checkpoint_type?: string
+    current_milestone_id?: string
+    compressed_context: string
+    next_recommended_todos: string[]
+    milestone_summaries: string[]
+  }
+  continuation_request?: {
+    reason: string
+    next_todos: string[]
+    expected_value: string
+    requires_user_approval: boolean
+  }
+  quality_gates?: Array<{ id: string; kind: string; status: string }>
+  revise_points?: Array<{ id: string; kind: string; status: string }>
+  expert_lanes?: Array<{ id: string; expert_id: string; role: string; node_ids: string[] }>
 }
 
 function taskNodeID(task: CoordinatorTask) {
@@ -121,13 +197,15 @@ export function Mission() {
     setProjection(result.data as unknown as CoordinatorProjection)
   }
 
-  async function action(name: "approve" | "cancel" | "resume" | "retry") {
+  async function action(name: "approve" | "cancel" | "resume" | "retry" | "continue", nodeID?: string) {
     try {
       setBusy(name)
       if (name === "approve") await sdk.client.coordinator.approve({ runID: route.runID }, { throwOnError: true })
       if (name === "cancel") await sdk.client.coordinator.cancel({ runID: route.runID }, { throwOnError: true })
       if (name === "resume") await sdk.client.coordinator.resume({ runID: route.runID }, { throwOnError: true })
-      if (name === "retry") await sdk.client.coordinator.retry({ runID: route.runID }, { throwOnError: true })
+      if (name === "retry")
+        await sdk.client.coordinator.retry({ runID: route.runID, node_id: nodeID }, { throwOnError: true })
+      if (name === "continue") await sdk.client.coordinator.continue({ runID: route.runID }, { throwOnError: true })
       await refresh()
     } catch (error) {
       toast.error(error)
@@ -158,6 +236,12 @@ export function Mission() {
   const canApprove = createMemo(() => run()?.state === "awaiting_approval")
   const canResume = createMemo(() => run()?.state === "active" || run()?.state === "blocked")
   const canRetry = createMemo(() => run()?.state === "failed" || run()?.state === "cancelled")
+  const canContinue = createMemo(
+    () =>
+      projection()?.budget_state?.budget_limited === true ||
+      projection()?.budget_state?.ceiling_hit === true ||
+      Boolean(projection()?.continuation_request),
+  )
   const canCancel = createMemo(
     () => run()?.state === "active" || run()?.state === "blocked" || run()?.state === "awaiting_approval",
   )
@@ -193,6 +277,11 @@ export function Mission() {
                   resume
                 </text>
               </Show>
+              <Show when={canContinue()}>
+                <text fg={theme.success} onMouseUp={() => void action("continue")}>
+                  continue
+                </text>
+              </Show>
               <Show when={canRetry()}>
                 <text fg={theme.warning} onMouseUp={() => void action("retry")}>
                   retry
@@ -218,10 +307,156 @@ export function Mission() {
             <box flexDirection="row" gap={2}>
               <text fg={theme.success}>{data().counts.completed} completed</text>
               <text fg={theme.info}>{data().counts.running} running</text>
+              <text fg={theme.warning}>{data().counts.partial} partial</text>
               <text fg={theme.textMuted}>{data().counts.pending} pending</text>
               <text fg={theme.error}>{data().counts.failed} failed</text>
               <text fg={theme.warning}>{data().counts.cancelled} cancelled</text>
             </box>
+
+            <Show when={data().long_task?.is_long_task || data().todo_timeline?.milestones.length}>
+              <box flexDirection="column" gap={0}>
+                <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                  Long Task
+                </text>
+                <box flexDirection="row" gap={2}>
+                  <text fg={theme.textMuted}>
+                    {data().long_task?.execution_model ?? data().long_task?.task_size ?? "short-task"}
+                  </text>
+                  <text fg={theme.textMuted}>
+                    {data().long_task?.confidence ?? "medium"} / score {data().long_task?.trigger_score ?? 0}
+                  </text>
+                  <text fg={theme.textMuted}>current: {data().todo_timeline?.current_milestone_id ?? "none"}</text>
+                  <Show when={data().progress_snapshot}>
+                    {(progress) => (
+                      <text fg={theme.textMuted}>
+                        progress {Math.round(progress().progress_score * 100)}% / evidence{" "}
+                        {Math.round(progress().evidence_coverage * 100)}%
+                      </text>
+                    )}
+                  </Show>
+                  <Show when={data().budget_state}>
+                    {(budget) => (
+                      <text
+                        fg={
+                          budget().ceiling_hit ? theme.error : budget().budget_limited ? theme.warning : theme.textMuted
+                        }
+                      >
+                        budget {Math.round(budget().soft_budget_used * 100)}%
+                      </text>
+                    )}
+                  </Show>
+                </box>
+                <Show when={data().long_task?.positive_signals?.length}>
+                  <text fg={theme.textMuted} wrapMode="word">
+                    why: {(data().long_task?.positive_signals ?? []).slice(0, 4).join("; ")}
+                  </text>
+                </Show>
+                <Show when={data().long_task?.negative_signals?.length}>
+                  <text fg={theme.warning} wrapMode="word">
+                    counter: {(data().long_task?.negative_signals ?? []).slice(0, 3).join("; ")}
+                  </text>
+                </Show>
+                <Show when={data().long_task?.needs_user_confirmation}>
+                  <text fg={theme.warning}>confirmation recommended before continuation</text>
+                </Show>
+                <For each={data().todo_timeline?.milestones ?? []}>
+                  {(milestone) => (
+                    <box flexDirection="column" paddingLeft={1}>
+                      <text
+                        fg={
+                          theme[
+                            milestone.status === "blocked"
+                              ? "error"
+                              : milestone.status === "active"
+                                ? "info"
+                                : milestone.status === "completed"
+                                  ? "success"
+                                  : "textMuted"
+                          ]
+                        }
+                      >
+                        {milestone.id} [{milestone.status}] {milestone.title} {Math.round(milestone.budget_slice * 100)}
+                        %
+                      </text>
+                      <Show when={milestone.expected_artifact}>
+                        <text fg={theme.textMuted}>artifact: {milestone.expected_artifact}</text>
+                      </Show>
+                    </box>
+                  )}
+                </For>
+                <Show when={data().continuation_request}>
+                  {(request) => (
+                    <box flexDirection="column" paddingLeft={1}>
+                      <text fg={request().requires_user_approval ? theme.warning : theme.info}>
+                        continuation: {request().reason}
+                      </text>
+                      <text fg={theme.textMuted}>next: {request().next_todos.join(", ") || "none"}</text>
+                      <text fg={theme.textMuted} wrapMode="word">
+                        value: {request().expected_value}
+                      </text>
+                    </box>
+                  )}
+                </Show>
+                <Show when={data().todo_timeline?.checkpoints.length}>
+                  <box flexDirection="column" paddingLeft={1}>
+                    <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                      Checkpoints
+                    </text>
+                    <For each={(data().todo_timeline?.checkpoints ?? []).slice(-6)}>
+                      {(checkpoint) => (
+                        <text fg={theme.textMuted} wrapMode="word">
+                          {checkpoint.id} [{checkpoint.type}] {checkpoint.summary}
+                        </text>
+                      )}
+                    </For>
+                  </box>
+                </Show>
+                <Show when={data().checkpoint_memory?.compressed_context}>
+                  <text fg={theme.textMuted} wrapMode="word">
+                    memory: {data().checkpoint_memory?.compressed_context}
+                  </text>
+                </Show>
+              </box>
+            </Show>
+
+            <Show
+              when={
+                data().effort_profile ||
+                data().quality_gates?.length ||
+                data().revise_points?.length ||
+                data().expert_lanes?.length
+              }
+            >
+              <box flexDirection="column" gap={0}>
+                <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                  Quality
+                </text>
+                <Show when={data().effort_profile}>
+                  {(effort) => (
+                    <text fg={theme.textMuted}>
+                      effort: planning {effort().planning_rounds}, verifiers {effort().verifier_count_min}, revise{" "}
+                      {effort().revise_policy}, max revise {effort().max_revise_nodes}
+                    </text>
+                  )}
+                </Show>
+                <Show when={data().quality_gates?.length}>
+                  <text fg={theme.textMuted}>
+                    gates: {(data().quality_gates ?? []).map((item) => `${item.id}:${item.status}`).join(", ")}
+                  </text>
+                </Show>
+                <Show when={data().revise_points?.length}>
+                  <text fg={theme.textMuted}>
+                    revise: {(data().revise_points ?? []).map((item) => `${item.kind}:${item.status}`).join(", ")}
+                  </text>
+                </Show>
+                <Show when={data().expert_lanes?.length}>
+                  <text fg={theme.textMuted}>
+                    experts:{" "}
+                    {(data().expert_lanes ?? []).map((item) => `${item.expert_id}(${item.node_ids.length})`).join(", ")}
+                  </text>
+                </Show>
+              </box>
+            </Show>
 
             <Show when={data().groups.length > 0}>
               <box flexDirection="column" gap={0}>
@@ -297,6 +532,17 @@ export function Mission() {
                               open
                             </text>
                           )}
+                        </Show>
+                        <Show
+                          when={
+                            task()?.status === "failed" ||
+                            task()?.status === "partial" ||
+                            task()?.status === "cancelled"
+                          }
+                        >
+                          <text fg={theme.warning} onMouseUp={() => void action("retry", node.id)}>
+                            retry
+                          </text>
                         </Show>
                       </box>
                       <text fg={theme.textMuted} wrapMode="word">

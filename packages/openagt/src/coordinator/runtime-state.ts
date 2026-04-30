@@ -24,6 +24,29 @@ function now() {
   return Date.now()
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export function taskLeaseFor(task: TaskRuntime.TaskRecord) {
+  const profile = isRecord(task.metadata?.effort_profile) ? task.metadata.effort_profile : undefined
+  const multiplier = typeof profile?.timeout_multiplier === "number" ? profile.timeout_multiplier : 1
+  const threshold = Math.round(30 * 60 * 1000 * multiplier)
+  const heartbeat =
+    typeof task.metadata?.lease_heartbeat_at === "number"
+      ? task.metadata.lease_heartbeat_at
+      : typeof task.metadata?.heartbeat_at === "number"
+        ? task.metadata.heartbeat_at
+        : task.started_at
+  const age = task.status === "running" && heartbeat ? Math.max(0, now() - heartbeat) : 0
+  return {
+    stale: task.status === "running" && heartbeat !== undefined && age >= threshold,
+    age_ms: age,
+    threshold_ms: threshold,
+    heartbeat_at: heartbeat,
+  }
+}
+
 function todoStatusFromTasks(items: TaskRuntime.TaskRecord[]) {
   if (items.length === 0) return "pending" as const
   if (items.some((item) => item.status === "failed")) return "blocked" as const
@@ -35,18 +58,144 @@ function todoStatusFromTasks(items: TaskRuntime.TaskRecord[]) {
   return "pending" as const
 }
 
-function runtimeTodoTimeline(plan: CoordinatorPlanType, taskByNode: Map<string, TaskRuntime.TaskRecord>) {
+function milestoneStatusFromTodos(items: Array<{ status: string }>) {
+  if (items.length === 0) return "pending" as const
+  if (items.some((item) => item.status === "blocked")) return "blocked" as const
+  if (items.every((item) => item.status === "skipped")) return "skipped" as const
+  if (items.every((item) => item.status === "done")) return "completed" as const
+  if (items.some((item) => item.status === "active")) return "active" as const
+  if (items.some((item) => item.status === "partial" || item.status === "done")) return "partial" as const
+  return "pending" as const
+}
+
+function checkpointTypeForTask(task: TaskRuntime.TaskRecord) {
+  if (task.status === "completed") return "node_checkpoint" as const
+  if (task.status === "cancelled") return "cancellation_checkpoint" as const
+  if (task.status === "failed" || task.status === "partial") return "recovery_checkpoint" as const
+  return undefined
+}
+
+function taskSummary(task: TaskRuntime.TaskRecord) {
+  return task.result_summary ?? task.error_summary ?? task.description
+}
+
+function runtimeTodoTimeline(
+  plan: CoordinatorPlanType,
+  taskList: TaskRuntime.TaskRecord[],
+  taskByNode: Map<string, TaskRuntime.TaskRecord>,
+) {
+  const todos = plan.todo_timeline.todos.map((item) => ({
+    ...item,
+    status: todoStatusFromTasks(
+      item.node_ids.flatMap((id) => {
+        const task = taskByNode.get(id)
+        return task ? [task] : []
+      }),
+    ),
+  }))
+  const milestones = plan.todo_timeline.milestones.map((item) => {
+    const milestoneTodos = todos.filter((todo) => item.todo_ids.includes(todo.id))
+    return {
+      ...item,
+      status: milestoneStatusFromTodos(milestoneTodos),
+    }
+  })
+  const current = milestones.find((item) => item.status !== "completed" && item.status !== "skipped")
+  const milestoneByNode = new Map(
+    milestones.flatMap((milestone) =>
+      milestone.todo_ids.flatMap((todoID) => {
+        const todo = todos.find((item) => item.id === todoID)
+        return (todo?.node_ids ?? []).map((nodeID) => [nodeID, milestone.id] as const)
+      }),
+    ),
+  )
+  const taskCheckpoints = taskList.flatMap((task) => {
+    const nodeID = nodeIDForTask(task)
+    const type = checkpointTypeForTask(task)
+    const retryCheckpoints = Array.isArray(task.metadata?.recovery_checkpoints)
+      ? task.metadata.recovery_checkpoints.filter(isRecord).map((item, index) => ({
+          id: `recovery_checkpoint_${task.task_id}_${index + 1}`,
+          type: "recovery_checkpoint" as const,
+          milestone_id: nodeID ? milestoneByNode.get(nodeID) : undefined,
+          node_id: nodeID,
+          task_id: task.task_id,
+          status: String(item.status ?? "recorded"),
+          summary: String(item.error_summary ?? item.result_summary ?? item.stop_reason ?? "Retry recovery checkpoint"),
+          next_recommended_action: "Use this checkpoint to avoid repeating the previous failed attempt.",
+          created_at: typeof item.created_at === "number" ? item.created_at : task.created_at,
+        }))
+      : []
+    if (!nodeID || !type) return retryCheckpoints
+    return [
+      ...retryCheckpoints,
+      {
+        id: `${type}_${task.task_id}`,
+        type,
+        milestone_id: milestoneByNode.get(nodeID),
+        node_id: nodeID,
+        task_id: task.task_id,
+        status: task.status,
+        summary: taskSummary(task),
+        next_recommended_action:
+          task.status === "failed" || task.status === "partial"
+            ? "Review recovery checkpoint before retrying this node."
+            : "Use this checkpoint as compact evidence for downstream nodes.",
+        created_at: task.finished_at ?? task.started_at ?? task.created_at,
+      },
+    ]
+  })
+  const milestoneCheckpoints = milestones.flatMap((milestone) => {
+    if (milestone.status !== "completed" || !milestone.checkpoint_after) return []
+    return [
+      {
+        id: `milestone_checkpoint_${milestone.id}`,
+        type: "milestone_checkpoint" as const,
+        milestone_id: milestone.id,
+        status: milestone.status,
+        summary: `${milestone.title} completed with expected artifact: ${milestone.expected_artifact}`,
+        next_recommended_action: "Proceed to the next milestone using this milestone memory slice.",
+        created_at: now(),
+      },
+    ]
+  })
   return TodoTimeline.parse({
     ...plan.todo_timeline,
-    todos: plan.todo_timeline.todos.map((item) => ({
-      ...item,
-      status: todoStatusFromTasks(
-        item.node_ids.flatMap((id) => {
-          const task = taskByNode.get(id)
-          return task ? [task] : []
-        }),
-      ),
-    })),
+    todos,
+    milestones,
+    current_milestone_id: current?.id,
+    checkpoints: [...taskCheckpoints, ...milestoneCheckpoints],
+    evidence_ledger: taskList
+      .filter((item) => item.status === "completed" || item.status === "partial")
+      .map((item) => {
+        const nodeID = nodeIDForTask(item)
+        return {
+          id: `evidence_${item.task_id}`,
+          source_type: "task" as const,
+          source_id: item.task_id,
+          milestone_id: nodeID ? milestoneByNode.get(nodeID) : undefined,
+          node_id: nodeID,
+          summary: taskSummary(item),
+          confidence: item.status === "completed" ? ("high" as const) : ("medium" as const),
+          scope: [...new Set([...item.read_scope, ...item.write_scope])],
+          created_at: item.finished_at ?? item.started_at ?? item.created_at,
+        }
+      }),
+    memory_slices: milestones
+      .filter((item) => item.status === "completed" || item.status === "partial" || item.status === "blocked")
+      .map((item) => ({
+        id: `memory_slice_${item.id}`,
+        milestone_id: item.id,
+        completed: todos
+          .filter((todo) => item.todo_ids.includes(todo.id) && todo.status === "done")
+          .map((todo) => todo.title),
+        important_context: item.acceptance_checks,
+        unresolved_risks: todos
+          .filter((todo) => item.todo_ids.includes(todo.id) && (todo.status === "blocked" || todo.status === "partial"))
+          .map((todo) => todo.title),
+        next_context: `${item.title}: ${item.status}. Carry forward expected artifact "${item.expected_artifact}".`,
+        discard_context: ["raw subagent transcript unless needed for evidence audit"],
+        created_at: now(),
+      })),
   })
 }
 
@@ -123,10 +272,13 @@ export function subtractResourceLimit(left: ResourceLimitType, right: ResourceLi
   return ResourceLimit.parse({
     max_rounds: left.max_rounds > right.max_rounds ? left.max_rounds - right.max_rounds : left.max_rounds,
     max_model_calls:
-      left.max_model_calls > right.max_model_calls ? left.max_model_calls - right.max_model_calls : left.max_model_calls,
+      left.max_model_calls > right.max_model_calls
+        ? left.max_model_calls - right.max_model_calls
+        : left.max_model_calls,
     max_tool_calls:
       left.max_tool_calls > right.max_tool_calls ? left.max_tool_calls - right.max_tool_calls : left.max_tool_calls,
-    max_subagents: left.max_subagents > right.max_subagents ? left.max_subagents - right.max_subagents : left.max_subagents,
+    max_subagents:
+      left.max_subagents > right.max_subagents ? left.max_subagents - right.max_subagents : left.max_subagents,
     max_wallclock_ms:
       left.max_wallclock_ms > right.max_wallclock_ms
         ? left.max_wallclock_ms - right.max_wallclock_ms
@@ -194,14 +346,24 @@ function checkpointMemoryFor(input: {
   todoTimeline: TodoTimelineType
   progressSnapshot: ProgressSnapshotType
 }) {
+  const checkpointType =
+    input.todoTimeline.checkpoints.find((item) => item.type === "recovery_checkpoint")?.type ??
+    input.todoTimeline.checkpoints.find((item) => item.type === "budget_checkpoint")?.type ??
+    input.todoTimeline.checkpoints.find((item) => item.type === "milestone_checkpoint")?.type ??
+    input.todoTimeline.checkpoints.find((item) => item.type === "node_checkpoint")?.type
   return CheckpointMemorySummary.parse({
     run_id: input.run.id,
     checkpoint_id: `checkpoint_${input.run.time.updated}`,
+    checkpoint_type: checkpointType,
+    current_milestone_id: input.todoTimeline.current_milestone_id,
     todo_state: input.todoTimeline.todos,
     completed_artifacts: input.todoTimeline.todos.filter((item) => item.status === "done").map((item) => item.title),
-    evidence_index: input.todoTimeline.todos
-      .filter((item) => item.status === "done" || item.status === "partial" || item.status === "active")
-      .map((item) => `${item.id}:${item.node_ids.join(",")}`),
+    evidence_index:
+      input.todoTimeline.evidence_ledger.length > 0
+        ? input.todoTimeline.evidence_ledger.map((item) => `${item.id}:${item.source_id}`)
+        : input.todoTimeline.todos
+            .filter((item) => item.status === "done" || item.status === "partial" || item.status === "active")
+            .map((item) => `${item.id}:${item.node_ids.join(",")}`),
     unresolved_claims: input.todoTimeline.todos
       .filter((item) => item.status === "partial" || item.status === "pending")
       .map((item) => item.title),
@@ -216,7 +378,13 @@ function checkpointMemoryFor(input: {
       .filter((item) => item.status === "pending" || item.status === "partial" || item.status === "blocked")
       .slice(0, 5)
       .map((item) => item.id),
-    compressed_context: `Progress ${Math.round(input.progressSnapshot.progress_score * 100)}%, evidence ${Math.round(input.progressSnapshot.evidence_coverage * 100)}%, confidence ${input.progressSnapshot.confidence}.`,
+    milestone_summaries: input.todoTimeline.memory_slices.map((item) => item.next_context),
+    compressed_context: [
+      `Progress ${Math.round(input.progressSnapshot.progress_score * 100)}%, evidence ${Math.round(input.progressSnapshot.evidence_coverage * 100)}%, confidence ${input.progressSnapshot.confidence}.`,
+      input.todoTimeline.current_milestone_id ? `Current milestone: ${input.todoTimeline.current_milestone_id}.` : "",
+    ]
+      .filter((item) => item.length > 0)
+      .join(" "),
   })
 }
 
@@ -275,13 +443,33 @@ export function runtimeStateFor(run: CoordinatorRunType, taskList: TaskRuntime.T
     ...item,
     status: gateStatusFor(taskByNode, item.node_id),
   }))
-  const todo_timeline = runtimeTodoTimeline(run.plan, taskByNode)
+  const base_todo_timeline = runtimeTodoTimeline(run.plan, taskList, taskByNode)
   const progress_snapshot = progressSnapshotFor({
-    todoTimeline: todo_timeline,
+    todoTimeline: base_todo_timeline,
     taskList,
     qualityGates: quality_gates,
   })
   const budget_state = budgetStateFor({ run, plan: run.plan, taskList, progressSnapshot: progress_snapshot })
+  const todo_timeline = TodoTimeline.parse({
+    ...base_todo_timeline,
+    checkpoints:
+      budget_state.budget_limited || budget_state.ceiling_hit
+        ? [
+            ...base_todo_timeline.checkpoints,
+            {
+              id: `budget_checkpoint_${run.time.updated}`,
+              type: "budget_checkpoint" as const,
+              milestone_id: base_todo_timeline.current_milestone_id,
+              status: budget_state.ceiling_hit ? "ceiling_hit" : "budget_limited",
+              summary: budget_state.ceiling_hit
+                ? "Absolute budget ceiling reached before all milestones completed."
+                : "Mission budget checkpoint reached with unfinished milestone work.",
+              next_recommended_action: "Review continuation request before adding budget or resuming.",
+              created_at: now(),
+            },
+          ]
+        : base_todo_timeline.checkpoints,
+  })
   const checkpoint_memory = checkpointMemoryFor({
     run,
     todoTimeline: todo_timeline,
@@ -318,6 +506,6 @@ export function planWithRuntimeState(
     progress_snapshot: runtime.progress_snapshot,
     checkpoint_memory: runtime.checkpoint_memory,
     continuation_request: runtime.continuation_request,
-    budget_limited: plan.budget_limited,
+    budget_limited: runtime.budget_state.budget_limited,
   })
 }

@@ -3,6 +3,7 @@
 import { client } from "./client.gen.js"
 import { buildClientParams, type Client, type Options as Options2, type TDataShape } from "./client/index.js"
 import type {
+  AgentConfig,
   AgentPartInput,
   AppAgentsResponses,
   AppLogErrors,
@@ -15,7 +16,10 @@ import type {
   AuthSetResponses,
   CommandListResponses,
   Config as Config3,
+  ConfigEffectiveResponses,
   ConfigGetResponses,
+  ConfigGlobalUpdateErrors,
+  ConfigGlobalUpdateResponses,
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
@@ -44,6 +48,7 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExecPolicyConfig,
   ExperimentalConsoleGetResponses,
   ExperimentalConsoleListOrgsResponses,
   ExperimentalConsoleSwitchOrgResponses,
@@ -76,6 +81,8 @@ import type {
   GlobalUpgradeErrors,
   GlobalUpgradeResponses,
   InstanceDisposeResponses,
+  LayoutConfig,
+  LogLevel,
   LspStatusResponses,
   McpAddErrors,
   McpAddResponses,
@@ -92,6 +99,7 @@ import type {
   McpLocalConfig,
   McpRemoteConfig,
   McpStatusResponses,
+  MessageRuntime,
   OutputFormat,
   Part as Part2,
   PartDeleteErrors,
@@ -99,6 +107,7 @@ import type {
   PartUpdateErrors,
   PartUpdateResponses,
   PathGetResponses,
+  PermissionConfig,
   PermissionListResponses,
   PermissionReplyErrors,
   PermissionReplyResponses,
@@ -125,6 +134,7 @@ import type {
   ProjectUpdateErrors,
   ProjectUpdateResponses,
   ProviderAuthResponses,
+  ProviderConfig,
   ProviderListResponses,
   ProviderOauthAuthorizeErrors,
   ProviderOauthAuthorizeResponses,
@@ -149,6 +159,7 @@ import type {
   QuestionRejectResponses,
   QuestionReplyErrors,
   QuestionReplyResponses,
+  ServerConfig,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -1362,6 +1373,301 @@ export class Pty extends HeyApiClient {
   }
 }
 
+export class Global2 extends HeyApiClient {
+  /**
+   * Update advanced global configuration
+   *
+   * Update the safe advanced-settings subset of the global OpenAGt configuration.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      $schema?: string
+      logLevel?: LogLevel
+      server?: ServerConfig
+      command?: {
+        [key: string]: {
+          template: string
+          description?: string
+          agent?: string
+          model?: string
+          subtask?: boolean
+        }
+      }
+      expert?: {
+        [key: string]: unknown
+      }
+      skills?: {
+        /**
+         * Additional paths to skill folders
+         */
+        paths?: Array<string>
+        /**
+         * URLs to fetch skills from (e.g., https://example.com/.well-known/skills/)
+         */
+        urls?: Array<string>
+      }
+      watcher?: {
+        ignore?: Array<string>
+      }
+      snapshot?: boolean
+      plugin?: Array<
+        | string
+        | [
+            string,
+            {
+              [key: string]: unknown
+            },
+          ]
+      >
+      autoupdate?: boolean | "notify"
+      disabled_providers?: Array<string>
+      enabled_providers?: Array<string>
+      model?: string
+      small_model?: string
+      default_agent?: string
+      username?: string
+      mode?: {
+        build?: AgentConfig
+        plan?: AgentConfig
+        [key: string]: AgentConfig | undefined
+      }
+      agent?: {
+        plan?: AgentConfig
+        build?: AgentConfig
+        general?: AgentConfig
+        explore?: AgentConfig
+        title?: AgentConfig
+        summary?: AgentConfig
+        compaction?: AgentConfig
+        [key: string]: AgentConfig | undefined
+      }
+      provider?: {
+        [key: string]: ProviderConfig
+      }
+      mcp?: {
+        [key: string]:
+          | McpLocalConfig
+          | McpRemoteConfig
+          | {
+              enabled: boolean
+            }
+      }
+      formatter?:
+        | boolean
+        | {
+            [key: string]: {
+              disabled?: boolean
+              command?: Array<string>
+              environment?: {
+                [key: string]: string
+              }
+              extensions?: Array<string>
+            }
+          }
+      lsp?:
+        | boolean
+        | {
+            [key: string]:
+              | {
+                  disabled: true
+                }
+              | {
+                  command: Array<string>
+                  extensions?: Array<string>
+                  disabled?: boolean
+                  env?: {
+                    [key: string]: string
+                  }
+                  initialization?: {
+                    [key: string]: unknown
+                  }
+                }
+          }
+      instructions?: Array<string>
+      layout?: LayoutConfig
+      permission?: PermissionConfig
+      exec_policy?: ExecPolicyConfig
+      tools?: {
+        [key: string]: boolean
+      }
+      enterprise?: {
+        /**
+         * Enterprise URL
+         */
+        url?: string
+      }
+      compaction?: {
+        /**
+         * Enable automatic compaction when context is full (default: true)
+         */
+        auto?: boolean
+        /**
+         * Enable pruning of old tool outputs (default: true)
+         */
+        prune?: boolean
+        /**
+         * Token buffer for compaction. Leaves enough window to avoid overflow during compaction.
+         */
+        reserved?: number
+      }
+      experimental?: {
+        disable_paste_summary?: boolean
+        /**
+         * Enable the batch tool
+         */
+        batch_tool?: boolean
+        /**
+         * Enable OpenTelemetry spans for AI SDK calls (using the 'experimental_telemetry' flag)
+         */
+        openTelemetry?: boolean
+        /**
+         * Tools that should only be available to primary agents.
+         */
+        primary_tools?: Array<string>
+        /**
+         * Continue the agent loop when a tool call is denied
+         */
+        continue_loop_on_deny?: boolean
+        /**
+         * Timeout in milliseconds for model context protocol (MCP) requests
+         */
+        mcp_timeout?: number
+        sandbox?: {
+          enabled?: boolean
+          backend?: "auto" | "seatbelt" | "windows_native" | "landlock" | "process"
+          failure_policy?: "closed" | "confirm_downgrade" | "fallback"
+          report_only?: boolean
+          broker_idle_ttl_ms?: number
+        }
+        /**
+         * Session memory configuration
+         */
+        memory?: {
+          /**
+           * Custom memory.md template path
+           */
+          template?: string
+          /**
+           * Max tokens for memory.md (default: 4096)
+           */
+          maxTokens?: number
+          trigger?: {
+            /**
+             * Initialize memory after N tokens (default: 6000)
+             */
+            minimumMessageTokensToInit?: number
+            /**
+             * Update memory after N additional tokens (default: 4000)
+             */
+            minimumTokensBetweenUpdate?: number
+            /**
+             * Update memory after N tool calls (default: 10)
+             */
+            toolCallsBetweenUpdates?: number
+          }
+        }
+        /**
+         * MCP tool quality scoring configuration
+         */
+        toolQuality?: {
+          /**
+           * Quality score weights for each checklist item
+           */
+          weights?: {
+            /**
+             * Score for valid schema (default: 20)
+             */
+            hasValidSchema?: number
+            /**
+             * Score for description (default: 15)
+             */
+            hasDescription?: number
+            /**
+             * Score for parameter descriptions (default: 20)
+             */
+            hasParameterDescriptions?: number
+            /**
+             * Score for return type description (default: 10)
+             */
+            hasReturnTypeDescription?: number
+            /**
+             * Score for examples (default: 10)
+             */
+            hasExamples?: number
+            /**
+             * Score for version (default: 5)
+             */
+            hasVersion?: number
+            /**
+             * Score for consistent naming (default: 10)
+             */
+            isNamingConsistent?: number
+            /**
+             * Score for deprecation warning (default: 10)
+             */
+            hasDeprecationWarning?: number
+          }
+        }
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "$schema" },
+            { in: "body", key: "logLevel" },
+            { in: "body", key: "server" },
+            { in: "body", key: "command" },
+            { in: "body", key: "expert" },
+            { in: "body", key: "skills" },
+            { in: "body", key: "watcher" },
+            { in: "body", key: "snapshot" },
+            { in: "body", key: "plugin" },
+            { in: "body", key: "autoupdate" },
+            { in: "body", key: "disabled_providers" },
+            { in: "body", key: "enabled_providers" },
+            { in: "body", key: "model" },
+            { in: "body", key: "small_model" },
+            { in: "body", key: "default_agent" },
+            { in: "body", key: "username" },
+            { in: "body", key: "mode" },
+            { in: "body", key: "agent" },
+            { in: "body", key: "provider" },
+            { in: "body", key: "mcp" },
+            { in: "body", key: "formatter" },
+            { in: "body", key: "lsp" },
+            { in: "body", key: "instructions" },
+            { in: "body", key: "layout" },
+            { in: "body", key: "permission" },
+            { in: "body", key: "exec_policy" },
+            { in: "body", key: "tools" },
+            { in: "body", key: "enterprise" },
+            { in: "body", key: "compaction" },
+            { in: "body", key: "experimental" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<ConfigGlobalUpdateResponses, ConfigGlobalUpdateErrors, ThrowOnError>({
+      url: "/config/global",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Config2 extends HeyApiClient {
   /**
    * Get configuration
@@ -1431,6 +1737,36 @@ export class Config2 extends HeyApiClient {
   }
 
   /**
+   * Get effective configuration
+   *
+   * Retrieve the current merged configuration with source metadata for advanced settings.
+   */
+  public effective<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigEffectiveResponses, unknown, ThrowOnError>({
+      url: "/config/effective",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * List config providers
    *
    * Get a list of all configured AI providers and their default models.
@@ -1458,6 +1794,11 @@ export class Config2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _global?: Global2
+  get global(): Global2 {
+    return (this._global ??= new Global2({ client: this.client }))
   }
 }
 
@@ -2204,6 +2545,7 @@ export class Session2 extends HeyApiClient {
       }
       format?: OutputFormat
       system?: string
+      runtime?: MessageRuntime
       variant?: string
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
@@ -2224,6 +2566,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "tools" },
             { in: "body", key: "format" },
             { in: "body", key: "system" },
+            { in: "body", key: "runtime" },
             { in: "body", key: "variant" },
             { in: "body", key: "parts" },
           ],
@@ -2336,6 +2679,7 @@ export class Session2 extends HeyApiClient {
       }
       format?: OutputFormat
       system?: string
+      runtime?: MessageRuntime
       variant?: string
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
@@ -2356,6 +2700,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "tools" },
             { in: "body", key: "format" },
             { in: "body", key: "system" },
+            { in: "body", key: "runtime" },
             { in: "body", key: "variant" },
             { in: "body", key: "parts" },
           ],
@@ -3099,6 +3444,11 @@ export class Plan extends HeyApiClient {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -3137,6 +3487,7 @@ export class Plan extends HeyApiClient {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -3155,6 +3506,12 @@ export class Plan extends HeyApiClient {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -3337,6 +3694,11 @@ export class Coordinator extends HeyApiClient {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -3375,6 +3737,7 @@ export class Coordinator extends HeyApiClient {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -3393,6 +3756,12 @@ export class Coordinator extends HeyApiClient {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -3570,6 +3939,11 @@ export class Coordinator extends HeyApiClient {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -3608,6 +3982,7 @@ export class Coordinator extends HeyApiClient {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -3626,6 +4001,12 @@ export class Coordinator extends HeyApiClient {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -4067,7 +4448,7 @@ export class Memory extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      scope?: "profile" | "workspace" | "session"
+      scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
       sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
@@ -4096,7 +4477,7 @@ export class Memory extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
-      scope?: "profile" | "workspace" | "session"
+      scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
       title?: string
       content?: string
       sessionID?: string
@@ -4161,7 +4542,7 @@ export class Memory extends HeyApiClient {
       workspace?: string
       query?: string
       sessionID?: string
-      scopes?: Array<"profile" | "workspace" | "session">
+      scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
       workflow?: string
       expertID?: string
       role?: string
@@ -4289,7 +4670,7 @@ export class Inbox extends HeyApiClient {
       directory?: string
       workspace?: string
       source?: "session" | "scheduled" | "webhook"
-      scope?: "profile" | "workspace" | "session"
+      scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
       goal?: string
       sessionID?: string
       contextRefs?: Array<string>
@@ -4505,7 +4886,7 @@ export class Gateway extends HeyApiClient {
       directory?: string
       workspace?: string
       goal?: string
-      scope?: "profile" | "workspace" | "session"
+      scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
       contextRefs?: Array<string>
       priority?: "high" | "normal" | "low"
       payload?: {

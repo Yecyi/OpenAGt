@@ -329,7 +329,7 @@ export type EventTaskUpdated = {
     parent_session_id: string
     result: {
       task_id: string
-      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
       summary: string
       child_session_id: string
       usage?: {
@@ -417,6 +417,21 @@ export type EventSessionCompacted = {
   }
 }
 
+export type EventMcpToolsChanged = {
+  type: "mcp.tools.changed"
+  properties: {
+    server: string
+  }
+}
+
+export type EventMcpBrowserOpenFailed = {
+  type: "mcp.browser.open.failed"
+  properties: {
+    mcpName: string
+    url: string
+  }
+}
+
 export type EventTuiPromptAppend = {
   type: "tui.prompt.append"
   properties: {
@@ -467,21 +482,6 @@ export type EventTuiSessionSelect = {
      * Session ID to navigate to
      */
     sessionID: string
-  }
-}
-
-export type EventMcpToolsChanged = {
-  type: "mcp.tools.changed"
-  properties: {
-    server: string
-  }
-}
-
-export type EventMcpBrowserOpenFailed = {
-  type: "mcp.browser.open.failed"
-  properties: {
-    mcpName: string
-    url: string
   }
 }
 
@@ -553,6 +553,192 @@ export type EventPtyDeleted = {
   type: "pty.deleted"
   properties: {
     id: string
+  }
+}
+
+export type EventCalibrationRecorded = {
+  type: "calibration.recorded"
+  properties: {
+    id: string
+    expert_id: string
+    workflow: string
+    prior: number
+    posterior: number
+    outcome: number
+    brier: number
+    time_recorded: number
+  }
+}
+
+export type EventMemoryUpdated = {
+  type: "memory.updated"
+  properties: {
+    id: string
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    projectID?: string
+    sessionID?: string
+    title: string
+    content: string
+    tags: Array<string>
+    metadata?: {
+      [key: string]: unknown
+    }
+    source:
+      | "manual"
+      | "coordinator"
+      | "verify"
+      | "scheduler"
+      | "gateway"
+      | "expert"
+      | "reviser"
+      | "verifier"
+      | "reducer"
+    importance: number
+    pinned: boolean
+    time: {
+      created: number
+      updated: number
+    }
+  }
+}
+
+export type EventInboxCreated = {
+  type: "inbox.created"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type EventInboxUpdated = {
+  type: "inbox.updated"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    source: "session" | "scheduled" | "webhook"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
+    scheduled_for?: number
+    payload?: {
+      [key: string]: unknown
+    }
+    time: {
+      created: number
+      updated: number
+      completed?: number
+    }
+  }
+}
+
+export type EventSchedulerScheduled = {
+  type: "scheduler.scheduled"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+  }
+}
+
+export type EventSchedulerFired = {
+  type: "scheduler.fired"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
+    inbox_item: {
+      id: string
+      projectID: string
+      sessionID?: string
+      source: "session" | "scheduled" | "webhook"
+      scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+      goal: string
+      context_refs: Array<string>
+      priority: "high" | "normal" | "low"
+      state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
+      scheduled_for?: number
+      payload?: {
+        [key: string]: unknown
+      }
+      time: {
+        created: number
+        updated: number
+        completed?: number
+      }
+    }
+  }
+}
+
+export type EventSchedulerCompleted = {
+  type: "scheduler.completed"
+  properties: {
+    id: string
+    projectID: string
+    sessionID?: string
+    goal: string
+    context_refs: Array<string>
+    priority: "high" | "normal" | "low"
+    scheduled_for: number
+    state: "pending" | "fired" | "completed" | "cancelled"
+    payload?: {
+      [key: string]: unknown
+    }
+    inbox_item_id?: string
+    time: {
+      created: number
+      updated: number
+      fired?: number
+      completed?: number
+    }
   }
 }
 
@@ -644,6 +830,9 @@ export type EventCoordinatorCreated = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -700,6 +889,11 @@ export type EventCoordinatorCreated = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -738,6 +932,7 @@ export type EventCoordinatorCreated = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -756,6 +951,12 @@ export type EventCoordinatorCreated = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -788,6 +989,9 @@ export type EventCoordinatorCreated = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -852,6 +1056,11 @@ export type EventCoordinatorCreated = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -867,6 +1076,11 @@ export type EventCoordinatorCreated = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -885,6 +1099,11 @@ export type EventCoordinatorCreated = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -892,7 +1111,7 @@ export type EventCoordinatorCreated = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -901,6 +1120,18 @@ export type EventCoordinatorCreated = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -923,7 +1154,60 @@ export type EventCoordinatorCreated = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -1008,6 +1292,14 @@ export type EventCoordinatorCreated = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -1028,6 +1320,7 @@ export type EventCoordinatorCreated = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -1145,6 +1438,9 @@ export type EventCoordinatorUpdated = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -1201,6 +1497,11 @@ export type EventCoordinatorUpdated = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -1239,6 +1540,7 @@ export type EventCoordinatorUpdated = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -1257,6 +1559,12 @@ export type EventCoordinatorUpdated = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -1289,6 +1597,9 @@ export type EventCoordinatorUpdated = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -1353,6 +1664,11 @@ export type EventCoordinatorUpdated = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -1368,6 +1684,11 @@ export type EventCoordinatorUpdated = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -1386,6 +1707,11 @@ export type EventCoordinatorUpdated = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -1393,7 +1719,7 @@ export type EventCoordinatorUpdated = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -1402,6 +1728,18 @@ export type EventCoordinatorUpdated = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -1424,7 +1762,60 @@ export type EventCoordinatorUpdated = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -1509,6 +1900,14 @@ export type EventCoordinatorUpdated = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -1529,6 +1928,7 @@ export type EventCoordinatorUpdated = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -1646,6 +2046,9 @@ export type EventCoordinatorCompleted = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -1702,6 +2105,11 @@ export type EventCoordinatorCompleted = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -1740,6 +2148,7 @@ export type EventCoordinatorCompleted = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -1758,6 +2167,12 @@ export type EventCoordinatorCompleted = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -1790,6 +2205,9 @@ export type EventCoordinatorCompleted = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -1854,6 +2272,11 @@ export type EventCoordinatorCompleted = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -1869,6 +2292,11 @@ export type EventCoordinatorCompleted = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -1887,6 +2315,11 @@ export type EventCoordinatorCompleted = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -1894,7 +2327,7 @@ export type EventCoordinatorCompleted = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -1903,6 +2336,18 @@ export type EventCoordinatorCompleted = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -1925,7 +2370,60 @@ export type EventCoordinatorCompleted = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -2010,6 +2508,14 @@ export type EventCoordinatorCompleted = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -2030,6 +2536,7 @@ export type EventCoordinatorCompleted = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -2055,178 +2562,6 @@ export type EventCoordinatorCompleted = {
       created: number
       updated: number
       finished?: number
-    }
-  }
-}
-
-export type EventMemoryUpdated = {
-  type: "memory.updated"
-  properties: {
-    id: string
-    scope: "profile" | "workspace" | "session"
-    projectID?: string
-    sessionID?: string
-    title: string
-    content: string
-    tags: Array<string>
-    metadata?: {
-      [key: string]: unknown
-    }
-    source:
-      | "manual"
-      | "coordinator"
-      | "verify"
-      | "scheduler"
-      | "gateway"
-      | "expert"
-      | "reviser"
-      | "verifier"
-      | "reducer"
-    importance: number
-    pinned: boolean
-    time: {
-      created: number
-      updated: number
-    }
-  }
-}
-
-export type EventInboxCreated = {
-  type: "inbox.created"
-  properties: {
-    id: string
-    projectID: string
-    sessionID?: string
-    source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
-    goal: string
-    context_refs: Array<string>
-    priority: "high" | "normal" | "low"
-    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
-    scheduled_for?: number
-    payload?: {
-      [key: string]: unknown
-    }
-    time: {
-      created: number
-      updated: number
-      completed?: number
-    }
-  }
-}
-
-export type EventInboxUpdated = {
-  type: "inbox.updated"
-  properties: {
-    id: string
-    projectID: string
-    sessionID?: string
-    source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
-    goal: string
-    context_refs: Array<string>
-    priority: "high" | "normal" | "low"
-    state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
-    scheduled_for?: number
-    payload?: {
-      [key: string]: unknown
-    }
-    time: {
-      created: number
-      updated: number
-      completed?: number
-    }
-  }
-}
-
-export type EventSchedulerScheduled = {
-  type: "scheduler.scheduled"
-  properties: {
-    id: string
-    projectID: string
-    sessionID?: string
-    goal: string
-    context_refs: Array<string>
-    priority: "high" | "normal" | "low"
-    scheduled_for: number
-    state: "pending" | "fired" | "completed" | "cancelled"
-    payload?: {
-      [key: string]: unknown
-    }
-    inbox_item_id?: string
-    time: {
-      created: number
-      updated: number
-      fired?: number
-      completed?: number
-    }
-  }
-}
-
-export type EventSchedulerFired = {
-  type: "scheduler.fired"
-  properties: {
-    id: string
-    projectID: string
-    sessionID?: string
-    goal: string
-    context_refs: Array<string>
-    priority: "high" | "normal" | "low"
-    scheduled_for: number
-    state: "pending" | "fired" | "completed" | "cancelled"
-    payload?: {
-      [key: string]: unknown
-    }
-    inbox_item_id?: string
-    time: {
-      created: number
-      updated: number
-      fired?: number
-      completed?: number
-    }
-    inbox_item: {
-      id: string
-      projectID: string
-      sessionID?: string
-      source: "session" | "scheduled" | "webhook"
-      scope: "profile" | "workspace" | "session"
-      goal: string
-      context_refs: Array<string>
-      priority: "high" | "normal" | "low"
-      state: "queued" | "active" | "blocked" | "done" | "failed" | "cancelled"
-      scheduled_for?: number
-      payload?: {
-        [key: string]: unknown
-      }
-      time: {
-        created: number
-        updated: number
-        completed?: number
-      }
-    }
-  }
-}
-
-export type EventSchedulerCompleted = {
-  type: "scheduler.completed"
-  properties: {
-    id: string
-    projectID: string
-    sessionID?: string
-    goal: string
-    context_refs: Array<string>
-    priority: "high" | "normal" | "low"
-    scheduled_for: number
-    state: "pending" | "fired" | "completed" | "cancelled"
-    payload?: {
-      [key: string]: unknown
-    }
-    inbox_item_id?: string
-    time: {
-      created: number
-      updated: number
-      fired?: number
-      completed?: number
     }
   }
 }
@@ -2279,6 +2614,16 @@ export type OutputFormatJsonSchema = {
 
 export type OutputFormat = OutputFormatText | OutputFormatJsonSchema
 
+export type MessageRuntime = {
+  stepBudget?: number
+  timeoutMs?: number
+  maxParallelSubagents?: number
+  effort?: "low" | "medium" | "high" | "deep"
+  workflow?: string
+  taskKind?: string
+  reason?: string
+}
+
 export type UserMessage = {
   id: string
   sessionID: string
@@ -2302,6 +2647,7 @@ export type UserMessage = {
   tools?: {
     [key: string]: boolean
   }
+  runtime?: MessageRuntime
 }
 
 export type AssistantMessage = {
@@ -2851,12 +3197,12 @@ export type GlobalEvent = {
     | EventSessionStatus
     | EventSessionIdle
     | EventSessionCompacted
+    | EventMcpToolsChanged
+    | EventMcpBrowserOpenFailed
     | EventTuiPromptAppend
     | EventTuiCommandExecute
     | EventTuiToastShow
     | EventTuiSessionSelect
-    | EventMcpToolsChanged
-    | EventMcpBrowserOpenFailed
     | EventCommandExecuted
     | EventVcsBranchUpdated
     | EventWorktreeReady
@@ -2865,15 +3211,16 @@ export type GlobalEvent = {
     | EventPtyUpdated
     | EventPtyExited
     | EventPtyDeleted
-    | EventCoordinatorCreated
-    | EventCoordinatorUpdated
-    | EventCoordinatorCompleted
+    | EventCalibrationRecorded
     | EventMemoryUpdated
     | EventInboxCreated
     | EventInboxUpdated
     | EventSchedulerScheduled
     | EventSchedulerFired
     | EventSchedulerCompleted
+    | EventCoordinatorCreated
+    | EventCoordinatorUpdated
+    | EventCoordinatorCompleted
     | EventWorkspaceReady
     | EventWorkspaceFailed
     | EventWorkspaceRestore
@@ -3305,6 +3652,12 @@ export type Config = {
       model?: string
       subtask?: boolean
     }
+  }
+  /**
+   * Coordinator expert role definitions (loaded from .opencode/experts*.md)
+   */
+  expert?: {
+    [key: string]: unknown
   }
   /**
    * Additional skill folder paths
@@ -3956,12 +4309,12 @@ export type EventEnvelope = {
   | EventSessionStatus
   | EventSessionIdle
   | EventSessionCompacted
+  | EventMcpToolsChanged
+  | EventMcpBrowserOpenFailed
   | EventTuiPromptAppend
   | EventTuiCommandExecute
   | EventTuiToastShow
   | EventTuiSessionSelect
-  | EventMcpToolsChanged
-  | EventMcpBrowserOpenFailed
   | EventCommandExecuted
   | EventVcsBranchUpdated
   | EventWorktreeReady
@@ -3970,15 +4323,16 @@ export type EventEnvelope = {
   | EventPtyUpdated
   | EventPtyExited
   | EventPtyDeleted
-  | EventCoordinatorCreated
-  | EventCoordinatorUpdated
-  | EventCoordinatorCompleted
+  | EventCalibrationRecorded
   | EventMemoryUpdated
   | EventInboxCreated
   | EventInboxUpdated
   | EventSchedulerScheduled
   | EventSchedulerFired
   | EventSchedulerCompleted
+  | EventCoordinatorCreated
+  | EventCoordinatorUpdated
+  | EventCoordinatorCompleted
   | EventWorkspaceReady
   | EventWorkspaceFailed
   | EventWorkspaceRestore
@@ -4851,6 +5205,347 @@ export type ConfigUpdateResponses = {
 
 export type ConfigUpdateResponse = ConfigUpdateResponses[keyof ConfigUpdateResponses]
 
+export type ConfigEffectiveData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/effective"
+}
+
+export type ConfigEffectiveResponses = {
+  /**
+   * Get effective config snapshot
+   */
+  200: {
+    config: Config
+    sources: Array<{
+      id: string
+      scope: "global" | "local" | "managed" | "env" | "flag" | "derived" | "unknown"
+      order: number
+    }>
+    field_sources: {
+      [key: string]: {
+        id: string
+        scope: "global" | "local" | "managed" | "env" | "flag" | "derived" | "unknown"
+        order: number
+      }
+    }
+  }
+}
+
+export type ConfigEffectiveResponse = ConfigEffectiveResponses[keyof ConfigEffectiveResponses]
+
+export type ConfigGlobalUpdateData = {
+  body?: {
+    /**
+     * JSON schema reference for configuration validation
+     */
+    $schema?: string
+    logLevel?: LogLevel
+    server?: ServerConfig
+    /**
+     * Command configuration
+     */
+    command?: {
+      [key: string]: {
+        template: string
+        description?: string
+        agent?: string
+        model?: string
+        subtask?: boolean
+      }
+    }
+    /**
+     * Coordinator expert role definitions (loaded from .opencode/experts*.md)
+     */
+    expert?: {
+      [key: string]: unknown
+    }
+    /**
+     * Additional skill folder paths
+     */
+    skills?: {
+      /**
+       * Additional paths to skill folders
+       */
+      paths?: Array<string>
+      /**
+       * URLs to fetch skills from (e.g., https://example.com/.well-known/skills/)
+       */
+      urls?: Array<string>
+    }
+    watcher?: {
+      ignore?: Array<string>
+    }
+    /**
+     * Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.
+     */
+    snapshot?: boolean
+    plugin?: Array<
+      | string
+      | [
+          string,
+          {
+            [key: string]: unknown
+          },
+        ]
+    >
+    /**
+     * Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications
+     */
+    autoupdate?: boolean | "notify"
+    /**
+     * Disable providers that are loaded automatically
+     */
+    disabled_providers?: Array<string>
+    /**
+     * When set, ONLY these providers will be enabled. All other providers will be ignored
+     */
+    enabled_providers?: Array<string>
+    /**
+     * Model to use in the format of provider/model, eg anthropic/claude-2
+     */
+    model?: string
+    /**
+     * Small model to use for tasks like title generation in the format of provider/model
+     */
+    small_model?: string
+    /**
+     * Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.
+     */
+    default_agent?: string
+    /**
+     * Custom username to display in conversations instead of system username
+     */
+    username?: string
+    /**
+     * @deprecated Use `agent` field instead.
+     */
+    mode?: {
+      build?: AgentConfig
+      plan?: AgentConfig
+      [key: string]: AgentConfig | undefined
+    }
+    /**
+     * Agent configuration
+     */
+    agent?: {
+      plan?: AgentConfig
+      build?: AgentConfig
+      general?: AgentConfig
+      explore?: AgentConfig
+      title?: AgentConfig
+      summary?: AgentConfig
+      compaction?: AgentConfig
+      [key: string]: AgentConfig | undefined
+    }
+    /**
+     * Custom provider configurations and model overrides
+     */
+    provider?: {
+      [key: string]: ProviderConfig
+    }
+    /**
+     * MCP (Model Context Protocol) server configurations
+     */
+    mcp?: {
+      [key: string]:
+        | McpLocalConfig
+        | McpRemoteConfig
+        | {
+            enabled: boolean
+          }
+    }
+    formatter?:
+      | boolean
+      | {
+          [key: string]: {
+            disabled?: boolean
+            command?: Array<string>
+            environment?: {
+              [key: string]: string
+            }
+            extensions?: Array<string>
+          }
+        }
+    lsp?:
+      | boolean
+      | {
+          [key: string]:
+            | {
+                disabled: true
+              }
+            | {
+                command: Array<string>
+                extensions?: Array<string>
+                disabled?: boolean
+                env?: {
+                  [key: string]: string
+                }
+                initialization?: {
+                  [key: string]: unknown
+                }
+              }
+        }
+    /**
+     * Additional instruction files or patterns to include
+     */
+    instructions?: Array<string>
+    layout?: LayoutConfig
+    permission?: PermissionConfig
+    exec_policy?: ExecPolicyConfig
+    tools?: {
+      [key: string]: boolean
+    }
+    enterprise?: {
+      /**
+       * Enterprise URL
+       */
+      url?: string
+    }
+    compaction?: {
+      /**
+       * Enable automatic compaction when context is full (default: true)
+       */
+      auto?: boolean
+      /**
+       * Enable pruning of old tool outputs (default: true)
+       */
+      prune?: boolean
+      /**
+       * Token buffer for compaction. Leaves enough window to avoid overflow during compaction.
+       */
+      reserved?: number
+    }
+    experimental?: {
+      disable_paste_summary?: boolean
+      /**
+       * Enable the batch tool
+       */
+      batch_tool?: boolean
+      /**
+       * Enable OpenTelemetry spans for AI SDK calls (using the 'experimental_telemetry' flag)
+       */
+      openTelemetry?: boolean
+      /**
+       * Tools that should only be available to primary agents.
+       */
+      primary_tools?: Array<string>
+      /**
+       * Continue the agent loop when a tool call is denied
+       */
+      continue_loop_on_deny?: boolean
+      /**
+       * Timeout in milliseconds for model context protocol (MCP) requests
+       */
+      mcp_timeout?: number
+      sandbox?: {
+        enabled?: boolean
+        backend?: "auto" | "seatbelt" | "windows_native" | "landlock" | "process"
+        failure_policy?: "closed" | "confirm_downgrade" | "fallback"
+        report_only?: boolean
+        broker_idle_ttl_ms?: number
+      }
+      /**
+       * Session memory configuration
+       */
+      memory?: {
+        /**
+         * Custom memory.md template path
+         */
+        template?: string
+        /**
+         * Max tokens for memory.md (default: 4096)
+         */
+        maxTokens?: number
+        trigger?: {
+          /**
+           * Initialize memory after N tokens (default: 6000)
+           */
+          minimumMessageTokensToInit?: number
+          /**
+           * Update memory after N additional tokens (default: 4000)
+           */
+          minimumTokensBetweenUpdate?: number
+          /**
+           * Update memory after N tool calls (default: 10)
+           */
+          toolCallsBetweenUpdates?: number
+        }
+      }
+      /**
+       * MCP tool quality scoring configuration
+       */
+      toolQuality?: {
+        /**
+         * Quality score weights for each checklist item
+         */
+        weights?: {
+          /**
+           * Score for valid schema (default: 20)
+           */
+          hasValidSchema?: number
+          /**
+           * Score for description (default: 15)
+           */
+          hasDescription?: number
+          /**
+           * Score for parameter descriptions (default: 20)
+           */
+          hasParameterDescriptions?: number
+          /**
+           * Score for return type description (default: 10)
+           */
+          hasReturnTypeDescription?: number
+          /**
+           * Score for examples (default: 10)
+           */
+          hasExamples?: number
+          /**
+           * Score for version (default: 5)
+           */
+          hasVersion?: number
+          /**
+           * Score for consistent naming (default: 10)
+           */
+          isNamingConsistent?: number
+          /**
+           * Score for deprecation warning (default: 10)
+           */
+          hasDeprecationWarning?: number
+        }
+      }
+    }
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/global"
+}
+
+export type ConfigGlobalUpdateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigGlobalUpdateError = ConfigGlobalUpdateErrors[keyof ConfigGlobalUpdateErrors]
+
+export type ConfigGlobalUpdateResponses = {
+  /**
+   * Successfully updated global config
+   */
+  200: Config
+}
+
+export type ConfigGlobalUpdateResponse = ConfigGlobalUpdateResponses[keyof ConfigGlobalUpdateResponses]
+
 export type ConfigProvidersData = {
   body?: never
   path?: never
@@ -5666,6 +6361,7 @@ export type SessionPromptData = {
     }
     format?: OutputFormat
     system?: string
+    runtime?: MessageRuntime
     variant?: string
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
@@ -5866,6 +6562,7 @@ export type SessionPromptAsyncData = {
     }
     format?: OutputFormat
     system?: string
+    runtime?: MessageRuntime
     variant?: string
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
@@ -6515,6 +7212,11 @@ export type CoordinatorPlanGenerateData = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       model?: {
         providerID: string
         modelID: string
@@ -6553,6 +7255,7 @@ export type CoordinatorPlanGenerateData = {
       origin: "user" | "coordinator" | "scheduler" | "gateway"
       expert_id?: string
       expert_role?: string
+      prompt_template_id?: string
       workflow?:
         | "coding"
         | "review"
@@ -6571,6 +7274,12 @@ export type CoordinatorPlanGenerateData = {
       artifact_id?: string
       revision_of?: string
       quality_gate_id?: string
+      mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+      mpacr_perspective?: string
+      mpacr_quorum?: number
+      mpacr_critic_node_ids?: Array<string>
+      mpacr_per_critic_timeout_ms?: number
+      mpacr_degraded?: boolean
       memory_namespace?: string
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -6727,6 +7436,11 @@ export type CoordinatorPlanGenerateResponses = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       model?: {
         providerID: string
         modelID: string
@@ -6765,6 +7479,7 @@ export type CoordinatorPlanGenerateResponses = {
       origin: "user" | "coordinator" | "scheduler" | "gateway"
       expert_id?: string
       expert_role?: string
+      prompt_template_id?: string
       workflow?:
         | "coding"
         | "review"
@@ -6783,6 +7498,12 @@ export type CoordinatorPlanGenerateResponses = {
       artifact_id?: string
       revision_of?: string
       quality_gate_id?: string
+      mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+      mpacr_perspective?: string
+      mpacr_quorum?: number
+      mpacr_critic_node_ids?: Array<string>
+      mpacr_per_critic_timeout_ms?: number
+      mpacr_degraded?: boolean
       memory_namespace?: string
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -6815,6 +7536,9 @@ export type CoordinatorPlanGenerateResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     parallel_policy?: {
       mode?: "off" | "safe" | "aggressive"
@@ -6879,6 +7603,11 @@ export type CoordinatorPlanGenerateResponses = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       expert_id: string
       node_ids: Array<string>
       memory_namespace: string
@@ -6894,6 +7623,11 @@ export type CoordinatorPlanGenerateResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       node_id?: string
       artifact_id?: string
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -6912,6 +7646,11 @@ export type CoordinatorPlanGenerateResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       target_node_id?: string
       artifact_id?: string
       required?: boolean
@@ -6919,7 +7658,7 @@ export type CoordinatorPlanGenerateResponses = {
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
     }>
     memory_context?: {
-      scopes?: Array<"profile" | "workspace" | "session">
+      scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
       workflow_tags?: Array<string>
       expert_tags?: Array<string>
       note_ids?: Array<string>
@@ -6928,6 +7667,18 @@ export type CoordinatorPlanGenerateResponses = {
       is_long_task?: boolean
       task_size?: "small" | "medium" | "large" | "huge"
       timeline_required?: boolean
+      execution_model?: "short-task" | "long-task" | "epic"
+      classification?: "short" | "medium" | "long" | "epic"
+      confidence?: "low" | "medium" | "high"
+      trigger_score?: number
+      decision_stage?: "pre-plan" | "post-plan" | "runtime"
+      positive_signals?: Array<string>
+      negative_signals?: Array<string>
+      needs_user_confirmation?: boolean
+      auto_upgrade_allowed?: boolean
+      auto_downgrade_allowed?: boolean
+      active_milestone_limit?: number
+      milestone_count?: number
       reasons?: Array<string>
     }
     todo_timeline?: {
@@ -6950,7 +7701,60 @@ export type CoordinatorPlanGenerateResponses = {
         todo_ids?: Array<string>
         expected_outputs?: Array<string>
         checkpoint_after?: boolean
+        milestone_id?: string
       }>
+      milestones?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+        risk?: "low" | "medium" | "high"
+        todo_ids?: Array<string>
+        acceptance_checks?: Array<string>
+        expected_artifact?: string
+        budget_slice?: number
+        checkpoint_after?: boolean
+      }>
+      current_milestone_id?: string
+      active_milestone_limit?: number
+      checkpoints?: Array<{
+        id: string
+        type:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        milestone_id?: string
+        node_id?: string
+        task_id?: string
+        status?: string
+        summary?: string
+        next_recommended_action?: string
+        created_at: number
+      }>
+      evidence_ledger?: Array<{
+        id: string
+        source_type?: "task" | "checkpoint" | "artifact" | "memory"
+        source_id: string
+        milestone_id?: string
+        node_id?: string
+        summary: string
+        confidence?: "low" | "medium" | "high"
+        scope?: Array<string>
+        created_at: number
+      }>
+      memory_slices?: Array<{
+        id: string
+        milestone_id?: string
+        completed?: Array<string>
+        important_context?: Array<string>
+        unresolved_risks?: Array<string>
+        next_context?: string
+        discard_context?: Array<string>
+        created_at: number
+      }>
+      pause_after_current_milestone?: boolean
     }
     budget_profile?: {
       scale?: "small" | "normal" | "large" | "max"
@@ -7035,6 +7839,14 @@ export type CoordinatorPlanGenerateResponses = {
     checkpoint_memory?: {
       run_id?: string
       checkpoint_id?: string
+      checkpoint_type?:
+        | "node_checkpoint"
+        | "milestone_checkpoint"
+        | "budget_checkpoint"
+        | "risk_checkpoint"
+        | "recovery_checkpoint"
+        | "cancellation_checkpoint"
+      current_milestone_id?: string
       todo_state?: Array<{
         id: string
         title: string
@@ -7055,6 +7867,7 @@ export type CoordinatorPlanGenerateResponses = {
         [key: string]: number
       }
       next_recommended_todos?: Array<string>
+      milestone_summaries?: Array<string>
       compressed_context?: string
     }
     continuation_request?: {
@@ -7125,6 +7938,11 @@ export type CoordinatorPlanData = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       model?: {
         providerID: string
         modelID: string
@@ -7163,6 +7981,7 @@ export type CoordinatorPlanData = {
       origin: "user" | "coordinator" | "scheduler" | "gateway"
       expert_id?: string
       expert_role?: string
+      prompt_template_id?: string
       workflow?:
         | "coding"
         | "review"
@@ -7181,6 +8000,12 @@ export type CoordinatorPlanData = {
       artifact_id?: string
       revision_of?: string
       quality_gate_id?: string
+      mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+      mpacr_perspective?: string
+      mpacr_quorum?: number
+      mpacr_critic_node_ids?: Array<string>
+      mpacr_per_critic_timeout_ms?: number
+      mpacr_degraded?: boolean
       memory_namespace?: string
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -7337,6 +8162,11 @@ export type CoordinatorPlanResponses = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       model?: {
         providerID: string
         modelID: string
@@ -7375,6 +8205,7 @@ export type CoordinatorPlanResponses = {
       origin: "user" | "coordinator" | "scheduler" | "gateway"
       expert_id?: string
       expert_role?: string
+      prompt_template_id?: string
       workflow?:
         | "coding"
         | "review"
@@ -7393,6 +8224,12 @@ export type CoordinatorPlanResponses = {
       artifact_id?: string
       revision_of?: string
       quality_gate_id?: string
+      mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+      mpacr_perspective?: string
+      mpacr_quorum?: number
+      mpacr_critic_node_ids?: Array<string>
+      mpacr_per_critic_timeout_ms?: number
+      mpacr_degraded?: boolean
       memory_namespace?: string
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -7425,6 +8262,9 @@ export type CoordinatorPlanResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     parallel_policy?: {
       mode?: "off" | "safe" | "aggressive"
@@ -7489,6 +8329,11 @@ export type CoordinatorPlanResponses = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       expert_id: string
       node_ids: Array<string>
       memory_namespace: string
@@ -7504,6 +8349,11 @@ export type CoordinatorPlanResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       node_id?: string
       artifact_id?: string
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -7522,6 +8372,11 @@ export type CoordinatorPlanResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       target_node_id?: string
       artifact_id?: string
       required?: boolean
@@ -7529,7 +8384,7 @@ export type CoordinatorPlanResponses = {
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
     }>
     memory_context?: {
-      scopes?: Array<"profile" | "workspace" | "session">
+      scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
       workflow_tags?: Array<string>
       expert_tags?: Array<string>
       note_ids?: Array<string>
@@ -7538,6 +8393,18 @@ export type CoordinatorPlanResponses = {
       is_long_task?: boolean
       task_size?: "small" | "medium" | "large" | "huge"
       timeline_required?: boolean
+      execution_model?: "short-task" | "long-task" | "epic"
+      classification?: "short" | "medium" | "long" | "epic"
+      confidence?: "low" | "medium" | "high"
+      trigger_score?: number
+      decision_stage?: "pre-plan" | "post-plan" | "runtime"
+      positive_signals?: Array<string>
+      negative_signals?: Array<string>
+      needs_user_confirmation?: boolean
+      auto_upgrade_allowed?: boolean
+      auto_downgrade_allowed?: boolean
+      active_milestone_limit?: number
+      milestone_count?: number
       reasons?: Array<string>
     }
     todo_timeline?: {
@@ -7560,7 +8427,60 @@ export type CoordinatorPlanResponses = {
         todo_ids?: Array<string>
         expected_outputs?: Array<string>
         checkpoint_after?: boolean
+        milestone_id?: string
       }>
+      milestones?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+        risk?: "low" | "medium" | "high"
+        todo_ids?: Array<string>
+        acceptance_checks?: Array<string>
+        expected_artifact?: string
+        budget_slice?: number
+        checkpoint_after?: boolean
+      }>
+      current_milestone_id?: string
+      active_milestone_limit?: number
+      checkpoints?: Array<{
+        id: string
+        type:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        milestone_id?: string
+        node_id?: string
+        task_id?: string
+        status?: string
+        summary?: string
+        next_recommended_action?: string
+        created_at: number
+      }>
+      evidence_ledger?: Array<{
+        id: string
+        source_type?: "task" | "checkpoint" | "artifact" | "memory"
+        source_id: string
+        milestone_id?: string
+        node_id?: string
+        summary: string
+        confidence?: "low" | "medium" | "high"
+        scope?: Array<string>
+        created_at: number
+      }>
+      memory_slices?: Array<{
+        id: string
+        milestone_id?: string
+        completed?: Array<string>
+        important_context?: Array<string>
+        unresolved_risks?: Array<string>
+        next_context?: string
+        discard_context?: Array<string>
+        created_at: number
+      }>
+      pause_after_current_milestone?: boolean
     }
     budget_profile?: {
       scale?: "small" | "normal" | "large" | "max"
@@ -7645,6 +8565,14 @@ export type CoordinatorPlanResponses = {
     checkpoint_memory?: {
       run_id?: string
       checkpoint_id?: string
+      checkpoint_type?:
+        | "node_checkpoint"
+        | "milestone_checkpoint"
+        | "budget_checkpoint"
+        | "risk_checkpoint"
+        | "recovery_checkpoint"
+        | "cancellation_checkpoint"
+      current_milestone_id?: string
       todo_state?: Array<{
         id: string
         title: string
@@ -7665,6 +8593,7 @@ export type CoordinatorPlanResponses = {
         [key: string]: number
       }
       next_recommended_todos?: Array<string>
+      milestone_summaries?: Array<string>
       compressed_context?: string
     }
     continuation_request?: {
@@ -7735,6 +8664,11 @@ export type CoordinatorRunData = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       model?: {
         providerID: string
         modelID: string
@@ -7773,6 +8707,7 @@ export type CoordinatorRunData = {
       origin: "user" | "coordinator" | "scheduler" | "gateway"
       expert_id?: string
       expert_role?: string
+      prompt_template_id?: string
       workflow?:
         | "coding"
         | "review"
@@ -7791,6 +8726,12 @@ export type CoordinatorRunData = {
       artifact_id?: string
       revision_of?: string
       quality_gate_id?: string
+      mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+      mpacr_perspective?: string
+      mpacr_quorum?: number
+      mpacr_critic_node_ids?: Array<string>
+      mpacr_per_critic_timeout_ms?: number
+      mpacr_degraded?: boolean
       memory_namespace?: string
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -7989,6 +8930,9 @@ export type CoordinatorRunResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -8045,6 +8989,11 @@ export type CoordinatorRunResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -8083,6 +9032,7 @@ export type CoordinatorRunResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -8101,6 +9051,12 @@ export type CoordinatorRunResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -8133,6 +9089,9 @@ export type CoordinatorRunResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -8197,6 +9156,11 @@ export type CoordinatorRunResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -8212,6 +9176,11 @@ export type CoordinatorRunResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -8230,6 +9199,11 @@ export type CoordinatorRunResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -8237,7 +9211,7 @@ export type CoordinatorRunResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -8246,6 +9220,18 @@ export type CoordinatorRunResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -8268,7 +9254,60 @@ export type CoordinatorRunResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -8353,6 +9392,14 @@ export type CoordinatorRunResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -8373,6 +9420,7 @@ export type CoordinatorRunResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -8506,6 +9554,9 @@ export type CoordinatorGetResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -8562,6 +9613,11 @@ export type CoordinatorGetResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -8600,6 +9656,7 @@ export type CoordinatorGetResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -8618,6 +9675,12 @@ export type CoordinatorGetResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -8650,6 +9713,9 @@ export type CoordinatorGetResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -8714,6 +9780,11 @@ export type CoordinatorGetResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -8729,6 +9800,11 @@ export type CoordinatorGetResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -8747,6 +9823,11 @@ export type CoordinatorGetResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -8754,7 +9835,7 @@ export type CoordinatorGetResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -8763,6 +9844,18 @@ export type CoordinatorGetResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -8785,7 +9878,60 @@ export type CoordinatorGetResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -8870,6 +10016,14 @@ export type CoordinatorGetResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -8890,6 +10044,7 @@ export type CoordinatorGetResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -9023,6 +10178,9 @@ export type CoordinatorListResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -9079,6 +10237,11 @@ export type CoordinatorListResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -9117,6 +10280,7 @@ export type CoordinatorListResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -9135,6 +10299,12 @@ export type CoordinatorListResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -9167,6 +10337,9 @@ export type CoordinatorListResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -9231,6 +10404,11 @@ export type CoordinatorListResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -9246,6 +10424,11 @@ export type CoordinatorListResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -9264,6 +10447,11 @@ export type CoordinatorListResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -9271,7 +10459,7 @@ export type CoordinatorListResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -9280,6 +10468,18 @@ export type CoordinatorListResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -9302,7 +10502,60 @@ export type CoordinatorListResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -9387,6 +10640,14 @@ export type CoordinatorListResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -9407,6 +10668,7 @@ export type CoordinatorListResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -9540,6 +10802,9 @@ export type CoordinatorApproveResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -9596,6 +10861,11 @@ export type CoordinatorApproveResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -9634,6 +10904,7 @@ export type CoordinatorApproveResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -9652,6 +10923,12 @@ export type CoordinatorApproveResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -9684,6 +10961,9 @@ export type CoordinatorApproveResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -9748,6 +11028,11 @@ export type CoordinatorApproveResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -9763,6 +11048,11 @@ export type CoordinatorApproveResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -9781,6 +11071,11 @@ export type CoordinatorApproveResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -9788,7 +11083,7 @@ export type CoordinatorApproveResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -9797,6 +11092,18 @@ export type CoordinatorApproveResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -9819,7 +11126,60 @@ export type CoordinatorApproveResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -9904,6 +11264,14 @@ export type CoordinatorApproveResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -9924,6 +11292,7 @@ export type CoordinatorApproveResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -10057,6 +11426,9 @@ export type CoordinatorCancelResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -10113,6 +11485,11 @@ export type CoordinatorCancelResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -10151,6 +11528,7 @@ export type CoordinatorCancelResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -10169,6 +11547,12 @@ export type CoordinatorCancelResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -10201,6 +11585,9 @@ export type CoordinatorCancelResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -10265,6 +11652,11 @@ export type CoordinatorCancelResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -10280,6 +11672,11 @@ export type CoordinatorCancelResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -10298,6 +11695,11 @@ export type CoordinatorCancelResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -10305,7 +11707,7 @@ export type CoordinatorCancelResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -10314,6 +11716,18 @@ export type CoordinatorCancelResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -10336,7 +11750,60 @@ export type CoordinatorCancelResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -10421,6 +11888,14 @@ export type CoordinatorCancelResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -10441,6 +11916,7 @@ export type CoordinatorCancelResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -10586,6 +12062,9 @@ export type CoordinatorRetryResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -10642,6 +12121,11 @@ export type CoordinatorRetryResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -10680,6 +12164,7 @@ export type CoordinatorRetryResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -10698,6 +12183,12 @@ export type CoordinatorRetryResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -10730,6 +12221,9 @@ export type CoordinatorRetryResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -10794,6 +12288,11 @@ export type CoordinatorRetryResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -10809,6 +12308,11 @@ export type CoordinatorRetryResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -10827,6 +12331,11 @@ export type CoordinatorRetryResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -10834,7 +12343,7 @@ export type CoordinatorRetryResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -10843,6 +12352,18 @@ export type CoordinatorRetryResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -10865,7 +12386,60 @@ export type CoordinatorRetryResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -10950,6 +12524,14 @@ export type CoordinatorRetryResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -10970,6 +12552,7 @@ export type CoordinatorRetryResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -11122,6 +12705,9 @@ export type CoordinatorContinueResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -11178,6 +12764,11 @@ export type CoordinatorContinueResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -11216,6 +12807,7 @@ export type CoordinatorContinueResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -11234,6 +12826,12 @@ export type CoordinatorContinueResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -11266,6 +12864,9 @@ export type CoordinatorContinueResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -11330,6 +12931,11 @@ export type CoordinatorContinueResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -11345,6 +12951,11 @@ export type CoordinatorContinueResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -11363,6 +12974,11 @@ export type CoordinatorContinueResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -11370,7 +12986,7 @@ export type CoordinatorContinueResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -11379,6 +12995,18 @@ export type CoordinatorContinueResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -11401,7 +13029,60 @@ export type CoordinatorContinueResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -11486,6 +13167,14 @@ export type CoordinatorContinueResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -11506,6 +13195,7 @@ export type CoordinatorContinueResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -11663,6 +13353,9 @@ export type CoordinatorDispatchResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       state:
         | "settling_intent"
@@ -11719,6 +13412,11 @@ export type CoordinatorDispatchResponses = {
             | "executor"
             | "memory-curator"
             | "automation-planner"
+            | "steel-manner"
+            | "red-team-critic"
+            | "defender"
+            | "synth-reviser"
+            | "calibrator"
           model?: {
             providerID: string
             modelID: string
@@ -11757,6 +13455,7 @@ export type CoordinatorDispatchResponses = {
           origin: "user" | "coordinator" | "scheduler" | "gateway"
           expert_id?: string
           expert_role?: string
+          prompt_template_id?: string
           workflow?:
             | "coding"
             | "review"
@@ -11775,6 +13474,12 @@ export type CoordinatorDispatchResponses = {
           artifact_id?: string
           revision_of?: string
           quality_gate_id?: string
+          mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+          mpacr_perspective?: string
+          mpacr_quorum?: number
+          mpacr_critic_node_ids?: Array<string>
+          mpacr_per_critic_timeout_ms?: number
+          mpacr_degraded?: boolean
           memory_namespace?: string
           confidence?: "low" | "medium" | "high"
           revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -11807,6 +13512,9 @@ export type CoordinatorDispatchResponses = {
           max_revision_per_artifact: number
           reasoning_effort?: "low" | "medium" | "high"
           timeout_multiplier: number
+          mpacr_enabled?: boolean
+          mpacr_critic_count?: number
+          mpacr_per_critic_timeout_ms?: number
         }
         parallel_policy?: {
           mode?: "off" | "safe" | "aggressive"
@@ -11871,6 +13579,11 @@ export type CoordinatorDispatchResponses = {
             | "executor"
             | "memory-curator"
             | "automation-planner"
+            | "steel-manner"
+            | "red-team-critic"
+            | "defender"
+            | "synth-reviser"
+            | "calibrator"
           expert_id: string
           node_ids: Array<string>
           memory_namespace: string
@@ -11886,6 +13599,11 @@ export type CoordinatorDispatchResponses = {
             | "verifier_revise"
             | "debugger_revise"
             | "final_revise"
+            | "steel_man"
+            | "red_team"
+            | "defense"
+            | "synthesis"
+            | "calibration"
           node_id?: string
           artifact_id?: string
           status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -11904,6 +13622,11 @@ export type CoordinatorDispatchResponses = {
             | "verifier_revise"
             | "debugger_revise"
             | "final_revise"
+            | "steel_man"
+            | "red_team"
+            | "defense"
+            | "synthesis"
+            | "calibration"
           target_node_id?: string
           artifact_id?: string
           required?: boolean
@@ -11911,7 +13634,7 @@ export type CoordinatorDispatchResponses = {
           status?: "pending" | "running" | "passed" | "failed" | "skipped"
         }>
         memory_context?: {
-          scopes?: Array<"profile" | "workspace" | "session">
+          scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
           workflow_tags?: Array<string>
           expert_tags?: Array<string>
           note_ids?: Array<string>
@@ -11920,6 +13643,18 @@ export type CoordinatorDispatchResponses = {
           is_long_task?: boolean
           task_size?: "small" | "medium" | "large" | "huge"
           timeline_required?: boolean
+          execution_model?: "short-task" | "long-task" | "epic"
+          classification?: "short" | "medium" | "long" | "epic"
+          confidence?: "low" | "medium" | "high"
+          trigger_score?: number
+          decision_stage?: "pre-plan" | "post-plan" | "runtime"
+          positive_signals?: Array<string>
+          negative_signals?: Array<string>
+          needs_user_confirmation?: boolean
+          auto_upgrade_allowed?: boolean
+          auto_downgrade_allowed?: boolean
+          active_milestone_limit?: number
+          milestone_count?: number
           reasons?: Array<string>
         }
         todo_timeline?: {
@@ -11942,7 +13677,60 @@ export type CoordinatorDispatchResponses = {
             todo_ids?: Array<string>
             expected_outputs?: Array<string>
             checkpoint_after?: boolean
+            milestone_id?: string
           }>
+          milestones?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+            risk?: "low" | "medium" | "high"
+            todo_ids?: Array<string>
+            acceptance_checks?: Array<string>
+            expected_artifact?: string
+            budget_slice?: number
+            checkpoint_after?: boolean
+          }>
+          current_milestone_id?: string
+          active_milestone_limit?: number
+          checkpoints?: Array<{
+            id: string
+            type:
+              | "node_checkpoint"
+              | "milestone_checkpoint"
+              | "budget_checkpoint"
+              | "risk_checkpoint"
+              | "recovery_checkpoint"
+              | "cancellation_checkpoint"
+            milestone_id?: string
+            node_id?: string
+            task_id?: string
+            status?: string
+            summary?: string
+            next_recommended_action?: string
+            created_at: number
+          }>
+          evidence_ledger?: Array<{
+            id: string
+            source_type?: "task" | "checkpoint" | "artifact" | "memory"
+            source_id: string
+            milestone_id?: string
+            node_id?: string
+            summary: string
+            confidence?: "low" | "medium" | "high"
+            scope?: Array<string>
+            created_at: number
+          }>
+          memory_slices?: Array<{
+            id: string
+            milestone_id?: string
+            completed?: Array<string>
+            important_context?: Array<string>
+            unresolved_risks?: Array<string>
+            next_context?: string
+            discard_context?: Array<string>
+            created_at: number
+          }>
+          pause_after_current_milestone?: boolean
         }
         budget_profile?: {
           scale?: "small" | "normal" | "large" | "max"
@@ -12027,6 +13815,14 @@ export type CoordinatorDispatchResponses = {
         checkpoint_memory?: {
           run_id?: string
           checkpoint_id?: string
+          checkpoint_type?:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          current_milestone_id?: string
           todo_state?: Array<{
             id: string
             title: string
@@ -12047,6 +13843,7 @@ export type CoordinatorDispatchResponses = {
             [key: string]: number
           }
           next_recommended_todos?: Array<string>
+          milestone_summaries?: Array<string>
           compressed_context?: string
         }
         continuation_request?: {
@@ -12183,6 +13980,9 @@ export type CoordinatorProjectionResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       state:
         | "settling_intent"
@@ -12239,6 +14039,11 @@ export type CoordinatorProjectionResponses = {
             | "executor"
             | "memory-curator"
             | "automation-planner"
+            | "steel-manner"
+            | "red-team-critic"
+            | "defender"
+            | "synth-reviser"
+            | "calibrator"
           model?: {
             providerID: string
             modelID: string
@@ -12277,6 +14082,7 @@ export type CoordinatorProjectionResponses = {
           origin: "user" | "coordinator" | "scheduler" | "gateway"
           expert_id?: string
           expert_role?: string
+          prompt_template_id?: string
           workflow?:
             | "coding"
             | "review"
@@ -12295,6 +14101,12 @@ export type CoordinatorProjectionResponses = {
           artifact_id?: string
           revision_of?: string
           quality_gate_id?: string
+          mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+          mpacr_perspective?: string
+          mpacr_quorum?: number
+          mpacr_critic_node_ids?: Array<string>
+          mpacr_per_critic_timeout_ms?: number
+          mpacr_degraded?: boolean
           memory_namespace?: string
           confidence?: "low" | "medium" | "high"
           revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -12327,6 +14139,9 @@ export type CoordinatorProjectionResponses = {
           max_revision_per_artifact: number
           reasoning_effort?: "low" | "medium" | "high"
           timeout_multiplier: number
+          mpacr_enabled?: boolean
+          mpacr_critic_count?: number
+          mpacr_per_critic_timeout_ms?: number
         }
         parallel_policy?: {
           mode?: "off" | "safe" | "aggressive"
@@ -12391,6 +14206,11 @@ export type CoordinatorProjectionResponses = {
             | "executor"
             | "memory-curator"
             | "automation-planner"
+            | "steel-manner"
+            | "red-team-critic"
+            | "defender"
+            | "synth-reviser"
+            | "calibrator"
           expert_id: string
           node_ids: Array<string>
           memory_namespace: string
@@ -12406,6 +14226,11 @@ export type CoordinatorProjectionResponses = {
             | "verifier_revise"
             | "debugger_revise"
             | "final_revise"
+            | "steel_man"
+            | "red_team"
+            | "defense"
+            | "synthesis"
+            | "calibration"
           node_id?: string
           artifact_id?: string
           status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -12424,6 +14249,11 @@ export type CoordinatorProjectionResponses = {
             | "verifier_revise"
             | "debugger_revise"
             | "final_revise"
+            | "steel_man"
+            | "red_team"
+            | "defense"
+            | "synthesis"
+            | "calibration"
           target_node_id?: string
           artifact_id?: string
           required?: boolean
@@ -12431,7 +14261,7 @@ export type CoordinatorProjectionResponses = {
           status?: "pending" | "running" | "passed" | "failed" | "skipped"
         }>
         memory_context?: {
-          scopes?: Array<"profile" | "workspace" | "session">
+          scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
           workflow_tags?: Array<string>
           expert_tags?: Array<string>
           note_ids?: Array<string>
@@ -12440,6 +14270,18 @@ export type CoordinatorProjectionResponses = {
           is_long_task?: boolean
           task_size?: "small" | "medium" | "large" | "huge"
           timeline_required?: boolean
+          execution_model?: "short-task" | "long-task" | "epic"
+          classification?: "short" | "medium" | "long" | "epic"
+          confidence?: "low" | "medium" | "high"
+          trigger_score?: number
+          decision_stage?: "pre-plan" | "post-plan" | "runtime"
+          positive_signals?: Array<string>
+          negative_signals?: Array<string>
+          needs_user_confirmation?: boolean
+          auto_upgrade_allowed?: boolean
+          auto_downgrade_allowed?: boolean
+          active_milestone_limit?: number
+          milestone_count?: number
           reasons?: Array<string>
         }
         todo_timeline?: {
@@ -12462,7 +14304,60 @@ export type CoordinatorProjectionResponses = {
             todo_ids?: Array<string>
             expected_outputs?: Array<string>
             checkpoint_after?: boolean
+            milestone_id?: string
           }>
+          milestones?: Array<{
+            id: string
+            title: string
+            status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+            risk?: "low" | "medium" | "high"
+            todo_ids?: Array<string>
+            acceptance_checks?: Array<string>
+            expected_artifact?: string
+            budget_slice?: number
+            checkpoint_after?: boolean
+          }>
+          current_milestone_id?: string
+          active_milestone_limit?: number
+          checkpoints?: Array<{
+            id: string
+            type:
+              | "node_checkpoint"
+              | "milestone_checkpoint"
+              | "budget_checkpoint"
+              | "risk_checkpoint"
+              | "recovery_checkpoint"
+              | "cancellation_checkpoint"
+            milestone_id?: string
+            node_id?: string
+            task_id?: string
+            status?: string
+            summary?: string
+            next_recommended_action?: string
+            created_at: number
+          }>
+          evidence_ledger?: Array<{
+            id: string
+            source_type?: "task" | "checkpoint" | "artifact" | "memory"
+            source_id: string
+            milestone_id?: string
+            node_id?: string
+            summary: string
+            confidence?: "low" | "medium" | "high"
+            scope?: Array<string>
+            created_at: number
+          }>
+          memory_slices?: Array<{
+            id: string
+            milestone_id?: string
+            completed?: Array<string>
+            important_context?: Array<string>
+            unresolved_risks?: Array<string>
+            next_context?: string
+            discard_context?: Array<string>
+            created_at: number
+          }>
+          pause_after_current_milestone?: boolean
         }
         budget_profile?: {
           scale?: "small" | "normal" | "large" | "max"
@@ -12547,6 +14442,14 @@ export type CoordinatorProjectionResponses = {
         checkpoint_memory?: {
           run_id?: string
           checkpoint_id?: string
+          checkpoint_type?:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          current_milestone_id?: string
           todo_state?: Array<{
             id: string
             title: string
@@ -12567,6 +14470,7 @@ export type CoordinatorProjectionResponses = {
             [key: string]: number
           }
           next_recommended_todos?: Array<string>
+          milestone_summaries?: Array<string>
           compressed_context?: string
         }
         continuation_request?: {
@@ -12599,7 +14503,7 @@ export type CoordinatorProjectionResponses = {
       group_id?: string
       parent_session_id: string
       child_session_id: string
-      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
       task_kind: "research" | "implement" | "verify" | "generic"
       subagent_type: string
       description: string
@@ -12632,6 +14536,7 @@ export type CoordinatorProjectionResponses = {
       pending: number
       running: number
       completed: number
+      partial: number
       failed: number
       cancelled: number
     }
@@ -12639,7 +14544,7 @@ export type CoordinatorProjectionResponses = {
       id: string
       node_ids: Array<string>
       task_ids: Array<string>
-      status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      status: "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
       merge_status: "none" | "waiting" | "merged" | "conflict"
       blocked_by: Array<string>
       conflicts: Array<string>
@@ -12700,6 +14605,11 @@ export type CoordinatorProjectionResponses = {
         | "executor"
         | "memory-curator"
         | "automation-planner"
+        | "steel-manner"
+        | "red-team-critic"
+        | "defender"
+        | "synth-reviser"
+        | "calibrator"
       expert_id: string
       node_ids: Array<string>
       memory_namespace: string
@@ -12715,6 +14625,11 @@ export type CoordinatorProjectionResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       node_id?: string
       artifact_id?: string
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -12733,6 +14648,11 @@ export type CoordinatorProjectionResponses = {
         | "verifier_revise"
         | "debugger_revise"
         | "final_revise"
+        | "steel_man"
+        | "red_team"
+        | "defense"
+        | "synthesis"
+        | "calibration"
       target_node_id?: string
       artifact_id?: string
       required?: boolean
@@ -12740,7 +14660,7 @@ export type CoordinatorProjectionResponses = {
       status?: "pending" | "running" | "passed" | "failed" | "skipped"
     }>
     memory_context: {
-      scopes?: Array<"profile" | "workspace" | "session">
+      scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
       workflow_tags?: Array<string>
       expert_tags?: Array<string>
       note_ids?: Array<string>
@@ -12758,11 +14678,26 @@ export type CoordinatorProjectionResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     long_task: {
       is_long_task?: boolean
       task_size?: "small" | "medium" | "large" | "huge"
       timeline_required?: boolean
+      execution_model?: "short-task" | "long-task" | "epic"
+      classification?: "short" | "medium" | "long" | "epic"
+      confidence?: "low" | "medium" | "high"
+      trigger_score?: number
+      decision_stage?: "pre-plan" | "post-plan" | "runtime"
+      positive_signals?: Array<string>
+      negative_signals?: Array<string>
+      needs_user_confirmation?: boolean
+      auto_upgrade_allowed?: boolean
+      auto_downgrade_allowed?: boolean
+      active_milestone_limit?: number
+      milestone_count?: number
       reasons?: Array<string>
     }
     todo_timeline: {
@@ -12785,7 +14720,60 @@ export type CoordinatorProjectionResponses = {
         todo_ids?: Array<string>
         expected_outputs?: Array<string>
         checkpoint_after?: boolean
+        milestone_id?: string
       }>
+      milestones?: Array<{
+        id: string
+        title: string
+        status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+        risk?: "low" | "medium" | "high"
+        todo_ids?: Array<string>
+        acceptance_checks?: Array<string>
+        expected_artifact?: string
+        budget_slice?: number
+        checkpoint_after?: boolean
+      }>
+      current_milestone_id?: string
+      active_milestone_limit?: number
+      checkpoints?: Array<{
+        id: string
+        type:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        milestone_id?: string
+        node_id?: string
+        task_id?: string
+        status?: string
+        summary?: string
+        next_recommended_action?: string
+        created_at: number
+      }>
+      evidence_ledger?: Array<{
+        id: string
+        source_type?: "task" | "checkpoint" | "artifact" | "memory"
+        source_id: string
+        milestone_id?: string
+        node_id?: string
+        summary: string
+        confidence?: "low" | "medium" | "high"
+        scope?: Array<string>
+        created_at: number
+      }>
+      memory_slices?: Array<{
+        id: string
+        milestone_id?: string
+        completed?: Array<string>
+        important_context?: Array<string>
+        unresolved_risks?: Array<string>
+        next_context?: string
+        discard_context?: Array<string>
+        created_at: number
+      }>
+      pause_after_current_milestone?: boolean
     }
     budget_profile: {
       scale?: "small" | "normal" | "large" | "max"
@@ -12870,6 +14858,14 @@ export type CoordinatorProjectionResponses = {
     checkpoint_memory: {
       run_id?: string
       checkpoint_id?: string
+      checkpoint_type?:
+        | "node_checkpoint"
+        | "milestone_checkpoint"
+        | "budget_checkpoint"
+        | "risk_checkpoint"
+        | "recovery_checkpoint"
+        | "cancellation_checkpoint"
+      current_milestone_id?: string
       todo_state?: Array<{
         id: string
         title: string
@@ -12890,6 +14886,7 @@ export type CoordinatorProjectionResponses = {
         [key: string]: number
       }
       next_recommended_todos?: Array<string>
+      milestone_summaries?: Array<string>
       compressed_context?: string
     }
     continuation_request?: {
@@ -13015,6 +15012,9 @@ export type CoordinatorResumeResponses = {
       max_revision_per_artifact: number
       reasoning_effort?: "low" | "medium" | "high"
       timeout_multiplier: number
+      mpacr_enabled?: boolean
+      mpacr_critic_count?: number
+      mpacr_per_critic_timeout_ms?: number
     }
     state:
       | "settling_intent"
@@ -13071,6 +15071,11 @@ export type CoordinatorResumeResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         model?: {
           providerID: string
           modelID: string
@@ -13109,6 +15114,7 @@ export type CoordinatorResumeResponses = {
         origin: "user" | "coordinator" | "scheduler" | "gateway"
         expert_id?: string
         expert_role?: string
+        prompt_template_id?: string
         workflow?:
           | "coding"
           | "review"
@@ -13127,6 +15133,12 @@ export type CoordinatorResumeResponses = {
         artifact_id?: string
         revision_of?: string
         quality_gate_id?: string
+        mpacr_role?: "steel_man" | "critic" | "defender" | "synthesis" | "calibrator"
+        mpacr_perspective?: string
+        mpacr_quorum?: number
+        mpacr_critic_node_ids?: Array<string>
+        mpacr_per_critic_timeout_ms?: number
+        mpacr_degraded?: boolean
         memory_namespace?: string
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
@@ -13159,6 +15171,9 @@ export type CoordinatorResumeResponses = {
         max_revision_per_artifact: number
         reasoning_effort?: "low" | "medium" | "high"
         timeout_multiplier: number
+        mpacr_enabled?: boolean
+        mpacr_critic_count?: number
+        mpacr_per_critic_timeout_ms?: number
       }
       parallel_policy?: {
         mode?: "off" | "safe" | "aggressive"
@@ -13223,6 +15238,11 @@ export type CoordinatorResumeResponses = {
           | "executor"
           | "memory-curator"
           | "automation-planner"
+          | "steel-manner"
+          | "red-team-critic"
+          | "defender"
+          | "synth-reviser"
+          | "calibrator"
         expert_id: string
         node_ids: Array<string>
         memory_namespace: string
@@ -13238,6 +15258,11 @@ export type CoordinatorResumeResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         node_id?: string
         artifact_id?: string
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
@@ -13256,6 +15281,11 @@ export type CoordinatorResumeResponses = {
           | "verifier_revise"
           | "debugger_revise"
           | "final_revise"
+          | "steel_man"
+          | "red_team"
+          | "defense"
+          | "synthesis"
+          | "calibration"
         target_node_id?: string
         artifact_id?: string
         required?: boolean
@@ -13263,7 +15293,7 @@ export type CoordinatorResumeResponses = {
         status?: "pending" | "running" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
-        scopes?: Array<"profile" | "workspace" | "session">
+        scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
         workflow_tags?: Array<string>
         expert_tags?: Array<string>
         note_ids?: Array<string>
@@ -13272,6 +15302,18 @@ export type CoordinatorResumeResponses = {
         is_long_task?: boolean
         task_size?: "small" | "medium" | "large" | "huge"
         timeline_required?: boolean
+        execution_model?: "short-task" | "long-task" | "epic"
+        classification?: "short" | "medium" | "long" | "epic"
+        confidence?: "low" | "medium" | "high"
+        trigger_score?: number
+        decision_stage?: "pre-plan" | "post-plan" | "runtime"
+        positive_signals?: Array<string>
+        negative_signals?: Array<string>
+        needs_user_confirmation?: boolean
+        auto_upgrade_allowed?: boolean
+        auto_downgrade_allowed?: boolean
+        active_milestone_limit?: number
+        milestone_count?: number
         reasons?: Array<string>
       }
       todo_timeline?: {
@@ -13294,7 +15336,60 @@ export type CoordinatorResumeResponses = {
           todo_ids?: Array<string>
           expected_outputs?: Array<string>
           checkpoint_after?: boolean
+          milestone_id?: string
         }>
+        milestones?: Array<{
+          id: string
+          title: string
+          status?: "pending" | "active" | "completed" | "partial" | "blocked" | "skipped"
+          risk?: "low" | "medium" | "high"
+          todo_ids?: Array<string>
+          acceptance_checks?: Array<string>
+          expected_artifact?: string
+          budget_slice?: number
+          checkpoint_after?: boolean
+        }>
+        current_milestone_id?: string
+        active_milestone_limit?: number
+        checkpoints?: Array<{
+          id: string
+          type:
+            | "node_checkpoint"
+            | "milestone_checkpoint"
+            | "budget_checkpoint"
+            | "risk_checkpoint"
+            | "recovery_checkpoint"
+            | "cancellation_checkpoint"
+          milestone_id?: string
+          node_id?: string
+          task_id?: string
+          status?: string
+          summary?: string
+          next_recommended_action?: string
+          created_at: number
+        }>
+        evidence_ledger?: Array<{
+          id: string
+          source_type?: "task" | "checkpoint" | "artifact" | "memory"
+          source_id: string
+          milestone_id?: string
+          node_id?: string
+          summary: string
+          confidence?: "low" | "medium" | "high"
+          scope?: Array<string>
+          created_at: number
+        }>
+        memory_slices?: Array<{
+          id: string
+          milestone_id?: string
+          completed?: Array<string>
+          important_context?: Array<string>
+          unresolved_risks?: Array<string>
+          next_context?: string
+          discard_context?: Array<string>
+          created_at: number
+        }>
+        pause_after_current_milestone?: boolean
       }
       budget_profile?: {
         scale?: "small" | "normal" | "large" | "max"
@@ -13379,6 +15474,14 @@ export type CoordinatorResumeResponses = {
       checkpoint_memory?: {
         run_id?: string
         checkpoint_id?: string
+        checkpoint_type?:
+          | "node_checkpoint"
+          | "milestone_checkpoint"
+          | "budget_checkpoint"
+          | "risk_checkpoint"
+          | "recovery_checkpoint"
+          | "cancellation_checkpoint"
+        current_milestone_id?: string
         todo_state?: Array<{
           id: string
           title: string
@@ -13399,6 +15502,7 @@ export type CoordinatorResumeResponses = {
           [key: string]: number
         }
         next_recommended_todos?: Array<string>
+        milestone_summaries?: Array<string>
         compressed_context?: string
       }
       continuation_request?: {
@@ -13465,7 +15569,7 @@ export type PersonalOverviewResponses = {
       session: number
       recent: Array<{
         id: string
-        scope: "profile" | "workspace" | "session"
+        scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
         projectID?: string
         sessionID?: string
         title: string
@@ -13503,7 +15607,7 @@ export type PersonalMemoryListData = {
   query?: {
     directory?: string
     workspace?: string
-    scope?: "profile" | "workspace" | "session"
+    scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
     sessionID?: string
   }
   url: "/personal/memory"
@@ -13515,7 +15619,7 @@ export type PersonalMemoryListResponses = {
    */
   200: Array<{
     id: string
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     projectID?: string
     sessionID?: string
     title: string
@@ -13547,7 +15651,7 @@ export type PersonalMemoryListResponse = PersonalMemoryListResponses[keyof Perso
 
 export type PersonalMemoryRememberData = {
   body?: {
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     title: string
     content: string
     sessionID?: string
@@ -13591,7 +15695,7 @@ export type PersonalMemoryRememberResponses = {
    */
   200: {
     id: string
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     projectID?: string
     sessionID?: string
     title: string
@@ -13625,7 +15729,7 @@ export type PersonalMemorySearchData = {
   body?: {
     query: string
     sessionID?: string
-    scopes?: Array<"profile" | "workspace" | "session">
+    scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
     workflow?: string
     expertID?: string
     role?: string
@@ -13646,7 +15750,7 @@ export type PersonalMemorySearchResponses = {
    */
   200: Array<{
     id: string
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     projectID?: string
     sessionID?: string
     title: string
@@ -13712,7 +15816,7 @@ export type PersonalMemorySynthesizeResponses = {
    */
   200: {
     id: string
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     projectID?: string
     sessionID?: string
     title: string
@@ -13763,7 +15867,7 @@ export type PersonalInboxListResponses = {
     projectID: string
     sessionID?: string
     source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
@@ -13785,7 +15889,7 @@ export type PersonalInboxListResponse = PersonalInboxListResponses[keyof Persona
 export type PersonalInboxCreateData = {
   body?: {
     source?: "session" | "scheduled" | "webhook"
-    scope?: "profile" | "workspace" | "session"
+    scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     sessionID?: string
     contextRefs?: Array<string>
@@ -13812,7 +15916,7 @@ export type PersonalInboxCreateResponses = {
     projectID: string
     sessionID?: string
     source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
@@ -13854,7 +15958,7 @@ export type PersonalInboxUpdateResponses = {
     projectID: string
     sessionID?: string
     source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
@@ -13980,7 +16084,7 @@ export type PersonalSchedulerDispatchResponses = {
     projectID: string
     sessionID?: string
     source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"
@@ -14044,7 +16148,7 @@ export type PersonalSchedulerCompleteResponse =
 export type PersonalGatewayWebhookData = {
   body?: {
     goal: string
-    scope?: "profile" | "workspace" | "session"
+    scope?: "profile" | "workspace" | "session" | "semantic" | "procedural"
     contextRefs?: Array<string>
     priority?: "high" | "normal" | "low"
     payload?: {
@@ -14068,7 +16172,7 @@ export type PersonalGatewayWebhookResponses = {
     projectID: string
     sessionID?: string
     source: "session" | "scheduled" | "webhook"
-    scope: "profile" | "workspace" | "session"
+    scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
     priority: "high" | "normal" | "low"

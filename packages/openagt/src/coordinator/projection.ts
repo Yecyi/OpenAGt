@@ -11,7 +11,7 @@ import type {
   ProgressSnapshot as ProgressSnapshotType,
   TodoTimeline as TodoTimelineType,
 } from "./schema"
-import type { runtimeStateFor } from "./runtime-state"
+import { taskLeaseFor, type runtimeStateFor } from "./runtime-state"
 
 type TaskStatus = "pending" | "running" | "completed" | "partial" | "failed" | "cancelled"
 type MergeStatus = "none" | "waiting" | "merged" | "conflict"
@@ -62,6 +62,21 @@ export function buildCoordinatorProjection(input: {
   runtime: ReturnType<typeof runtimeStateFor>
 }): CoordinatorProjection {
   const taskByNode = input.runtime.taskByNode
+  const taskList = input.taskList.map((task) => {
+    const lease = taskLeaseFor(task)
+    if (!lease.stale) return task
+    return {
+      ...task,
+      metadata: {
+        ...(task.metadata ?? {}),
+        stale: true,
+        stale_after_ms: lease.threshold_ms,
+        stale_age_ms: lease.age_ms,
+        lease_heartbeat_at: lease.heartbeat_at,
+        retryable: true,
+      },
+    }
+  })
   const groupIDs = [
     ...new Set(input.run.plan.nodes.flatMap((item) => (item.parallel_group ? [item.parallel_group] : []))),
   ]
@@ -83,13 +98,7 @@ export function buildCoordinatorProjection(input: {
     const reducerTask = reducer ? taskByNode.get(reducer.id) : undefined
     const conflicts = nodes.flatMap((item) => item.conflicts)
     const merge_status: MergeStatus =
-      conflicts.length > 0
-        ? "conflict"
-        : reducerTask?.status === "completed"
-          ? "merged"
-          : reducer
-            ? "waiting"
-            : "none"
+      conflicts.length > 0 ? "conflict" : reducerTask?.status === "completed" ? "merged" : reducer ? "waiting" : "none"
     return {
       id: groupID,
       node_ids: nodes.map((item) => item.id),
@@ -105,14 +114,14 @@ export function buildCoordinatorProjection(input: {
   })
   return {
     run: input.run,
-    tasks: input.taskList,
+    tasks: taskList,
     counts: {
-      pending: input.taskList.filter((item) => item.status === "pending").length,
-      running: input.taskList.filter((item) => item.status === "running").length,
-      completed: input.taskList.filter((item) => item.status === "completed").length,
-      partial: input.taskList.filter((item) => item.status === "partial").length,
-      failed: input.taskList.filter((item) => item.status === "failed").length,
-      cancelled: input.taskList.filter((item) => item.status === "cancelled").length,
+      pending: taskList.filter((item) => item.status === "pending").length,
+      running: taskList.filter((item) => item.status === "running").length,
+      completed: taskList.filter((item) => item.status === "completed").length,
+      partial: taskList.filter((item) => item.status === "partial").length,
+      failed: taskList.filter((item) => item.status === "failed").length,
+      cancelled: taskList.filter((item) => item.status === "cancelled").length,
     },
     groups,
     expert_lanes: input.run.plan.expert_lanes,

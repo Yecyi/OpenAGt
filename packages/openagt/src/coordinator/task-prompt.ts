@@ -90,8 +90,20 @@ export function buildTaskPrompt(record: TaskRuntime.TaskRecord, dependencies: Ta
   const dependencySummaries = dependencies.length
     ? `\n\nCompleted dependency handoff:\n${dependencies.map((item) => `- ${item.description}: ${item.result_summary ?? item.error_summary ?? item.status}`).join("\n")}`
     : ""
+  const roleContract =
+    metadata.role === "reducer"
+      ? "\n\nReducer contract: output compact_synthesis, conflicts, recommended_next_nodes, evidence_coverage, and confidence. Do not pass through full raw transcripts."
+      : metadata.role === "implementer"
+        ? "\n\nImplementer contract: use reducer/checkpoint synthesis as primary context; return changed_scope, rollback_notes, local_verification, risks, and confidence."
+        : metadata.role === "verifier"
+          ? "\n\nVerifier contract: verify only your assigned dimension; return evidence, command summaries when available, residual_risk, and confidence."
+          : metadata.role === "reviewer"
+            ? "\n\nReviewer contract: consume final artifact, verifier evidence, and checkpoint memory; return verdict, required_fixes, evidence_for, evidence_against, and residual_risks."
+            : metadata.role === "researcher"
+              ? "\n\nResearcher contract: stay inside assigned_scope, avoid excluded_scope, and return evidence, confidence, unknowns, and recommended_next_step."
+              : ""
   const checks = record.acceptance_checks.length
     ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
     : ""
-  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
+  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${roleContract}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
 }

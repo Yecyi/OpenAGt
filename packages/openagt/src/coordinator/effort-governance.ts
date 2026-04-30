@@ -1,9 +1,5 @@
 import z from "zod"
-import {
-  budgetProfileFor,
-  longTaskProfileFor,
-  type BudgetOptions,
-} from "./budget-governance"
+import { budgetProfileFor, longTaskProfileFor, type BudgetOptions } from "./budget-governance"
 import { effortProfileFor } from "./effort-profile"
 import { basePlanForIntent } from "./base-plan"
 import { lowEffortNodes, reviseGraphFor, rewriteDeps, sinkIDs } from "./graph-revisions"
@@ -83,6 +79,7 @@ function effortPlanMetadata(input: {
     nodes: input.nodes,
     expertLanes: expert_lanes,
     workflow: input.workflow,
+    activeMilestoneLimit: long_task.active_milestone_limit,
   })
   const budget_profile = budgetProfileFor({
     effort: input.effort,
@@ -158,8 +155,11 @@ function effortPlanMetadata(input: {
       progress_score: 0,
     }),
     checkpoint_memory: CheckpointMemorySummary.parse({
+      checkpoint_type: long_task.timeline_required ? "milestone_checkpoint" : undefined,
+      current_milestone_id: todo_timeline.current_milestone_id,
       todo_state: todo_timeline.todos,
       next_recommended_todos: todo_timeline.todos.filter((item) => item.priority === "high").map((item) => item.id),
+      milestone_summaries: todo_timeline.milestones.map((item) => `${item.id}: ${item.title}`),
       compressed_context: long_task.timeline_required
         ? `Long task checkpoint memory initialized for ${input.workflow}/${input.effort}.`
         : "",
@@ -518,4 +518,3 @@ export function defaultPlanForIntent(
   })
   return applyEffortGovernance(basePlanForIntent(effectiveIntent), effectiveIntent, effort, input)
 }
-

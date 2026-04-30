@@ -26,6 +26,16 @@ function groupKey(parentSessionID: SessionID, groupID: string) {
   return ["task_group", parentSessionID, groupID]
 }
 
+function recoveryCheckpointFor(record: TaskRecord) {
+  return {
+    status: record.status,
+    result_summary: record.result_summary,
+    error_summary: record.error_summary,
+    stop_reason: record.stop_reason,
+    created_at: Date.now(),
+  }
+}
+
 export interface CreateInput {
   parentSessionID: SessionID
   childSessionID: SessionID
@@ -80,10 +90,7 @@ export function createTaskWriteOps(deps: {
   bus: Bus.Interface
   cancelHandlers: Map<string, () => void>
   TaskUpdated: BusEvent.Definition
-  get: (input: {
-    taskID: SessionID
-    parentSessionID: SessionID
-  }) => Effect.Effect<Option.Option<TaskRecord>, Error>
+  get: (input: { taskID: SessionID; parentSessionID: SessionID }) => Effect.Effect<Option.Option<TaskRecord>, Error>
 }) {
   const { storage, bus, cancelHandlers, TaskUpdated, get } = deps
 
@@ -129,9 +136,7 @@ export function createTaskWriteOps(deps: {
       const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), fn)
       const beforeStatus = Option.isSome(before) ? before.value.status : undefined
       const groupStateChanged =
-        Option.isNone(before) ||
-        before.value.group_id !== record.group_id ||
-        beforeStatus !== record.status
+        Option.isNone(before) || before.value.group_id !== record.group_id || beforeStatus !== record.status
       if (groupStateChanged) {
         yield* refreshGroup(record)
       }
@@ -175,7 +180,9 @@ export function createTaskWriteOps(deps: {
     }
     yield* storage.write(taskKey(input.parentSessionID, input.childSessionID), record)
     if (input.groupID) {
-      const existing = yield* storage.read<TaskGroup>(groupKey(input.parentSessionID, input.groupID)).pipe(Effect.option)
+      const existing = yield* storage
+        .read<TaskGroup>(groupKey(input.parentSessionID, input.groupID))
+        .pipe(Effect.option)
       if (Option.isNone(existing)) {
         yield* storage.write(groupKey(input.parentSessionID, input.groupID), {
           group_id: input.groupID,
@@ -201,8 +208,14 @@ export function createTaskWriteOps(deps: {
 
   const setRunning = Effect.fn("TaskRuntime.setRunning")(function* (taskID: SessionID, parentSessionID: SessionID) {
     return yield* update(parentSessionID, taskID, (draft) => {
+      const timestamp = Date.now()
       draft.status = "running"
-      draft.started_at = draft.started_at ?? Date.now()
+      draft.started_at = draft.started_at ?? timestamp
+      draft.metadata = {
+        ...(draft.metadata ?? {}),
+        lease_started_at: draft.metadata?.lease_started_at ?? timestamp,
+        lease_heartbeat_at: timestamp,
+      }
     })
   })
 
@@ -213,9 +226,15 @@ export function createTaskWriteOps(deps: {
     const started = { value: false }
     const record = yield* storage.update<TaskRecord>(taskKey(parentSessionID, taskID), (draft) => {
       if (draft.status !== "pending") return
+      const timestamp = Date.now()
       started.value = true
       draft.status = "running"
-      draft.started_at = draft.started_at ?? Date.now()
+      draft.started_at = draft.started_at ?? timestamp
+      draft.metadata = {
+        ...(draft.metadata ?? {}),
+        lease_started_at: draft.metadata?.lease_started_at ?? timestamp,
+        lease_heartbeat_at: timestamp,
+      }
     })
     if (!started.value) return
     yield* refreshGroup(record)
@@ -337,6 +356,12 @@ export function createTaskWriteOps(deps: {
       return yield* Effect.fail(new Error(`Task cannot be retried from state: ${current.value.status}`))
     }
     return yield* update(input.parentSessionID, input.taskID, (draft) => {
+      const previous = Array.isArray(draft.metadata?.recovery_checkpoints)
+        ? draft.metadata.recovery_checkpoints.filter(
+            (item): item is ReturnType<typeof recoveryCheckpointFor> =>
+              typeof item === "object" && item !== null && !Array.isArray(item),
+          )
+        : []
       draft.status = "pending"
       draft.started_at = undefined
       draft.finished_at = undefined
@@ -347,6 +372,7 @@ export function createTaskWriteOps(deps: {
       if (draft.metadata) {
         draft.metadata = {
           ...draft.metadata,
+          recovery_checkpoints: [...previous, recoveryCheckpointFor(current.value)].slice(-5),
           partial: undefined,
           retryable: undefined,
           limit_reason: undefined,

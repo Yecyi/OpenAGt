@@ -1,8 +1,6 @@
 import { BudgetTuning } from "@/agent/budget-tuning"
-import { isBroadAgentTask } from "@/agent/task-classifier"
 import {
   BudgetProfile,
-  LongTaskProfile,
   ResourceLimit,
   type AutoContinuePolicy as AutoContinuePolicyType,
   type BudgetScale as BudgetScaleType,
@@ -14,6 +12,7 @@ import {
   type TodoTimeline as TodoTimelineType,
 } from "./schema"
 import type { WorkspaceSignals } from "./workspace-signals"
+import { longTaskProfileForDecision } from "./long-task-decision"
 import {
   absoluteBaseLimit,
   autoContinueForEffort,
@@ -70,45 +69,7 @@ export function longTaskProfileFor(input: {
   nodeCount: number
   workspaceSignals?: WorkspaceSignals
 }) {
-  const tokenEstimate = Math.ceil(input.goal.length / 4)
-  const outputDimensions = input.intent.success_criteria.length + (input.goal.match(/\n|\d\.|;|,/g)?.length ?? 0)
-  const workspaceScore =
-    (input.workspaceSignals?.file_count ?? 0) >= 1_000
-      ? 3
-      : (input.workspaceSignals?.file_count ?? 0) >= 300
-        ? 2
-        : (input.workspaceSignals?.file_count ?? 0) >= 100
-          ? 1
-          : 0
-  const explicitLong = isBroadAgentTask(input.goal)
-  const score =
-    (explicitLong ? 3 : 0) +
-    (input.effort === "deep" ? 3 : input.effort === "high" ? 2 : 0) +
-    (input.nodeCount >= 12 ? 3 : input.nodeCount >= 8 ? 2 : input.nodeCount >= 5 ? 1 : 0) +
-    (tokenEstimate >= 300 ? 2 : tokenEstimate >= 120 ? 1 : 0) +
-    (outputDimensions >= 8 ? 2 : outputDimensions >= 5 ? 1 : 0) +
-    workspaceScore +
-    ((input.workspaceSignals?.package_count ?? 0) >= 6
-      ? 2
-      : (input.workspaceSignals?.package_count ?? 0) >= 2
-        ? 1
-        : 0) +
-    ((input.workspaceSignals?.language_count ?? 0) >= 4 ? 1 : 0)
-  const task_size = score >= 10 ? "huge" : score >= 7 ? "large" : score >= 4 ? "medium" : "small"
-  const is_long_task = score >= 4 || ((input.effort === "high" || input.effort === "deep") && explicitLong)
-  return LongTaskProfile.parse({
-    is_long_task,
-    task_size,
-    timeline_required: is_long_task,
-    reasons: [
-      explicitLong ? "broad or deep-dive goal" : undefined,
-      input.effort === "high" || input.effort === "deep" ? `${input.effort} effort selected` : undefined,
-      input.nodeCount >= 5 ? `coordinator plan has ${input.nodeCount} nodes` : undefined,
-      tokenEstimate >= 120 ? `prompt estimate is ${tokenEstimate} tokens` : undefined,
-      outputDimensions >= 5 ? `goal has ${outputDimensions} output dimensions` : undefined,
-      ...(input.workspaceSignals?.reasons ?? []),
-    ].filter((item): item is string => Boolean(item)),
-  })
+  return longTaskProfileForDecision(input)
 }
 
 export function budgetProfileFor(input: {

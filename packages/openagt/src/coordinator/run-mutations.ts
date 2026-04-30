@@ -6,7 +6,7 @@ import { Database, eq } from "@/storage"
 import { Effect, Option } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { addResourceLimit, scaleResourceLimit } from "./budget-governance"
-import { planWithRuntimeState, runtimeStateFor } from "./runtime-state"
+import { planWithRuntimeState, runtimeStateFor, taskLeaseFor } from "./runtime-state"
 import { CoordinatorPlan, BudgetProfile, BudgetState, ResourceLimit } from "./schema"
 import type {
   AutoContinuePolicy as AutoContinuePolicyType,
@@ -29,7 +29,10 @@ export class CoordinatorRunMutations {
     },
   ) {}
 
-  activateRun = Effect.fn("Coordinator.activateRun")(function* (this: CoordinatorRunMutations, id: CoordinatorRunIDType) {
+  activateRun = Effect.fn("Coordinator.activateRun")(function* (
+    this: CoordinatorRunMutations,
+    id: CoordinatorRunIDType,
+  ) {
     const runOpt = yield* this.deps.get(id)
     if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
     if (runOpt.value.state === "completed" || runOpt.value.state === "failed" || runOpt.value.state === "cancelled")
@@ -51,6 +54,35 @@ export class CoordinatorRunMutations {
     const updated = yield* this.deps.runStore.readAfterUpdate(id)
     yield* this.deps.publishUpdated(updated)
     return updated
+  })
+
+  private reconcileStaleTasks = Effect.fn("Coordinator.reconcileStaleTasks")(function* (
+    this: CoordinatorRunMutations,
+    run: CoordinatorRunType,
+  ) {
+    const taskList = yield* this.deps.relevantTasks(run)
+    const stale = taskList.filter((item) => taskLeaseFor(item).stale)
+    if (stale.length === 0) return 0
+    const tasks = this.deps.tasks
+    yield* Effect.all(
+      stale.map((item) =>
+        tasks.partial({
+          taskID: item.task_id,
+          parentSessionID: item.parent_session_id,
+          output: item.result_summary ?? item.error_summary ?? "Stale running task recovered before resume",
+          reason: "Coordinator resume recovered a stale running task lease",
+          retryable: true,
+          remainingScope: item.acceptance_checks.length
+            ? item.acceptance_checks
+            : [...item.read_scope, ...item.write_scope],
+        }),
+      ),
+      {
+        concurrency: BudgetTuning.concurrency.storageRead,
+        discard: true,
+      },
+    )
+    return stale.length
   })
 
   approve = Effect.fn("Coordinator.approve")(function* (this: CoordinatorRunMutations, id: CoordinatorRunIDType) {
@@ -97,15 +129,15 @@ export class CoordinatorRunMutations {
         .filter((item) => item.status === "pending" || item.status === "running")
         .map((item) =>
           Effect.gen(function* () {
-          if (item.status === "running" && Option.isSome(prompt)) {
-            yield* prompt.value.cancel(item.child_session_id).pipe(Effect.ignore)
-          }
-          yield* tasks.cancel({
-            taskID: item.task_id,
-            parentSessionID: item.parent_session_id,
-            reason: "Coordinator run cancelled",
-          })
-        }),
+            if (item.status === "running" && Option.isSome(prompt)) {
+              yield* prompt.value.cancel(item.child_session_id).pipe(Effect.ignore)
+            }
+            yield* tasks.cancel({
+              taskID: item.task_id,
+              parentSessionID: item.parent_session_id,
+              reason: "Coordinator run cancelled",
+            })
+          }),
         ),
       {
         concurrency: BudgetTuning.concurrency.storageRead,
@@ -251,11 +283,29 @@ export class CoordinatorRunMutations {
     if (current.value.state !== "blocked" && current.value.state !== "active") {
       return yield* Effect.fail(new Error(`Coordinator run cannot be resumed from state: ${current.value.state}`))
     }
+    const recovered = yield* this.reconcileStaleTasks(current.value)
     const activated = yield* this.activateRun(id)
     if (activated.state !== "active") return activated
     yield* this.deps.dispatchReady(id).pipe(Effect.ignore)
     const runOpt = yield* this.deps.get(id)
     if (Option.isNone(runOpt)) throw new Error(`Coordinator run not found: ${id}`)
+    if (recovered > 0) {
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              summary: `Coordinator run resumed after recovering ${recovered} stale task${recovered === 1 ? "" : "s"}`,
+              time_updated: this.deps.now(),
+            })
+            .where(eq(CoordinatorRunTable.id, id))
+            .run(),
+        ),
+      )
+      const updated = yield* this.deps.runStore.readAfterUpdate(id)
+      yield* this.deps.publishUpdated(updated)
+      return updated
+    }
     return runOpt.value
   })
 }

@@ -43,6 +43,7 @@ import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
 import { Mission } from "@tui/routes/mission"
+import { startMissionFromDialog } from "@tui/routes/mission-create"
 import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
@@ -433,6 +434,18 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
           type: "home",
         })
         dialog.clear()
+      },
+    },
+    {
+      title: "Create mission",
+      value: "mission.create",
+      description: "Analyze a goal and start a coordinator mission",
+      category: "Mission",
+      slash: {
+        name: "mission",
+      },
+      onSelect: (dialog) => {
+        void startMissionFromDialog({ dialog, local, route, sdk, toast })
       },
     },
     {

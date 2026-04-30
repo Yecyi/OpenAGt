@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Exit, Layer } from "effect"
 import { Bus } from "../../src/bus"
 import { Coordinator } from "../../src/coordinator/coordinator"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
@@ -87,6 +87,97 @@ const it = testEffect(
 )
 
 describe("coordinator runner", () => {
+  it.live("rejects illegal coordinator state transitions", () =>
+    provideTmpdirServer(
+      () =>
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const coordinator = yield* Coordinator.Service
+          const parent = yield* sessions.create({ title: "Coordinator state machine" })
+          const run = yield* coordinator.run({
+            sessionID: parent.id,
+            goal: "complete this general task",
+            mode: "assisted",
+            approved: true,
+          })
+
+          const approveAgain = yield* Effect.exit(coordinator.approve(run.id))
+          const continueWithoutBudget = yield* Effect.exit(coordinator.continueRun({ id: run.id }))
+
+          expect(Exit.isFailure(approveAgain)).toBe(true)
+          expect(Exit.isFailure(continueWithoutBudget)).toBe(true)
+        }),
+      {
+        git: true,
+        config: providerCfg,
+      },
+    ),
+  )
+
+  it.live("cancel propagates to pending coordinator tasks", () =>
+    provideTmpdirServer(
+      () =>
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const tasks = yield* TaskRuntime.Service
+          const coordinator = yield* Coordinator.Service
+          const parent = yield* sessions.create({ title: "Coordinator cancel" })
+          const run = yield* coordinator.run({
+            sessionID: parent.id,
+            goal: "complete this general task",
+            mode: "manual",
+          })
+
+          yield* coordinator.cancel(run.id)
+          const records = yield* tasks.list(parent.id)
+
+          expect(records.length).toBeGreaterThan(0)
+          expect(records.every((item) => item.status === "cancelled")).toBe(true)
+        }),
+      {
+        git: true,
+        config: providerCfg,
+      },
+    ),
+  )
+
+  it.live("retry with node scope does not restart unrelated failed nodes", () =>
+    provideTmpdirServer(
+      () =>
+        Effect.gen(function* () {
+          const sessions = yield* Session.Service
+          const tasks = yield* TaskRuntime.Service
+          const coordinator = yield* Coordinator.Service
+          const parent = yield* sessions.create({ title: "Coordinator retry node" })
+          const run = yield* coordinator.run({
+            sessionID: parent.id,
+            goal: "complete this general task",
+            mode: "manual",
+          })
+          const records = yield* tasks.list(parent.id)
+          const research = records.find((item) => item.metadata?.coordinator_node_id === "research")
+          const execute = records.find((item) => item.metadata?.coordinator_node_id === "execute")
+          if (!research || !execute) throw new Error("Expected research and execute tasks")
+
+          yield* tasks.fail({ taskID: research.task_id, parentSessionID: parent.id, error: "research failed" })
+          yield* tasks.fail({ taskID: execute.task_id, parentSessionID: parent.id, error: "execute failed" })
+          yield* coordinator.cancel(run.id)
+          yield* coordinator.retry({ id: run.id, nodeID: "execute" })
+          const updated = yield* tasks.list(parent.id)
+          const researchAfter = updated.find((item) => item.task_id === research.task_id)
+          const executeAfter = updated.find((item) => item.task_id === execute.task_id)
+
+          expect(researchAfter?.status).toBe("failed")
+          expect(executeAfter?.status).toBe("pending")
+          expect(Array.isArray(executeAfter?.metadata?.recovery_checkpoints)).toBe(true)
+        }),
+      {
+        git: true,
+        config: providerCfg,
+      },
+    ),
+  )
+
   it.live("tracks coordinator task completion and synthesizes memory", () =>
     provideTmpdirServer(
       () =>

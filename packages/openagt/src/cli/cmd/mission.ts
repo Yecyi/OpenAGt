@@ -9,7 +9,7 @@ import { createOpencodeClient, type OpencodeClient } from "@openagt/sdk/v2"
 
 type MissionMode = "manual" | "assisted" | "autonomous"
 type MissionFormat = "text" | "json"
-type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection" | "continue"
+type MissionAction = "approve" | "cancel" | "resume" | "retry" | "projection" | "continue" | "checkpoint" | "summarize"
 type ParallelMode = "off" | "safe" | "aggressive"
 type MissionEffort = "low" | "medium" | "high" | "deep"
 type MissionBudget = "small" | "normal" | "large" | "max"
@@ -129,8 +129,20 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
       run: { id: string; state: string; summary?: string }
       counts: Record<string, number>
       effort_profile?: Record<string, unknown>
-      long_task?: { is_long_task: boolean; task_size: string; timeline_required: boolean; reasons: string[] }
-      todo_timeline?: { todos: Array<{ id: string; title: string; status: string }> }
+      long_task?: {
+        is_long_task: boolean
+        task_size: string
+        execution_model?: string
+        classification?: string
+        confidence?: string
+        trigger_score?: number
+        milestone_count?: number
+        timeline_required: boolean
+        positive_signals?: string[]
+        negative_signals?: string[]
+        needs_user_confirmation?: boolean
+        reasons: string[]
+      }
       budget_state?: {
         budget_limited: boolean
         ceiling_hit: boolean
@@ -139,6 +151,15 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         absolute_ceiling_used: number
       }
       progress_snapshot?: { progress_score: number; evidence_coverage: number; confidence: string }
+      checkpoint_memory?: {
+        checkpoint_id?: string
+        checkpoint_type?: string
+        current_milestone_id?: string
+        compressed_context: string
+        evidence_index: string[]
+        milestone_summaries: string[]
+        next_recommended_todos: string[]
+      }
       continuation_request?: {
         reason: string
         next_todos: string[]
@@ -148,6 +169,20 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
       expert_lanes?: Array<{ id: string; expert_id: string; role: string; node_ids: string[] }>
       quality_gates?: Array<{ id: string; kind: string; status: string }>
       revise_points?: Array<{ id: string; kind: string; status: string }>
+      todo_timeline?: {
+        todos: Array<{ id: string; title: string; status: string }>
+        milestones: Array<{
+          id: string
+          title: string
+          status: string
+          expected_artifact: string
+          budget_slice: number
+        }>
+        current_milestone_id?: string
+        checkpoints: Array<{ id: string; type: string; milestone_id?: string; summary: string }>
+        evidence_ledger: Array<{ id: string; source_id: string; milestone_id?: string; summary: string }>
+        memory_slices: Array<{ id: string; milestone_id?: string; next_context: string }>
+      }
       tasks: Array<{
         status: string
         description: string
@@ -164,6 +199,7 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
         conflicts: string[]
       }>
     }
+    const showTimeline = data.showTimeline === true
     UI.println(
       `Run ${projection.run.id}: ${projection.run.state}${projection.run.summary ? ` - ${projection.run.summary}` : ""}`,
     )
@@ -177,8 +213,15 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     }
     if (projection.long_task?.is_long_task) {
       UI.println(
-        `  long task: ${projection.long_task.task_size}, timeline ${projection.long_task.timeline_required ? "required" : "optional"}`,
+        `  long task: ${projection.long_task.execution_model ?? projection.long_task.task_size}, ${projection.long_task.confidence ?? "medium"} confidence, score ${projection.long_task.trigger_score ?? 0}, timeline ${projection.long_task.timeline_required ? "required" : "optional"}, milestones ${projection.long_task.milestone_count ?? 0}`,
       )
+      if (projection.long_task.positive_signals?.length) {
+        UI.println(`    why: ${projection.long_task.positive_signals.slice(0, 4).join("; ")}`)
+      }
+      if (projection.long_task.negative_signals?.length) {
+        UI.println(`    counter-signals: ${projection.long_task.negative_signals.slice(0, 3).join("; ")}`)
+      }
+      if (projection.long_task.needs_user_confirmation) UI.println(`    confirmation recommended before continuation`)
     }
     if (projection.progress_snapshot) {
       UI.println(
@@ -193,6 +236,42 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
     }
     if (projection.todo_timeline?.todos.length) {
       UI.println(`  todos: ${projection.todo_timeline.todos.map((item) => `${item.id}:${item.status}`).join(", ")}`)
+    }
+    if (showTimeline && projection.todo_timeline) {
+      UI.println(`  milestones: ${projection.todo_timeline.current_milestone_id ?? "none"} current`)
+      for (const milestone of projection.todo_timeline.milestones) {
+        UI.println(
+          `    ${milestone.id} [${milestone.status}] ${milestone.title} (${Math.round(milestone.budget_slice * 100)}%)`,
+        )
+        if (milestone.expected_artifact) UI.println(`      artifact: ${milestone.expected_artifact}`)
+      }
+      if (projection.todo_timeline.checkpoints.length > 0) {
+        UI.println(`  checkpoints:`)
+        for (const checkpoint of projection.todo_timeline.checkpoints.slice(-8)) {
+          UI.println(`    ${checkpoint.id} [${checkpoint.type}] ${checkpoint.summary}`)
+        }
+      }
+      if (projection.todo_timeline.evidence_ledger.length > 0) {
+        UI.println(`  evidence: ${projection.todo_timeline.evidence_ledger.length} compact entries`)
+      }
+      if (projection.todo_timeline.memory_slices.length > 0) {
+        UI.println(`  memory slices:`)
+        for (const slice of projection.todo_timeline.memory_slices.slice(-5)) {
+          UI.println(`    ${slice.id}: ${slice.next_context}`)
+        }
+      }
+    }
+    if (showTimeline && projection.checkpoint_memory) {
+      UI.println(`  checkpoint memory: ${projection.checkpoint_memory.checkpoint_id ?? "none"}`)
+      if (projection.checkpoint_memory.checkpoint_type) {
+        UI.println(`    type: ${projection.checkpoint_memory.checkpoint_type}`)
+      }
+      if (projection.checkpoint_memory.compressed_context) {
+        UI.println(`    context: ${projection.checkpoint_memory.compressed_context}`)
+      }
+      if (projection.checkpoint_memory.next_recommended_todos.length > 0) {
+        UI.println(`    next todos: ${projection.checkpoint_memory.next_recommended_todos.join(", ")}`)
+      }
     }
     if (projection.continuation_request) {
       UI.println(`  continuation: ${projection.continuation_request.reason}`)
@@ -218,6 +297,34 @@ function emit(format: MissionFormat, type: string, data: Record<string, unknown>
       if (task.error_summary) UI.println(`    error: ${task.error_summary}`)
     }
     UI.empty()
+    return
+  }
+  if (type === "checkpoint") {
+    const checkpoint = data.checkpoint as {
+      checkpoint_id?: string
+      checkpoint_type?: string
+      current_milestone_id?: string
+      compressed_context: string
+      evidence_index: string[]
+      milestone_summaries: string[]
+      next_recommended_todos: string[]
+    }
+    UI.println(UI.Style.TEXT_NORMAL_BOLD + "Checkpoint" + UI.Style.TEXT_NORMAL)
+    UI.println(`  id: ${checkpoint.checkpoint_id ?? "none"}`)
+    UI.println(`  type: ${checkpoint.checkpoint_type ?? "snapshot"}`)
+    UI.println(`  milestone: ${checkpoint.current_milestone_id ?? "none"}`)
+    if (checkpoint.compressed_context) UI.println(`  context: ${checkpoint.compressed_context}`)
+    if (checkpoint.evidence_index.length > 0) UI.println(`  evidence: ${checkpoint.evidence_index.join(", ")}`)
+    if (checkpoint.next_recommended_todos.length > 0) {
+      UI.println(`  next: ${checkpoint.next_recommended_todos.join(", ")}`)
+    }
+    for (const item of checkpoint.milestone_summaries) UI.println(`  milestone: ${item}`)
+    UI.empty()
+    return
+  }
+  if (type === "summary") {
+    UI.println(String(data.summary ?? ""))
+    UI.empty()
   }
 }
 
@@ -229,7 +336,13 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function watchProjection(sdk: OpencodeClient, runID: string, format: MissionFormat, showGroups = false) {
+async function watchProjection(
+  sdk: OpencodeClient,
+  runID: string,
+  format: MissionFormat,
+  showGroups = false,
+  showTimeline = false,
+) {
   let last = ""
   while (true) {
     const result = await sdk.coordinator.projection({ runID }, { throwOnError: true })
@@ -245,7 +358,7 @@ async function watchProjection(sdk: OpencodeClient, runID: string, format: Missi
       })),
     })
     if (key !== last) {
-      emit(format, "projection", { projection, showGroups })
+      emit(format, "projection", { projection, showGroups, showTimeline })
       last = key
     }
     if (terminal(projection.run.state)) return projection
@@ -266,6 +379,8 @@ async function createMission(
     parallelMode?: ParallelMode
     maxParallelAgents?: number
     showGroups?: boolean
+    showTimeline?: boolean
+    milestoneSummary?: boolean
     effort?: MissionEffort
     workflow?: MissionWorkflow
     budget?: MissionBudget
@@ -325,7 +440,7 @@ async function createMission(
     if (input.format === "text") UI.println(`Approve with: openagt mission --run ${run.id} --action approve --watch`)
     return run
   }
-  if (input.watch) return await watchProjection(sdk, run.id, input.format, input.showGroups)
+  if (input.watch) return await watchProjection(sdk, run.id, input.format, input.showGroups, input.showTimeline)
   return run
 }
 
@@ -339,6 +454,8 @@ async function controlMission(
     nodeID?: string
     taskID?: string
     showGroups?: boolean
+    showTimeline?: boolean
+    milestoneSummary?: boolean
     autoContinue?: MissionAutoContinue
     budgetDelta?: ReturnType<typeof budgetDelta>
   },
@@ -363,11 +480,28 @@ async function controlMission(
               : undefined
   if (input.action === "projection") {
     const projection = (await sdk.coordinator.projection({ runID: input.runID }, { throwOnError: true })).data
-    emit(input.format, "projection", { projection, showGroups: input.showGroups })
+    emit(input.format, "projection", {
+      projection,
+      showGroups: input.showGroups,
+      showTimeline: input.showTimeline,
+    })
+    return projection.run
+  }
+  if (input.action === "checkpoint") {
+    const projection = (await sdk.coordinator.projection({ runID: input.runID }, { throwOnError: true })).data
+    emit(input.format, "checkpoint", { checkpoint: projection.checkpoint_memory })
+    return projection.run
+  }
+  if (input.action === "summarize") {
+    const summary = (await sdk.coordinator.summarize({ runID: input.runID }, { throwOnError: true })).data.summary
+    emit(input.format, "summary", { summary })
+    if (!input.milestoneSummary) return { id: input.runID, state: "summarized", summary }
+    const projection = (await sdk.coordinator.projection({ runID: input.runID }, { throwOnError: true })).data
+    emit(input.format, "checkpoint", { checkpoint: projection.checkpoint_memory })
     return projection.run
   }
   if (result) emit(input.format, "run", { run: result.data })
-  if (input.watch) return await watchProjection(sdk, input.runID, input.format, input.showGroups)
+  if (input.watch) return await watchProjection(sdk, input.runID, input.format, input.showGroups, input.showTimeline)
   return result?.data
 }
 
@@ -493,6 +627,16 @@ export const MissionCommand = cmd({
         default: false,
         describe: "show parallel groups in projection output",
       })
+      .option("timeline", {
+        type: "boolean",
+        default: false,
+        describe: "show long-task milestones, checkpoints, evidence, and memory slices in projection output",
+      })
+      .option("milestone", {
+        type: "boolean",
+        default: false,
+        describe: "include milestone checkpoint memory when summarizing a run",
+      })
       .option("session", {
         type: "string",
         describe: "root session id to use",
@@ -503,7 +647,7 @@ export const MissionCommand = cmd({
       })
       .option("action", {
         type: "string",
-        choices: ["approve", "cancel", "resume", "retry", "projection", "continue"] as const,
+        choices: ["approve", "cancel", "resume", "retry", "projection", "continue", "checkpoint", "summarize"] as const,
         describe: "action for an existing run",
       })
       .option("node", {
@@ -535,6 +679,8 @@ export const MissionCommand = cmd({
           nodeID: args.node,
           taskID: args.task,
           showGroups: args["show-groups"],
+          showTimeline: args.timeline,
+          milestoneSummary: args.milestone,
           autoContinue: args["auto-continue"] as MissionAutoContinue | undefined,
           budgetDelta: budgetDelta({
             rounds: args["budget-delta-rounds"],
@@ -563,6 +709,7 @@ export const MissionCommand = cmd({
         parallelMode: args.parallel as ParallelMode,
         maxParallelAgents: args["max-parallel-agents"],
         showGroups: args["show-groups"],
+        showTimeline: args.timeline,
         effort: args.effort as MissionEffort,
         workflow: args.workflow as MissionWorkflow | undefined,
         budget: args.budget as MissionBudget,

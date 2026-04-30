@@ -1,8 +1,4 @@
-import {
-  TodoTimeline,
-  type CoordinatorNode as CoordinatorNodeType,
-  type TaskType as TaskTypeType,
-} from "./schema"
+import { TodoTimeline, type CoordinatorNode as CoordinatorNodeType, type TaskType as TaskTypeType } from "./schema"
 
 export function todoStage(node: CoordinatorNodeType): "plan" | "research" | "expert" | "reduce" | "verify" | "final" {
   if (node.role === "planner") return "plan"
@@ -27,6 +23,7 @@ export function todoTimelineFor(input: {
   nodes: CoordinatorNodeType[]
   expertLanes: Array<{ id: string; node_ids: string[] }>
   workflow: TaskTypeType
+  activeMilestoneLimit?: number
 }) {
   if (!input.required) return TodoTimeline.parse({ required: false, todos: [], phases: [] })
   const stages = ["plan", "research", "expert", "reduce", "verify", "final"] as const
@@ -59,16 +56,35 @@ export function todoTimelineFor(input: {
       },
     ]
   })
+  const phases = todos.map((item, index) => ({
+    id: `phase_${index + 1}_${item.assigned_stage}`,
+    title: item.title,
+    todo_ids: [item.id],
+    expected_outputs: [item.acceptance_hint || item.title],
+    checkpoint_after:
+      item.assigned_stage === "reduce" || item.assigned_stage === "verify" || item.assigned_stage === "final",
+    milestone_id: `milestone_${index + 1}_${item.assigned_stage}`,
+  }))
+  const totalWeight = todos.reduce((acc, item) => acc + item.budget_weight, 0)
   return TodoTimeline.parse({
     required: true,
     todos,
-    phases: todos.map((item, index) => ({
-      id: `phase_${index + 1}_${item.assigned_stage}`,
-      title: item.title,
-      todo_ids: [item.id],
-      expected_outputs: [item.acceptance_hint || item.title],
-      checkpoint_after:
-        item.assigned_stage === "reduce" || item.assigned_stage === "verify" || item.assigned_stage === "final",
-    })),
+    phases,
+    milestones: phases.map((item) => {
+      const todo = todos.find((candidate) => item.todo_ids.includes(candidate.id))
+      return {
+        id: item.milestone_id,
+        title: item.title,
+        status: "pending" as const,
+        risk: todo?.priority === "high" ? ("medium" as const) : ("low" as const),
+        todo_ids: item.todo_ids,
+        acceptance_checks: todo?.acceptance_hint ? [todo.acceptance_hint] : item.expected_outputs,
+        expected_artifact: item.expected_outputs[0] ?? item.title,
+        budget_slice: totalWeight > 0 ? (todo?.budget_weight ?? 1) / totalWeight : 1 / Math.max(1, phases.length),
+        checkpoint_after: item.checkpoint_after,
+      }
+    }),
+    current_milestone_id: phases[0]?.milestone_id,
+    active_milestone_limit: input.activeMilestoneLimit ?? 2,
   })
 }

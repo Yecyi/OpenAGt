@@ -1,6 +1,9 @@
 ﻿import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 import { isBroadAgentTask } from "../../src/agent/task-classifier"
+import { taskLeaseFor } from "../../src/coordinator/runtime-state"
+import { buildTaskPrompt } from "../../src/coordinator/task-prompt"
+import type { TaskRuntime } from "../../src/session/task-runtime"
 
 describe("coordinator intent planning", () => {
   test("broad task classifier requires project or depth context for architecture and algorithms", () => {
@@ -146,6 +149,14 @@ describe("coordinator intent planning", () => {
     expect(plan.long_task.is_long_task).toBe(true)
     expect(plan.long_task.task_size).toBe("huge")
     expect(plan.long_task.timeline_required).toBe(true)
+    expect(plan.long_task.execution_model).toBe("epic")
+    expect(plan.long_task.classification).toBe("epic")
+    expect(plan.long_task.confidence).toBe("high")
+    expect(plan.long_task.trigger_score).toBeGreaterThanOrEqual(10)
+    expect(plan.long_task.positive_signals).toEqual(expect.arrayContaining(["broad or deep-dive goal"]))
+    expect(plan.long_task.negative_signals).toEqual([])
+    expect(plan.long_task.active_milestone_limit).toBe(2)
+    expect(plan.long_task.milestone_count).toBeGreaterThanOrEqual(6)
     expect(plan.todo_timeline.required).toBe(true)
     expect(plan.todo_timeline.todos.map((item) => item.id)).toEqual([
       "todo_plan",
@@ -156,6 +167,19 @@ describe("coordinator intent planning", () => {
       "todo_final",
     ])
     expect(plan.todo_timeline.todos.every((item) => item.node_ids.length > 0)).toBe(true)
+    expect(plan.todo_timeline.milestones.map((item) => item.id)).toEqual([
+      "milestone_1_plan",
+      "milestone_2_research",
+      "milestone_3_expert",
+      "milestone_4_reduce",
+      "milestone_5_verify",
+      "milestone_6_final",
+    ])
+    expect(plan.todo_timeline.current_milestone_id).toBe("milestone_1_plan")
+    expect(plan.todo_timeline.milestones.every((item) => item.expected_artifact.length > 0)).toBe(true)
+    expect(Math.round(plan.todo_timeline.milestones.reduce((acc, item) => acc + item.budget_slice, 0) * 100)).toBe(100)
+    expect(plan.todo_timeline.checkpoints).toEqual([])
+    expect(plan.todo_timeline.evidence_ledger).toEqual([])
     expect(plan.nodes.at(-1)?.id).toBe("budget_checkpoint_synthesis")
     expect(plan.nodes.find((item) => item.id === "budget_checkpoint_synthesis")?.depends_on).toEqual(["final_revise"])
     expect(plan.budget_profile.absolute_ceiling.max_rounds).toBeGreaterThanOrEqual(240)
@@ -165,8 +189,29 @@ describe("coordinator intent planning", () => {
     expect(plan.budget_profile.absolute_ceiling.max_wallclock_ms).toBeGreaterThanOrEqual(8 * 60 * 60 * 1000)
     expect(plan.budget_profile.single_checkpoint_ceiling.max_wallclock_ms).toBe(45 * 60 * 1000)
     expect(plan.budget_profile.no_progress_stop.checkpoint_window).toBe(5)
+    expect(plan.checkpoint_memory.current_milestone_id).toBe("milestone_1_plan")
+    expect(plan.checkpoint_memory.milestone_summaries).toHaveLength(plan.todo_timeline.milestones.length)
     expect(plan.checkpoint_memory.todo_state).toHaveLength(plan.todo_timeline.todos.length)
     expect(plan.progress_snapshot.pending).toBe(plan.todo_timeline.todos.length)
+  })
+
+  test("quick scoped tasks do not trigger long-task mode just because effort is high", () => {
+    const plan = defaultPlanForIntent(settleIntentProfile({ goal: "quick fix one typo" }), { effort: "high" })
+
+    expect(plan.long_task.is_long_task).toBe(false)
+    expect(plan.long_task.execution_model).toBe("short-task")
+    expect(plan.long_task.classification).toBe("short")
+    expect(plan.long_task.negative_signals).toEqual(expect.arrayContaining(["quick or minimal task wording"]))
+    expect(plan.nodes.some((item) => item.id === "budget_checkpoint_synthesis")).toBe(false)
+  })
+
+  test("deep effort can increase scrutiny without upgrading a simple task to epic", () => {
+    const plan = defaultPlanForIntent(settleIntentProfile({ goal: "summarize README" }), { effort: "deep" })
+
+    expect(plan.long_task.execution_model).not.toBe("epic")
+    expect(plan.long_task.classification).not.toBe("epic")
+    expect(plan.long_task.positive_signals).toContain("deep effort selected")
+    expect(plan.long_task.negative_signals).toContain("short goal with clear workflow")
   })
 
   test("small medium tasks keep timeline optional but still review final output", () => {
@@ -236,5 +281,107 @@ describe("coordinator intent planning", () => {
       expect(plan.nodes.length).toBeGreaterThan(0)
       expect(plan.nodes.some((item) => item.role !== "reviser")).toBe(true)
     }
+  })
+
+  test("subagent prompt harness exposes role-specific contracts", () => {
+    const plan = defaultPlanForIntent(settleIntentProfile({ goal: "implement mission control backend API" }))
+    const taskFor = (nodeID: string, status: TaskRuntime.TaskRecord["status"] = "pending"): TaskRuntime.TaskRecord => {
+      const node = plan.nodes.find((item) => item.id === nodeID)
+      if (!node) throw new Error(`Missing node ${nodeID}`)
+      return {
+        task_id: `ses_${nodeID}` as TaskRuntime.TaskRecord["task_id"],
+        group_id: "coordinator_test",
+        parent_session_id: "ses_parent" as TaskRuntime.TaskRecord["parent_session_id"],
+        child_session_id: `ses_child_${nodeID}` as TaskRuntime.TaskRecord["child_session_id"],
+        status,
+        task_kind: node.task_kind,
+        subagent_type: node.subagent_type,
+        description: node.description,
+        prompt_hash: "hash",
+        depends_on: [],
+        write_scope: node.write_scope,
+        read_scope: node.read_scope,
+        acceptance_checks: node.acceptance_checks,
+        priority: node.priority,
+        origin: node.origin,
+        metadata: {
+          prompt: node.prompt,
+          role: node.role,
+          output_schema: node.output_schema,
+          assigned_scope: node.assigned_scope,
+          excluded_scope: node.excluded_scope,
+          workflow: plan.workflow,
+          effort: plan.effort,
+          todo_timeline: plan.todo_timeline,
+          long_task: plan.long_task,
+        },
+        created_at: Date.now(),
+      }
+    }
+
+    const researcherPrompt = buildTaskPrompt(taskFor("research_repo_structure"), [])
+    expect(researcherPrompt).toContain("Researcher contract")
+    expect(researcherPrompt).toContain("Assigned scope")
+    expect(researcherPrompt).toContain("Excluded scope")
+    expect(researcherPrompt).toContain("evidence")
+    expect(researcherPrompt).toContain("confidence")
+    expect(researcherPrompt).toContain("unknowns")
+
+    const reducerPrompt = buildTaskPrompt(taskFor("research_synthesis"), [
+      { ...taskFor("research_repo_structure", "completed"), result_summary: "repo evidence" },
+    ])
+    expect(reducerPrompt).toContain("Reducer contract")
+    expect(reducerPrompt).toContain("compact_synthesis")
+    expect(reducerPrompt).toContain("conflicts")
+    expect(reducerPrompt).toContain("recommended_next_nodes")
+
+    const implementerPrompt = buildTaskPrompt(taskFor("implement"), [
+      { ...taskFor("research_synthesis", "completed"), result_summary: "compact synthesis" },
+    ])
+    expect(implementerPrompt).toContain("Implementer contract")
+    expect(implementerPrompt).toContain("changed_scope")
+    expect(implementerPrompt).toContain("rollback_notes")
+    expect(implementerPrompt).toContain("local_verification")
+
+    const verifierPrompt = buildTaskPrompt(taskFor("verify_typecheck"), [])
+    expect(verifierPrompt).toContain("Verifier contract")
+    expect(verifierPrompt).toContain("assigned dimension")
+
+    const reviewerPrompt = buildTaskPrompt(taskFor("review"), [
+      { ...taskFor("verify_typecheck", "completed"), result_summary: "typecheck evidence" },
+    ])
+    expect(reviewerPrompt).toContain("Reviewer contract")
+    expect(reviewerPrompt).toContain("verifier evidence")
+    expect(reviewerPrompt).toContain("checkpoint memory")
+    expect(reviewerPrompt).toContain("required_fixes")
+  })
+
+  test("task lease detects stale running subagents", () => {
+    const lease = taskLeaseFor({
+      task_id: "ses_task" as TaskRuntime.TaskRecord["task_id"],
+      group_id: "coordinator_test",
+      parent_session_id: "ses_parent" as TaskRuntime.TaskRecord["parent_session_id"],
+      child_session_id: "ses_child" as TaskRuntime.TaskRecord["child_session_id"],
+      status: "running",
+      task_kind: "research",
+      subagent_type: "general",
+      description: "stale task",
+      prompt_hash: "hash",
+      depends_on: [],
+      write_scope: [],
+      read_scope: [],
+      acceptance_checks: [],
+      priority: "normal",
+      origin: "coordinator",
+      metadata: {
+        effort_profile: { timeout_multiplier: 0.25 },
+        lease_heartbeat_at: Date.now() - 8 * 60 * 1000,
+      },
+      created_at: Date.now() - 9 * 60 * 1000,
+      started_at: Date.now() - 9 * 60 * 1000,
+    })
+
+    expect(lease.stale).toBe(true)
+    expect(lease.threshold_ms).toBe(450_000)
   })
 })

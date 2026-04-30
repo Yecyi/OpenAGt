@@ -20,6 +20,13 @@ const typecheckPackages = [
 
 const runtimeTests = [
   "test/session/task-runtime-agentic.test.ts",
+  "test/agent/coordinator-intent.test.ts",
+  "test/agent/coordinator-runner.test.ts",
+  "test/agent/coordinator-v121-pipeline.test.ts",
+  "test/agent/expert-additive.test.ts",
+  "test/agent/mpacr-governance.test.ts",
+  "test/agent/mpacr-schema.test.ts",
+  "test/agent/review-verdict.test.ts",
   "test/session/compaction.test.ts",
   "test/agent/coordinator-personal.test.ts",
   "test/server/security-middleware.test.ts",
@@ -43,7 +50,11 @@ async function verifyConfigSchemas() {
     const configFile = path.join(dir, "config.json")
     const tuiFile = path.join(dir, "tui.json")
     await $`bun run script/schema.ts ${configFile} ${tuiFile}`.cwd("packages/openagt")
-    await assertGeneratedFileCurrent("packages/openagt/schema/config.json", "packages/openagt/schema/config.json", configFile)
+    await assertGeneratedFileCurrent(
+      "packages/openagt/schema/config.json",
+      "packages/openagt/schema/config.json",
+      configFile,
+    )
     await assertGeneratedFileCurrent("packages/openagt/schema/tui.json", "packages/openagt/schema/tui.json", tuiFile)
   } finally {
     await rm(dir, { recursive: true, force: true })

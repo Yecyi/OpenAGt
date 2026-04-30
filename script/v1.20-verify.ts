@@ -60,7 +60,13 @@ const focusedTests = [
   "test/util/process.test.ts",
   "test/session/compaction.test.ts",
   "test/agent/coordinator-intent.test.ts",
+  "test/agent/coordinator-runner.test.ts",
+  "test/agent/coordinator-v121-pipeline.test.ts",
   "test/agent/coordinator-personal.test.ts",
+  "test/agent/expert-additive.test.ts",
+  "test/agent/mpacr-governance.test.ts",
+  "test/agent/mpacr-schema.test.ts",
+  "test/agent/review-verdict.test.ts",
   "test/session/task-runtime-agentic.test.ts",
 ]
 

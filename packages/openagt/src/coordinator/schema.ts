@@ -49,7 +49,19 @@ export {
 } from "./schema-budget"
 export { CheckpointMemorySummary, MemoryContext } from "./schema-memory"
 export { CriticalReviewVerdict, QualityGate, RevisePoint } from "./schema-review"
-export { TimelinePhase, TimelineTodo, TodoStage, TodoStatus, TodoTimeline } from "./schema-timeline"
+export {
+  CheckpointType,
+  EvidenceLedgerItem,
+  MilestoneStatus,
+  MissionCheckpoint,
+  MissionMemorySlice,
+  MissionMilestone,
+  TimelinePhase,
+  TimelineTodo,
+  TodoStage,
+  TodoStatus,
+  TodoTimeline,
+} from "./schema-timeline"
 
 const coordinatorRunIdSchema = Schema.String.annotate({ [ZodOverride]: Identifier.schema("coordinator") }).pipe(
   Schema.brand("CoordinatorRunID"),
@@ -110,6 +122,18 @@ export const LongTaskProfile = z.object({
   is_long_task: z.boolean().default(false),
   task_size: TaskSize.default("small"),
   timeline_required: z.boolean().default(false),
+  execution_model: z.enum(["short-task", "long-task", "epic"]).default("short-task"),
+  classification: z.enum(["short", "medium", "long", "epic"]).default("short"),
+  confidence: ConfidenceLevel.default("medium"),
+  trigger_score: z.number().min(0).max(100).default(0),
+  decision_stage: z.enum(["pre-plan", "post-plan", "runtime"]).default("post-plan"),
+  positive_signals: z.array(z.string()).default([]),
+  negative_signals: z.array(z.string()).default([]),
+  needs_user_confirmation: z.boolean().default(false),
+  auto_upgrade_allowed: z.boolean().default(true),
+  auto_downgrade_allowed: z.boolean().default(true),
+  active_milestone_limit: z.number().int().min(1).max(8).default(2),
+  milestone_count: z.number().int().min(0).default(0),
   reasons: z.array(z.string()).default([]),
 })
 export type LongTaskProfile = z.infer<typeof LongTaskProfile>
@@ -227,13 +251,31 @@ export const CoordinatorPlan = z.object({
     is_long_task: false,
     task_size: "small",
     timeline_required: false,
+    execution_model: "short-task",
+    classification: "short",
+    confidence: "medium",
+    trigger_score: 0,
+    decision_stage: "post-plan",
+    positive_signals: [],
+    negative_signals: [],
+    needs_user_confirmation: false,
+    auto_upgrade_allowed: true,
+    auto_downgrade_allowed: true,
+    active_milestone_limit: 2,
+    milestone_count: 0,
     reasons: [],
   }),
-  todo_timeline: TodoTimeline.default({
+  todo_timeline: TodoTimeline.default(() => ({
     required: false,
     todos: [],
     phases: [],
-  }),
+    milestones: [],
+    active_milestone_limit: 2,
+    checkpoints: [],
+    evidence_ledger: [],
+    memory_slices: [],
+    pause_after_current_milestone: false,
+  })),
   budget_profile: BudgetProfile.default(() => BudgetProfile.parse({})),
   budget_state: BudgetState.default(() => BudgetState.parse({})),
   progress_snapshot: ProgressSnapshot.default(() => ProgressSnapshot.parse({})),
