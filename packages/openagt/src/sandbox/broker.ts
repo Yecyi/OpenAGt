@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from "effect"
 import { fileURLToPath } from "url"
+import { spawn } from "child_process"
 import { createFrameParser, encodeFrame } from "./protocol"
 import {
   SANDBOX_PROTOCOL_VERSION,
@@ -39,6 +40,29 @@ export function brokerCommand(argv = process.argv, execPath = process.execPath, 
   if (!/\.(?:[cm]?[jt]s|tsx?|jsx?)$/i.test(script)) return [execPath]
   if (execPath.toLowerCase().includes("bun")) return [execPath, ...execArgv, sourceBroker]
   return [execPath, ...execArgv, script]
+}
+
+async function stopBrokerProcess(proc: ReturnType<typeof Bun.spawn>, reader: ReadableStreamDefaultReader<Uint8Array>) {
+  try {
+    if (proc.stdin && typeof proc.stdin !== "number") proc.stdin.end()
+  } catch {}
+  try {
+    proc.kill()
+  } catch {}
+  if (process.platform === "win32" && proc.pid) {
+    await new Promise<void>((resolve) => {
+      const killer = spawn("taskkill", ["/pid", String(proc.pid), "/f", "/t"], {
+        stdio: "ignore",
+        windowsHide: true,
+      })
+      killer.once("exit", () => resolve())
+      killer.once("error", () => resolve())
+    })
+  }
+  try {
+    await Promise.race([reader.cancel(), new Promise((resolve) => setTimeout(resolve, 1000))])
+  } catch {}
+  await Promise.race([proc.exited.catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 1000))])
 }
 
 export const layer = Layer.effect(
@@ -100,9 +124,9 @@ export const layer = Layer.effect(
         item.reject(new Error(frame.error))
       }
     }, fail)
+    const reader = proc.stdout.getReader()
     ;(async () => {
       try {
-        const reader = proc.stdout.getReader()
         while (true) {
           const next = await reader.read()
           if (next.done) break
@@ -128,10 +152,8 @@ export const layer = Layer.effect(
             } catch {}
           }
         } catch {}
-        try {
-          proc.stdin.end()
-        } catch {}
-        proc.kill()
+        fail(new Error("Sandbox broker stopped"))
+        await stopBrokerProcess(proc, reader)
       }),
     )
 

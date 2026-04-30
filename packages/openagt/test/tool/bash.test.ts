@@ -96,7 +96,9 @@ function createRuntime(configLayer = config) {
 const runtime = createRuntime()
 
 afterAll(async () => {
-  await Promise.all(runtimes.splice(0).map((item) => item.dispose()))
+  for (const item of runtimes.splice(0)) {
+    await item.dispose()
+  }
 })
 
 function initBash(configLayer = config) {
