@@ -652,7 +652,7 @@ describe("MPACR skipped critic runtime contract", () => {
             status: "completed",
           }).pipe(Effect.tap(() => coordinator.dispatch(run.id).pipe(Effect.ignore))),
         )
-        yield* coordinator.dispatch(run.id)
+        yield* coordinator.dispatch(run.id).pipe(Effect.ignore)
 
         const synthesis = yield* waitForNodeStatus({
           tasks,
