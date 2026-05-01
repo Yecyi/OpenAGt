@@ -1,8 +1,8 @@
 # Affordance Tools — Design Doc
 
-**Status**: design (pending product Q&A; not yet implemented)
+**Status**: implemented (Wave 3, 2026-05-02). See "Implementation status" at the end of the doc for what shipped vs what was deferred.
 **Date**: 2026-05-02
-**Phase**: Wave 2 (b) of the LLM-behavior plan
+**Phase**: Wave 2 (b) → Wave 3 of the LLM-behavior plan
 
 ## Purpose
 
@@ -151,7 +151,36 @@ Need answers before implementation starts:
 
 **Q6**. Coordinator awareness of `gave_up`: should MPACR / verifier nodes that call `task_give_up` produce a verdict of `"ask_user"` rather than `"failed"`? Affects how the existing partial-failure quorum logic (`coordinator/mpacr.ts:155`) treats sub-agent give-ups.
 
-## Phase 1 implementation checklist (after design approved)
+## Implementation status (Wave 3, 2026-05-02)
+
+Q&A resolutions used during implementation:
+
+- **Q1**: kept `task_give_up` (clarity > euphemism).
+- **Q2**: blocking flag affects the inbox item's `state` (`blocked` vs `queued`), but does **not** force the harness to halt the turn. The model is informed via the tool output to pause work that depends on the resolution; harness-level turn blocking can be added incrementally if needed.
+- **Q3**: did **not** drop `OPENAGT_ENABLE_QUESTION_TOOL` gate in this commit. `request_context` was *not* added as a separate tool — the existing `question` tool covers the synchronous-ask case for users who have it enabled.
+- **Q4**: effort-profile coupling deferred — the tools are unconditionally available; per-effort-tier permission/visibility tuning is a follow-up.
+- **Q5**: `task_give_up.open_inbox_item` defaults to `true` (paper trail).
+- **Q6**: did **not** add `gave_up` to coordinator task-state enum. `task_give_up` writes an inbox item and returns a structured marker; the coordinator sees normal turn completion. If a distinct task-state value is later useful, it can be added incrementally without breaking the tool contract.
+
+What shipped:
+
+- ✅ `"agent"` added to `InboxSource` enum
+- ✅ `escalate_to_inbox` tool — registered, typed, audited (0 block in default scan)
+- ✅ `task_give_up` tool — registered, typed, audited
+- ✅ Tool mention in `default.txt`, `anthropic.txt`, `beast.txt` system prompts
+- ✅ README key-features entry
+- ✅ Permission default: allow (no special gating; settable via existing `OPENAGT_PERMISSION` config)
+
+What is deferred:
+
+- Effort-profile coupling logic (per-tier visibility / confirmation requirements)
+- Distinct `gave_up` coordinator task state
+- MPACR critic-quorum awareness of give-up
+- Inbox CLI `--reply <text>` flag
+- Snapshot tests asserting verbatim user-text preservation through the tool path
+- System-prompt mention in non-headline prompts (`gpt.txt`, `gemini.txt`, `kimi.txt`, `codex.txt`, `trinity.txt`, `copilot-gpt-5.txt`)
+
+## Phase 1 implementation checklist (historical; reference)
 
 1. Add `"agent"` to `personal/schema.ts:69` `InboxSource` enum + sqlite migration if needed.
 2. Add `"gave_up"` to `coordinator/schema-enums.ts` task state enum + migration.

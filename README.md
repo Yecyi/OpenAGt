@@ -97,6 +97,7 @@ The current stable runtime is centered around these backend capabilities:
 - Coordinator Runtime v1 for dependency-aware task graph execution
 - Personal Agent Core v1 for profile, workspace, and session memory
 - Inbox, wakeup, and scheduler primitives for long-running agent behavior
+- Stop affordances (`escalate_to_inbox`, `task_give_up`) so the agent has structured ways to stop without it being a failure
 - Headless server and generated JavaScript SDK
 - `opencode` compatibility alias for transition safety
 
