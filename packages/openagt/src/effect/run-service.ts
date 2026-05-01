@@ -39,6 +39,8 @@ export function makeRuntime<I, S, E>(service: Context.Service<I, S>, layer: Laye
   let rt: ManagedRuntime.ManagedRuntime<I, E> | undefined
   const getRuntime = () => (rt ??= ManagedRuntime.make(Layer.provideMerge(layer, Observability.layer), { memoMap }))
 
+  // Standalone service runtimes attach the current instance/workspace for legacy
+  // helpers. AppRuntime remains the owner for full application flows.
   return {
     runSync: <A, Err>(fn: (svc: S) => Effect.Effect<A, Err, I>) => getRuntime().runSync(attach(service.use(fn))),
     runPromiseExit: <A, Err>(fn: (svc: S) => Effect.Effect<A, Err, I>, options?: Effect.RunOptions) =>

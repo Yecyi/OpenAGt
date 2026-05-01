@@ -77,6 +77,7 @@ type RuntimeState = {
   plugins: PluginEntry[]
   plugins_by_id: Map<string, PluginEntry>
   pending: Map<string, ConfigPlugin.Origin>
+  activating: Set<string>
 }
 
 const log = Log.create({ service: "tui.plugin" })
@@ -145,6 +146,11 @@ function resolveRoot(root: string) {
   return path.resolve(process.cwd(), root)
 }
 
+function pathInside(root: string, target: string) {
+  const relative = path.relative(root, target)
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
+}
+
 function createThemeInstaller(
   meta: ConfigPlugin.Origin,
   root: string,
@@ -154,6 +160,10 @@ function createThemeInstaller(
   return async (file) => {
     const raw = file.startsWith("file://") ? fileURLToPath(file) : file
     const src = path.isAbsolute(raw) ? raw : path.resolve(root, raw)
+    if (!pathInside(root, src)) {
+      log.warn("blocked tui plugin theme outside plugin root", { path: spec, id: plugin.id, theme: src, root })
+      return
+    }
     const name = path.basename(src, path.extname(src))
     const source_dir = path.dirname(meta.source)
     const local_dir =
@@ -431,17 +441,30 @@ async function deactivatePluginEntry(state: RuntimeState, plugin: PluginEntry, p
 }
 
 async function activatePluginEntry(state: RuntimeState, plugin: PluginEntry, persist: boolean) {
+  if (state.activating.has(plugin.id)) {
+    fail("blocked tui plugin activation cycle", {
+      path: plugin.load.spec,
+      id: plugin.id,
+      stack: [...state.activating],
+    })
+    return false
+  }
   plugin.enabled = true
   if (persist) writePluginEnabledState(state.api, plugin.id, true)
   if (plugin.scope) return true
+  state.activating.add(plugin.id)
 
   const scope = createPluginScope(plugin.load, plugin.id)
   const api = pluginApi(state, plugin, scope, plugin.id)
   const ok = await Promise.resolve()
     .then(async () => {
-      await syncPluginThemes(plugin)
-      await plugin.plugin(api, plugin.load.options, plugin.meta)
-      return true
+      try {
+        await syncPluginThemes(plugin)
+        await plugin.plugin(api, plugin.load.options, plugin.meta)
+        return true
+      } finally {
+        state.activating.delete(plugin.id)
+      }
     })
     .catch((error) => {
       fail("failed to initialize tui plugin", {
@@ -918,53 +941,59 @@ async function installPluginBySpec(
   }
 }
 
-let dir = ""
-let loaded: Promise<void> | undefined
 let runtime: RuntimeState | undefined
+const loadedByCwd = new Map<string, Promise<void>>()
+const runtimesByCwd = new Map<string, RuntimeState>()
 export const Slot = View
+
+function currentRuntime() {
+  return runtimesByCwd.get(process.cwd())
+}
 
 export async function init(input: { api: HostPluginApi; config: TuiConfig.Info }) {
   const cwd = process.cwd()
-  if (loaded) {
-    if (dir !== cwd) {
-      throw new Error(`TuiPluginRuntime.init() called with a different working directory. expected=${dir} got=${cwd}`)
-    }
-    return loaded
-  }
-
-  dir = cwd
-  loaded = load(input)
-  return loaded
+  const existing = loadedByCwd.get(cwd)
+  if (existing) return existing
+  const task = load(input).catch((error) => {
+    loadedByCwd.delete(cwd)
+    runtimesByCwd.delete(cwd)
+    if (runtime?.directory === cwd) runtime = undefined
+    throw error
+  })
+  loadedByCwd.set(cwd, task)
+  return task
 }
 
 export function list() {
-  if (!runtime) return []
-  return listPluginStatus(runtime)
+  const state = currentRuntime()
+  if (!state) return []
+  return listPluginStatus(state)
 }
 
 export async function activatePlugin(id: string) {
-  return activatePluginById(runtime, id, true)
+  return activatePluginById(currentRuntime(), id, true)
 }
 
 export async function deactivatePlugin(id: string) {
-  return deactivatePluginById(runtime, id, true)
+  return deactivatePluginById(currentRuntime(), id, true)
 }
 
 export async function addPlugin(spec: string) {
-  return addPluginBySpec(runtime, spec)
+  return addPluginBySpec(currentRuntime(), spec)
 }
 
 export async function installPlugin(spec: string, options?: { global?: boolean }) {
-  return installPluginBySpec(runtime, spec, options?.global)
+  return installPluginBySpec(currentRuntime(), spec, options?.global)
 }
 
 export async function dispose() {
-  const task = loaded
-  loaded = undefined
-  dir = ""
+  const cwd = process.cwd()
+  const task = loadedByCwd.get(cwd)
+  loadedByCwd.delete(cwd)
   if (task) await task
-  const state = runtime
-  runtime = undefined
+  const state = runtimesByCwd.get(cwd) ?? (runtime?.directory === cwd ? runtime : undefined)
+  runtimesByCwd.delete(cwd)
+  if (runtime?.directory === cwd) runtime = undefined
   if (!state) return
   const queue = [...state.plugins].reverse()
   for (const plugin of queue) {
@@ -983,8 +1012,10 @@ async function load(input: { api: Api; config: TuiConfig.Info }) {
     plugins: [],
     plugins_by_id: new Map(),
     pending: new Map(),
+    activating: new Set(),
   }
   runtime = next
+  runtimesByCwd.set(cwd, next)
   try {
     await Instance.provide({
       directory: cwd,

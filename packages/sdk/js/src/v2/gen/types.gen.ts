@@ -1083,7 +1083,7 @@ export type EventCoordinatorCreated = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -1108,7 +1108,7 @@ export type EventCoordinatorCreated = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -1691,7 +1691,7 @@ export type EventCoordinatorUpdated = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -1716,7 +1716,7 @@ export type EventCoordinatorUpdated = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -2299,7 +2299,7 @@ export type EventCoordinatorCompleted = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -2324,7 +2324,7 @@ export type EventCoordinatorCompleted = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -7630,7 +7630,7 @@ export type CoordinatorPlanGenerateResponses = {
         | "calibration"
       node_id?: string
       artifact_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       required?: boolean
       confidence?: "low" | "medium" | "high"
       issues?: Array<string>
@@ -7655,7 +7655,7 @@ export type CoordinatorPlanGenerateResponses = {
       artifact_id?: string
       required?: boolean
       node_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
     }>
     memory_context?: {
       scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -8356,7 +8356,7 @@ export type CoordinatorPlanResponses = {
         | "calibration"
       node_id?: string
       artifact_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       required?: boolean
       confidence?: "low" | "medium" | "high"
       issues?: Array<string>
@@ -8381,7 +8381,7 @@ export type CoordinatorPlanResponses = {
       artifact_id?: string
       required?: boolean
       node_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
     }>
     memory_context?: {
       scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -9183,7 +9183,7 @@ export type CoordinatorRunResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -9208,7 +9208,7 @@ export type CoordinatorRunResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -9807,7 +9807,7 @@ export type CoordinatorGetResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -9832,7 +9832,7 @@ export type CoordinatorGetResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -10431,7 +10431,7 @@ export type CoordinatorListResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -10456,7 +10456,7 @@ export type CoordinatorListResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -11055,7 +11055,7 @@ export type CoordinatorApproveResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -11080,7 +11080,7 @@ export type CoordinatorApproveResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -11679,7 +11679,7 @@ export type CoordinatorCancelResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -11704,7 +11704,7 @@ export type CoordinatorCancelResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -12315,7 +12315,7 @@ export type CoordinatorRetryResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -12340,7 +12340,7 @@ export type CoordinatorRetryResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -12958,7 +12958,7 @@ export type CoordinatorContinueResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -12983,7 +12983,7 @@ export type CoordinatorContinueResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -13606,7 +13606,7 @@ export type CoordinatorDispatchResponses = {
             | "calibration"
           node_id?: string
           artifact_id?: string
-          status?: "pending" | "running" | "passed" | "failed" | "skipped"
+          status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
           required?: boolean
           confidence?: "low" | "medium" | "high"
           issues?: Array<string>
@@ -13631,7 +13631,7 @@ export type CoordinatorDispatchResponses = {
           artifact_id?: string
           required?: boolean
           node_id?: string
-          status?: "pending" | "running" | "passed" | "failed" | "skipped"
+          status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         }>
         memory_context?: {
           scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -14233,7 +14233,7 @@ export type CoordinatorProjectionResponses = {
             | "calibration"
           node_id?: string
           artifact_id?: string
-          status?: "pending" | "running" | "passed" | "failed" | "skipped"
+          status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
           required?: boolean
           confidence?: "low" | "medium" | "high"
           issues?: Array<string>
@@ -14258,7 +14258,7 @@ export type CoordinatorProjectionResponses = {
           artifact_id?: string
           required?: boolean
           node_id?: string
-          status?: "pending" | "running" | "passed" | "failed" | "skipped"
+          status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         }>
         memory_context?: {
           scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -14632,7 +14632,7 @@ export type CoordinatorProjectionResponses = {
         | "calibration"
       node_id?: string
       artifact_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       required?: boolean
       confidence?: "low" | "medium" | "high"
       issues?: Array<string>
@@ -14657,7 +14657,7 @@ export type CoordinatorProjectionResponses = {
       artifact_id?: string
       required?: boolean
       node_id?: string
-      status?: "pending" | "running" | "passed" | "failed" | "skipped"
+      status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
     }>
     memory_context: {
       scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">
@@ -15265,7 +15265,7 @@ export type CoordinatorResumeResponses = {
           | "calibration"
         node_id?: string
         artifact_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
         required?: boolean
         confidence?: "low" | "medium" | "high"
         issues?: Array<string>
@@ -15290,7 +15290,7 @@ export type CoordinatorResumeResponses = {
         artifact_id?: string
         required?: boolean
         node_id?: string
-        status?: "pending" | "running" | "passed" | "failed" | "skipped"
+        status?: "pending" | "running" | "pending_quorum" | "passed" | "failed" | "skipped"
       }>
       memory_context?: {
         scopes?: Array<"profile" | "workspace" | "session" | "semantic" | "procedural">

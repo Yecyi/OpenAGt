@@ -122,6 +122,9 @@ export const AppLayer = Layer.mergeAll(
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })
 type Runtime = Pick<typeof rt, "runSync" | "runPromise" | "runPromiseExit" | "runFork" | "runCallback" | "dispose">
+// AppRuntime is the top-level attach boundary for CLI/TUI/server flows. Smaller
+// service runtimes may still attach for standalone helpers, but should not add a
+// third context source.
 const wrap = (effect: Parameters<typeof rt.runSync>[0]) => attach(effect as never) as never
 
 export const AppRuntime: Runtime = {

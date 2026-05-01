@@ -9,4 +9,4 @@ await $`bun dev generate`
 
 await $`bun ./packages/sdk/js/script/build.ts`
 
-await $`./script/format.ts`
+await $`bun ./script/format.ts`

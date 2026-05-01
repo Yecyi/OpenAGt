@@ -70,6 +70,7 @@ export interface PartialInput {
   reason: string
   retryable?: boolean
   remainingScope?: string[]
+  metadata?: Record<string, unknown>
 }
 
 export interface FailInput {
@@ -297,6 +298,7 @@ export function createTaskWriteOps(deps: {
       draft.stop_reason = input.reason
       draft.metadata = {
         ...(draft.metadata ?? {}),
+        ...(input.metadata ?? {}),
         partial: true,
         retryable: input.retryable ?? true,
         limit_reason: input.reason,

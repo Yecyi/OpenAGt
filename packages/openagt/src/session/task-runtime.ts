@@ -163,6 +163,7 @@ export interface Interface {
     reason: string
     retryable?: boolean
     remainingScope?: string[]
+    metadata?: Record<string, unknown>
   }) => Effect.Effect<TaskRecord, Error>
   readonly fail: (input: {
     taskID: SessionID

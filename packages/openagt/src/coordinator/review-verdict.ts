@@ -10,6 +10,10 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((item) => value.includes(item))
 }
 
+function hasNegatedPass(value: string) {
+  return /\b(does\s+not|did\s+not|do\s+not|not|cannot|can't|failed\s+to|fails\s+to)\s+pass\b/.test(value)
+}
+
 function fencedJsonCandidates(text: string) {
   return Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)).flatMap((match) => {
     const candidate = match[1]?.trim()
@@ -77,7 +81,10 @@ export function reviewVerdictFromText(text: string | undefined): CriticalReviewV
     }
   }
   const normalized = text.toLowerCase()
-  if (hasAny(normalized, ['"verdict":"pass"', "verdict: pass", "verdict pass", '"pass":true', "pass: true"])) {
+  if (
+    !hasNegatedPass(normalized) &&
+    hasAny(normalized, ['"verdict":"pass"', "verdict: pass", "verdict pass", '"pass":true', "pass: true"])
+  ) {
     return CriticalReviewVerdict.parse({
       verdict: "pass",
       confidence: hasAny(normalized, ["confidence: high", '"confidence":"high"']) ? "high" : "medium",

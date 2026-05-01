@@ -8,7 +8,7 @@ import PROMPT_BEAST from "./prompt/beast.txt"
 import PROMPT_GEMINI from "./prompt/gemini.txt"
 import PROMPT_GPT from "./prompt/gpt.txt"
 import PROMPT_KIMI from "./prompt/kimi.txt"
-
+import PROMPT_COPILOT from "./prompt/copilot-gpt-5.txt"
 import PROMPT_CODEX from "./prompt/codex.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
 import type { Provider } from "@/provider"
@@ -154,20 +154,47 @@ function getSkillsMemoKey(agent: Agent.Info): string {
   return `${agent.name}:${permissionHash}`
 }
 
-export function provider(model: Provider.Model) {
-  if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
-    return [PROMPT_BEAST]
-  if (model.api.id.includes("gpt")) {
-    if (model.api.id.includes("codex")) {
-      return [PROMPT_CODEX]
-    }
-    return [PROMPT_GPT]
-  }
-  if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
-  if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
-  if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
-  if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI]
-  return [PROMPT_DEFAULT]
+// Model-id prompt routing.
+//
+// First match wins. Patterns run against the model id lowercased. The order
+// below is significant: more specific patterns (e.g. `codex`, `copilot`) must
+// precede general family matches (e.g. `gpt`).
+//
+// To add a new variant: import its prompt above, add a row here. To re-route an
+// existing model family: edit the pattern. There is no hidden fallback logic;
+// what you see is what runs.
+export interface PromptRoute {
+  readonly name: string
+  readonly pattern: RegExp
+  readonly prompt: string
+}
+
+export const PROMPT_ROUTES: readonly PromptRoute[] = [
+  // Codex variants of the GPT family use a single-tool-per-message workflow.
+  { name: "codex", pattern: /codex/, prompt: PROMPT_CODEX },
+  // Copilot's GPT-5 surface ships its own tool spec and output formatting rules.
+  { name: "copilot", pattern: /copilot/, prompt: PROMPT_COPILOT },
+  // Reasoning-grade GPT/O-series models earn the autonomous "beast" persona.
+  // Matches o1/o3/o4 and gpt-4/5/6 without enumerating individual versions.
+  // Pattern is unanchored to mirror the original includes()-based routing
+  // (e.g. provider-prefixed ids like "openai/gpt-4-turbo" still resolve).
+  { name: "beast", pattern: /o[1-9]\d*|gpt-[4-9]|gpt-[1-9]\d+/, prompt: PROMPT_BEAST },
+  // Other GPT family members (e.g. gpt-3.5) get the standard GPT prompt.
+  { name: "gpt", pattern: /gpt/, prompt: PROMPT_GPT },
+  { name: "gemini", pattern: /gemini-/, prompt: PROMPT_GEMINI },
+  { name: "anthropic", pattern: /claude/, prompt: PROMPT_ANTHROPIC },
+  { name: "trinity", pattern: /trinity/, prompt: PROMPT_TRINITY },
+  { name: "kimi", pattern: /kimi/, prompt: PROMPT_KIMI },
+]
+
+export function resolvePromptRoute(modelId: string): PromptRoute | undefined {
+  const id = modelId.toLowerCase()
+  return PROMPT_ROUTES.find((route) => route.pattern.test(id))
+}
+
+export function provider(model: Provider.Model): string[] {
+  const route = resolvePromptRoute(model.api.id)
+  return [route?.prompt ?? PROMPT_DEFAULT]
 }
 
 export interface EnvironmentResult {

@@ -23,7 +23,7 @@ export const QualityGate = z.object({
   kind: ReviseKind,
   node_id: z.string().optional(),
   artifact_id: z.string().optional(),
-  status: z.enum(["pending", "running", "passed", "failed", "skipped"]).default("pending"),
+  status: z.enum(["pending", "running", "pending_quorum", "passed", "failed", "skipped"]).default("pending"),
   required: z.boolean().default(true),
   confidence: ConfidenceLevel.optional(),
   issues: z.array(z.string()).default([]),
@@ -37,6 +37,6 @@ export const RevisePoint = z.object({
   artifact_id: z.string().optional(),
   required: z.boolean().default(true),
   node_id: z.string().optional(),
-  status: z.enum(["pending", "running", "passed", "failed", "skipped"]).default("pending"),
+  status: z.enum(["pending", "running", "pending_quorum", "passed", "failed", "skipped"]).default("pending"),
 })
 export type RevisePoint = z.infer<typeof RevisePoint>

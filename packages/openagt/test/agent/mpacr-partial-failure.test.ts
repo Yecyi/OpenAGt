@@ -650,21 +650,26 @@ describe("MPACR skipped critic runtime contract", () => {
             parentSessionID: parent.id,
             nodeID,
             status: "completed",
-          }).pipe(Effect.tap(() => coordinator.dispatch(run.id).pipe(Effect.ignore))),
+          }),
         )
-        yield* coordinator.dispatch(run.id).pipe(Effect.ignore)
 
         const synthesis = yield* waitForNodeStatus({
           tasks,
           parentSessionID: parent.id,
           nodeID: "synthesis",
-          status: "failed",
+          status: "partial",
         })
 
-        expect(synthesis.metadata?.mpacr_quorum_escalated).toBe(true)
+        expect(synthesis.metadata?.mpacr_quorum_pending).toBe(true)
         expect(synthesis.metadata?.mpacr_quorum_required).toBe(2)
         expect(synthesis.metadata?.mpacr_quorum_substantive_count).toBe(0)
         expect(synthesis.metadata?.review_text).toContain('"verdict":"ask_user"')
+        expect(synthesis.metadata?.retryable).toBe(true)
+        expect(
+          (yield* coordinator.projection(run.id)).tasks.find(
+            (item) => item.metadata?.coordinator_node_id === "synthesis",
+          )?.metadata?.mpacr_quorum_pending,
+        ).toBe(true)
         expect(quorumPromptCalls.some((text) => text.startsWith("Synthesize the debate."))).toBe(false)
       }),
     ),

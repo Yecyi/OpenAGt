@@ -6628,7 +6628,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           },
                           "required": {
                             "default": true,
@@ -6692,7 +6692,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           }
                         },
                         "required": ["id", "kind"]
@@ -9041,7 +9041,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           },
                           "required": {
                             "default": true,
@@ -9105,7 +9105,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           }
                         },
                         "required": ["id", "kind"]
@@ -11711,7 +11711,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -11775,7 +11775,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -14423,7 +14423,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   },
                                   "required": {
                                     "default": true,
@@ -14487,7 +14487,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   }
                                 },
                                 "required": ["id", "kind"]
@@ -16644,7 +16644,7 @@
                                 "status": {
                                   "default": "pending",
                                   "type": "string",
-                                  "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                  "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                 },
                                 "required": {
                                   "default": true,
@@ -16708,7 +16708,7 @@
                                 "status": {
                                   "default": "pending",
                                   "type": "string",
-                                  "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                  "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                 }
                               },
                               "required": ["id", "kind"]
@@ -18859,7 +18859,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -18923,7 +18923,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -21073,7 +21073,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -21137,7 +21137,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -23287,7 +23287,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -23351,7 +23351,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -25529,7 +25529,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -25593,7 +25593,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -27860,7 +27860,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   },
                                   "required": {
                                     "default": true,
@@ -27924,7 +27924,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   }
                                 },
                                 "required": ["id", "kind"]
@@ -30085,7 +30085,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   },
                                   "required": {
                                     "default": true,
@@ -30149,7 +30149,7 @@
                                   "status": {
                                     "default": "pending",
                                     "type": "string",
-                                    "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                    "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                                   }
                                 },
                                 "required": ["id", "kind"]
@@ -31778,7 +31778,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           },
                           "required": {
                             "default": true,
@@ -31841,7 +31841,7 @@
                           "status": {
                             "default": "pending",
                             "type": "string",
-                            "enum": ["pending", "running", "passed", "failed", "skipped"]
+                            "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                           }
                         },
                         "required": ["id", "kind"]
@@ -33936,7 +33936,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               },
                               "required": {
                                 "default": true,
@@ -34000,7 +34000,7 @@
                               "status": {
                                 "default": "pending",
                                 "type": "string",
-                                "enum": ["pending", "running", "passed", "failed", "skipped"]
+                                "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                               }
                             },
                             "required": ["id", "kind"]
@@ -42386,7 +42386,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         },
                         "required": {
                           "default": true,
@@ -42450,7 +42450,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         }
                       },
                       "required": ["id", "kind"]
@@ -44565,7 +44565,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         },
                         "required": {
                           "default": true,
@@ -44629,7 +44629,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         }
                       },
                       "required": ["id", "kind"]
@@ -46744,7 +46744,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         },
                         "required": {
                           "default": true,
@@ -46808,7 +46808,7 @@
                         "status": {
                           "default": "pending",
                           "type": "string",
-                          "enum": ["pending", "running", "passed", "failed", "skipped"]
+                          "enum": ["pending", "running", "pending_quorum", "passed", "failed", "skipped"]
                         }
                       },
                       "required": ["id", "kind"]

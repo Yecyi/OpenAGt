@@ -1,8 +1,9 @@
 ﻿import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 import { isBroadAgentTask } from "../../src/agent/task-classifier"
-import { taskLeaseFor } from "../../src/coordinator/runtime-state"
+import { runtimeStateFor, taskLeaseFor } from "../../src/coordinator/runtime-state"
 import { buildTaskPrompt } from "../../src/coordinator/task-prompt"
+import type { CoordinatorRun } from "../../src/coordinator/schema"
 import type { TaskRuntime } from "../../src/session/task-runtime"
 
 describe("coordinator intent planning", () => {
@@ -383,5 +384,55 @@ describe("coordinator intent planning", () => {
 
     expect(lease.stale).toBe(true)
     expect(lease.threshold_ms).toBe(450_000)
+  })
+
+  test("runtime state caps long-task evidence and checkpoint lists", () => {
+    const intent = settleIntentProfile({ goal: "analyze the project and produce a complete hardening plan" })
+    const plan = defaultPlanForIntent(intent, { effort: "deep" })
+    const nodeID = plan.nodes[0]?.id ?? "planner"
+    const startedAt = Date.now()
+    const tasks = Array.from({ length: 120 }, (_, index): TaskRuntime.TaskRecord => ({
+      task_id: `ses_task_${index}` as TaskRuntime.TaskRecord["task_id"],
+      group_id: "coordinator_test",
+      parent_session_id: "ses_parent" as TaskRuntime.TaskRecord["parent_session_id"],
+      child_session_id: `ses_child_${index}` as TaskRuntime.TaskRecord["child_session_id"],
+      status: "completed",
+      task_kind: "research",
+      subagent_type: "general",
+      description: `task ${index}`,
+      prompt_hash: "hash",
+      depends_on: [],
+      write_scope: [],
+      read_scope: ["packages/openagt"],
+      acceptance_checks: [],
+      priority: "normal",
+      origin: "coordinator",
+      metadata: { coordinator_node_id: nodeID },
+      created_at: index,
+      started_at: index,
+      finished_at: index,
+      result_summary: `result ${index}`,
+    }))
+    const runtime = runtimeStateFor(
+      {
+        id: "coordinator_test" as CoordinatorRun["id"],
+        sessionID: "ses_parent",
+        goal: "analyze the project and produce a complete hardening plan",
+        intent,
+        mode: "autonomous",
+        workflow: intent.workflow,
+        effort: "deep",
+        effort_profile: plan.effort_profile,
+        state: "active",
+        plan,
+        task_ids: tasks.map((item) => item.task_id),
+        time: { created: startedAt, updated: startedAt + 120 },
+      },
+      tasks,
+    )
+
+    expect(runtime.todo_timeline.evidence_ledger).toHaveLength(50)
+    expect(runtime.todo_timeline.checkpoints).toHaveLength(100)
+    expect(runtime.todo_timeline.evidence_ledger.at(-1)?.summary).toBe("result 119")
   })
 })

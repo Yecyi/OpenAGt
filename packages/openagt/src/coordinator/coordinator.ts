@@ -304,6 +304,33 @@ export const layer = Layer.effect(
       return updated
     })
 
+    const blockRunForDispatchFailure = Effect.fn("Coordinator.blockRunForDispatchFailure")(function* (
+      id: CoordinatorRunIDType,
+      reason: string,
+    ) {
+      const runOpt = yield* get(id)
+      if (Option.isNone(runOpt) || runOpt.value.state !== "active") return
+      const taskList = yield* relevantTasks(runOpt.value)
+      const runtime = runtimeStateFor(runOpt.value, taskList)
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              state: "blocked",
+              summary: `Coordinator dispatch failed after task update: ${reason.slice(0, 240)}`,
+              plan: planWithRuntimeState(runOpt.value.plan, runtime),
+              time_updated: now(),
+              time_finished: null,
+            })
+            .where(eq(CoordinatorRunTable.id, id))
+            .run(),
+        ),
+      )
+      const updated = yield* runStore.readAfterUpdate(id)
+      yield* publish(Event.Updated, updated)
+    })
+
     const taskExecutor = new CoordinatorTaskExecutor({
       tasks,
       getPrompt: () => Effect.serviceOption(SessionPrompt.Service),
@@ -330,7 +357,7 @@ export const layer = Layer.effect(
       dispatchLoop.dispatchReady(id),
     )
 
-    const subscriptionManager = new CoordinatorSubscriptionManager(bus, dispatchReady)
+    const subscriptionManager = new CoordinatorSubscriptionManager(bus, dispatchReady, blockRunForDispatchFailure)
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
         subscriptionManager.clear()

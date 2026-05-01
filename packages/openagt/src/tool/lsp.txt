@@ -1,19 +1,19 @@
-Interact with Language Server Protocol (LSP) servers to get code intelligence features.
+Interact with Language Server Protocol (LSP) servers to access code-intelligence features.
 
 Supported operations:
-- goToDefinition: Find where a symbol is defined
-- findReferences: Find all references to a symbol
-- hover: Get hover information (documentation, type info) for a symbol
-- documentSymbol: Get all symbols (functions, classes, variables) in a document
-- workspaceSymbol: Search for symbols across the entire workspace
-- goToImplementation: Find implementations of an interface or abstract method
-- prepareCallHierarchy: Get call hierarchy item at a position (functions/methods)
-- incomingCalls: Find all functions/methods that call the function at a position
-- outgoingCalls: Find all functions/methods called by the function at a position
+- `goToDefinition` — find where a symbol is defined.
+- `findReferences` — find all references to a symbol.
+- `hover` — get hover information (documentation, type info) for a symbol.
+- `documentSymbol` — list all symbols (functions, classes, variables) in a document.
+- `workspaceSymbol` — search for symbols across the entire workspace.
+- `goToImplementation` — find implementations of an interface or abstract method.
+- `prepareCallHierarchy` — get the call hierarchy item at a position (functions/methods).
+- `incomingCalls` — find all functions/methods that call the function at a position.
+- `outgoingCalls` — find all functions/methods called by the function at a position.
 
 All operations require:
-- filePath: The file to operate on
-- line: The line number (1-based, as shown in editors)
-- character: The character offset (1-based, as shown in editors)
+- `filePath` — the file to operate on.
+- `line` — line number (1-based, as shown in editors).
+- `character` — character offset (1-based, as shown in editors).
 
-Note: LSP servers must be configured for the file type. If no server is available, an error will be returned.
+Note: an LSP server must be configured for the file's language. If no server is available, an error is returned.

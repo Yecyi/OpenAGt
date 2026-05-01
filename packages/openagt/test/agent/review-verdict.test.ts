@@ -50,4 +50,10 @@ describe("reviewVerdictFromText", () => {
     expect(verdict?.verdict).toBe("retry")
     expect(verdict?.required_changes).toContain("Reviewer requested retry")
   })
+
+  test("does not treat negated pass wording as an approval", () => {
+    const verdict = reviewVerdictFromText("This change does not pass the review; required changes remain.")
+
+    expect(verdict?.verdict).toBe("revise")
+  })
 })

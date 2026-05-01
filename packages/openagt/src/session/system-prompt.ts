@@ -8,6 +8,7 @@
 
 import fs from "fs"
 import path from "path"
+import { Log } from "@/util"
 import {
   DYNAMIC_BOUNDARY_MARKER,
   type DynamicContext,
@@ -22,6 +23,8 @@ import {
   isStaticSegment,
   parsePromptSegments,
 } from "./system-prompt-parser"
+
+const log = Log.create({ service: "system-prompt-loader" })
 
 export * from "./system-prompt-contracts"
 export { clearExpiredCache, getCacheStats, invalidateCache } from "./system-prompt-cache"
@@ -57,15 +60,24 @@ const PROMPT_FILES: Record<string, string> = {
 // Prompt Loading
 // ============================================================
 
+// A missing prompt file used to silently resolve to an empty string, which
+// meant a typo in PROMPT_FILES would ship an empty system prompt without any
+// signal in the logs. We now log loudly and rethrow so misconfigurations
+// surface immediately. Callers that genuinely need optional fallback behavior
+// should catch the error explicitly and decide what to do.
+function reportMissing(filepath: string, error: NodeJS.ErrnoException): never {
+  log.error("prompt file not found", { filepath, code: error.code })
+  throw error
+}
+
 export async function loadPromptFile(filename: string): Promise<string> {
   const filepath = path.join(PROMPT_DIR, filename)
   try {
     return await fs.promises.readFile(filepath, "utf-8")
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return ""
-    }
-    throw error
+    const err = error as NodeJS.ErrnoException
+    if (err.code === "ENOENT") return reportMissing(filepath, err)
+    throw err
   }
 }
 
@@ -74,10 +86,9 @@ export function loadPromptFileSync(filename: string): string {
   try {
     return fs.readFileSync(filepath, "utf-8")
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return ""
-    }
-    throw error
+    const err = error as NodeJS.ErrnoException
+    if (err.code === "ENOENT") return reportMissing(filepath, err)
+    throw err
   }
 }
 

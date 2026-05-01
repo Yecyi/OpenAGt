@@ -24,8 +24,16 @@ function now() {
   return Date.now()
 }
 
+const checkpointLimit = 100
+const evidenceLimit = 50
+const memorySliceLimit = 50
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function latestByCreated<T extends { created_at: number }>(items: T[], limit: number) {
+  return items.toSorted((a, b) => a.created_at - b.created_at).slice(-limit)
 }
 
 export function taskLeaseFor(task: TaskRuntime.TaskRecord) {
@@ -163,39 +171,47 @@ function runtimeTodoTimeline(
     todos,
     milestones,
     current_milestone_id: current?.id,
-    checkpoints: [...taskCheckpoints, ...milestoneCheckpoints],
-    evidence_ledger: taskList
-      .filter((item) => item.status === "completed" || item.status === "partial")
-      .map((item) => {
-        const nodeID = nodeIDForTask(item)
-        return {
-          id: `evidence_${item.task_id}`,
-          source_type: "task" as const,
-          source_id: item.task_id,
-          milestone_id: nodeID ? milestoneByNode.get(nodeID) : undefined,
-          node_id: nodeID,
-          summary: taskSummary(item),
-          confidence: item.status === "completed" ? ("high" as const) : ("medium" as const),
-          scope: [...new Set([...item.read_scope, ...item.write_scope])],
-          created_at: item.finished_at ?? item.started_at ?? item.created_at,
-        }
-      }),
-    memory_slices: milestones
-      .filter((item) => item.status === "completed" || item.status === "partial" || item.status === "blocked")
-      .map((item) => ({
-        id: `memory_slice_${item.id}`,
-        milestone_id: item.id,
-        completed: todos
-          .filter((todo) => item.todo_ids.includes(todo.id) && todo.status === "done")
-          .map((todo) => todo.title),
-        important_context: item.acceptance_checks,
-        unresolved_risks: todos
-          .filter((todo) => item.todo_ids.includes(todo.id) && (todo.status === "blocked" || todo.status === "partial"))
-          .map((todo) => todo.title),
-        next_context: `${item.title}: ${item.status}. Carry forward expected artifact "${item.expected_artifact}".`,
-        discard_context: ["raw subagent transcript unless needed for evidence audit"],
-        created_at: now(),
-      })),
+    checkpoints: latestByCreated([...taskCheckpoints, ...milestoneCheckpoints], checkpointLimit),
+    evidence_ledger: latestByCreated(
+      taskList
+        .filter((item) => item.status === "completed" || item.status === "partial")
+        .map((item) => {
+          const nodeID = nodeIDForTask(item)
+          return {
+            id: `evidence_${item.task_id}`,
+            source_type: "task" as const,
+            source_id: item.task_id,
+            milestone_id: nodeID ? milestoneByNode.get(nodeID) : undefined,
+            node_id: nodeID,
+            summary: taskSummary(item),
+            confidence: item.status === "completed" ? ("high" as const) : ("medium" as const),
+            scope: [...new Set([...item.read_scope, ...item.write_scope])],
+            created_at: item.finished_at ?? item.started_at ?? item.created_at,
+          }
+        }),
+      evidenceLimit,
+    ),
+    memory_slices: latestByCreated(
+      milestones
+        .filter((item) => item.status === "completed" || item.status === "partial" || item.status === "blocked")
+        .map((item) => ({
+          id: `memory_slice_${item.id}`,
+          milestone_id: item.id,
+          completed: todos
+            .filter((todo) => item.todo_ids.includes(todo.id) && todo.status === "done")
+            .map((todo) => todo.title),
+          important_context: item.acceptance_checks,
+          unresolved_risks: todos
+            .filter(
+              (todo) => item.todo_ids.includes(todo.id) && (todo.status === "blocked" || todo.status === "partial"),
+            )
+            .map((todo) => todo.title),
+          next_context: `${item.title}: ${item.status}. Carry forward expected artifact "${item.expected_artifact}".`,
+          discard_context: ["raw subagent transcript unless needed for evidence audit"],
+          created_at: now(),
+        })),
+      memorySliceLimit,
+    ),
   })
 }
 
@@ -425,6 +441,7 @@ function taskByNodeFor(taskList: TaskRuntime.TaskRecord[]) {
 function gateStatusFor(taskByNode: Map<string, TaskRuntime.TaskRecord>, nodeID?: string) {
   const task = nodeID ? taskByNode.get(nodeID) : undefined
   if (!task) return "pending" as const
+  if (task.metadata?.mpacr_quorum_pending === true) return "pending_quorum" as const
   if (task.status === "completed")
     return reviewFailureMessage(reviewVerdictForTask(task)) ? ("failed" as const) : ("passed" as const)
   if (task.status === "partial") return task.metadata?.retryable === true ? ("pending" as const) : ("failed" as const)
@@ -454,20 +471,23 @@ export function runtimeStateFor(run: CoordinatorRunType, taskList: TaskRuntime.T
     ...base_todo_timeline,
     checkpoints:
       budget_state.budget_limited || budget_state.ceiling_hit
-        ? [
-            ...base_todo_timeline.checkpoints,
-            {
-              id: `budget_checkpoint_${run.time.updated}`,
-              type: "budget_checkpoint" as const,
-              milestone_id: base_todo_timeline.current_milestone_id,
-              status: budget_state.ceiling_hit ? "ceiling_hit" : "budget_limited",
-              summary: budget_state.ceiling_hit
-                ? "Absolute budget ceiling reached before all milestones completed."
-                : "Mission budget checkpoint reached with unfinished milestone work.",
-              next_recommended_action: "Review continuation request before adding budget or resuming.",
-              created_at: now(),
-            },
-          ]
+        ? latestByCreated(
+            [
+              ...base_todo_timeline.checkpoints,
+              {
+                id: `budget_checkpoint_${run.time.updated}`,
+                type: "budget_checkpoint" as const,
+                milestone_id: base_todo_timeline.current_milestone_id,
+                status: budget_state.ceiling_hit ? "ceiling_hit" : "budget_limited",
+                summary: budget_state.ceiling_hit
+                  ? "Absolute budget ceiling reached before all milestones completed."
+                  : "Mission budget checkpoint reached with unfinished milestone work.",
+                next_recommended_action: "Review continuation request before adding budget or resuming.",
+                created_at: now(),
+              },
+            ],
+            checkpointLimit,
+          )
         : base_todo_timeline.checkpoints,
   })
   const checkpoint_memory = checkpointMemoryFor({

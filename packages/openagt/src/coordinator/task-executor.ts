@@ -71,19 +71,22 @@ export class CoordinatorTaskExecutor {
       )
       const quorumEscalation = mpacrQuorumEscalation(started, dependencies)
       if (quorumEscalation) {
-        const failed = yield* input.tasks.fail({
+        const partial = yield* input.tasks.partial({
           taskID: started.task_id,
           parentSessionID: started.parent_session_id,
-          error: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
+          output: JSON.stringify(quorumEscalation.verdict),
+          reason: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
+          retryable: true,
+          remainingScope: quorumEscalation.missing,
           metadata: mpacrVerdictMetadata(quorumEscalation.verdict, {
-            mpacr_quorum_escalated: true,
+            mpacr_quorum_pending: true,
             mpacr_quorum_required: quorumEscalation.quorum,
             mpacr_quorum_substantive_count: quorumEscalation.substantive,
             mpacr_missing_critic_node_ids: quorumEscalation.missing,
           }),
         })
-        yield* input.recordCalibrationOutcome(failed, quorumEscalation.verdict)
-        yield* input.recordPromptOutcome(failed, false)
+        yield* input.recordCalibrationOutcome(partial, quorumEscalation.verdict)
+        yield* input.recordPromptOutcome(partial, false)
         yield* continueGroup()
         return
       }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { CriticalReviewVerdict, EffortProfile, ReviseKind } from "../../src/coordinator/schema"
+import { CriticalReviewVerdict, EffortProfile, QualityGate, ReviseKind } from "../../src/coordinator/schema"
 
 describe("CriticalReviewVerdict — MPACR fields", () => {
   test("legacy verdict shape still parses (no MPACR fields)", () => {
@@ -59,6 +59,14 @@ describe("CriticalReviewVerdict — MPACR fields", () => {
   test("verdict accepts the new 'skipped' state for partial-failure handling", () => {
     const parsed = CriticalReviewVerdict.parse({ verdict: "skipped" })
     expect(parsed.verdict).toBe("skipped")
+  })
+})
+
+describe("QualityGate — MPACR pending quorum", () => {
+  test("accepts pending_quorum as a first-class gate status", () => {
+    expect(QualityGate.parse({ id: "gate", kind: "synthesis", status: "pending_quorum" }).status).toBe(
+      "pending_quorum",
+    )
   })
 })
 
