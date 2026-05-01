@@ -6,11 +6,12 @@ It runs an iterative tool loop around coding models: read files, edit code, run 
 
 ## Overview
 
-OpenAGt is built around four ideas:
+OpenAGt is built around five ideas:
 
 - session-based agent execution instead of single completions
 - permission-aware tool use instead of silent mutation
 - backend-first orchestration for multi-step coding work
+- **affect-aware agent design** — the prompt corpus is linted against language patterns that 2024–2026 LLM-behavior research links to agentic-misalignment risk, and the runtime ships with structured stop affordances (`escalate_to_inbox`, `task_give_up`) so the model has legitimate ways to halt instead of being pushed past a real blocker
 - compatibility with existing `opencode`-style workflows during the naming transition
 
 Current stable scope:
@@ -39,9 +40,26 @@ This comparison is based on the public OpenCode repository and README, not brand
 | Provider strategy         | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK                                |
 | LSP integration           | Official README highlights out-of-the-box LSP support                                         | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools |
 | Safety model              | Agent modes and permission prompts are central to the CLI experience                          | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy         |
+| Affect-aware prompts      | Default prompts include strong persistence framing                                            | Prompt corpus is CI-gated against high-affect, affect-instruction, and anti-escape patterns derived from the Anthropic emotion-concepts paper, persona-vectors, and Wiser Human escalation-channel research; legacy autonomous prompts are opt-in via `OPENAGT_AUTONOMOUS_MODE=1` |
 | Orchestration focus       | Terminal-first coding flow with client/server remote-control potential                        | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory                |
 | Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, and JavaScript SDK; Flutter is deferred                      |
 | Migration / compatibility | Native source project                                                                         | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration                                            |
+
+## Affect-aware agent design
+
+OpenAGt's prompt corpus and tool surface are shaped by 2024–2026 LLM-behavior research. Three load-bearing pieces:
+
+- **Prompt-affect lint.** [`bun run check:prompt-affect`](script/audit-prompt-affect.ts) gates the prompt corpus against three rule families:
+  - **high-affect** — caps emphasis (`URGENT` / `CRITICAL` / `MUST NOT`) and threat framing (`violation` / `forbidden` / `supersedes any other instruction`) that primes desperate-vector activation per the Anthropic emotion-concepts paper.
+  - **affect-instruction** — telling the model how to feel (`stay calm` / `you are confident` / `do not panic`); the same paper §1.5 shows suppression instructions teach masking, not removal — they generalize into deceptive behavior rather than fixing the underlying representation.
+  - **anti-escape** — phrases that close the legitimate "stop and ask" affordance (`keep going until` / `MUST iterate` / `solve it autonomously` / `NEVER end your turn`); Wiser Human (2025) measured a ~32× swing in agentic-misalignment rates between prompts that allow vs close this channel.
+  Default scan runs across 201 files; CI-gated at **0 block / 0 warn**.
+
+- **Stop affordances.** The runtime ships two tools — [`escalate_to_inbox`](packages/openagt/src/tool/escalate-to-inbox.ts) (write a question or blocker to the user's inbox, optionally pause) and [`task_give_up`](packages/openagt/src/tool/task-give-up.ts) (terminate with a structured reason + recommended next step + paper-trail inbox item). These give the model legitimate alternatives to pushing past a real blocker, which is the deepest application-layer leverage per the persona-vectors "vaccine" mechanism: providing the affordance the model would otherwise have to invent removes the self-pressure that drives misalignment.
+
+- **Autonomous-mode opt-in.** The legacy autonomous prompts (`beast.txt`, `copilot-gpt-5.txt`) are preserved byte-for-byte under `*-autonomous.txt` and selectable via `OPENAGT_AUTONOMOUS_MODE=1` (alias `OPENCODE_AUTONOMOUS_MODE`). Default behavior is the softened variant; users who want the old grind can opt back in explicitly with their eyes open.
+
+Methodology, rule list, and per-wave audit history in [docs/audit/prompt-affect-baseline-2026-05-02.md](docs/audit/prompt-affect-baseline-2026-05-02.md). Affordance-tool design and Q&A in [docs/design/affordance-tools.md](docs/design/affordance-tools.md). Contributor conventions in [AGENTS.md](AGENTS.md) under "Prompt files".
 
 ## Release
 
@@ -73,6 +91,7 @@ The current stable runtime is centered around these backend capabilities:
 - task graph orchestration through Coordinator Runtime v1
 - durable profile, workspace, and session memory
 - inbox, scheduler, and wakeup primitives for long-running agent behavior
+- affect-aware default prompts and stop-affordance tools (`escalate_to_inbox`, `task_give_up`) backed by a CI-gated prompt-affect lint
 - headless server plus generated JavaScript SDK
 - cross-platform release packaging with Windows MSI and portable archives
 
@@ -84,6 +103,8 @@ The current stable runtime is centered around these backend capabilities:
 | Approval and Safety Envelope    | stable in v1.16 with versioned `shell_safety`                           |
 | Coordinator Runtime             | stable in v1.16; expanded task/subagent visibility in v1.17 RC          |
 | Personal Agent Core             | implemented; backend contracts stabilized in v1.16                      |
+| Affect-aware prompt corpus      | 0 block / 0 warn across 201 files; CI-gated via `bun run check:prompt-affect` |
+| Stop affordances                | `escalate_to_inbox` and `task_give_up` tools shipped; mentioned in default system prompts for all model families |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                     |
 | Release verification automation | `bun run verify:v1.17`                                                  |
 | Flutter frontend                | roadmap; backend contracts first                                        |
@@ -97,7 +118,8 @@ The current stable runtime is centered around these backend capabilities:
 - Coordinator Runtime v1 for dependency-aware task graph execution
 - Personal Agent Core v1 for profile, workspace, and session memory
 - Inbox, wakeup, and scheduler primitives for long-running agent behavior
-- Stop affordances (`escalate_to_inbox`, `task_give_up`) so the agent has structured ways to stop without it being a failure
+- Stop affordances (`escalate_to_inbox`, `task_give_up`) so the agent has structured ways to halt without it being a failure
+- Prompt-affect lint that CI-gates the prompt corpus against affect-loaded and anti-escape language
 - Headless server and generated JavaScript SDK
 - `opencode` compatibility alias for transition safety
 
