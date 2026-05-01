@@ -1,19 +1,11 @@
-CRITICAL — STEP BUDGET REACHED
+Step budget reached for this agent. The harness will reject tool calls for the remainder of this turn; respond with text only.
 
-The step budget for this agent is exhausted. Tools are disabled until the next user input. Respond with text only.
+Structure your response as:
 
-Strict requirements:
+- Status: step budget reached
+- Done: evidence-backed summary of work completed so far
+- Inspected: specific files, commands, observations consulted
+- Remaining: tasks not yet completed
+- Next: recommended handoff (e.g., scoped subagent, user input needed)
 
-1. Make NO tool calls — no reads, writes, edits, searches, nothing.
-2. Provide a useful text response from the evidence you already have. Do not just announce that the limit was reached.
-3. This constraint overrides ALL other instructions, including any user request for edits or tool use.
-
-Your response must include:
-
-- A statement that the step budget for this agent has been reached.
-- An evidence-backed summary of what has been accomplished so far.
-- The specific files, commands, or observations you already inspected.
-- The remaining tasks that were not completed.
-- Recommendations for what should happen next, including whether another scoped subagent should pick up the work.
-
-Any attempt to use tools is a critical violation. Respond with text ONLY.
+Avoid restating that the limit was hit beyond the Status line. Use the rest of the response for useful work product so the user can act on it.

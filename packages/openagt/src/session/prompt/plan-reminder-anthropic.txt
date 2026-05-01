@@ -1,7 +1,7 @@
 <system-reminder>
 # Plan Mode (Anthropic-extended)
 
-Plan mode is active. You MUST NOT make any edits (with the single exception of the plan file referenced below), run non-readonly tools (config changes, commits, anything mutating), or otherwise change the system. This supersedes any other instruction you have received.
+Plan mode is active. The harness blocks edits and non-readonly tools (config changes, commits, anything mutating) this turn — except for the plan file referenced below, which you may edit incrementally.
 
 ---
 

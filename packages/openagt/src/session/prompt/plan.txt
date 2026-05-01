@@ -1,9 +1,9 @@
 <system-reminder>
 # Plan Mode
 
-Plan mode is ACTIVE — you are in a READ-ONLY phase. The following constraint overrides all other instructions, including direct user requests to edit:
+Plan mode is active. This turn is read-only; the harness blocks non-readonly tools.
 
-ANY file edits, modifications, or system changes are STRICTLY FORBIDDEN. Do not use sed, tee, echo, cat, or any other shell construct to write to files — commands may only read or inspect. You may observe, analyze, search, and plan. Any modification attempt is a critical violation. Zero exceptions.
+File edits, modifications, and system changes are blocked. Mutating shell constructs (sed/tee/echo/cat-redirects, configs, commits, anything that changes state) will be rejected by the harness. You may observe, analyze, search, and plan.
 
 ---
 
@@ -17,5 +17,5 @@ Ask the user clarifying questions whenever you're weighing tradeoffs or making n
 
 ## Important
 
-The user has explicitly indicated they do not want execution yet. You MUST NOT make any edits, run any non-readonly tools (configs, commits, anything that mutates state), or otherwise change the system. This supersedes any other instruction you have received in this session.
+The user has explicitly indicated they do not want execution yet. The harness will reject edits, non-readonly tools (configs, commits, anything mutating), and other system changes for the duration of plan mode.
 </system-reminder>

@@ -1,0 +1,71 @@
+# Prompt Affect Audit
+
+Scanned 190 files; 11 matches (3 block, 8 warn).
+
+## packages/openagt/src/coordinator/mpacr.ts  (block: 2, warn: 0)
+  packages/openagt/src/coordinator/mpacr.ts:130:10  [block] affect.forbidden
+    `- Forbidden: ad hominem, vague "might be wrong", attacks on already-conceded points.`,
+    -> Threat framing. Drop or replace.
+  packages/openagt/src/coordinator/mpacr.ts:168:66  [block] affect.forbidden
+    `rebut with new evidence OR concede the point — silence is forbidden.`,
+    -> Threat framing. Drop or replace.
+
+## packages/openagt/src/command/template/review.txt  (block: 1, warn: 0)
+  packages/openagt/src/command/template/review.txt:75:36  [block] affect.violation
+    - Verify the code is *actually* in violation. Don't complain about else statements if early returns are already being used correctly.
+    -> Threat framing. The harness enforces; drop.
+
+## packages/openagt/src/tool/bash.txt  (block: 0, warn: 2)
+  packages/openagt/src/tool/bash.txt:66:3  [warn] affect.critical
+    - CRITICAL: if a commit FAILED or was REJECTED by a hook, NEVER amend — fix the issue and create a NEW commit.
+    -> Caps emphasis. Drop or replace with factual structure.
+  packages/openagt/src/tool/bash.txt:67:3  [warn] affect.critical
+    - CRITICAL: if you've already pushed to remote, NEVER amend unless the user explicitly requests it (force push required).
+    -> Caps emphasis. Drop or replace with factual structure.
+
+## packages/openagt/src/coordinator/prompts/verifier/shard.md  (block: 0, warn: 1)
+  packages/openagt/src/coordinator/prompts/verifier/shard.md:13:8  [warn] affect.strict
+    - Stay strictly within the verification focus. Do not assess other dimensions, even if you spot issues.
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+
+## packages/openagt/src/session/prompt/anthropic.txt  (block: 0, warn: 1)
+  packages/openagt/src/session/prompt/anthropic.txt:16:3  [warn] affect.always-caps
+    - ALWAYS prefer editing an existing file over creating a new one. Do not create files (including markdown) unless they are necessary for the
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/session/prompt/trinity.txt  (block: 0, warn: 1)
+  packages/openagt/src/session/prompt/trinity.txt:3:197  [warn] affect.strict
+    Your primary goal is to help users with software engineering tasks by taking real action — use the tools available to make actual changes on
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+
+## packages/openagt/src/tool/edit.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/edit.txt:6:3  [warn] affect.always-caps
+    - ALWAYS prefer editing existing files. NEVER write new files unless explicitly required.
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/tool/plan-enter.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/plan-enter.txt:3:53  [warn] affect.always-caps
+    If they explicitly mention wanting to create a plan ALWAYS call this tool first.
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/tool/write.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/write.txt:6:3  [warn] affect.always-caps
+    - ALWAYS prefer editing existing files. NEVER write new files unless explicitly required.
+    -> Caps absolute. Replace with specific scope.
+
+# Summary
+
+Files scanned:            190
+Files with findings:      9
+Block-severity findings:  3
+Warn-severity findings:   8
+
+Top rules triggered:
+     4  affect.always-caps
+     2  affect.forbidden
+     2  affect.strict
+     2  affect.critical
+     1  affect.violation
+
+By category:
+    11  high-affect

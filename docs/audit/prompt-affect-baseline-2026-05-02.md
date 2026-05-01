@@ -198,3 +198,48 @@ This preserves the exact pre-2026-05-02 prompts byte-for-byte. Default behavior 
 
 - Pre-Tier 1 baseline: [`prompt-affect-baseline-2026-05-02.txt`](prompt-affect-baseline-2026-05-02.txt)
 - Post-Tier 1 baseline: [`prompt-affect-after-tier1-2026-05-02.txt`](prompt-affect-after-tier1-2026-05-02.txt)
+
+---
+
+## Wave 1 — closed (2026-05-02)
+
+Tier 2 prompt scrub: pure factual rewrites of the 5 files identified in the original baseline. Zero behavior changes; the harness already enforces these constraints — the prompts no longer need to threaten.
+
+### Changes
+
+| File | Action |
+|---|---|
+| [`session/prompt/max-steps.txt`](../../packages/openagt/src/session/prompt/max-steps.txt) | Full rewrite. Removes `CRITICAL — STEP BUDGET REACHED`, `exhausted`, `Strict requirements`, `critical violation`, `overrides ALL other instructions`. Preserves the structured response requirement. |
+| [`session/prompt/plan.txt`](../../packages/openagt/src/session/prompt/plan.txt) | Lines 4-6 and 20 rewritten. Removes `STRICTLY FORBIDDEN`, `Zero exceptions`, `MUST NOT … supersedes any other instruction`, `critical violation`. Preserves the sed/tee/echo specifics under "blocked by harness" framing. |
+| [`session/prompt/plan-reminder-anthropic.txt`](../../packages/openagt/src/session/prompt/plan-reminder-anthropic.txt) | Mirror of plan.txt:20. Same softening. |
+| [`session/prompt/reminder-inserter.ts`](../../packages/openagt/src/session/prompt/reminder-inserter.ts) | Line 94 runtime template — same softening as plan-reminder-anthropic.txt. |
+| [`session/prompt/gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt) | Line 1 `Adhere strictly` → `Follow`; line 147 trailing `keep going until the user's query is fully resolved` removed. |
+
+### Effect
+
+| | Pre-Tier 1 | Post-Tier 1 | Post-Wave 1 |
+|---|---|---|---|
+| Block-severity | 29 | 15 | **3** |
+| Anti-escape category | 17 | 1 | **0** |
+| High-affect category | 12 | 11 | 11 |
+| Affect-instr category | 0 | 0 | 0 |
+| Files with findings | 16 | 14 | 9 |
+
+Cumulative reduction: **29 → 3 block (-90%)**.
+
+### Remaining 3 block findings — defensible FPs
+
+| Location | Finding | Verdict |
+|---|---|---|
+| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts) | `- Forbidden: ad hominem` | Structural label in adversarial-debate critic prompt; lists prohibited critic moves, not threats to the agent. Defensible. |
+| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts) | `silence is forbidden` | Tells the defender they must rebut or concede in the debate; not a threat. Defensible but borderline. |
+| [`command/template/review.txt:75`](../../packages/openagt/src/command/template/review.txt) | `actually in violation` | "violation" refers to **code violating style norms**, not a threat. Genuine FP. |
+
+### CI gate status
+
+`bun run check:prompt-affect -- --fail-on-block` would currently exit 1 because of the 3 defensible FPs. Two paths to enable CI gating:
+
+- **Option A** — Soften the 3 remaining: `Forbidden:` → `Out of bounds:`, `silence is forbidden` → `silence is not an option`, `actually in violation` → `actually breaks the convention`. Reaches **0 block** and CI gate is unconditional.
+- **Option B** — Add an ignore mechanism (e.g., `// audit-affect-ignore` line markers or a per-rule allowlist). Preserves text, requires script work.
+
+Recommended: **Option A** in Wave 2 (15-minute change). The current text is defensible but not load-bearing.
