@@ -1,6 +1,8 @@
 import { PlanExitTool } from "./plan"
 import { Session } from "../session"
 import { QuestionTool } from "./question"
+import { EscalateToInboxTool } from "./escalate-to-inbox"
+import { PersonalAgent } from "../personal/personal"
 import { BashTool } from "./bash"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
@@ -94,6 +96,7 @@ export const layer = Layer.effect(
     const taskStop = yield* TaskStopTool
     const read = yield* ReadTool
     const question = yield* QuestionTool
+    const escalateToInbox = yield* EscalateToInboxTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
@@ -191,6 +194,7 @@ export const layer = Layer.effect(
           skill: Tool.init(skilltool),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
+          escalate_to_inbox: Tool.init(escalateToInbox),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
         })
@@ -239,6 +243,7 @@ export const layer = Layer.effect(
             withConcurrencySafety(tool.code),
             withConcurrencySafety(tool.skill),
             withConcurrencySafety(tool.patch),
+            withConcurrencySafety(tool.escalate_to_inbox),
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [withConcurrencySafety(tool.lsp)] : []),
             ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli"
               ? [withConcurrencySafety(tool.plan)]
@@ -363,6 +368,7 @@ export const defaultLayer = Layer.suspend(() => {
     Config.defaultLayer,
     Plugin.defaultLayer,
     Question.defaultLayer,
+    PersonalAgent.defaultLayer,
     Todo.defaultLayer,
     Skill.defaultLayer,
     Agent.defaultLayer,
