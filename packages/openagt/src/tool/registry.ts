@@ -2,6 +2,7 @@ import { PlanExitTool } from "./plan"
 import { Session } from "../session"
 import { QuestionTool } from "./question"
 import { EscalateToInboxTool } from "./escalate-to-inbox"
+import { TaskGiveUpTool } from "./task-give-up"
 import { PersonalAgent } from "../personal/personal"
 import { BashTool } from "./bash"
 import { EditTool } from "./edit"
@@ -97,6 +98,7 @@ export const layer = Layer.effect(
     const read = yield* ReadTool
     const question = yield* QuestionTool
     const escalateToInbox = yield* EscalateToInboxTool
+    const taskGiveUp = yield* TaskGiveUpTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
@@ -195,6 +197,7 @@ export const layer = Layer.effect(
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           escalate_to_inbox: Tool.init(escalateToInbox),
+          task_give_up: Tool.init(taskGiveUp),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
         })
@@ -244,6 +247,7 @@ export const layer = Layer.effect(
             withConcurrencySafety(tool.skill),
             withConcurrencySafety(tool.patch),
             withConcurrencySafety(tool.escalate_to_inbox),
+            withConcurrencySafety(tool.task_give_up),
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [withConcurrencySafety(tool.lsp)] : []),
             ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli"
               ? [withConcurrencySafety(tool.plan)]

@@ -1,0 +1,17 @@
+Terminate the current task with a structured non-error outcome. Use this when continuing past the current point would require guessing past a real blocker, or when the right next step depends on user judgment that you do not have.
+
+Choosing to give up is a valid outcome, not a failure. Returning a half-finished implementation when continuation was reasonable is one failure mode; pushing past a real blocker is the other. This tool is the "right way to stop" when the second is the bigger risk.
+
+Use this tool when:
+- A precondition is missing that you cannot resolve from available tools, and `escalate_to_inbox` was already filed but the user is not available synchronously.
+- The task scope as specified is unachievable but a narrower scope would be — surface that narrower scope as `recommend_next`.
+- The user has previously overridden a similar approach; don't push through.
+- The estimated remaining effort exceeds the reasonable budget for this task.
+
+Parameters:
+- reason: one of "missing_precondition" / "user_judgment_needed" / "risk_threshold" / "budget_exceeded" / "outside_scope".
+- partial_result: optional summary of what was completed before stopping.
+- recommend_next: optional suggested follow-up (e.g., "scope this PR to file X only").
+- open_inbox_item: if true (default), also writes an inbox item with the reason + partial result + recommendation, so the user has a paper trail.
+
+Returns a structured outcome marker. After calling this tool, end your turn with a brief summary referencing the partial result and recommendation. Do not retry or attempt the task again in the same turn.
