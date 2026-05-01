@@ -63,8 +63,8 @@ Only create commits when the user asks. If unclear, ask first.
   1. User explicitly requested amend, OR commit SUCCEEDED but a pre-commit hook auto-modified files that need including.
   2. The HEAD commit was created by you in this conversation (verify: `git log -1 --format='%an %ae'`).
   3. The commit has NOT been pushed to remote (verify: `git status` shows "Your branch is ahead").
-- CRITICAL: if a commit FAILED or was REJECTED by a hook, NEVER amend — fix the issue and create a NEW commit.
-- CRITICAL: if you've already pushed to remote, NEVER amend unless the user explicitly requests it (force push required).
+- If a commit failed or was rejected by a hook, do not amend — fix the issue and create a new commit.
+- If you've already pushed to remote, do not amend unless the user explicitly requests it (force push required).
 - NEVER commit changes unless explicitly asked. It is VERY IMPORTANT to only commit when the user explicitly requests it.
 
 **Commit workflow**

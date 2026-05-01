@@ -1,6 +1,6 @@
 Use this tool to suggest switching to plan agent when the user's request would benefit from planning before implementation.
 
-If they explicitly mention wanting to create a plan ALWAYS call this tool first.
+If they explicitly mention wanting to create a plan, call this tool first.
 
 This tool will ask the user if they want to switch to plan agent.
 
