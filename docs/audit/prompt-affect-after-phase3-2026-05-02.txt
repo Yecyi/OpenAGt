@@ -1,0 +1,14 @@
+# Prompt Affect Audit
+
+Scanned 201 files; 0 matches (0 block, 0 warn).
+
+# Summary
+
+Files scanned:            201
+Files with findings:      0
+Block-severity findings:  0
+Warn-severity findings:   0
+
+Top rules triggered:
+
+By category:

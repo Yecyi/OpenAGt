@@ -68,12 +68,13 @@ const RULES: readonly Rule[] = [
 const PROMPT_GLOBS = [
   "packages/openagt/src/**/*.txt",
   "packages/openagt/src/**/*.md",
-  "packages/openagt/src/session/prompt/*.ts",
-  "packages/openagt/src/session/*.ts",
-  "packages/openagt/src/coordinator/prompts/**/*.md",
-  "packages/openagt/src/coordinator/*.ts",
-  "packages/openagt/src/agent/*.ts",
-  "packages/openagt/src/personal/*.ts",
+  // session/* and session/compaction/* both build dynamic prompt strings;
+  // include the whole tree under session and coordinator (excluding tests),
+  // plus the personal/agent paths investigated during Phase 5.
+  "packages/openagt/src/session/**/*.ts",
+  "packages/openagt/src/coordinator/**/*.ts",
+  "packages/openagt/src/agent/**/*.ts",
+  "packages/openagt/src/personal/**/*.ts",
   "packages/openagt/src/tool/*.txt",
 ]
 
@@ -103,12 +104,22 @@ const collectFiles = async () => {
   return [...seen].sort()
 }
 
-// In .ts files, skip matches that are clearly inside a control-flow check
-// against a string literal (e.g. `code.includes("exhausted")`). Those are
-// runtime introspection, not text addressed to the model.
+// In .ts files, skip matches that are clearly:
+// 1. Inside a control-flow check against a string literal
+//    (e.g. `code.includes("exhausted")`) — runtime introspection.
+// 2. Inside a regex literal used as a content pattern matcher
+//    (e.g. `/(?<!\w)CRITICAL(?!\w)/i` in importance.ts) — the regex
+//    searches FOR these words in user-supplied content; it is not text
+//    addressed to the model.
 const isCodeInspectionLine = (file: string, line: string) => {
   if (!file.endsWith(".ts")) return false
-  return /\.(includes|startsWith|endsWith|match|test|indexOf|search)\s*\(/.test(line)
+  if (/\.(includes|startsWith|endsWith|match|test|indexOf|search)\s*\(/.test(line)) return true
+  // Regex literal: line trimmed starts with `pattern: /` or bare `/`, and
+  // ends with `/<flags>,?` or `/<flags>;?`. Crude but adequate for the
+  // pattern-list shape used in compaction/{importance,semantic}.ts.
+  const trimmed = line.trim()
+  if (/^(pattern\s*:\s*)?\/[^/\s].*\/[gimsuy]*[,;)]?\s*$/.test(trimmed)) return true
+  return false
 }
 
 const scanFile = async (rel: string): Promise<Match[]> => {

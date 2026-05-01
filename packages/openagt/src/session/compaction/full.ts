@@ -27,12 +27,11 @@ export interface FullCompactConfig {
 }
 
 export const DEFAULT_FULL_COMPACT_CONFIG: FullCompactConfig = {
-  summaryTemplate: `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
+  summaryTemplate: `This turn is a context-summary turn. The harness rejects tool calls for the duration of this turn; respond with text only.
 
-- Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.
-- You already have all the context you need in the conversation above.
-- Tool calls will be REJECTED and will waste your only turn; you will fail the task.
-- Your entire response must be plain text: follow the summary template below.
+- Tool calls (Read, Bash, Grep, Glob, Edit, Write, etc.) will not execute this turn.
+- You already have the context needed in the conversation above.
+- Your response must be plain text following the summary template below.
 
 Provide a detailed prompt for continuing our conversation above.
 Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.
