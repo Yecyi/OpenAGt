@@ -66,7 +66,7 @@ export const MemorySource = z.enum([
 ])
 export type MemorySource = z.infer<typeof MemorySource>
 
-export const InboxSource = z.enum(["session", "scheduled", "webhook"])
+export const InboxSource = z.enum(["session", "scheduled", "webhook", "agent"])
 export type InboxSource = z.infer<typeof InboxSource>
 
 export const InboxState = z.enum(["queued", "active", "blocked", "done", "failed", "cancelled"])
