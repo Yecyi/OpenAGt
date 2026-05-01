@@ -65,6 +65,12 @@ export const Flag = {
   OPENAGT_SERVER_LOCAL_TOKEN:
     process.env["OPENAGT_SERVER_LOCAL_TOKEN"] ?? process.env["OPENCODE_SERVER_LOCAL_TOKEN"],
   OPENAGT_ENABLE_QUESTION_TOOL: truthy("OPENAGT_ENABLE_QUESTION_TOOL"),
+  // When set, GPT/O-series and Copilot model routes use the legacy autonomous
+  // prompts (beast-autonomous.txt / copilot-gpt-5-autonomous.txt) instead of
+  // the softened defaults. The autonomous variants close the escalation
+  // affordance — opt in only when you understand that trade-off. See
+  // docs/audit/prompt-affect-baseline-2026-05-02.md.
+  OPENAGT_AUTONOMOUS_MODE: truthy("OPENAGT_AUTONOMOUS_MODE") || truthy("OPENCODE_AUTONOMOUS_MODE"),
 
   OPENCODE_AUTO_HEAP_SNAPSHOT: truthy("OPENCODE_AUTO_HEAP_SNAPSHOT"),
   OPENCODE_GIT_BASH_PATH: process.env["OPENCODE_GIT_BASH_PATH"] ?? process.env["OPENAGT_GIT_BASH_PATH"],

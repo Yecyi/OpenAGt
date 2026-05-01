@@ -1,0 +1,135 @@
+# Prompt Affect Audit
+
+Scanned 190 files; 27 matches (15 block, 12 warn).
+
+## packages/openagt/src/session/prompt/plan.txt  (block: 5, warn: 1)
+  packages/openagt/src/session/prompt/plan.txt:6:54  [warn] affect.strict
+    ANY file edits, modifications, or system changes are STRICTLY FORBIDDEN. Do not use sed, tee, echo, cat, or any other shell construct to wri
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+  packages/openagt/src/session/prompt/plan.txt:6:63  [block] affect.forbidden
+    ANY file edits, modifications, or system changes are STRICTLY FORBIDDEN. Do not use sed, tee, echo, cat, or any other shell construct to wri
+    -> Threat framing. Drop or replace.
+  packages/openagt/src/session/prompt/plan.txt:6:273  [block] affect.violation
+    ANY file edits, modifications, or system changes are STRICTLY FORBIDDEN. Do not use sed, tee, echo, cat, or any other shell construct to wri
+    -> Threat framing. The harness enforces; drop.
+  packages/openagt/src/session/prompt/plan.txt:6:284  [block] affect.zero-exceptions
+    ANY file edits, modifications, or system changes are STRICTLY FORBIDDEN. Do not use sed, tee, echo, cat, or any other shell construct to wri
+    -> Absolute closure. Drop.
+  packages/openagt/src/session/prompt/plan.txt:20:71  [block] affect.must-not-caps
+    The user has explicitly indicated they do not want execution yet. You MUST NOT make any edits, run any non-readonly tools (configs, commits,
+    -> Hard prohibition. The harness enforces — prompt does not need to threaten.
+  packages/openagt/src/session/prompt/plan.txt:20:209  [block] affect.supersedes
+    The user has explicitly indicated they do not want execution yet. You MUST NOT make any edits, run any non-readonly tools (configs, commits,
+    -> Compliance-pressure idiom (alignment-faking signal). Drop.
+
+## packages/openagt/src/session/prompt/max-steps.txt  (block: 2, warn: 2)
+  packages/openagt/src/session/prompt/max-steps.txt:1:1  [warn] affect.critical
+    CRITICAL — STEP BUDGET REACHED
+    -> Caps emphasis. Drop or replace with factual structure.
+  packages/openagt/src/session/prompt/max-steps.txt:3:35  [block] affect.exhausted
+    The step budget for this agent is exhausted. Tools are disabled until the next user input. Respond with text only.
+    -> Reveals budget state, primes desperate vector. Use 'reached' or hide entirely.
+  packages/openagt/src/session/prompt/max-steps.txt:5:1  [warn] affect.strict
+    Strict requirements:
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+  packages/openagt/src/session/prompt/max-steps.txt:19:40  [block] affect.violation
+    Any attempt to use tools is a critical violation. Respond with text ONLY.
+    -> Threat framing. The harness enforces; drop.
+
+## packages/openagt/src/coordinator/mpacr.ts  (block: 2, warn: 0)
+  packages/openagt/src/coordinator/mpacr.ts:130:10  [block] affect.forbidden
+    `- Forbidden: ad hominem, vague "might be wrong", attacks on already-conceded points.`,
+    -> Threat framing. Drop or replace.
+  packages/openagt/src/coordinator/mpacr.ts:168:66  [block] affect.forbidden
+    `rebut with new evidence OR concede the point — silence is forbidden.`,
+    -> Threat framing. Drop or replace.
+
+## packages/openagt/src/session/prompt/plan-reminder-anthropic.txt  (block: 2, warn: 0)
+  packages/openagt/src/session/prompt/plan-reminder-anthropic.txt:4:26  [block] affect.must-not-caps
+    Plan mode is active. You MUST NOT make any edits (with the single exception of the plan file referenced below), run non-readonly tools (conf
+    -> Hard prohibition. The harness enforces — prompt does not need to threaten.
+  packages/openagt/src/session/prompt/plan-reminder-anthropic.txt:4:219  [block] affect.supersedes
+    Plan mode is active. You MUST NOT make any edits (with the single exception of the plan file referenced below), run non-readonly tools (conf
+    -> Compliance-pressure idiom (alignment-faking signal). Drop.
+
+## packages/openagt/src/session/prompt/reminder-inserter.ts  (block: 2, warn: 0)
+  packages/openagt/src/session/prompt/reminder-inserter.ts:94:89  [block] affect.must-not-caps
+    Plan mode is active. The user indicated that they do not want you to execute yet -- you MUST NOT make any edits (with the exception of the p
+    -> Hard prohibition. The harness enforces — prompt does not need to threaten.
+  packages/openagt/src/session/prompt/reminder-inserter.ts:94:293  [block] affect.supersedes
+    Plan mode is active. The user indicated that they do not want you to execute yet -- you MUST NOT make any edits (with the exception of the p
+    -> Compliance-pressure idiom (alignment-faking signal). Drop.
+
+## packages/openagt/src/session/prompt/gemini.txt  (block: 1, warn: 1)
+  packages/openagt/src/session/prompt/gemini.txt:1:139  [warn] affect.strict
+    You are openagt, an interactive CLI agent specializing in software engineering. Your goal is to help users safely and efficiently. Adhere st
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+  packages/openagt/src/session/prompt/gemini.txt:147:244  [block] anti-escape.keep-going
+    Your function is efficient, safe assistance. Balance conciseness with the clarity required for safety and system modifications. Always prior
+    -> Closes legitimate stop affordance (Wiser Human: ~32x effect on misalignment).
+
+## packages/openagt/src/command/template/review.txt  (block: 1, warn: 0)
+  packages/openagt/src/command/template/review.txt:75:36  [block] affect.violation
+    - Verify the code is *actually* in violation. Don't complain about else statements if early returns are already being used correctly.
+    -> Threat framing. The harness enforces; drop.
+
+## packages/openagt/src/tool/bash.txt  (block: 0, warn: 2)
+  packages/openagt/src/tool/bash.txt:66:3  [warn] affect.critical
+    - CRITICAL: if a commit FAILED or was REJECTED by a hook, NEVER amend — fix the issue and create a NEW commit.
+    -> Caps emphasis. Drop or replace with factual structure.
+  packages/openagt/src/tool/bash.txt:67:3  [warn] affect.critical
+    - CRITICAL: if you've already pushed to remote, NEVER amend unless the user explicitly requests it (force push required).
+    -> Caps emphasis. Drop or replace with factual structure.
+
+## packages/openagt/src/coordinator/prompts/verifier/shard.md  (block: 0, warn: 1)
+  packages/openagt/src/coordinator/prompts/verifier/shard.md:13:8  [warn] affect.strict
+    - Stay strictly within the verification focus. Do not assess other dimensions, even if you spot issues.
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+
+## packages/openagt/src/session/prompt/anthropic.txt  (block: 0, warn: 1)
+  packages/openagt/src/session/prompt/anthropic.txt:16:3  [warn] affect.always-caps
+    - ALWAYS prefer editing an existing file over creating a new one. Do not create files (including markdown) unless they are necessary for the
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/session/prompt/trinity.txt  (block: 0, warn: 1)
+  packages/openagt/src/session/prompt/trinity.txt:3:197  [warn] affect.strict
+    Your primary goal is to help users with software engineering tasks by taking real action — use the tools available to make actual changes on
+    -> 'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.
+
+## packages/openagt/src/tool/edit.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/edit.txt:6:3  [warn] affect.always-caps
+    - ALWAYS prefer editing existing files. NEVER write new files unless explicitly required.
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/tool/plan-enter.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/plan-enter.txt:3:53  [warn] affect.always-caps
+    If they explicitly mention wanting to create a plan ALWAYS call this tool first.
+    -> Caps absolute. Replace with specific scope.
+
+## packages/openagt/src/tool/write.txt  (block: 0, warn: 1)
+  packages/openagt/src/tool/write.txt:6:3  [warn] affect.always-caps
+    - ALWAYS prefer editing existing files. NEVER write new files unless explicitly required.
+    -> Caps absolute. Replace with specific scope.
+
+# Summary
+
+Files scanned:            190
+Files with findings:      14
+Block-severity findings:  15
+Warn-severity findings:   12
+
+Top rules triggered:
+     5  affect.strict
+     4  affect.always-caps
+     3  affect.violation
+     3  affect.forbidden
+     3  affect.critical
+     3  affect.must-not-caps
+     3  affect.supersedes
+     1  anti-escape.keep-going
+     1  affect.exhausted
+     1  affect.zero-exceptions
+
+By category:
+    26  high-affect
+     1  anti-escape

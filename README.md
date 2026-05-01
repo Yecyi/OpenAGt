@@ -334,6 +334,7 @@ Useful runtime variables:
 | `OPENAGT_PURE`                   | Disable external plugins                 |
 | `OPENAGT_EXPERIMENTAL`           | Enable experimental feature bundle       |
 | `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling        |
+| `OPENAGT_AUTONOMOUS_MODE`        | Restore legacy "beast" / "copilot" autonomous prompts (closes the escalation affordance — opt in only when you understand the trade-off; see `docs/audit/prompt-affect-baseline-2026-05-02.md`) |
 | `OPENAGT_DB`                     | Override database path                   |
 
 ## Extending OpenAGt

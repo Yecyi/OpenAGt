@@ -5,16 +5,19 @@ import { Instance } from "../project/instance"
 import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_DEFAULT from "./prompt/default.txt"
 import PROMPT_BEAST from "./prompt/beast.txt"
+import PROMPT_BEAST_AUTONOMOUS from "./prompt/beast-autonomous.txt"
 import PROMPT_GEMINI from "./prompt/gemini.txt"
 import PROMPT_GPT from "./prompt/gpt.txt"
 import PROMPT_KIMI from "./prompt/kimi.txt"
 import PROMPT_COPILOT from "./prompt/copilot-gpt-5.txt"
+import PROMPT_COPILOT_AUTONOMOUS from "./prompt/copilot-gpt-5-autonomous.txt"
 import PROMPT_CODEX from "./prompt/codex.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
 import type { Provider } from "@/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
+import { Flag } from "@/flag/flag"
 import { Log } from "@/util"
 import { DYNAMIC_BOUNDARY_MARKER, parsePromptSegments } from "./system-prompt"
 
@@ -192,9 +195,17 @@ export function resolvePromptRoute(modelId: string): PromptRoute | undefined {
   return PROMPT_ROUTES.find((route) => route.pattern.test(id))
 }
 
+// When OPENAGT_AUTONOMOUS_MODE=1, GPT/O-series and Copilot routes use the
+// legacy autonomous prompts that close the escalation affordance. Default
+// route prompts are softened per docs/audit/prompt-affect-baseline-2026-05-02.md.
 export function provider(model: Provider.Model): string[] {
   const route = resolvePromptRoute(model.api.id)
-  return [route?.prompt ?? PROMPT_DEFAULT]
+  if (!route) return [PROMPT_DEFAULT]
+  if (Flag.OPENAGT_AUTONOMOUS_MODE) {
+    if (route.name === "beast") return [PROMPT_BEAST_AUTONOMOUS]
+    if (route.name === "copilot") return [PROMPT_COPILOT_AUTONOMOUS]
+  }
+  return [route.prompt]
 }
 
 export interface EnvironmentResult {
