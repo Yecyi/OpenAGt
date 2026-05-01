@@ -127,7 +127,7 @@ function criticNode(input: MpacrInput, perspective: CriticPerspective, idx: numb
       `- You may NOT attack a weaker reading than the steel-manned one.`,
       `- For EACH attack, quote the steel-manned claim verbatim.`,
       `- For EACH attack, list evidence_for (your view) AND evidence_against (counter-evidence).`,
-      `- Forbidden: ad hominem, vague "might be wrong", attacks on already-conceded points.`,
+      `- Out of bounds: ad hominem, vague "might be wrong", attacks on already-conceded points.`,
       ``,
       `Output: CriticalReviewVerdict with verdict, evidence_for, evidence_against, required_changes, confidence, and posterior in [0,1].`,
     ].join("\n"),
@@ -165,7 +165,7 @@ function defenderNode(input: MpacrInput, criticIds: readonly string[], steelManI
     description: `Defense / concession round for ${input.target.id}`,
     prompt: [
       `Respond to each critique. For every critic finding you must EITHER`,
-      `rebut with new evidence OR concede the point — silence is forbidden.`,
+      `rebut with new evidence OR concede the point — silence is not an option.`,
       ``,
       `Goal: ${input.goal}`,
       `Workflow: ${input.workflow}`,

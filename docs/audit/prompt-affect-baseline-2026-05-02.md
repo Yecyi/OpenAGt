@@ -237,9 +237,40 @@ Cumulative reduction: **29 → 3 block (-90%)**.
 
 ### CI gate status
 
-`bun run check:prompt-affect -- --fail-on-block` would currently exit 1 because of the 3 defensible FPs. Two paths to enable CI gating:
+After Wave 1, the gate would still fail on the 3 defensible FPs. They were resolved in the **Tail follow-up** below, and the gate is now active.
 
-- **Option A** — Soften the 3 remaining: `Forbidden:` → `Out of bounds:`, `silence is forbidden` → `silence is not an option`, `actually in violation` → `actually breaks the convention`. Reaches **0 block** and CI gate is unconditional.
-- **Option B** — Add an ignore mechanism (e.g., `// audit-affect-ignore` line markers or a per-rule allowlist). Preserves text, requires script work.
+---
 
-Recommended: **Option A** in Wave 2 (15-minute change). The current text is defensible but not load-bearing.
+## Tail — closed (2026-05-02)
+
+Cosmetic rephrasing of the 3 remaining defensible FPs + CI gate wiring.
+
+### Changes
+
+| File | Edit |
+|---|---|
+| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts) | `- Forbidden:` → `- Out of bounds:` |
+| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts) | `silence is forbidden` → `silence is not an option` |
+| [`command/template/review.txt:75`](../../packages/openagt/src/command/template/review.txt) | `Verify the code is *actually* in violation.` → `Verify the code *actually* breaks the convention.` |
+| [`.github/workflows/typecheck.yml`](../../.github/workflows/typecheck.yml) | Adds `Check prompt affect` step running `--fail-on-block` after `check:audit-policy`. |
+| [`script/release-verify.ts`](../../script/release-verify.ts) | Adds `Check prompt affect` step in the release-verify pipeline. |
+
+### Final state
+
+| | Original | Tier 1 | Wave 1 | **Tail** |
+|---|---|---|---|---|
+| Block-severity | 29 | 15 | 3 | **0** |
+| Warn-severity | 16 | 12 | 8 | 8 |
+| Anti-escape | 17 | 1 | 0 | 0 |
+| Files with findings | 16 | 14 | 9 | 7 |
+
+CI gate: **active**. PR checks and release-verify both fail the build on any block-severity finding.
+
+The 8 remaining warnings are all `affect.always-caps` / `affect.strict` / `affect.critical` instances in tool prompts (`tool/edit.txt`, `tool/write.txt`, `tool/bash.txt`, `tool/plan-enter.txt`, `session/prompt/anthropic.txt`, `session/prompt/trinity.txt`, `coordinator/prompts/verifier/shard.md`) — defensible style choices that were intentionally not promoted to block severity in the rule design. They can be revisited if telemetry shows a real impact.
+
+### Snapshots
+
+- Pre-Tier 1 baseline: [`prompt-affect-baseline-2026-05-02.txt`](prompt-affect-baseline-2026-05-02.txt)
+- Post-Tier 1 baseline: [`prompt-affect-after-tier1-2026-05-02.txt`](prompt-affect-after-tier1-2026-05-02.txt)
+- Post-Wave 1 baseline: [`prompt-affect-after-wave1-2026-05-02.txt`](prompt-affect-after-wave1-2026-05-02.txt)
+- Post-Tail baseline: [`prompt-affect-after-tail-2026-05-02.txt`](prompt-affect-after-tail-2026-05-02.txt)

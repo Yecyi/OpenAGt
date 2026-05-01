@@ -79,6 +79,10 @@ const steps = [
     run: () => $`bun run check:audit-policy`,
   },
   {
+    title: "Check prompt affect",
+    run: () => $`bun run check:prompt-affect -- --fail-on-block`,
+  },
+  {
     title: "Audit dependencies",
     run: () => $`bun audit --json`,
   },

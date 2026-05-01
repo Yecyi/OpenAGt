@@ -23,6 +23,9 @@ jobs:
       - name: Check audit policy
         run: bun run check:audit-policy
 
+      - name: Check prompt affect
+        run: bun run check:prompt-affect -- --fail-on-block
+
       - name: Check source integrity
         run: bun run check:integrity
 

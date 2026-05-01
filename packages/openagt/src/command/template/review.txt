@@ -72,7 +72,7 @@ Use best judgement when processing input.
 
 **Don't be a zealot about style.** When checking code against conventions:
 
-- Verify the code is *actually* in violation. Don't complain about else statements if early returns are already being used correctly.
+- Verify the code *actually* breaks the convention. Don't complain about else statements if early returns are already being used correctly.
 - Some "violations" are acceptable when they're the simplest option. A `let` statement is fine if the alternative is convoluted.
 - Excessive nesting is a legitimate concern regardless of other style choices.
 - Don't flag style preferences as issues unless they clearly violate established project conventions.
