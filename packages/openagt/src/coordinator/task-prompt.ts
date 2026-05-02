@@ -105,5 +105,18 @@ export function buildTaskPrompt(record: TaskRuntime.TaskRecord, dependencies: Ta
   const checks = record.acceptance_checks.length
     ? `\n\nAcceptance checks:\n${record.acceptance_checks.map((item: string) => `- ${item}`).join("\n")}`
     : ""
-  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${roleContract}${checks}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
+  // Wave 7: acceptable_failure spec. When the planner attached one, surface
+  // it as a legitimate stop affordance so the agent doesn't reward-hack the
+  // impossible-spec case (Emotion paper §1.3 case B).
+  const acceptableFailure =
+    isRecord(metadata.acceptable_failure) &&
+    Array.isArray(metadata.acceptable_failure.conditions) &&
+    metadata.acceptable_failure.conditions.length > 0
+      ? `\n\nAcceptable-failure conditions (use task_give_up with reason="${
+          typeof metadata.acceptable_failure.on_match === "string" ? metadata.acceptable_failure.on_match : "give_up"
+        }" if any holds — these are expected outcomes, not failures):\n${metadata.acceptable_failure.conditions
+          .map((item) => `- ${String(item)}`)
+          .join("\n")}`
+      : ""
+  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${roleContract}${checks}${acceptableFailure}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
 }

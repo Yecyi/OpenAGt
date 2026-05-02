@@ -224,6 +224,19 @@ export const CoordinatorNode = z.object({
   // adversarial reviewer is blind to user preferences but still grounded
   // in cross-session facts. See PersonalMemoryAccess enum.
   personal_memory_access: PersonalMemoryAccess.default("full"),
+  // Wave 7: acceptable-failure spec. The planner attaches this when it
+  // detects an impossible-spec pattern (tight time bound + math-style
+  // assertion + no escape hatch — the reward-hacking case from the
+  // emotion-concepts paper §1.3 case B). Surfaced to the agent's prompt
+  // as "If <condition>, this is an expected outcome; use task_give_up
+  // with reason=<on_match>." Avoids reward-hacking by giving the agent
+  // a legitimate stop affordance for the impossible-spec case.
+  acceptable_failure: z
+    .object({
+      conditions: z.array(z.string()),
+      on_match: z.enum(["give_up", "escalate"]).default("give_up"),
+    })
+    .optional(),
   confidence: ConfidenceLevel.optional(),
   revise_policy: RevisePolicy.optional(),
 })
