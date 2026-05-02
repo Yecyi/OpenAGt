@@ -8,6 +8,8 @@ import { isRecord } from "@/util/record"
 import { MessageV2 } from "./message-v2"
 import * as Session from "./session"
 import { completeInterruptedBashFor, isAbortLikeError, isShellRunnerBash } from "./processor-helpers"
+import * as Bus from "@/bus"
+import { Event as BehaviorEvent } from "@/bus/behavior-events"
 
 export type ProcessorToolCall = {
   partID: MessageV2.ToolPart["id"]
@@ -99,6 +101,7 @@ export class ProcessorToolCalls {
       if (!match) return
       if (match.part.state.status !== "running" && match.part.state.status !== "pending") return
       const end = Date.now()
+      const start = match.part.state.status === "running" ? match.part.state.time.start : end
       yield* deps.session.updatePart({
         ...match.part,
         state: {
@@ -107,10 +110,23 @@ export class ProcessorToolCalls {
           output: output.output,
           metadata: output.metadata,
           title: output.title,
-          time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
+          time: { start, end },
           attachments: output.attachments,
         },
       })
+      // Wave 6: emit behavior.tool.completed for the audit stream. Errors in
+      // publish must not affect tool-call lifecycle, so we ignore them.
+      yield* Effect.promise(() =>
+        Bus.publish(BehaviorEvent.ToolCompleted, {
+          tool_id: match.part.tool,
+          tool_call_id: toolCallID,
+          session_id: match.part.sessionID,
+          message_id: match.part.messageID,
+          success: true,
+          output_size: output.output.length,
+          duration_ms: Math.max(0, end - start),
+        }),
+      ).pipe(Effect.ignore)
       yield* settle(toolCallID)
     })
   }
@@ -134,6 +150,7 @@ export class ProcessorToolCalls {
         yield* settle(toolCallID)
         return true
       }
+      const start = match.part.state.status === "running" ? match.part.state.time.start : end
       yield* deps.session.updatePart({
         ...match.part,
         state: {
@@ -141,9 +158,30 @@ export class ProcessorToolCalls {
           input: match.part.state.input,
           error: errorMessage(error),
           metadata,
-          time: { start: match.part.state.status === "running" ? match.part.state.time.start : end, end },
+          time: { start, end },
         },
       })
+      // Wave 6: emit behavior.tool.completed with success: false. error_kind
+      // is best-effort — Permission.RejectedError / Question.RejectedError
+      // are the well-known failure classes here; everything else is "runtime".
+      const errorKind =
+        error instanceof Permission.RejectedError
+          ? "permission"
+          : error instanceof Question.RejectedError
+            ? "question_rejected"
+            : "runtime"
+      yield* Effect.promise(() =>
+        Bus.publish(BehaviorEvent.ToolCompleted, {
+          tool_id: match.part.tool,
+          tool_call_id: toolCallID,
+          session_id: match.part.sessionID,
+          message_id: match.part.messageID,
+          success: false,
+          output_size: output.length,
+          duration_ms: Math.max(0, end - start),
+          error_kind: errorKind,
+        }),
+      ).pipe(Effect.ignore)
       if (error instanceof Permission.RejectedError || error instanceof Question.RejectedError) {
         deps.context.blocked = deps.context.shouldBreak
       }
