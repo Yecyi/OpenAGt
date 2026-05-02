@@ -67,11 +67,18 @@ Methodology, rule list, and per-wave audit history in [docs/audit/prompt-affect-
 
 Current stable release:
 
-- [v1.16.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.16.0)
+- [v1.21.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.21.0) — adds the
+  domain-specialized agentic helper runtime (MPACR critical-review pipeline,
+  three-layer memory architecture, dynamic expert / prompt-template registry).
+  Full notes: [docs/releases/v1.21.0.md](docs/releases/v1.21.0.md).
 
-Current release candidate:
+Previous stable line:
 
-- [v1.17.0-rc.3](https://github.com/Yecyi/OpenAGt/releases/tag/v1.17.0-rc.3)
+- [v1.20.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.20.2) — final
+  release of the v1.20 line before the v1.21 expansion.
+
+Note: the v1.17 RC line was never promoted to stable; the project jumped from
+v1.16 directly to the v1.20 line.
 
 Published assets:
 
@@ -101,14 +108,14 @@ The current stable runtime is centered around these backend capabilities:
 
 | Capability                      | Status                                                                  |
 | ------------------------------- | ----------------------------------------------------------------------- |
-| Session runtime and tool loop   | stable in v1.16; hardened in v1.17 RC                                   |
+| Session runtime and tool loop   | stable in v1.16; hardened through the v1.20 line                        |
 | Approval and Safety Envelope    | stable in v1.16 with versioned `shell_safety`                           |
-| Coordinator Runtime             | stable in v1.16; expanded task/subagent visibility in v1.17 RC          |
-| Personal Agent Core             | implemented; backend contracts stabilized in v1.16                      |
+| Coordinator Runtime             | stable in v1.16; MPACR critical-review pipeline lands in v1.21          |
+| Personal Agent Core             | three-layer memory + consolidator land in v1.21                         |
 | Affect-aware prompt corpus      | 0 block / 0 warn across 201 files; CI-gated via `bun run check:prompt-affect` |
 | Stop affordances                | `escalate_to_inbox` and `task_give_up` tools shipped; mentioned in default system prompts for all model families |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                     |
-| Release verification automation | `bun run verify:v1.17`                                                  |
+| Release verification automation | `bun run verify:v1.21`                                                  |
 | Flutter frontend                | roadmap; backend contracts first                                        |
 
 ## Key Features
@@ -341,10 +348,10 @@ bun typecheck
 bun test
 ```
 
-v1.16 release verification:
+v1.21 release verification:
 
 ```bash
-bun run verify:v1.17
+bun run verify:v1.21
 ```
 
 ## Configuration and Environment
