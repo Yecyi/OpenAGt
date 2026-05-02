@@ -17,6 +17,23 @@ export class Rule extends Schema.Class<Rule>("PermissionRule")({
   permission: Schema.String,
   pattern: Schema.String,
   action: Action,
+  // Wave 8 Step 3: when true, a tool invocation matching this rule should
+  // be routed through a forked subagent (clean child session) rather than
+  // executed in the current session. Two purposes:
+  //
+  //   1. Context discipline (Principle 3, Context Rot research) — risky
+  //      tools that may dump large output (e.g. webfetch on a large page,
+  //      bash with potentially noisy stdout) get a fresh context window
+  //      so the parent session's attention budget is preserved.
+  //   2. Affect isolation (Emotion-concepts paper) — failures from a
+  //      risky tool don't accumulate in the parent's context as desperate-
+  //      vector activation triggers; the failure stays scoped to the
+  //      subagent.
+  //
+  // Schema-only in this commit. The harness path that consults this flag
+  // (rule match -> route through TaskTool fork instead of executing inline)
+  // is deferred; this field declares the policy hook for future wiring.
+  requires_fresh_context: Schema.optional(Schema.Boolean),
 }) {
   static readonly zod = zod(this)
 }
