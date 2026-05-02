@@ -129,11 +129,12 @@ When the legacy autonomous prompts are active (`OPENAGT_AUTONOMOUS_MODE=1`):
 
 How the user sees escalations:
 
-1. **CLI/TUI**: existing `inbox` command lists pending items with `[block]` / `[queue]` markers; `inbox resolve <id>` prompts for the answer and unblocks the agent (if blocked). May need to grow a `--reply <text>` flag.
+1. **CLI** *(shipped Wave 10)*: `openagt inbox list / view <id> / resolve <id> [--reply <text>] / dispatch`. Source: [`packages/openagt/src/cli/cmd/inbox.ts`](../../packages/openagt/src/cli/cmd/inbox.ts). Default `list` shows non-done items first; `--reply` text is preserved byte-for-byte into `payload.user_reply` via `replyToInboxItem` ops (regression-tested in [`test/cli/inbox-reply-verbatim.test.ts`](../../packages/openagt/test/cli/inbox-reply-verbatim.test.ts)).
 2. **Server/SSE**: `inbox.created` and `inbox.updated` events already exist; web client gets a notification for free.
-3. **Sync `request_context`**: blocks the model turn with the existing question-tool UX (or a sibling UX if Q3 = (b)).
+3. **TUI**: not yet wired. Web client suffices for graphical workflows; CLI suffices for terminal workflows. Out of scope for Wave 10.
+4. **Sync `request_context`**: blocks the model turn with the existing question-tool UX (or a sibling UX if Q3 = (b)).
 
-No new UI surfaces needed for v1.
+**Resume after reply**: the agent does not auto-resume when the user replies via `inbox resolve --reply`. The reply is captured in `payload.user_reply` and the user runs the existing resume flow (`openagt run --resume <session>` etc.) when ready. Auto-resume requires a long-running watcher process and is deferred to a future wave.
 
 ## Open product questions
 
@@ -176,7 +177,7 @@ What is deferred:
 - Effort-profile coupling logic (per-tier visibility / confirmation requirements)
 - Distinct `gave_up` coordinator task state
 - MPACR critic-quorum awareness of give-up
-- Inbox CLI `--reply <text>` flag
+- Inbox CLI `--reply <text>` flag *(shipped Wave 10, commit ae0f62a9a + 355cd0a28)*
 - Snapshot tests asserting verbatim user-text preservation through the tool path
 - System-prompt mention in non-headline prompts (`gpt.txt`, `gemini.txt`, `kimi.txt`, `codex.txt`, `trinity.txt`, `copilot-gpt-5.txt`)
 
@@ -188,7 +189,7 @@ What is deferred:
 4. Register in tool registry; ensure default permission policy is applied.
 5. Update default system prompts ([`default.txt`](../../packages/openagt/src/session/prompt/default.txt), [`anthropic.txt`](../../packages/openagt/src/session/prompt/anthropic.txt)) to mention these as first-class options. Re-run `bun run check:prompt-affect` — should still be 0 block.
 6. Coordinator: route `task_give_up` outcomes to `gave_up` state; pipe to existing run-store / SSE.
-7. Inbox CLI: add `--reply <text>` flag to `inbox resolve` if missing.
+7. Inbox CLI: add `--reply <text>` flag to `inbox resolve` if missing. ✅ shipped Wave 10.
 8. Tests: snapshot tests asserting user-supplied `question` / `what` text is preserved verbatim through inbox storage.
 9. Docs: update [README.md](../../README.md) with the three new tools; cross-link this design doc.
 

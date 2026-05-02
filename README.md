@@ -267,6 +267,10 @@ Shell permission requests also expose structured `shell_safety` metadata.
 | `openagt serve`                       | Start the headless server               |
 | `openagt web`                         | Start the server and web UI flow        |
 | `openagt session list`                | List sessions                           |
+| `openagt inbox list`                  | List agent-written inbox items (filter by `--state` / `--source`; `--all` includes resolved) |
+| `openagt inbox view <id>`             | Show one inbox item with full goal + payload context |
+| `openagt inbox resolve <id> [--reply <text>]` | Mark an inbox item resolved; with `--reply` the text is passed back to the agent's payload byte-for-byte (verbatim, no paraphrase). Use `--state cancelled` to dismiss without resolving |
+| `openagt inbox dispatch`              | Manually fire any due-but-not-yet-fired scheduled wakeups for this project |
 | `openagt providers login`             | Add or refresh provider credentials     |
 | `openagt mcp list`                    | Inspect MCP configuration               |
 | `openagt debug paths`                 | Print effective runtime paths           |
