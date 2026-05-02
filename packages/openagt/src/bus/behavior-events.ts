@@ -8,7 +8,7 @@
 // memory injections, sub-agent dispatch, file touches — independent of what
 // the agent said it would do.
 //
-// Existing event families like `provider.fallback.hop`, `tools.changed`,
+// Existing event families like `provider.fallback.hop`, `mcp.tools.changed`,
 // `permission.asked/replied`, `File.Event.Edited`, and the coordinator
 // `publishUpdated` signal each capture a slice. The behavior.* family wraps
 // these into a single observable stream with consistent correlation IDs

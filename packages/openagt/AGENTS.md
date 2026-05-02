@@ -179,7 +179,7 @@ The following features were built as Phase 2 improvements:
 ### Bus Event Persistence (`src/bus/index.ts`)
 
 - `EventBuffer` ring buffer (max 1000 events) persisted to `$XDG_STATE_HOME/opencode/events/events.jsonl`.
-- Critical events (`provider.fallback.hop`, `tools.changed`, etc.) written to buffer.
+- Critical events (`provider.fallback.hop`, `mcp.tools.changed`, etc.) written to buffer.
 - `getRecentEvents()` and `replayEvents()` added to `Bus.Service` interface.
 - Buffer flushed on service shutdown.
 - All `catch {}` blocks now log errors instead of silently swallowing them.

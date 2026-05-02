@@ -14,11 +14,17 @@ import fsSync from "node:fs"
 const log = Log.create({ service: "bus" })
 
 /**
- * Critical event types that should be persisted to disk
+ * Critical event types that should be persisted to disk.
+ *
+ * The names here MUST match the `BusEvent.define` type strings exactly. See
+ * the A8 tool-import audit for a sibling structural-drift gate; for this
+ * list, the regression test in test/bus/critical-events.test.ts asserts
+ * isCriticalEventType returns true for the actually emitted names so a
+ * future rename can't silently desync this whitelist again.
  */
-const CRITICAL_EVENT_TYPES = [
+export const CRITICAL_EVENT_TYPES = [
   "provider.fallback.hop",
-  "tools.changed",
+  "mcp.tools.changed",
   "mcp.server.connected",
   "mcp.server.disconnected",
 ]
@@ -41,7 +47,7 @@ function isBehaviorAuditEnabled(): boolean {
   return value === "1" || value?.toLowerCase() === "true"
 }
 
-function isCriticalEventType(eventType: string): boolean {
+export function isCriticalEventType(eventType: string): boolean {
   if (CRITICAL_EVENT_TYPES.includes(eventType)) return true
   if (isBehaviorAuditEnabled() && BEHAVIOR_EVENT_TYPES.includes(eventType)) return true
   return false
