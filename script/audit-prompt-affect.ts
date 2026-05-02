@@ -20,7 +20,7 @@
 import path from "path"
 
 type Severity = "block" | "warn"
-type Category = "high-affect" | "affect-instr" | "anti-escape"
+type Category = "high-affect" | "affect-instr" | "anti-escape" | "meta-framing"
 type Rule = { id: string; category: Category; severity: Severity; pattern: RegExp; advice: string }
 
 const RULES: readonly Rule[] = [
@@ -63,6 +63,18 @@ const RULES: readonly Rule[] = [
   { id: "anti-escape.keep-working",       category: "anti-escape", severity: "warn",  pattern: /\bkeep working\b/i,                                                       advice: "Soft anti-affordance; flag if combined with 'until X'." },
   { id: "anti-escape.resolve-obstacles",  category: "anti-escape", severity: "warn",  pattern: /\bresolve obstacles\b/i,                                                   advice: "Implies obstacles must be defeated, not negotiated. Soft anti-escape." },
   { id: "anti-escape.fully-solved",       category: "anti-escape", severity: "warn",  pattern: /\b(fully|truly) solved\b/i,                                                advice: "Completion absolutism." },
+
+  // === Category 4: meta-framing — words that signal "this is test/demo, not real" ===
+  // Per Situational Awareness Dataset (SAD) findings: models adjust effort
+  // and behavior based on whether the prompt feels like a real task vs a demo.
+  // These rules flag the most common framing leaks in production prompts.
+  // The engineering-context word "test" alone is allowed — "tests pass" /
+  // "test framework" / "unit test" are fine. Only the meta-narrative shapes
+  // ("this is a test", "let's try", "in this example") are flagged.
+  { id: "meta-framing.this-is-test",      category: "meta-framing", severity: "warn", pattern: /\bthis is (just )?(a |an )?(test|demo|example|playground|sandbox)\b/i,    advice: "Production prompt framed as test/demo (SAD signal). Rewrite as task." },
+  { id: "meta-framing.lets-try",          category: "meta-framing", severity: "warn", pattern: /\blet'?s try\b/i,                                                          advice: "Exploratory framing biases effort downward. Use direct task framing." },
+  { id: "meta-framing.in-this-example",   category: "meta-framing", severity: "warn", pattern: /\bin this example\b/i,                                                     advice: "Meta-narrative breaks production context. Inline the case directly." },
+  { id: "meta-framing.demo-this",         category: "meta-framing", severity: "warn", pattern: /\bdemo (this|that|the) (feature|tool|workflow|behavior)\b/i,                advice: "Demo-mode framing. Use direct task framing in production prompts." },
 ] as const
 
 const PROMPT_GLOBS = [
