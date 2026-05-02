@@ -73,14 +73,17 @@ export const PermissionDecided = BusEvent.define(
 )
 
 // behavior.memory.injected — fires when personal memory notes are attached
-// to a session/plan context. kind_breakdown lets a downstream consumer track
-// which memory kinds are flowing into which sessions over time without
-// dereferencing every note_id.
+// to a session/plan context. session_id and plan_id are both optional —
+// plan-enrichment fires without a session_id (the plan exists before any
+// subagent session is dispatched). kind_breakdown lets a downstream
+// consumer track which memory kinds are flowing into which contexts over
+// time without dereferencing every note_id.
 export const MemoryInjected = BusEvent.define(
   "behavior.memory.injected",
   z.object({
-    session_id: z.string(),
+    session_id: z.string().optional(),
     plan_id: z.string().optional(),
+    goal_hash: z.string(),
     note_ids: z.array(z.string()),
     kind_breakdown: z.object({
       fact: z.number().int().min(0).default(0),

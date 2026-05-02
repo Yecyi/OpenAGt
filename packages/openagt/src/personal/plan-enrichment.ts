@@ -7,7 +7,18 @@
 // that would mislead downstream consumers.
 
 import { Effect } from "effect"
+import * as Bus from "@/bus"
+import { Event as BehaviorEvent } from "@/bus/behavior-events"
 import { Service, enrichMemoryContext, taskSignatureFor } from "./three-layer"
+
+// Stable djb2 hash of the plan goal so audit consumers can correlate
+// behavior.memory.injected with downstream behavior.subagent.dispatched
+// events that carry the same goal_hash.
+function hashGoal(goal: string): string {
+  let hash = 5381
+  for (let i = 0; i < goal.length; i++) hash = ((hash << 5) + hash) ^ goal.charCodeAt(i)
+  return (hash >>> 0).toString(36)
+}
 
 // Type the plan loosely so this module does not import the heavy
 // CoordinatorPlan zod object; the coordinator passes its concrete type in.
@@ -50,5 +61,19 @@ export const enrichPlanMemory = <P extends PlanLike>(
       recipes: trimmedRecipes.map((r) => ({ note_id: r.note_id, domain: r.domain })),
       domain,
     })
+    // Wave 6: emit behavior.memory.injected. Both searchSemantic and
+    // searchProcedural already filter to kind=fact (Wave 5 Step 5), so the
+    // breakdown is currently 100% fact. We still emit the breakdown shape
+    // so downstream pipelines have a stable schema once preference/belief
+    // notes start flowing through alternative search paths.
+    const totalNotes = facts.length + trimmedRecipes.length
+    yield* Effect.promise(() =>
+      Bus.publish(BehaviorEvent.MemoryInjected, {
+        goal_hash: hashGoal(plan.goal),
+        note_ids: [...facts.map((f) => f.note_id), ...trimmedRecipes.map((r) => r.note_id)],
+        kind_breakdown: { fact: totalNotes, preference: 0, belief: 0 },
+        source: "plan_enrichment",
+      }),
+    ).pipe(Effect.ignore)
     return { ...plan, memory_context: enriched }
   })
