@@ -361,6 +361,7 @@ Useful runtime variables:
 | `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling        |
 | `OPENAGT_AUTONOMOUS_MODE`        | Restore legacy "beast" / "copilot" autonomous prompts (closes the escalation affordance — opt in only when you understand the trade-off; see `docs/audit/prompt-affect-baseline-2026-05-02.md`) |
 | `OPENAGT_BEHAVIOR_AUDIT`         | Persist `behavior.*` events to the disk-backed ring buffer (in-memory by default; see `docs/audit/behavior-stream.md`) |
+| `OPENAGT_EXPERIMENTAL_AUTO_FORK` | Fork to a clean subagent with a handoff brief once a session crosses 75% context, instead of aggressive in-session full-compaction. Schema declared; runtime fork path is in development |
 | `OPENAGT_DB`                     | Override database path                   |
 
 ## Extending OpenAGt

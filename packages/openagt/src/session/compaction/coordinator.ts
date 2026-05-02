@@ -36,7 +36,17 @@ const log = Log.create({ service: "compaction.coordinator" })
 // Types
 // ============================================================
 
-export type CompactionLayer = "micro" | "auto" | "full"
+// Wave 8 Step 4: "handoff" is a fourth layer above "full" — instead of
+// in-session compaction, the runtime forks a clean subagent with a
+// handoff brief and ends the parent. Addresses Context Rot at the
+// session-lifecycle level: when a session crosses ~75% context, fresh
+// subcontext is more reliable than aggressive compaction.
+//
+// Gated behind OPENAGT_EXPERIMENTAL_AUTO_FORK while the handoff brief
+// generation + subagent dispatch path stabilizes. When the env is unset
+// (default), this layer never fires and the existing micro/auto/full
+// cascade is unchanged.
+export type CompactionLayer = "micro" | "auto" | "full" | "handoff"
 
 export interface CompactionDecision {
   layer: CompactionLayer | "none"
@@ -61,6 +71,16 @@ export interface CompactionCoordinatorConfig {
   enableThreeLayer: boolean
   preferMicroOverAuto: boolean
   aggressiveCompression: boolean
+  // Wave 8 Step 4: when true, the decide() path will return layer="handoff"
+  // before reaching the "full" fallback if context usage crosses
+  // autoForkThreshold. Off by default — gated on OPENAGT_EXPERIMENTAL_AUTO_FORK.
+  enableAutoFork: boolean
+  autoForkThreshold: number
+}
+
+const isAutoForkEnabled = (): boolean => {
+  const value = process.env.OPENAGT_EXPERIMENTAL_AUTO_FORK ?? process.env.OPENCODE_EXPERIMENTAL_AUTO_FORK
+  return value === "1" || value?.toLowerCase() === "true"
 }
 
 export const DEFAULT_COORDINATOR_CONFIG: CompactionCoordinatorConfig = {
@@ -71,6 +91,8 @@ export const DEFAULT_COORDINATOR_CONFIG: CompactionCoordinatorConfig = {
   enableThreeLayer: true,
   preferMicroOverAuto: true,
   aggressiveCompression: false,
+  enableAutoFork: isAutoForkEnabled(),
+  autoForkThreshold: 0.75,
 }
 
 // ============================================================
@@ -121,11 +143,24 @@ export class CompactionCoordinator {
       }
     }
 
+    // Layer 4 (Wave 8 Step 4): when OPENAGT_EXPERIMENTAL_AUTO_FORK is set,
+    // prefer handoff-to-fork over in-session full-compaction once context
+    // crosses autoForkThreshold (default 0.75). Forking to a clean subagent
+    // with a handoff brief is more reliable than aggressive in-session
+    // compaction at high context utilization (Context Rot research).
+    if (this.config.enableAutoFork && budget.used / model.limit.context >= this.config.autoForkThreshold) {
+      return {
+        layer: "handoff",
+        reason: `auto-fork threshold reached (${budget.used}/${model.limit.context}, threshold=${this.config.autoForkThreshold})`,
+        shouldCompact: true,
+      }
+    }
+
     // Layer 3: Check if FullCompact is required
     if (warningState.isAtBlockingLimit || budget.compressionRatio > 1.5) {
       return {
         layer: "full",
-        reason: `context limit exceeded (${budget.used}/${model.limit.context})`,
+        reason: `context limit reached (${budget.used}/${model.limit.context})`,
         shouldCompact: true,
       }
     }

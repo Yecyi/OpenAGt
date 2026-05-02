@@ -78,6 +78,14 @@ export const Flag = {
   // behavior.* events regardless of this flag — persistence is the only
   // thing it controls. See docs/audit/behavior-stream.md.
   OPENAGT_BEHAVIOR_AUDIT: truthy("OPENAGT_BEHAVIOR_AUDIT") || truthy("OPENCODE_BEHAVIOR_AUDIT"),
+  // Wave 8: when set, the compaction coordinator returns layer="handoff"
+  // before falling through to "full" once context usage crosses
+  // autoForkThreshold (default 0.75). Forking to a clean subagent with a
+  // handoff brief is the Context Rot-aware alternative to aggressive
+  // in-session compaction. Schema-only today — the consuming code that
+  // performs the fork + handoff brief is deferred.
+  OPENAGT_EXPERIMENTAL_AUTO_FORK:
+    truthy("OPENAGT_EXPERIMENTAL_AUTO_FORK") || truthy("OPENCODE_EXPERIMENTAL_AUTO_FORK"),
 
   OPENCODE_AUTO_HEAP_SNAPSHOT: truthy("OPENCODE_AUTO_HEAP_SNAPSHOT"),
   OPENCODE_GIT_BASH_PATH: process.env["OPENCODE_GIT_BASH_PATH"] ?? process.env["OPENAGT_GIT_BASH_PATH"],
