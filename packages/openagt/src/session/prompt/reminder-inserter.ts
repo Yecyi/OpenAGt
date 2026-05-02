@@ -10,7 +10,7 @@ import { PartID } from "../schema"
 import * as Session from "../session"
 import BUILD_SWITCH from "./build-switch.txt"
 import PROMPT_PLAN from "./plan.txt"
-import { addReminder } from "./reminder"
+import { addSafetyReminder } from "./reminder"
 
 export type PromptReminderInserterInput = {
   messages: MessageV2.WithParts[]
@@ -34,8 +34,11 @@ export class PromptReminderInserter {
 
       if (!Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE) {
         if (input.agent.name === "plan") {
-          // A-P1-3: Add to reminder budget with high importance
-          addReminder(PROMPT_PLAN, 8)
+          // Wave 8 Step 2: plan-mode is a hard safety constraint — the
+          // harness blocks non-readonly tools while it's active. Route into
+          // the safety pool so it can't be evicted by lower-importance
+          // info-class reminders that pile up later in the session.
+          addSafetyReminder(PROMPT_PLAN, 8)
           userMessage.parts.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
@@ -47,8 +50,10 @@ export class PromptReminderInserter {
         }
         const wasPlan = input.messages.some((msg) => msg.info.role === "assistant" && msg.info.agent === "plan")
         if (wasPlan && input.agent.name === "build") {
-          // A-P1-3: Add to reminder budget with high importance
-          addReminder(BUILD_SWITCH, 8)
+          // Build-switch reminder also routes through safety pool — it's
+          // the transition out of plan-mode and carries the constraint
+          // delta the model needs to apply.
+          addSafetyReminder(BUILD_SWITCH, 8)
           userMessage.parts.push({
             id: PartID.ascending(),
             messageID: userMessage.info.id,
@@ -66,8 +71,8 @@ export class PromptReminderInserter {
         const plan = Session.plan(input.session)
         if (!(yield* deps.fsys.existsSafe(plan))) return input.messages
         const text = `${BUILD_SWITCH}\n\nA plan file exists at ${plan}. You should execute on the plan defined within it`
-        // A-P1-3: Add to reminder budget with high importance
-        addReminder(text, 8)
+        // Wave 8 Step 2: build-switch with plan-file pointer — safety pool.
+        addSafetyReminder(text, 8)
         const part = yield* deps.sessions.updatePart({
           id: PartID.ascending(),
           messageID: userMessage.info.id,
