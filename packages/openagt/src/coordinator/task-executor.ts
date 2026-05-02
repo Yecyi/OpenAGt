@@ -1,5 +1,7 @@
 // Owns coordinator task prompt execution and task result recording.
 // It does not select ready tasks, create coordinator runs, or summarize runs.
+import * as Bus from "@/bus"
+import { Event as BehaviorEvent } from "@/bus/behavior-events"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { TaskRuntime } from "@/session/task-runtime"
@@ -66,6 +68,25 @@ export class CoordinatorTaskExecutor {
         })
       const started = yield* input.tasks.tryStartPending(record.task_id, record.parent_session_id)
       if (!started) return
+      // Wave 6: emit behavior.subagent.dispatched once the task transitions
+      // from pending to running. isolation_level reads from record.metadata
+      // when the planner attached it (CoordinatorNode.personal_memory_access);
+      // defaults to "full" for the legacy dispatch path that doesn't carry
+      // the flag through metadata yet.
+      const isolationLevel =
+        (started.metadata?.personal_memory_access as "full" | "facts_only" | "blind" | undefined) ?? "full"
+      yield* Effect.promise(() =>
+        Bus.publish(BehaviorEvent.SubagentDispatched, {
+          parent_session_id: String(started.parent_session_id),
+          child_session_id: String(started.child_session_id),
+          node_id: String(started.task_id),
+          agent: started.subagent_type,
+          role: typeof started.metadata?.role === "string" ? started.metadata.role : undefined,
+          isolation_level: isolationLevel,
+          goal_hash: started.prompt_hash,
+          started_at: started.started_at ?? Date.now(),
+        }),
+      ).pipe(Effect.ignore)
       const dependencies = (yield* input.tasks.list(started.parent_session_id)).filter((item) =>
         started.depends_on.includes(item.task_id),
       )
