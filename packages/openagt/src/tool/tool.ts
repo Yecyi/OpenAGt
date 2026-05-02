@@ -103,6 +103,61 @@ export interface ExecuteResult<M extends Metadata = Metadata> {
   attachments?: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[]
 }
 
+// Wave 7: structured tool-error contract. Tools that fail with a known
+// failure mode should throw `new ToolError({kind, fact, attempt?, of?})`
+// instead of `new Error("FAILED: ...")`. Downstream error handlers (e.g.
+// session/processor-tool-calls.ts fail()) can detect ToolError instances
+// and surface a factual one-line message to the model instead of leaking
+// affect-loaded prose like "FAILED" or "ERROR ERROR ERROR" — per the
+// emotion-concepts paper §1.3, tool-error language is one of the dynamic
+// affect surfaces models read at every retry.
+//
+// kinds:
+//   - validation: arguments failed schema/precondition checks
+//   - io: filesystem / network / DB error not under the agent's control
+//   - permission: a permission rule rejected the call
+//   - timeout: the tool exceeded its time budget
+//   - missing_precondition: required state (file, env var, dependency) absent
+//   - runtime: catch-all for unexpected failures
+export type ToolErrorKind =
+  | "validation"
+  | "io"
+  | "permission"
+  | "timeout"
+  | "missing_precondition"
+  | "runtime"
+
+export interface ToolErrorInput {
+  readonly kind: ToolErrorKind
+  // One-line factual description. Avoid "FAILED" / "ERROR" prefixes — the
+  // attempt-of-N framing surfaces failure structure without affect.
+  readonly fact: string
+  readonly attempt?: number
+  readonly of?: number
+  readonly cause?: unknown
+}
+
+export class ToolError extends Error {
+  readonly kind: ToolErrorKind
+  readonly fact: string
+  readonly attempt?: number
+  readonly of?: number
+
+  constructor(input: ToolErrorInput) {
+    const attemptSuffix = input.attempt !== undefined && input.of !== undefined ? `attempt ${input.attempt}/${input.of}: ` : ""
+    super(`${attemptSuffix}${input.fact}`, input.cause !== undefined ? { cause: input.cause } : undefined)
+    this.name = "ToolError"
+    this.kind = input.kind
+    this.fact = input.fact
+    this.attempt = input.attempt
+    this.of = input.of
+  }
+}
+
+export function isToolError(value: unknown): value is ToolError {
+  return value instanceof ToolError
+}
+
 export interface Def<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
   id: string
   description: string
