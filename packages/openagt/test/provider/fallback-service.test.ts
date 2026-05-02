@@ -221,6 +221,55 @@ describe("provider.fallback-service", () => {
     expect(verdict.server).toBe(true)
   })
 
+  // Regression for April 2026-04 finding 4.5 — `computeBackoff` was defined
+  // but never called, so a 429 storm rotated the chain at full speed. The
+  // sleep is now gated on `state.attempts > 0` so the *first* hop after a
+  // failure runs immediately (the user already paid the failed-call
+  // latency) but consecutive hops back off computeBackoff(attempts, policy).
+  test("backs off between consecutive next() calls after the first hop", async () => {
+    const baseDelayMs = 80
+    const jitterFactor = 0.3
+    const result = await run(
+      {
+        provider: {
+          primary: {
+            fallback: {
+              enabled: true,
+              chain: [
+                { provider: "backup", model: "model-a" },
+                { provider: "backup", model: "model-b" },
+              ],
+              maxRetries: 5,
+              retryPolicy: { baseDelayMs, jitterFactor },
+            },
+          },
+        },
+      },
+      [model("backup", "model-a"), model("backup", "model-b")],
+      Effect.gen(function* () {
+        const fallback = yield* ProviderFallback.Service
+        const state0 = yield* fallback.createState("primary", "main")
+        if (!state0) throw new Error("missing fallback state")
+        const t1 = Date.now()
+        const hop1 = yield* fallback.next(state0)
+        const elapsed1 = Date.now() - t1
+        if (!hop1) throw new Error("missing hop1")
+        const t2 = Date.now()
+        const hop2 = yield* fallback.next(hop1.state)
+        const elapsed2 = Date.now() - t2
+        return { elapsed1, elapsed2, hop2 }
+      }),
+    )
+
+    expect(result.hop2).toBeDefined()
+    // First hop runs immediately — no backoff before the first probe.
+    expect(result.elapsed1).toBeLessThan(40)
+    // Second hop sleeps computeBackoff(1, policy) = 2 * baseDelayMs ± jitter.
+    // Lower bound is 2 * baseDelayMs * (1 - jitterFactor) by construction.
+    const minExpected = 2 * baseDelayMs * (1 - jitterFactor)
+    expect(result.elapsed2).toBeGreaterThanOrEqual(minExpected)
+  })
+
   test("publishes the shared fallback bus event and returns a safe metrics snapshot", async () => {
     const events: Array<{ type: string; properties: unknown }> = []
     const result = await Effect.runPromise(

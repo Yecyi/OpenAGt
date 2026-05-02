@@ -149,8 +149,20 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
     const next: Interface["next"] = Effect.fn("ProviderFallback.next")(function* (fallbackState: FallbackState) {
       if (fallbackState.attempts >= fallbackState.maxRetries) return undefined
 
-      const now = Date.now()
       const policy = fallbackState.retryPolicy
+
+      // Backoff between consecutive hops. The first call into next runs
+      // immediately because the user already paid the failed-call latency
+      // that triggered fallback. Subsequent calls (state.attempts > 0)
+      // sleep computeBackoff(attempts, policy) before probing the next
+      // entry — so a 429 storm rotating through the chain doesn't hammer
+      // every provider in the same wallclock millisecond. Without this
+      // sleep computeBackoff was dead code (April 2026-04 finding 4.5).
+      if (fallbackState.attempts > 0) {
+        yield* Effect.sleep(computeBackoff(fallbackState.attempts, policy))
+      }
+
+      const now = Date.now()
       let index = fallbackState.index + 1
       let attempts = fallbackState.attempts
 
