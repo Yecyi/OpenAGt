@@ -76,6 +76,10 @@ const PROMPT_GLOBS = [
   "packages/openagt/src/agent/**/*.ts",
   "packages/openagt/src/personal/**/*.ts",
   "packages/openagt/src/tool/*.txt",
+  // Wave 7: tool implementations construct dynamic error messages that
+  // become tool output the model reads on every retry. Same affect surface
+  // as the static .txt prompts.
+  "packages/openagt/src/tool/*.ts",
 ]
 
 // Files that are intentionally affect-loaded (e.g. opt-in autonomous mode
