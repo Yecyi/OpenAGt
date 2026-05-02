@@ -13,6 +13,7 @@ import DESCRIPTION from "./edit.txt"
 import { File } from "../file"
 import { FileWatcher } from "../file/watcher"
 import { Bus } from "../bus"
+import { Event as BehaviorEvent } from "../bus/behavior-events"
 import { Format } from "../format"
 import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
@@ -135,6 +136,16 @@ export const EditTool = Tool.define(
               file: filePath,
               event: "change",
             })
+            // Wave 6: behavior.file.touched. See bus/behavior-events.ts.
+            yield* bus
+              .publish(BehaviorEvent.FileTouched, {
+                path: filePath,
+                kind: "edit",
+                session_id: String(ctx.sessionID),
+                tool_call_id: ctx.callID,
+                bytes: contentNew.length,
+              })
+              .pipe(Effect.ignore)
             contentNew = yield* afs.readFileString(filePath)
             diff = trimDiff(
               createTwoFilesPatch(

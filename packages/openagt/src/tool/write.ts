@@ -6,6 +6,7 @@ import { LSP } from "../lsp"
 import { createTwoFilesPatch } from "diff"
 import DESCRIPTION from "./write.txt"
 import { Bus } from "../bus"
+import { Event as BehaviorEvent } from "../bus/behavior-events"
 import { File } from "../file"
 import { FileWatcher } from "../file/watcher"
 import { Format } from "../format"
@@ -58,6 +59,18 @@ export const WriteTool = Tool.define(
             file: filepath,
             event: exists ? "change" : "add",
           })
+          // Wave 6: behavior.file.touched lets a single audit consumer
+          // reconstruct filesystem footprint without joining File.Event.Edited
+          // and FileWatcher.Event.Updated against tool-call lifecycle events.
+          yield* bus
+            .publish(BehaviorEvent.FileTouched, {
+              path: filepath,
+              kind: "write",
+              session_id: String(ctx.sessionID),
+              tool_call_id: ctx.callID,
+              bytes: params.content.length,
+            })
+            .pipe(Effect.ignore)
 
           let output = "Wrote file successfully."
           yield* lsp.touchFile(filepath, true)

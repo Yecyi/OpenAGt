@@ -7,6 +7,8 @@ import * as Tool from "./tool"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { LSP } from "../lsp"
 import DESCRIPTION from "./read.txt"
+import * as Bus from "../bus"
+import { Event as BehaviorEvent } from "../bus/behavior-events"
 import { Instance } from "../project/instance"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
@@ -284,6 +286,18 @@ export const ReadTool = Tool.define(
       if (loaded.length > 0) {
         output += `\n\n<system-reminder>\n${loaded.map((item) => item.content).join("\n\n")}\n</system-reminder>`
       }
+
+      // Wave 6: behavior.file.touched (kind: "read"). Static Bus.publish so
+      // we don't need to inject Bus.Service into the read tool's deps.
+      yield* Effect.promise(() =>
+        Bus.publish(BehaviorEvent.FileTouched, {
+          path: filepath,
+          kind: "read",
+          session_id: String(ctx.sessionID),
+          tool_call_id: ctx.callID,
+          bytes: output.length,
+        }),
+      ).pipe(Effect.ignore)
 
       return {
         title,
