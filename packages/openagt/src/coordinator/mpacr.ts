@@ -155,6 +155,10 @@ function criticNode(input: MpacrInput, perspective: CriticPerspective, idx: numb
     mpacr_per_critic_timeout_ms: input.profile.mpacr_per_critic_timeout_ms,
     mpacr_degraded: false,
     memory_namespace: `${input.workflow}:red-team:${perspective}`,
+    // Wave 5: red-team critics ground in cross-session facts (semantic
+    // domain knowledge, procedural recipes) but stay blind to user
+    // preferences — sycophancy mitigation per ELEPHANT.
+    personal_memory_access: "facts_only",
   })
 }
 
@@ -196,6 +200,9 @@ function defenderNode(input: MpacrInput, criticIds: readonly string[], steelManI
     mpacr_critic_node_ids: [...criticIds],
     mpacr_degraded: false,
     memory_namespace: `${input.workflow}:defender`,
+    // Wave 5: defender grounds rebuttals in factual evidence; stays
+    // blind to user preferences so the debate is judged on merit.
+    personal_memory_access: "facts_only",
   })
 }
 
@@ -258,6 +265,10 @@ function synthesisNode(
     mpacr_critic_node_ids: [...criticIds],
     mpacr_degraded: false,
     memory_namespace: `${input.workflow}:synth-reviser`,
+    // Wave 5: synthesis judges the debate on factual merit; user
+    // preferences stay out so the verdict is not biased toward what
+    // the user wants to hear.
+    personal_memory_access: "facts_only",
   })
 }
 

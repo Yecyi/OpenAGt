@@ -47,6 +47,16 @@ export type BudgetScale = z.infer<typeof BudgetScale>
 export const AutoContinuePolicy = z.enum(["never", "checkpoint", "safe"])
 export type AutoContinuePolicy = z.infer<typeof AutoContinuePolicy>
 
+// Wave 5: how much personal memory a CoordinatorNode's session may see.
+// Default "full" preserves existing behavior. "facts_only" filters memory
+// queries to kind: ["fact"] so the subagent grounds in cross-session
+// empirical claims but not in user preferences (devil's-advocate / red-team
+// reviewers; sycophancy mitigation per ELEPHANT). "blind" excludes personal
+// memory entirely for pure-adversary roles where any context bleed is
+// undesirable.
+export const PersonalMemoryAccess = z.enum(["full", "facts_only", "blind"])
+export type PersonalMemoryAccess = z.infer<typeof PersonalMemoryAccess>
+
 export const RevisePolicy = z.enum(["none", "critical_only", "all_artifacts"])
 export type RevisePolicy = z.infer<typeof RevisePolicy>
 

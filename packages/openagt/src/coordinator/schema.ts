@@ -11,6 +11,7 @@ import {
   CoordinatorParallelMode,
   EffortLevel,
   NodePriority,
+  PersonalMemoryAccess,
   ReviseKind,
   RevisePolicy,
   RiskLevel,
@@ -217,6 +218,12 @@ export const CoordinatorNode = z.object({
   mpacr_per_critic_timeout_ms: z.number().int().min(1).optional(),
   mpacr_degraded: z.boolean().optional(),
   memory_namespace: z.string().optional(),
+  // Wave 5: how much personal memory this node's session may see.
+  // Default "full" — existing nodes are unchanged. Critic / defender /
+  // synthesis nodes set "facts_only" for sycophancy mitigation so the
+  // adversarial reviewer is blind to user preferences but still grounded
+  // in cross-session facts. See PersonalMemoryAccess enum.
+  personal_memory_access: PersonalMemoryAccess.default("full"),
   confidence: ConfidenceLevel.optional(),
   revise_policy: RevisePolicy.optional(),
 })
