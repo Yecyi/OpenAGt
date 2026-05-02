@@ -11,6 +11,7 @@ export const PersonalMemoryNoteTable = sqliteTable(
   {
     id: text().$type<MemoryNoteID>().primaryKey(),
     scope: text().notNull(),
+    kind: text().notNull().default("belief"),
     project_id: text()
       .$type<ProjectID>()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
@@ -28,6 +29,7 @@ export const PersonalMemoryNoteTable = sqliteTable(
   },
   (table) => [
     index("personal_memory_scope_idx").on(table.scope),
+    index("personal_memory_kind_idx").on(table.kind),
     index("personal_memory_project_idx").on(table.project_id),
     index("personal_memory_session_idx").on(table.session_id),
   ],

@@ -18,6 +18,7 @@ export function memoryFromRow(row: typeof PersonalMemoryNoteTable.$inferSelect) 
   return MemoryNote.parse({
     id: row.id,
     scope: row.scope,
+    kind: row.kind ?? "belief",
     projectID: row.project_id ?? undefined,
     sessionID: row.session_id ?? undefined,
     title: row.title,

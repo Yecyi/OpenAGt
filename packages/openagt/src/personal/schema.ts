@@ -53,6 +53,17 @@ export const ScheduledWakeupID = scheduledWakeupIdSchema.pipe(
 export const MemoryScope = z.enum(["profile", "workspace", "session", "semantic", "procedural"])
 export type MemoryScope = z.infer<typeof MemoryScope>
 
+// Wave 5: orthogonal to scope (where the note lives) — kind classifies what
+// the note CLAIMS so injection can be selective. Fact: empirical claim
+// about the world or codebase; injected by default. Preference: stated user
+// preference about style/approach; influences style metadata only, not
+// textual context. Belief: working hypothesis or assertion not yet
+// confirmed; opt-in via explicit search. Default is "belief" because the
+// most conservative interpretation of an unclassified note is "user said
+// this; treat as their stated belief".
+export const MemoryKind = z.enum(["fact", "preference", "belief"])
+export type MemoryKind = z.infer<typeof MemoryKind>
+
 export const MemorySource = z.enum([
   "manual",
   "coordinator",
@@ -81,6 +92,7 @@ export type WorkPriority = z.infer<typeof WorkPriority>
 export const MemoryNote = z.object({
   id: MemoryNoteID.zod,
   scope: MemoryScope,
+  kind: MemoryKind.default("belief"),
   projectID: z.string().optional(),
   sessionID: z.string().optional(),
   title: z.string(),

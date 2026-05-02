@@ -11,6 +11,7 @@ import {
   MemoryNoteID,
   MemorySearchResult,
   MemorySource,
+  type MemoryKind as MemoryKindType,
   type MemoryNote as MemoryNoteType,
   type MemoryScope as MemoryScopeType,
   type MemorySearchResult as MemorySearchResultType,
@@ -45,6 +46,10 @@ export type SynthesizeKind =
 
 export interface RememberInput {
   scope: MemoryScopeType
+  // Wave 5: orthogonal classifier — fact (empirical claim), preference
+  // (stated style/approach choice), belief (working hypothesis). Default
+  // "belief" because most ad-hoc remember() callers don't classify.
+  kind?: MemoryKindType
   title: string
   content: string
   projectID?: ProjectID
@@ -110,6 +115,7 @@ export function createMemoryOps(bus: Bus.Interface) {
           .values({
             id,
             scope: input.scope,
+            kind: input.kind ?? "belief",
             project_id: input.projectID,
             session_id: input.sessionID,
             title: input.title,
