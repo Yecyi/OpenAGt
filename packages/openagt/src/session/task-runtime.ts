@@ -188,7 +188,21 @@ export interface Interface {
     mode: "all" | "any"
     timeoutMs?: number
   }) => Effect.Effect<TaskResult[], Error>
-  readonly canRun: (input: { parentSessionID: SessionID; task: TaskRecord }) => Effect.Effect<boolean, Error>
+  /**
+   * Decide whether `task` is eligible to dispatch right now.
+   *
+   * Pass `tasks` to evaluate against a pre-fetched snapshot — required when
+   * the caller dispatches multiple ready tasks in one sweep (the dispatch
+   * loop). Without `tasks` canRun calls list() itself (O(N) storage reads
+   * per call), so a sweep of K ready tasks becomes O(K*N) — see April
+   * 2026-04 finding 4.7. The snapshot path is the dispatch-loop fast path;
+   * the no-snapshot path is the single-task tool/test fast path.
+   */
+  readonly canRun: (input: {
+    parentSessionID: SessionID
+    task: TaskRecord
+    tasks?: TaskRecord[]
+  }) => Effect.Effect<boolean, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/TaskRuntime") {}
@@ -222,7 +236,7 @@ export const layer = Layer.effect(
     })
 
     const canRun: Interface["canRun"] = Effect.fn("TaskRuntime.canRun")(function* (input) {
-      const tasks = yield* list(input.parentSessionID)
+      const tasks = input.tasks ?? (yield* list(input.parentSessionID))
       if (
         !input.task.depends_on.every((taskID) =>
           tasks.some((item) => item.task_id === taskID && item.status === "completed"),

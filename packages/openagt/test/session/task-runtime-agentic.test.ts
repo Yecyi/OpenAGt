@@ -156,6 +156,55 @@ describe("task runtime agentic scheduling", () => {
     ),
   )
 
+  // Regression for April 2026-04 finding 4.7 — canRun used to call
+  // list() unconditionally, so a sweep of K ready tasks paid O(K*N)
+  // storage reads where N is total tasks ever created in the session.
+  // The dispatch loop now passes its pre-fetched allTasks snapshot in.
+  // This test pins the new contract: when `tasks` is provided, the
+  // snapshot is the source of truth and the storage list is bypassed.
+  it.live("canRun honors a pre-fetched tasks snapshot for the dispatch sweep fast path", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "canRun snapshot fast path" })
+        const upstream = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_canrun_upstream" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "upstream",
+          prompt: "research",
+          dependsOn: [],
+        })
+        yield* tasks.setRunning(upstream.task_id, parent.id)
+        yield* tasks.complete({ taskID: upstream.task_id, parentSessionID: parent.id })
+        const downstream = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_canrun_downstream" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "downstream",
+          prompt: "use upstream",
+          dependsOn: [upstream.task_id],
+        })
+
+        // Default path: canRun calls list internally and sees the completed
+        // upstream dep. Backward compatibility for single-task callers.
+        expect(yield* tasks.canRun({ parentSessionID: parent.id, task: downstream })).toBe(true)
+
+        // Snapshot path: an empty snapshot hides the upstream dep entirely,
+        // so the dependency check fails even though storage has the dep.
+        // This proves the snapshot parameter actually short-circuits list().
+        expect(yield* tasks.canRun({ parentSessionID: parent.id, task: downstream, tasks: [] })).toBe(false)
+
+        // Snapshot path with the real list passed in: matches default path.
+        const snapshot = yield* tasks.list(parent.id)
+        expect(yield* tasks.canRun({ parentSessionID: parent.id, task: downstream, tasks: snapshot })).toBe(true)
+      }),
+    ),
+  )
+
   it.live("does not double-count Anthropic cache tokens in task usage", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {

@@ -39,6 +39,9 @@ export class CoordinatorDispatchLoop {
       }
       const allTasks = yield* input.relevantTasks(run)
       const pending = allTasks.filter((item) => item.status === "pending")
+      // canRun receives the pre-fetched allTasks snapshot so a sweep of K
+      // ready tasks is O(N) storage reads (the relevantTasks call above)
+      // instead of O(K*N). See A4 in the canRun signature comment for why.
       const ready = (yield* Effect.forEach(
         pending,
         (item) =>
@@ -46,6 +49,7 @@ export class CoordinatorDispatchLoop {
             .canRun({
               parentSessionID: SessionID.make(run.sessionID),
               task: item,
+              tasks: allTasks,
             })
             .pipe(Effect.map((allowed) => (allowed ? item : undefined))),
         {
