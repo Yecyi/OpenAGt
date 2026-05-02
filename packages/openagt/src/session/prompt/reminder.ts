@@ -7,84 +7,138 @@
  * Budgets are keyed by sessionID so reminders accumulated in one session
  * don't leak into another. Use `installLifecycleHooks(unsubFn)` from a layer
  * setup so the per-session map is freed on Session.Event.Deleted.
+ *
+ * Wave 8: split into two pools per Veseli 2025's attention positional bias
+ * finding (when context >50% full, distance from end decides retrievability).
+ *
+ *   - Safety pool: hard constraints the harness must always surface
+ *     (plan-mode block, permission-deny, dangerous-shell warnings).
+ *     Never evicted. Bounded at SAFETY_REMINDER_TOKEN_BUDGET tokens.
+ *   - Info pool: existing importance-evicted reminders (plan/build switching,
+ *     general workflow nudges). Bounded at INFO_REMINDER_TOKEN_BUDGET tokens.
+ *
+ * Total reminder cap = SAFETY + INFO = 2000 tokens (unchanged from pre-split
+ * total). Safety reservation guarantees a baseline of safety-class messages
+ * even when info-class reminders are aggressively pushed.
  */
 
-const REMINDER_TOKEN_BUDGET = 2000
 const REMINDER_CHARS_PER_TOKEN = 4
+// Reserved for never-evicted safety reminders (plan-mode, permission, etc.).
+const SAFETY_REMINDER_TOKEN_BUDGET = 512
+// Existing importance-evicted budget; reduced from 2000 to keep total at 2000.
+const INFO_REMINDER_TOKEN_BUDGET = 1488
 
 export interface ReminderEntry {
   text: string
   importance: number
   timestamp: number
+  safety: boolean
 }
 
 /**
  * In-memory reminder budget tracker
- * Manages importance-based reminders with token budget enforcement
+ *
+ * Maintains two pools:
+ *   - safety entries (never evicted, hard cap at SAFETY budget)
+ *   - info entries (importance + FIFO eviction, hard cap at INFO budget)
+ *
+ * `getAll()` returns safety entries first (turn-tail position, attention
+ * priority per Veseli 2025) followed by info entries.
  */
 export class ReminderBudget {
-  private entries: ReminderEntry[] = []
+  private safetyEntries: ReminderEntry[] = []
+  private infoEntries: ReminderEntry[] = []
 
   /**
-   * Add a reminder entry with automatic budget enforcement
+   * Add a reminder. Default tier is "info" (importance-evicted).
+   * Pass safety: true for hard safety constraints that must not be evicted.
    */
-  add(text: string, importance: number): void {
-    this.entries.push({ text, importance, timestamp: Date.now() })
-    this.enforce()
+  add(text: string, importance: number, options: { safety?: boolean } = {}): void {
+    const safety = options.safety ?? false
+    const entry: ReminderEntry = { text, importance, timestamp: Date.now(), safety }
+    if (safety) {
+      this.safetyEntries.push(entry)
+      this.enforceSafety()
+    } else {
+      this.infoEntries.push(entry)
+      this.enforceInfo()
+    }
   }
 
   /**
-   * Get all reminders as text array
+   * Get all reminders as text array. Safety entries surface first so the
+   * combined string puts them at the top of the reminder section
+   * (turn-tail position when this section sits at the user-message tail).
    */
   getAll(): string[] {
-    return this.entries.map((e) => e.text)
+    return [...this.safetyEntries.map((e) => e.text), ...this.infoEntries.map((e) => e.text)]
   }
 
   /**
-   * Clear all reminders
+   * Clear all reminders (both pools).
    */
   clear(): void {
-    this.entries = []
+    this.safetyEntries = []
+    this.infoEntries = []
   }
 
   /**
-   * Get total character count
+   * Get total character count across both pools.
    */
   get totalChars(): number {
-    return this.entries.reduce((sum, r) => sum + r.text.length, 0)
+    const safety = this.safetyEntries.reduce((sum, r) => sum + r.text.length, 0)
+    const info = this.infoEntries.reduce((sum, r) => sum + r.text.length, 0)
+    return safety + info
   }
 
   /**
-   * Get total estimated tokens
+   * Get total estimated tokens across both pools.
    */
   get totalTokens(): number {
     return Math.ceil(this.totalChars / REMINDER_CHARS_PER_TOKEN)
   }
 
   /**
-   * Get remaining budget in characters
+   * Get remaining info-pool budget in characters. Safety pool has its own
+   * bookkeeping; this is the budget for new info-class entries.
    */
   get remainingChars(): number {
-    const targetChars = REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
-    return Math.max(0, targetChars - this.totalChars)
+    const targetChars = INFO_REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+    const used = this.infoEntries.reduce((sum, r) => sum + r.text.length, 0)
+    return Math.max(0, targetChars - used)
   }
 
   /**
-   * Enforce the token budget by evicting lowest importance entries
+   * Safety pool: bounded eviction by FIFO only (oldest first). Importance
+   * doesn't apply — safety reminders are inherently load-bearing. The
+   * SAFETY budget should be sized so this rarely needs to evict; if it
+   * does, the oldest safety reminder is the one most likely already
+   * acknowledged or stale.
    */
-  private enforce(): void {
-    const targetChars = REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+  private enforceSafety(): void {
+    const targetChars = SAFETY_REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+    this.safetyEntries.sort((a, b) => a.timestamp - b.timestamp)
+    while (this.safetyEntries.length > 0) {
+      const totalChars = this.safetyEntries.reduce((sum, r) => sum + r.text.length, 0)
+      if (totalChars <= targetChars) break
+      this.safetyEntries.shift()
+    }
+  }
 
-    // Sort by importance (lowest first) then timestamp (oldest first) for FIFO
-    this.entries.sort((a, b) => {
+  /**
+   * Info pool: importance-then-timestamp eviction (existing behavior,
+   * preserved unchanged from pre-Wave-8 ReminderBudget).
+   */
+  private enforceInfo(): void {
+    const targetChars = INFO_REMINDER_TOKEN_BUDGET * REMINDER_CHARS_PER_TOKEN
+    this.infoEntries.sort((a, b) => {
       if (a.importance !== b.importance) return a.importance - b.importance
       return a.timestamp - b.timestamp
     })
-
-    while (this.entries.length > 0) {
-      const totalChars = this.entries.reduce((sum, r) => sum + r.text.length, 0)
+    while (this.infoEntries.length > 0) {
+      const totalChars = this.infoEntries.reduce((sum, r) => sum + r.text.length, 0)
       if (totalChars <= targetChars) break
-      this.entries.shift()
+      this.infoEntries.shift()
     }
   }
 }
@@ -117,6 +171,15 @@ export const defaultReminderBudget = new ReminderBudget()
 export function addReminder(text: string, importance: number, sessionID?: string): void {
   const budget = sessionID ? getBudget(sessionID) : defaultReminderBudget
   budget.add(text, importance)
+}
+
+// Wave 8: explicit safety-tier helper. Safety reminders go into the
+// never-evicted pool and surface first in getAll() output. Use for
+// plan-mode blocks, permission-deny notices, and dangerous-shell warnings —
+// anything the harness must always be allowed to surface.
+export function addSafetyReminder(text: string, importance: number, sessionID?: string): void {
+  const budget = sessionID ? getBudget(sessionID) : defaultReminderBudget
+  budget.add(text, importance, { safety: true })
 }
 
 export function getReminders(sessionID?: string): string[] {
