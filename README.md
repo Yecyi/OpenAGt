@@ -59,6 +59,8 @@ OpenAGt's prompt corpus and tool surface are shaped by 2024–2026 LLM-behavior 
 
 - **Autonomous-mode opt-in.** The legacy autonomous prompts (`beast.txt`, `copilot-gpt-5.txt`) are preserved byte-for-byte under `*-autonomous.txt` and selectable via `OPENAGT_AUTONOMOUS_MODE=1` (alias `OPENCODE_AUTONOMOUS_MODE`). Default behavior is the softened variant; users who want the old grind can opt back in explicitly with their eyes open.
 
+- **Behavior audit stream.** A unified `behavior.*` event family (tool calls, permission decisions, memory injections, sub-agent dispatch, file touches) with consistent correlation IDs lets a single observer reconstruct what the agent actually did, independent of the model's stated reasoning — the CoT-faithfulness research shows reasoning trace is only 25–39% accurate on misaligned hints, so action-level audit is the only reliable signal. In-memory by default; persisted to the event ring buffer with `OPENAGT_BEHAVIOR_AUDIT=1`. See [docs/audit/behavior-stream.md](docs/audit/behavior-stream.md).
+
 Methodology, rule list, and per-wave audit history in [docs/audit/prompt-affect-baseline-2026-05-02.md](docs/audit/prompt-affect-baseline-2026-05-02.md). Affordance-tool design and Q&A in [docs/design/affordance-tools.md](docs/design/affordance-tools.md). Contributor conventions in [AGENTS.md](AGENTS.md) under "Prompt files".
 
 ## Release
@@ -358,6 +360,7 @@ Useful runtime variables:
 | `OPENAGT_EXPERIMENTAL`           | Enable experimental feature bundle       |
 | `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling        |
 | `OPENAGT_AUTONOMOUS_MODE`        | Restore legacy "beast" / "copilot" autonomous prompts (closes the escalation affordance — opt in only when you understand the trade-off; see `docs/audit/prompt-affect-baseline-2026-05-02.md`) |
+| `OPENAGT_BEHAVIOR_AUDIT`         | Persist `behavior.*` events to the disk-backed ring buffer (in-memory by default; see `docs/audit/behavior-stream.md`) |
 | `OPENAGT_DB`                     | Override database path                   |
 
 ## Extending OpenAGt
