@@ -333,6 +333,10 @@ export const layer = Layer.effect(
         const parsed = SemanticFactInput.parse(input)
         const note = yield* personal.remember({
           scope: "semantic" as MemoryScopeType,
+          // Wave 5: semantic facts are empirical (subject, predicate, object)
+          // claims about the world or codebase. Tag as fact so the
+          // critic-isolation filter (`kinds: ["fact"]`) returns them.
+          kind: "fact",
           title: makeSemanticTitle(parsed),
           content: `${parsed.subject} ${parsed.predicate} ${parsed.object}`,
           projectID: parsed.projectID as ProjectID | undefined,
@@ -360,6 +364,10 @@ export const layer = Layer.effect(
       const successRate = parsed.success_count / Math.max(1, parsed.success_count + parsed.failure_count)
       const note = yield* personal.remember({
         scope: "procedural" as MemoryScopeType,
+        // Wave 5: procedural recipes are observed-to-work patterns —
+        // empirical claims about which step sequences succeed. Tag as
+        // fact so the critic-isolation filter returns them.
+        kind: "fact",
         title: `Recipe: ${parsed.task_signature}`,
         content: parsed.steps.map((s, i) => `${i + 1}. ${s.description}`).join("\n"),
         tags: proceduralTags(parsed),
