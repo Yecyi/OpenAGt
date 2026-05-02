@@ -24,6 +24,30 @@ const CRITICAL_EVENT_TYPES = [
 ]
 
 /**
+ * Wave 6 behavior.* event types — persisted only when OPENAGT_BEHAVIOR_AUDIT
+ * is set. See bus/behavior-events.ts for the full taxonomy.
+ */
+const BEHAVIOR_EVENT_TYPES = [
+  "behavior.tool.invoked",
+  "behavior.tool.completed",
+  "behavior.permission.decided",
+  "behavior.memory.injected",
+  "behavior.subagent.dispatched",
+  "behavior.file.touched",
+]
+
+function isBehaviorAuditEnabled(): boolean {
+  const value = process.env.OPENAGT_BEHAVIOR_AUDIT ?? process.env.OPENCODE_BEHAVIOR_AUDIT
+  return value === "1" || value?.toLowerCase() === "true"
+}
+
+function isCriticalEventType(eventType: string): boolean {
+  if (CRITICAL_EVENT_TYPES.includes(eventType)) return true
+  if (isBehaviorAuditEnabled() && BEHAVIOR_EVENT_TYPES.includes(eventType)) return true
+  return false
+}
+
+/**
  * Ring buffer for event persistence with bounded capacity.
  * Max capacity is configurable via the `OPENCODE_EVENT_BUFFER_SIZE` environment variable.
  */
@@ -75,7 +99,7 @@ class EventBuffer {
 
   push(event: { timestamp: number; payload: unknown }): boolean {
     const eventType = (event.payload as any)?.type ?? ""
-    const isCritical = CRITICAL_EVENT_TYPES.includes(eventType)
+    const isCritical = isCriticalEventType(eventType)
 
     // Backpressure: at 90% capacity, drop non-critical events
     if (this.events.length >= this.maxCapacity * 0.9 && !isCritical) {

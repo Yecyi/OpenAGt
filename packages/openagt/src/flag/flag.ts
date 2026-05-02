@@ -71,6 +71,13 @@ export const Flag = {
   // affordance — opt in only when you understand that trade-off. See
   // docs/audit/prompt-affect-baseline-2026-05-02.md.
   OPENAGT_AUTONOMOUS_MODE: truthy("OPENAGT_AUTONOMOUS_MODE") || truthy("OPENCODE_AUTONOMOUS_MODE"),
+  // When set, behavior.* events (tool invocations, permission decisions,
+  // memory injections, subagent dispatch, file touches) are persisted to the
+  // event ring buffer alongside the existing critical-event family. Off by
+  // default to avoid disk I/O on every tool call. SSE subscribers receive
+  // behavior.* events regardless of this flag — persistence is the only
+  // thing it controls. See docs/audit/behavior-stream.md.
+  OPENAGT_BEHAVIOR_AUDIT: truthy("OPENAGT_BEHAVIOR_AUDIT") || truthy("OPENCODE_BEHAVIOR_AUDIT"),
 
   OPENCODE_AUTO_HEAP_SNAPSHOT: truthy("OPENCODE_AUTO_HEAP_SNAPSHOT"),
   OPENCODE_GIT_BASH_PATH: process.env["OPENCODE_GIT_BASH_PATH"] ?? process.env["OPENAGT_GIT_BASH_PATH"],
