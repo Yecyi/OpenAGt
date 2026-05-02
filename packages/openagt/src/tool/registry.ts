@@ -48,6 +48,7 @@ import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@openagt/shared/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
+import { warnDeprecatedConfigDir } from "../config/canonical-discovery"
 import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -168,6 +169,7 @@ export const layer = Layer.effect(
         )
         if (matches.length) yield* config.waitForDependencies()
         for (const match of matches) {
+          warnDeprecatedConfigDir("tool", "tools", match)
           const namespace = path.basename(match, path.extname(match))
           const mod = yield* Effect.promise(
             () => import(process.platform === "win32" ? match : pathToFileURL(match).href),

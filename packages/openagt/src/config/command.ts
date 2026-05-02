@@ -7,6 +7,7 @@ import { Glob } from "@openagt/shared/util/glob"
 import { Bus } from "@/bus"
 import { zod } from "@/util/effect-zod"
 import { withStatics } from "@/util/schema"
+import { warnDeprecatedConfigDir } from "./canonical-discovery"
 import { configEntryNameFromPath } from "./entry-name"
 import { InvalidError } from "./error"
 import * as ConfigMarkdown from "./markdown"
@@ -32,6 +33,7 @@ export async function load(dir: string) {
     dot: true,
     symlink: true,
   })) {
+    warnDeprecatedConfigDir("command", "commands", item)
     const md = await ConfigMarkdown.parse(item).catch(async (err) => {
       const message = ConfigMarkdown.FrontmatterError.isInstance(err)
         ? err.data.message

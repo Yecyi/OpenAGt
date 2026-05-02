@@ -1,5 +1,6 @@
 export * as Config from "./config"
 export * as ConfigAgent from "./agent"
+export * as ConfigCanonicalDiscovery from "./canonical-discovery"
 export * as ConfigCommand from "./command"
 export * as ConfigExecPolicy from "./exec-policy"
 export * as ConfigError from "./error"

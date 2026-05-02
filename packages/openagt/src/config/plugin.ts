@@ -5,6 +5,7 @@ import { isPathPluginSpec, parsePluginSpecifier, resolvePathPluginTarget } from 
 import { zod } from "@/util/effect-zod"
 import { withStatics } from "@/util/schema"
 import path from "path"
+import { warnDeprecatedConfigDir } from "./canonical-discovery"
 
 export const Options = Schema.Record(Schema.String, Schema.Unknown).pipe(withStatics((s) => ({ zod: zod(s) })))
 export type Options = Schema.Schema.Type<typeof Options>
@@ -36,6 +37,7 @@ export async function load(dir: string) {
     dot: true,
     symlink: true,
   })) {
+    warnDeprecatedConfigDir("plugins", "plugin", item)
     plugins.push(pathToFileURL(item).href)
   }
   return plugins

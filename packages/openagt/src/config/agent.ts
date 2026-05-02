@@ -7,6 +7,7 @@ import { zod, ZodOverride } from "@/util/effect-zod"
 import { Log } from "../util"
 import { NamedError } from "@openagt/shared/util/error"
 import { Glob } from "@openagt/shared/util/glob"
+import { warnDeprecatedConfigDir } from "./canonical-discovery"
 import { configEntryNameFromPath } from "./entry-name"
 import { InvalidError } from "./error"
 import * as ConfigMarkdown from "./markdown"
@@ -121,6 +122,7 @@ export async function load(dir: string) {
     dot: true,
     symlink: true,
   })) {
+    warnDeprecatedConfigDir("agent", "agents", item)
     const md = await ConfigMarkdown.parse(item).catch(async (err) => {
       const message = ConfigMarkdown.FrontmatterError.isInstance(err)
         ? err.data.message
@@ -158,6 +160,7 @@ export async function loadMode(dir: string) {
     dot: true,
     symlink: true,
   })) {
+    warnDeprecatedConfigDir("mode", "modes", item)
     const md = await ConfigMarkdown.parse(item).catch(async (err) => {
       const message = ConfigMarkdown.FrontmatterError.isInstance(err)
         ? err.data.message

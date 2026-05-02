@@ -12,6 +12,7 @@ import { Global } from "@/global"
 import { Permission } from "@/permission"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { Config } from "../config"
+import { warnDeprecatedConfigDir } from "../config/canonical-discovery"
 import { ConfigMarkdown } from "../config"
 import { Glob } from "@openagt/shared/util/glob"
 import { Log } from "../util"
@@ -115,7 +116,7 @@ const scan = Effect.fnUntraced(function* (
   state: ScanState,
   root: string,
   pattern: string,
-  opts?: { dot?: boolean; scope?: string },
+  opts?: { dot?: boolean; scope?: string; deprecatedAlias?: { canonical: string; deprecated: string } },
 ) {
   const matches = yield* Effect.tryPromise({
     try: () =>
@@ -136,6 +137,9 @@ const scan = Effect.fnUntraced(function* (
   )
 
   for (const match of matches) {
+    if (opts?.deprecatedAlias) {
+      warnDeprecatedConfigDir(opts.deprecatedAlias.canonical, opts.deprecatedAlias.deprecated, match)
+    }
     state.matches.add(match)
     state.dirs.add(path.dirname(match))
   }
@@ -168,7 +172,9 @@ const discoverSkills = Effect.fnUntraced(function* (
 
   const configDirs = yield* config.directories()
   for (const dir of configDirs) {
-    yield* scan(state, dir, OPENCODE_SKILL_PATTERN)
+    yield* scan(state, dir, OPENCODE_SKILL_PATTERN, {
+      deprecatedAlias: { canonical: "skills", deprecated: "skill" },
+    })
   }
 
   const cfg = yield* config.get()
