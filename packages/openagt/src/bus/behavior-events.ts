@@ -54,18 +54,21 @@ export const ToolCompleted = BusEvent.define(
   }),
 )
 
-// behavior.permission.decided — wraps permission.replied with the decision
-// flattened into a single field. Easier to consume than the structured Reply
-// shape for audit pipelines that just want allow/deny histograms.
+// behavior.permission.decided — wraps permission.replied with the
+// permission/contracts.ts `Reply` value flattened. "once" means approved
+// for this call only; "always" means approved + persisted to allow-list;
+// "reject" means denied (and any sibling pending requests in the same
+// session are also rejected). cascade=true marks the secondary rejections
+// emitted automatically when the original reject cascades.
 export const PermissionDecided = BusEvent.define(
   "behavior.permission.decided",
   z.object({
     request_id: z.string(),
     session_id: z.string(),
-    action: z.enum(["allow", "deny", "always", "reject", "ask"]),
-    reason: z.string().optional(),
-    tool_id: z.string().optional(),
-    tool_call_id: z.string().optional(),
+    action: z.enum(["once", "always", "reject"]),
+    pattern: z.string().optional(),
+    risk_level: z.string().optional(),
+    cascade: z.boolean().default(false),
   }),
 )
 

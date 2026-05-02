@@ -1,4 +1,5 @@
 import { Bus } from "@/bus"
+import { Event as BehaviorEvent } from "@/bus/behavior-events"
 import { InstanceState } from "@/effect"
 import { PermissionTable } from "@/session/session.sql"
 import { Database, eq } from "@/storage"
@@ -6,12 +7,28 @@ import { Log, Wildcard } from "@/util"
 import { Context, Deferred, Effect, Layer, Schema } from "effect"
 import { truncateForAudit, writeAuditLog } from "./audit"
 import { CorrectedError, DeniedError, RejectedError, Request } from "./contracts"
-import type { AskInput, Error, ReplyInput, Rule, Ruleset } from "./contracts"
+import type { AskInput, Error, Reply, ReplyInput, Rule, Ruleset } from "./contracts"
 import { Event } from "./events"
 import { evaluate as evalRule } from "./evaluate"
 import { PermissionID } from "./schema"
 
 const log = Log.create({ service: "permission" })
+
+// Wave 6: behavior.permission.decided emission. Publish errors are ignored
+// because the audit stream is best-effort observability and must not block
+// the permission reply path on bus backpressure.
+function publishBehaviorDecision(bus: Bus.Interface, request: Request, reply: Reply, cascade: boolean) {
+  return bus
+    .publish(BehaviorEvent.PermissionDecided, {
+      request_id: String(request.id),
+      session_id: String(request.sessionID),
+      action: reply,
+      pattern: request.patterns[0],
+      risk_level: typeof request.metadata?.riskLevel === "string" ? request.metadata.riskLevel : undefined,
+      cascade,
+    })
+    .pipe(Effect.ignore)
+}
 
 export interface Interface {
   readonly ask: (input: AskInput) => Effect.Effect<void, Error>
@@ -111,6 +128,7 @@ export const layer = Layer.effect(
         requestID: existing.info.id,
         reply: input.reply,
       })
+      yield* publishBehaviorDecision(bus, existing.info, input.reply, false)
 
       if (input.reply === "reject") {
         yield* Deferred.fail(
@@ -126,6 +144,7 @@ export const layer = Layer.effect(
             requestID: item.info.id,
             reply: "reject",
           })
+          yield* publishBehaviorDecision(bus, item.info, "reject", true)
           yield* Deferred.fail(item.deferred, new RejectedError())
         }
         return
@@ -165,6 +184,7 @@ export const layer = Layer.effect(
           requestID: item.info.id,
           reply: "always",
         })
+        yield* publishBehaviorDecision(bus, item.info, "always", true)
         yield* Deferred.succeed(item.deferred, undefined)
       }
     })
