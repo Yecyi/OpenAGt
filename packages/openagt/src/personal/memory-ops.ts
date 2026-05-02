@@ -63,6 +63,10 @@ export interface RememberInput {
 
 export interface ListMemoryInput {
   scope?: MemoryScopeType
+  // Wave 5: optional allow-list of kinds. When omitted, all kinds returned
+  // (no behavior change for existing callers). Critic / no-personal-memory
+  // call sites pass `["fact"]` to filter out preferences and beliefs.
+  kinds?: MemoryKindType[]
   projectID?: ProjectID
   sessionID?: SessionID
 }
@@ -72,6 +76,8 @@ export interface SearchMemoryInput {
   projectID?: ProjectID
   sessionID?: SessionID
   scopes?: MemoryScopeType[]
+  // Wave 5: same allow-list semantics as ListMemoryInput.kinds.
+  kinds?: MemoryKindType[]
   workflow?: string
   expertID?: string
   role?: string
@@ -149,6 +155,7 @@ export function createMemoryOps(bus: Bus.Interface) {
           .filter(
             (row) =>
               (!input?.scope || row.scope === input.scope) &&
+              (!input?.kinds || input.kinds.includes((row.kind ?? "belief") as MemoryKindType)) &&
               (!input?.projectID || row.project_id === input.projectID) &&
               (!input?.sessionID || row.session_id === input.sessionID),
           ),
@@ -218,6 +225,7 @@ export function createMemoryOps(bus: Bus.Interface) {
           .filter(
             (row) =>
               scopes.includes(row.scope as MemoryScopeType) &&
+              (!input.kinds || input.kinds.includes((row.kind ?? "belief") as MemoryKindType)) &&
               (!input.projectID || row.project_id === input.projectID) &&
               (!input.workflow || row.tags.includes(`workflow:${input.workflow}`)) &&
               (!input.expertID || row.tags.includes(`expert:${input.expertID}`)) &&
