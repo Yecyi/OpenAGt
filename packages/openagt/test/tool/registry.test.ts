@@ -4,6 +4,7 @@ import fs from "fs/promises"
 import { Effect, Layer } from "effect"
 import { Instance } from "../../src/project/instance"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import { PersonalAgent } from "../../src/personal/personal"
 import { ToolRegistry } from "../../src/tool"
 import { Config } from "../../src/config"
 import { provideTmpdirInstance } from "../fixture/fixture"
@@ -11,7 +12,9 @@ import { testEffect } from "../lib/effect"
 
 const node = CrossSpawnSpawner.defaultLayer
 
-const it = testEffect(Layer.mergeAll(Config.defaultLayer, ToolRegistry.defaultLayer, node))
+const it = testEffect(
+  Layer.mergeAll(Config.defaultLayer, ToolRegistry.defaultLayer.pipe(Layer.provide(PersonalAgent.defaultLayer)), node),
+)
 
 afterEach(async () => {
   await Instance.disposeAll()

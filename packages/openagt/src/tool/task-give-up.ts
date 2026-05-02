@@ -1,7 +1,9 @@
 import z from "zod"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { PersonalAgent } from "../personal/personal"
+// See escalate-to-inbox.ts for the rationale on importing from
+// personal/service directly instead of personal/personal.
+import { Service as PersonalAgentService } from "../personal/service"
 import { Instance } from "../project/instance"
 import DESCRIPTION from "./task-give-up.txt"
 
@@ -36,10 +38,10 @@ type Metadata = {
   inbox_id?: string
 }
 
-export const TaskGiveUpTool = Tool.define<typeof parameters, Metadata, PersonalAgent.Service>(
+export const TaskGiveUpTool = Tool.define<typeof parameters, Metadata, PersonalAgentService>(
   "task_give_up",
   Effect.gen(function* () {
-    const personal = yield* PersonalAgent.Service
+    const personal = yield* PersonalAgentService
     return {
       description: DESCRIPTION,
       parameters,

@@ -6,11 +6,11 @@ import { ProjectID } from "@/project/schema"
 import { Session } from "@/session"
 import { SessionID } from "@/session/schema"
 import { TaskRuntime } from "@/session/task-runtime"
-import { Context, Effect, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { createInboxOps } from "./inbox-ops"
 import { createIngestionOps } from "./ingestion-ops"
 import { createMemoryOps, type SynthesizeKind } from "./memory-ops"
-import { createOverviewOps, type OverviewInput, type OverviewResult } from "./overview-ops"
+import { createOverviewOps } from "./overview-ops"
 import { createWakeupOps } from "./wakeup-ops"
 import {
   InboxCreated,
@@ -20,23 +20,12 @@ import {
   SchedulerFired,
   SchedulerScheduled,
 } from "./events"
-import type {
-  CreateInboxItemInput,
-  ListInboxItemsInput,
-  UpdateInboxStateInput,
-} from "./inbox-ops"
-import type { IngestSessionInput, IngestWebhookInput } from "./ingestion-ops"
-import type {
-  ListMemoryInput,
-  RememberInput,
-  SearchMemoryInput,
-  SynthesizeInput,
-} from "./memory-ops"
-import type {
-  DispatchDueWakeupsInput,
-  ListDueWakeupsInput,
-  ScheduleWakeupInput,
-} from "./wakeup-ops"
+// Service tag + Interface live in ./service so consumers (e.g. tool/escalate-to-inbox.ts)
+// can import them without triggering personal -> coordinator load.
+import { Service } from "./service"
+import type { Interface } from "./service"
+export { Service } from "./service"
+export type { Interface } from "./service"
 import type {
   InboxItem as InboxItemType,
   MemoryNote as MemoryNoteType,
@@ -73,24 +62,7 @@ function memoryTags(input: {
   ].filter((item): item is string => Boolean(item))
 }
 
-export interface Interface {
-  readonly remember: (input: RememberInput) => Effect.Effect<MemoryNoteType, Error>
-  readonly listMemory: (input?: ListMemoryInput) => Effect.Effect<MemoryNoteType[], Error>
-  readonly searchMemory: (input: SearchMemoryInput) => Effect.Effect<MemorySearchResultType[], Error>
-  readonly synthesize: (input: SynthesizeInput) => Effect.Effect<MemoryNoteType, Error>
-  readonly createInboxItem: (input: CreateInboxItemInput) => Effect.Effect<InboxItemType, Error>
-  readonly listInboxItems: (input: ListInboxItemsInput) => Effect.Effect<InboxItemType[], Error>
-  readonly updateInboxState: (input: UpdateInboxStateInput) => Effect.Effect<InboxItemType, Error>
-  readonly scheduleWakeup: (input: ScheduleWakeupInput) => Effect.Effect<ScheduledWakeupType, Error>
-  readonly listDueWakeups: (input: ListDueWakeupsInput) => Effect.Effect<ScheduledWakeupType[], Error>
-  readonly dispatchDueWakeups: (input: DispatchDueWakeupsInput) => Effect.Effect<InboxItemType[], Error>
-  readonly completeWakeup: (id: z.infer<typeof ScheduledWakeupID.zod>) => Effect.Effect<ScheduledWakeupType, Error>
-  readonly ingestSession: (input: IngestSessionInput) => Effect.Effect<InboxItemType, Error>
-  readonly ingestWebhook: (input: IngestWebhookInput) => Effect.Effect<InboxItemType, Error>
-  readonly overview: (input: OverviewInput) => Effect.Effect<OverviewResult, Error>
-}
-
-export class Service extends Context.Service<Service, Interface>()("@openagt/PersonalAgent") {}
+// Interface and Service moved to ./service (re-exported above).
 
 export const layer = Layer.effect(
   Service,

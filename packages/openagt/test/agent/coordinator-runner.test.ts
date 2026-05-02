@@ -83,7 +83,11 @@ const it = testEffect(
     PersonalAgent.defaultLayer,
     ThreeLayerMemory.defaultLayer,
     ExpertRegistry.defaultLayer,
-  ).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer)),
+  ).pipe(
+    Layer.provide(ThreeLayerMemory.defaultLayer),
+    Layer.provide(ExpertRegistry.defaultLayer),
+    Layer.provide(PersonalAgent.defaultLayer),
+  ),
 )
 
 describe("coordinator runner", () => {

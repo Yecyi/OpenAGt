@@ -1,7 +1,12 @@
 import z from "zod"
 import { Effect } from "effect"
 import * as Tool from "./tool"
-import { PersonalAgent } from "../personal/personal"
+// Import from personal/service directly so the tool registry's load chain
+// doesn't pull in personal/personal -> coordinator/coordinator (TDZ cycle).
+// Service tag + Interface live in personal/service.ts; the actual layer
+// construction in personal/personal.ts is provided at the AppRuntime peer
+// level, not by ToolRegistry's defaultLayer.
+import { Service as PersonalAgentService } from "../personal/service"
 import { Instance } from "../project/instance"
 import DESCRIPTION from "./escalate-to-inbox.txt"
 
@@ -26,10 +31,10 @@ type Metadata = {
   blocked: boolean
 }
 
-export const EscalateToInboxTool = Tool.define<typeof parameters, Metadata, PersonalAgent.Service>(
+export const EscalateToInboxTool = Tool.define<typeof parameters, Metadata, PersonalAgentService>(
   "escalate_to_inbox",
   Effect.gen(function* () {
-    const personal = yield* PersonalAgent.Service
+    const personal = yield* PersonalAgentService
     return {
       description: DESCRIPTION,
       parameters,

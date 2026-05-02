@@ -5,6 +5,7 @@ import { fileURLToPath } from "url"
 import { Effect, Layer } from "effect"
 import { Instance } from "../../src/project/instance"
 import { Config } from "../../src/config"
+import { PersonalAgent } from "../../src/personal/personal"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { Session } from "../../src/session"
 import { MessageV2 } from "../../src/session/message-v2"
@@ -18,7 +19,13 @@ function run<A, E>(fx: Effect.Effect<A, E, SessionPrompt.Service | Session.Servi
   return Effect.runPromise(
     fx.pipe(
       Effect.scoped,
-      Effect.provide(Layer.mergeAll(Config.defaultLayer, SessionPrompt.defaultLayer, Session.defaultLayer)),
+      Effect.provide(
+        Layer.mergeAll(
+          Config.defaultLayer,
+          SessionPrompt.defaultLayer.pipe(Layer.provide(PersonalAgent.defaultLayer)),
+          Session.defaultLayer,
+        ),
+      ),
     ),
   )
 }

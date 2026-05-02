@@ -5,6 +5,7 @@ import { Session } from "../../src/session"
 import { SessionPrompt } from "../../src/session/prompt"
 import { Log } from "../../src/util"
 import { Instance } from "../../src/project/instance"
+import { PersonalAgent } from "../../src/personal/personal"
 import { MessageV2 } from "../../src/session/message-v2"
 import { Config } from "../../src/config"
 
@@ -26,7 +27,13 @@ function run<A, E>(fx: Effect.Effect<A, E, SessionPrompt.Service | Session.Servi
   return Effect.runPromise(
     fx.pipe(
       Effect.scoped,
-      Effect.provide(Layer.mergeAll(Config.defaultLayer, SessionPrompt.defaultLayer, Session.defaultLayer)),
+      Effect.provide(
+        Layer.mergeAll(
+          Config.defaultLayer,
+          SessionPrompt.defaultLayer.pipe(Layer.provide(PersonalAgent.defaultLayer)),
+          Session.defaultLayer,
+        ),
+      ),
     ),
   )
 }

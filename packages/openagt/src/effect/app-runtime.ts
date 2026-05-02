@@ -117,6 +117,10 @@ export const AppLayer = Layer.mergeAll(
   Layer.provide(ExpertRegistry.defaultLayer),
   Layer.provide(Calibration.defaultLayer),
   Layer.provide(PromptTemplates.defaultLayer),
+  // Wave 6 follow-up: ToolRegistry no longer self-imports PersonalAgent
+  // (avoids the registry → personal → coordinator → TDZ cycle that broke
+  // CI tests). Provide it explicitly here at the AppRuntime level.
+  Layer.provide(PersonalAgent.defaultLayer),
   Layer.provideMerge(Observability.layer),
 )
 

@@ -3,7 +3,19 @@ import { Session } from "../session"
 import { QuestionTool } from "./question"
 import { EscalateToInboxTool } from "./escalate-to-inbox"
 import { TaskGiveUpTool } from "./task-give-up"
-import { PersonalAgent } from "../personal/personal"
+// Note: do NOT `import { PersonalAgent } from "../personal/personal"` here.
+// personal/personal.ts has a top-level import of coordinator/coordinator.ts
+// (subscribes to Coordinator.Event.Completed). Pulling it into registry.ts
+// at module load creates a registry → personal → coordinator import chain
+// that deadlocks coordinator.ts:505 (Layer.provide(Agent.defaultLayer))
+// at TDZ when test files load tool/registry through this path. The
+// PersonalAgent.defaultLayer dependency for escalate_to_inbox / task_give_up
+// is provided at the peer level by AppRuntime (effect/app-runtime.ts), the
+// same way the coordinator's own peer-level requirements are satisfied
+// (see comment in coordinator.ts:497-500). Test files that compose
+// ToolRegistry.layer directly must add Layer.provide(PersonalAgent.defaultLayer)
+// to their merge — same pattern as Session.defaultLayer / TaskRuntime
+// .defaultLayer.
 import { BashTool } from "./bash"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
@@ -372,7 +384,6 @@ export const defaultLayer = Layer.suspend(() => {
     Config.defaultLayer,
     Plugin.defaultLayer,
     Question.defaultLayer,
-    PersonalAgent.defaultLayer,
     Todo.defaultLayer,
     Skill.defaultLayer,
     Agent.defaultLayer,

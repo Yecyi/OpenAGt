@@ -16,6 +16,7 @@ import { TaskStopTool } from "../../src/tool/task_stop"
 import { TaskWaitTool } from "../../src/tool/task_wait"
 import { Truncate } from "../../src/tool"
 import { ToolRegistry } from "../../src/tool"
+import { PersonalAgent } from "../../src/personal/personal"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { TaskRuntime } from "../../src/session/task-runtime"
@@ -39,7 +40,7 @@ const it = testEffect(
     Session.defaultLayer,
     TaskRuntime.defaultLayer,
     Truncate.defaultLayer,
-    ToolRegistry.defaultLayer,
+    ToolRegistry.defaultLayer.pipe(Layer.provide(PersonalAgent.defaultLayer)),
   ),
 )
 
