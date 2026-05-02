@@ -229,7 +229,10 @@ export const layer = Layer.effect(
 
     return Service.of({
       environment(model) {
-        const memoKey = "environment"
+        const project = Instance.project
+        const directory = Instance.directory
+        const worktree = Instance.worktree
+        const memoKey = `${model.providerID}:${model.api.id}:${directory}:${worktree}:${project.vcs}:${process.platform}`
         const dateStr = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date())
         const hash = computeHash(dateStr)
 
@@ -238,13 +241,12 @@ export const layer = Layer.effect(
           return cached.value
         }
 
-        const project = Instance.project
         const staticParts = [
           `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
           `Here is some useful information about the environment you are running in:`,
           `<env>`,
-          `  Working directory: ${Instance.directory}`,
-          `  Workspace root folder: ${Instance.worktree}`,
+          `  Working directory: ${directory}`,
+          `  Workspace root folder: ${worktree}`,
           `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
           `  Platform: ${process.platform}`,
           `</env>`,
