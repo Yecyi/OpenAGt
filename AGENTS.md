@@ -113,6 +113,27 @@ bun run check:prompt-affect -- --include-opt-in # also scan *-autonomous.txt opt
 
 Methodology, rule list, and per-wave history in `docs/audit/prompt-affect-baseline-2026-05-02.md`. Affordance-tool design in `docs/design/affordance-tools.md`.
 
+### Tool registry imports
+
+Tool implementation files (`packages/openagt/src/tool/*.ts`) are loaded by `tool/registry.ts` at module-init time. If a tool file pulls in a value-namespace that itself depends on `Agent.defaultLayer` while the agent layer is still defining itself, the JS engine throws a temporal-dead-zone error on `coordinator/coordinator.ts:505`.
+
+Wave 11 A1 worked around the canonical instance of this trap by extracting `PersonalAgent.Service` into `personal/service.ts` (no Coordinator chain). Wave 11 A8 pins that contract via `bun run check:tool-imports`, which rejects:
+
+- `import` of `personal/personal` from a tool file (block) — use `personal/service` instead.
+- `import` of `coordinator/coordinator` from a tool file (block) — type-only imports of `coordinator/schema*.ts` or runtime resolution via `Effect.gen` are fine.
+- `import` of `agent/agent` from a tool file (warn) — `import type` is preferred; if you genuinely need the value namespace, do it inside an Effect.gen body so the layer is already resolved.
+
+Type-only imports (`import type { ... } from`) are skipped — they're erased at compile time and don't trigger module load.
+
+The auditor allows `tool/registry.ts`, `tool/tool.ts`, and `tool/truncate.ts` (the framework files, not individual tools).
+
+```bash
+bun run check:tool-imports                     # human-readable report
+bun run check:tool-imports -- --fail-on-block  # CI mode (exits 1 on any block)
+```
+
+The fixture at `script/fixtures/tool-bad-import.ts` and the test at `packages/openagt/test/script/audit-tool-imports.test.ts` keep the rule from silently bit-rotting.
+
 ## Testing
 
 - Avoid mocks as much as possible
