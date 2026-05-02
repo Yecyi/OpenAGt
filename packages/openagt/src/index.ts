@@ -26,6 +26,7 @@ import { AcpCommand } from "./cli/cmd/acp"
 import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
+import { InboxCommand } from "./cli/cmd/inbox"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { ExpertsCommand } from "./cli/cmd/experts"
@@ -187,6 +188,7 @@ const cli = yargs(args)
   .command(GithubCommand)
   .command(PrCommand)
   .command(SessionCommand)
+  .command(InboxCommand)
   .command(PluginCommand)
   .command(DbCommand)
   .command(ExpertsCommand)
