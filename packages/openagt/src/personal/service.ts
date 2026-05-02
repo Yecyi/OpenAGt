@@ -16,6 +16,7 @@ import { Context, Effect } from "effect"
 import type {
   CreateInboxItemInput,
   ListInboxItemsInput,
+  ReplyToInboxItemInput,
   UpdateInboxStateInput,
 } from "./inbox-ops"
 import type { IngestSessionInput, IngestWebhookInput } from "./ingestion-ops"
@@ -48,6 +49,9 @@ export interface Interface {
   readonly createInboxItem: (input: CreateInboxItemInput) => Effect.Effect<InboxItemType, Error>
   readonly listInboxItems: (input: ListInboxItemsInput) => Effect.Effect<InboxItemType[], Error>
   readonly updateInboxState: (input: UpdateInboxStateInput) => Effect.Effect<InboxItemType, Error>
+  // Wave 10: atomic reply + resolve. Reply text passes byte-for-byte
+  // into payload.user_reply; state -> "done"; time_completed set.
+  readonly replyToInboxItem: (input: ReplyToInboxItemInput) => Effect.Effect<InboxItemType, Error>
   readonly scheduleWakeup: (input: ScheduleWakeupInput) => Effect.Effect<ScheduledWakeupType, Error>
   readonly listDueWakeups: (input: ListDueWakeupsInput) => Effect.Effect<ScheduledWakeupType[], Error>
   readonly dispatchDueWakeups: (input: DispatchDueWakeupsInput) => Effect.Effect<InboxItemType[], Error>

@@ -223,6 +223,7 @@ export const layer = Layer.effect(
       createInboxItem: wrap(inbox.createInboxItem),
       listInboxItems: wrap(inbox.listInboxItems),
       updateInboxState: wrap(inbox.updateInboxState),
+      replyToInboxItem: wrap(inbox.replyToInboxItem),
       scheduleWakeup: wrap(wakeup.scheduleWakeup),
       listDueWakeups: wrap(wakeup.listDueWakeups),
       dispatchDueWakeups: wrap(wakeup.dispatchDueWakeups),

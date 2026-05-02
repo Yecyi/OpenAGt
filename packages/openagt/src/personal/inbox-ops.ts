@@ -42,6 +42,15 @@ export interface UpdateInboxStateInput {
   state: InboxStateType
 }
 
+// Wave 10: atomic "reply + resolve" path. The user's reply text is merged
+// into the existing payload as `user_reply`, alongside a `replied_at`
+// timestamp; state moves to "done". Same Phase 5 verbatim guarantee as
+// `goal` field — the reply string passes byte-for-byte into payload.
+export interface ReplyToInboxItemInput {
+  id: z.infer<typeof InboxItemID.zod>
+  reply: string
+}
+
 export function createInboxOps(bus: Bus.Interface) {
   const createInboxItem = Effect.fn("PersonalAgent.createInboxItem")(function* (input: CreateInboxItemInput) {
     const id = InboxItemID.ascending()
@@ -112,9 +121,44 @@ export function createInboxOps(bus: Bus.Interface) {
     return item
   })
 
-  return { createInboxItem, listInboxItems, updateInboxState } as {
+  const replyToInboxItem = Effect.fn("PersonalAgent.replyToInboxItem")(function* (input: ReplyToInboxItemInput) {
+    const timestamp = now()
+    const existing = yield* Effect.sync(() =>
+      Database.use((db) => db.select().from(InboxItemTable).where(eq(InboxItemTable.id, input.id)).get()),
+    )
+    if (!existing) return yield* Effect.fail(new Error(`Inbox item not found: ${input.id}`))
+    // Verbatim merge — input.reply passes byte-for-byte into payload.user_reply.
+    // No paraphrase, no template wrap, no sanitize. Phase 5 contract.
+    const nextPayload: Record<string, unknown> = {
+      ...(existing.payload ?? {}),
+      user_reply: input.reply,
+      replied_at: timestamp,
+    }
+    yield* Effect.sync(() =>
+      Database.use((db) =>
+        db
+          .update(InboxItemTable)
+          .set({
+            state: "done",
+            payload: nextPayload,
+            time_updated: timestamp,
+            time_completed: timestamp,
+          })
+          .where(eq(InboxItemTable.id, input.id))
+          .run(),
+      ),
+    )
+    const item = yield* Effect.sync(() =>
+      Database.use((db) => db.select().from(InboxItemTable).where(eq(InboxItemTable.id, input.id)).get()),
+    ).pipe(Effect.map((row) => inboxFromRow(row!)))
+    yield* bus.publish(InboxUpdated, item)
+    return item
+  })
+
+  return { createInboxItem, listInboxItems, updateInboxState, replyToInboxItem } as {
     createInboxItem: (input: CreateInboxItemInput) => Effect.Effect<InboxItemType, Error>
     listInboxItems: (input: ListInboxItemsInput) => Effect.Effect<InboxItemType[], Error>
     updateInboxState: (input: UpdateInboxStateInput) => Effect.Effect<InboxItemType, Error>
+    replyToInboxItem: (input: ReplyToInboxItemInput) => Effect.Effect<InboxItemType, Error>
   }
 }
