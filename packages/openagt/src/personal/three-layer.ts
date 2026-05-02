@@ -388,9 +388,14 @@ export const layer = Layer.effect(
     const searchSemantic: Interface["searchSemantic"] = Effect.fn("ThreeLayer.searchSemantic")(function* (input) {
       const limit = input.limit ?? 5
       const minConfidence = input.minConfidence ?? 0.5
+      // Wave 5: semantic scope is supposed to hold empirical claims; restrict
+      // to kind=fact so a stray non-fact note in this scope cannot leak in
+      // as a "fact". Belt and suspenders — Wave 5 Step 3 already classifies
+      // recordSemanticFact's writes as fact.
       const results: MemorySearchResultType[] = yield* personal.searchMemory({
         query: input.query,
         scopes: ["semantic"],
+        kinds: ["fact"],
       })
       // Apply domain + confidence filters in-process; FTS5 handles the BM25 ranking.
       const facts = results
@@ -406,9 +411,13 @@ export const layer = Layer.effect(
         // Procedural recipes are indexed by task_signature in tags. We do an FTS
         // query over the tag prefix; the consolidator (B.3) will keep tags
         // canonicalized.
+        // Wave 5: same belt-and-suspenders as searchSemantic — only return
+        // kind=fact procedural notes (the recordProceduralRecipe write site
+        // already sets kind=fact).
         const results = yield* personal.searchMemory({
           query: `task_sig:${taskSignature}`,
           scopes: ["procedural"],
+          kinds: ["fact"],
         })
         return results
           .map((r) => readProceduralFromNote(r))
