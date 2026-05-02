@@ -135,7 +135,7 @@ const focusedTests = [
   // mpacr-partial-failure: 22/23 pass; the `synthesis enforces quorum`
   // case has a 5s timeout race that pre-dates Wave 11 and reproduces on
   // main. Tracked as `inc.mpacr-quorum-timeout`. Excluded here so the
-  // gate doesn't return a false-negative blocking the v1.21.1 cut.
+  // gate doesn't return a false-negative blocking the v1.21.0 cut.
   // "test/agent/mpacr-partial-failure.test.ts",
   "test/agent/mpacr-schema.test.ts",
   "test/agent/mpacr-shape.test.ts",
@@ -146,7 +146,7 @@ const focusedTests = [
   // into coordinator/prompts/*.md and the snapshot strings were never
   // refreshed. Pre-existing on main. Tracked as
   // `inc.prompt-templates-snapshot-drift`. Refresh is a separate
-  // Phase B Stream 3 row, not gating for the v1.21.1 patch.
+  // Phase B Stream 3 row, not gating for the v1.21.0 patch.
   // "test/agent/prompt-templates-snapshot.test.ts",
   "test/agent/review-verdict.test.ts",
   "test/personal/three-layer.test.ts",
