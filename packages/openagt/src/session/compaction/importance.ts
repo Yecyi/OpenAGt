@@ -31,11 +31,15 @@ export const TOOL_IMPORTANCE_WEIGHT: Record<string, number> = {
   bash_commit: 9, // Git commits are important milestones
   git_commit: 9, // Git commits are important milestones
   bash: 8, // Any bash can have important side effects
+  escalate_to_inbox: 10, // Agent's own escalation decisions are critical context for the inbox/coordinator handoff
+  task_give_up: 10, // Reasons for giving up inform future planning and recipe selection
+  task: 8, // Task delegation context — parent needs to know what was farmed out
 
   // ===== Medium-High Importance (6-7) =====
   // These provide important context for current task
   read: 7, // Read content may be current task context
-  todo_write: 6, // Todo tasks affect future planning
+  todowrite: 7, // Todo state — keys lookups for procedural recipes (matches Tool.define id)
+  todo_write: 6, // Legacy alias retained for backwards compatibility
   ask: 5, // User questions affect direction
 
   // ===== Medium Importance (4-5) =====
@@ -146,6 +150,18 @@ export const PRESERVE_CONTENT_PATTERNS: ContentPattern[] = [
     pattern: /compilation\s+error/i,
     weight: 8,
     reason: "Compilation error",
+  },
+
+  // Architectural decisions - changing direction is critical context
+  {
+    pattern: /\b(decided|chose|selected|switched to|migrated to|replaced|opted for|going with)\b/i,
+    weight: 8,
+    reason: "Architectural decision",
+  },
+  {
+    pattern: /\b(rejected|ruled out|abandoned|reverted|rolled back)\b/i,
+    weight: 8,
+    reason: "Architectural rejection",
   },
 ]
 

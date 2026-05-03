@@ -16,7 +16,11 @@ export type SandboxBackendStatus = {
   reason?: string
 }
 
-export type SandboxPolicySummary = {
+// Renamed from SandboxPolicySummary to make explicit that this is *advisory*
+// metadata only — the process backend does not enforce filesystem or network
+// policy at the OS level. The `enforced` flag tells consumers whether any
+// real OS-level isolation took place.
+export type SandboxPolicyAdvisory = {
   enforcement: SandboxEnforcement
   backendPreference: SandboxBackendPreference
   filesystemPolicy: SandboxFilesystemPolicy
@@ -24,6 +28,7 @@ export type SandboxPolicySummary = {
   allowedPaths: string[]
   writablePaths: string[]
   reportOnly: boolean
+  enforced: boolean
 }
 
 export type SandboxExecRequest = {
@@ -52,7 +57,7 @@ export type SandboxExecResult = {
   stdout_tail: string
   stderr_tail: string
   output_path?: string
-  policy_summary: SandboxPolicySummary
+  policy_advisory: SandboxPolicyAdvisory
 }
 
 export type SandboxHelloFrame = {
