@@ -168,6 +168,11 @@ export const IntentProfile = z.object({
   secondary_workflows: z.array(TaskType).default([]),
   expected_output: z.string(),
   permission_expectations: z.array(z.string()),
+  // C2: knowledge-domain classification. Set by settleIntentProfile via
+  // detectDomain (multilingual keyword classifier). Downstream consumers
+  // (taskSignatureFor, plan-enrichment) prefer this field when present
+  // instead of re-running detection from the raw goal string.
+  domain: z.string().default("general"),
 })
 export type IntentProfile = z.infer<typeof IntentProfile>
 

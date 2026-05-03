@@ -66,6 +66,24 @@ describe("taskSignatureFor — stable across rephrasings", () => {
     const b = taskSignatureFor({ goal: "draft architecture doc", workflow: "coding" })
     expect(a).not.toBe(b)
   })
+
+  test("explicit domain override skips detectDomain (C2: lets caller use intent.domain)", () => {
+    // The goal text alone would resolve to "general" (no keyword hits), but
+    // an explicit domain wins. This is how callers with an IntentProfile pass
+    // through the domain set by settleIntentProfile.
+    const sig = taskSignatureFor({ goal: "do the thing now", workflow: "coding", domain: "coding" })
+    expect(sig.startsWith("coding:coding:")).toBe(true)
+  })
+
+  test("explicit domain takes precedence over what detectDomain would compute", () => {
+    // Goal contains finance keywords ("budget tax"); explicit domain "research" overrides.
+    const sig = taskSignatureFor({
+      goal: "summarize the budget tax research paper",
+      workflow: "research",
+      domain: "research",
+    })
+    expect(sig.startsWith("research:research:")).toBe(true)
+  })
 })
 
 describe("enrichMemoryContext — pure merge", () => {
