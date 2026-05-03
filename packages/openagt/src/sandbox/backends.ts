@@ -7,7 +7,7 @@ import type {
   SandboxBackendStatus,
   SandboxExecRequest,
   SandboxExecResult,
-  SandboxPolicySummary,
+  SandboxPolicyAdvisory,
 } from "./types"
 
 export type SandboxBackendHandle = {
@@ -27,7 +27,10 @@ export type SandboxBackend = {
   readonly run: (input: SandboxBackendRunInput) => SandboxBackendHandle
 }
 
-function summary(request: SandboxExecRequest, reportOnly: boolean): SandboxPolicySummary {
+// `enforced=false` for the process backend: it has no OS-level isolation
+// (no chroot/seccomp/namespaces/Landlock). The fields above describe what the
+// caller *requested*, not what was applied.
+function advisory(request: SandboxExecRequest, reportOnly: boolean): SandboxPolicyAdvisory {
   return {
     enforcement: request.enforcement,
     backendPreference: request.backend_preference,
@@ -36,6 +39,7 @@ function summary(request: SandboxExecRequest, reportOnly: boolean): SandboxPolic
     allowedPaths: request.allowed_paths,
     writablePaths: request.writable_paths,
     reportOnly,
+    enforced: false,
   }
 }
 
@@ -159,7 +163,7 @@ function processBackend(): SandboxBackend {
             backend_used: "process",
             stdout_tail: "",
             stderr_tail: "",
-            policy_summary: summary(input.request, true),
+            policy_advisory: advisory(input.request, true),
           })
         })
         .catch((error) => {

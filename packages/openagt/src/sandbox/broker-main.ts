@@ -6,6 +6,18 @@ const backends = new Map(detectBackends().map((item) => [item.status.name, item]
 const running = new Map<string, { kill: () => void }>()
 const preAbort = new Set<string>()
 
+// Honest disclosure: only the process backend is implemented today, and it
+// applies no OS-level filesystem/network isolation. Per-request enforcement
+// fields are advisory only — see SandboxPolicyAdvisory.enforced.
+const nativeBackendAvailable = Array.from(backends.values()).some(
+  (item) => item.status.name !== "process" && item.status.available,
+)
+if (!nativeBackendAvailable) {
+  Bun.stderr.write(
+    "[SECURITY] sandbox broker: no native isolation backend available — process backend has no FS/network enforcement. policy_advisory.enforced=false on all results.\n",
+  )
+}
+
 async function send(frame: unknown) {
   Bun.stdout.write(encodeFrame(frame as never))
 }
@@ -17,7 +29,7 @@ function backendFor(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.star
   return backends.get("process") ?? preferred
 }
 
-function policySummary(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"], reportOnly: boolean) {
+function policyAdvisory(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"], reportOnly: boolean) {
   return {
     enforcement: frame.enforcement,
     backendPreference: frame.backend_preference,
@@ -26,6 +38,7 @@ function policySummary(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.s
     allowedPaths: frame.allowed_paths,
     writablePaths: frame.writable_paths,
     reportOnly,
+    enforced: false,
   }
 }
 
@@ -72,7 +85,7 @@ const parser = createFrameParser((frame) => {
         backend_used: "process",
         stdout_tail: "",
         stderr_tail: "",
-        policy_summary: policySummary(frame.request, true),
+        policy_advisory: policyAdvisory(frame.request, true),
       },
     })
     return

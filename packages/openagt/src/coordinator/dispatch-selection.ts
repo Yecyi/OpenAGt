@@ -1,4 +1,5 @@
 import { TaskRuntime } from "@/session/task-runtime"
+import { scopeOverlap } from "@/session/task-runtime-helpers"
 import { resourceLimitSlots, todoForNode, todoUsageFor } from "./runtime-state"
 import type {
   CoordinatorRun as CoordinatorRunType,
@@ -15,6 +16,19 @@ function groupFor(item: TaskRuntime.TaskRecord) {
 
 function nodeFor(item: TaskRuntime.TaskRecord) {
   return nodeIDForTask(item) ?? ""
+}
+
+// Defense-in-depth check for ParallelExecutionPolicy.write_parallel_requires_disjoint_scope.
+// The planner usually structures the DAG so write-conflicting nodes have explicit
+// dependency edges, but a hallucinated parallel_group on overlapping write_scopes would
+// otherwise slip through. We only block when *both* sides have non-empty write_scope —
+// read-only tasks (empty write_scope) are never blocked here.
+function hasWriteScopeConflict(
+  candidate: TaskRuntime.TaskRecord,
+  others: readonly TaskRuntime.TaskRecord[],
+): boolean {
+  if (candidate.write_scope.length === 0) return false
+  return others.some((other) => other.write_scope.length > 0 && scopeOverlap(candidate.write_scope, other.write_scope))
 }
 
 export function dispatchSelectionFor(input: {
@@ -62,7 +76,7 @@ export function dispatchSelectionFor(input: {
     if (!todo || !budget) return true
     return resourceLimitSlots(todoUsageFor(input.run, input.allTasks, todo.id), budget) > 0
   }
-  const selected = (
+  const preselected = (
     input.run.plan.parallel_policy.mode === "off"
       ? orderedReady.slice(0, Math.min(slots, 1))
       : targetGroup
@@ -71,5 +85,15 @@ export function dispatchSelectionFor(input: {
   )
     .filter(withinTodoBudget)
     .slice(0, budgetSlots)
+
+  // Apply write-scope disjointness if the policy requires it. We must consider both
+  // already-running tasks and tasks accepted earlier in this same dispatch round, so
+  // walk the preselected list one at a time and skip overlapping candidates.
+  const enforceDisjoint = input.run.plan.parallel_policy.write_parallel_requires_disjoint_scope
+  const selected: TaskRuntime.TaskRecord[] = []
+  for (const candidate of preselected) {
+    if (enforceDisjoint && hasWriteScopeConflict(candidate, [...running, ...selected])) continue
+    selected.push(candidate)
+  }
   return { orderedReady, budgetSlots, selected }
 }
