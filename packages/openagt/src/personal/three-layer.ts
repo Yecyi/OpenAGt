@@ -133,18 +133,90 @@ export function proceduralTags(input: ProceduralRecipeInput): string[] {
 }
 
 // Lightweight goal -> domain classifier. Reads vocabulary lists from a small
-// in-process map. The plan calls out task-classifier.ts as the canonical
-// classifier; this is a pragmatic stub that detectDomain() can swap to once
-// task-classifier.ts gains a domain output.
+// in-process map. Each domain's list is intentionally polyglot — English,
+// Chinese, and other CJK terms live side-by-side so a single matcher works
+// across languages. C2 intent: an LLM-based refiner can later replace this
+// when settleIntentProfile gains an Effect signature; for now the keyword
+// classifier is the canonical entry point and is also exposed via the
+// IntentProfile.domain field set in coordinator/intent-profile.ts.
 const DOMAIN_KEYWORDS: Record<string, readonly string[]> = {
-  coding: ["code", "function", "module", "package", "api", "test", "repo"],
-  research: ["research", "paper", "literature", "study", "explore", "summarize"],
-  writing: ["draft", "write", "essay", "letter", "memo", "blog"],
-  "data-analysis": ["dataset", "csv", "table", "stats", "analysis", "chart"],
-  "personal-admin": ["calendar", "schedule", "inbox", "email", "task", "remind"],
-  finance: ["budget", "tax", "invoice", "expense", "deduction", "ledger"],
-  health: ["doctor", "appointment", "symptom", "prescription", "diet"],
-  legal: ["regulation", "compliance", "contract", "clause", "statute"],
+  coding: [
+    "code",
+    "function",
+    "module",
+    "package",
+    "api",
+    "test",
+    "repo",
+    "代码",
+    "函数",
+    "模块",
+    "接口",
+    "测试",
+    "仓库",
+    "编程",
+    "重构",
+  ],
+  research: [
+    "research",
+    "paper",
+    "literature",
+    "study",
+    "explore",
+    "summarize",
+    "研究",
+    "论文",
+    "文献",
+    "调研",
+    "综述",
+    "总结",
+  ],
+  writing: ["draft", "write", "essay", "letter", "memo", "blog", "起草", "撰写", "文章", "信件", "备忘", "博客", "文案"],
+  "data-analysis": [
+    "dataset",
+    "csv",
+    "table",
+    "stats",
+    "analysis",
+    "chart",
+    "数据集",
+    "表格",
+    "统计",
+    "分析",
+    "图表",
+    "数据",
+  ],
+  "personal-admin": [
+    "calendar",
+    "schedule",
+    "inbox",
+    "email",
+    "task",
+    "remind",
+    "日历",
+    "日程",
+    "收件箱",
+    "邮件",
+    "待办",
+    "提醒",
+  ],
+  finance: [
+    "budget",
+    "tax",
+    "invoice",
+    "expense",
+    "deduction",
+    "ledger",
+    "预算",
+    "税",
+    "发票",
+    "支出",
+    "财务",
+    "账目",
+    "报销",
+  ],
+  health: ["doctor", "appointment", "symptom", "prescription", "diet", "医生", "预约", "症状", "处方", "饮食", "健康"],
+  legal: ["regulation", "compliance", "contract", "clause", "statute", "法规", "合规", "合同", "条款", "法律", "条例"],
 }
 
 export function detectDomain(goal: string): string {
@@ -165,8 +237,12 @@ export function detectDomain(goal: string): string {
 // (workflow, domain, top-3 keywords) sets get the same signature so a recipe
 // recorded for one task is reusable for the next. Sorting BEFORE slicing
 // ensures word-order in the goal text doesn't change the signature.
-export function taskSignatureFor(input: { goal: string; workflow: string }): string {
-  const domain = detectDomain(input.goal)
+//
+// `domain` may be passed explicitly when the caller already has it from
+// IntentProfile.domain (avoids re-running detectDomain). Falls back to
+// re-deriving from the goal otherwise.
+export function taskSignatureFor(input: { goal: string; workflow: string; domain?: string }): string {
+  const domain = input.domain ?? detectDomain(input.goal)
   const keywords = extractKeywords(input.goal).sort().slice(0, 3).join(",")
   return `${input.workflow}:${domain}:${keywords}`
 }

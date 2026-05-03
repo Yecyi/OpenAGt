@@ -22,6 +22,13 @@ describe("coordinator intent planning", () => {
     expect(intent.workflow_confidence).toBe("high")
   })
 
+  test("populates IntentProfile.domain via the multilingual classifier (C2)", () => {
+    expect(settleIntentProfile({ goal: "implement mission control backend API" }).domain).toBe("coding")
+    expect(settleIntentProfile({ goal: "把发票录入财务账目并做报销" }).domain).toBe("finance")
+    expect(settleIntentProfile({ goal: "总结一下这篇研究论文" }).domain).toBe("research")
+    expect(settleIntentProfile({ goal: "Tell me a joke" }).domain).toBe("general")
+  })
+
   test("builds a coding workflow with parallel research, reducer, verifier group, and reviewer", () => {
     const intent = settleIntentProfile({ goal: "implement mission control backend API" })
     const plan = defaultPlanForIntent(intent)

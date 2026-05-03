@@ -2,6 +2,7 @@
 // This file classifies goals only; it does not generate plan nodes or run coordinator tasks.
 
 import { classifyGoal, isProjectDeepDiveGoal } from "@/agent/task-classifier"
+import { detectDomain } from "@/personal/three-layer"
 import { IntentProfile, type IntentProfile as IntentProfileType, type TaskType as TaskTypeType } from "./schema"
 
 function taskTypeForGoal(goal: string): TaskTypeType {
@@ -104,5 +105,6 @@ export function settleIntentProfile(input: { goal: string }) {
     secondary_workflows: [],
     expected_output: expectedOutput(task_type),
     permission_expectations: permissionExpectations(task_type, risk_level),
+    domain: detectDomain(input.goal),
   })
 }

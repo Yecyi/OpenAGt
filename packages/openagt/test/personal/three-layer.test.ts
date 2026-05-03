@@ -135,4 +135,18 @@ describe("detectDomain heuristic", () => {
     // Two finance keywords + one coding keyword → finance wins.
     expect(detectDomain("Reconcile the budget invoice line in code")).toBe("finance")
   })
+
+  test("recognises Chinese domain keywords (C2: multilingual support)", () => {
+    expect(detectDomain("帮我重构这个模块的接口")).toBe("coding")
+    expect(detectDomain("总结一下这篇研究论文的核心论点")).toBe("research")
+    expect(detectDomain("起草一封给老板的备忘信件")).toBe("writing")
+    expect(detectDomain("分析这个数据集的统计图表")).toBe("data-analysis")
+    expect(detectDomain("把发票录入财务账目并做报销")).toBe("finance")
+    expect(detectDomain("帮我预约一下医生看症状")).toBe("health")
+    expect(detectDomain("review 一下这个合同条款的合规风险")).toBe("legal")
+  })
+
+  test("falls back to 'general' for non-domain Chinese text", () => {
+    expect(detectDomain("讲个笑话给我听")).toBe("general")
+  })
 })
