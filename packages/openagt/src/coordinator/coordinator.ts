@@ -33,7 +33,7 @@ import { nodeIDForTask } from "./task-record"
 import { promptTemplateRoleAndVariant, promptTemplateVars } from "./task-prompt"
 import { checkpointNode, node, plannerNode, reviseNode, withExpertHarness } from "./plan-node-factory"
 import { parallelResearchStage, parallelVerificationStage, researcher } from "./plan-stages"
-import { expandVerifyNodes, orderPlan, validatePlan } from "./plan-ordering"
+import { expandVerifyNodes, orderPlan, planValidationErrorMessage, validatePlanResult } from "./plan-ordering"
 import { workspaceSignalsForGoal, type WorkspaceSignals } from "./workspace-signals"
 import { buildCoordinatorProjection, type CoordinatorProjection } from "./projection"
 import { buildCoordinatorSummary } from "./summary"
@@ -196,10 +196,16 @@ export const layer = Layer.effect(
           : CoordinatorPlan.parse({ ...basePlanForIntent(intent), parallel_policy })
       const expanded = expandVerifyNodes(base)
       const governed = applyEffortGovernance(expanded, intent, effort, input)
-      yield* Effect.try({
-        try: () => validatePlan(governed),
-        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
-      })
+      // B1: structured validation — surface duplicate/missing-dep/cycle with
+      // typed detail instead of an untagged thrown Error. Auto-repair is
+      // deliberately NOT applied here: existing tests assert that the
+      // coordinator REJECTS user-provided plans with dangling deps, because
+      // silently dropping them masks planner bugs at the source. Callers
+      // wanting auto-repair can call repairMissingDeps explicitly.
+      const validation = validatePlanResult(governed)
+      if (!validation.ok) {
+        return yield* Effect.fail(new Error(planValidationErrorMessage(validation)))
+      }
       yield* Effect.forEach(
         governed.nodes.flatMap((item) => (item.model ? [item.model] : [])),
         (model) => provider.getModel(ProviderID.make(model.providerID), ModelID.make(model.modelID)),
