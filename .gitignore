@@ -38,8 +38,7 @@ tsconfig.tsbuildinfo
 .obsidian/workspace.json
 
 # Local reference code drops
-Code Reference/codex/
-Code Reference/hermes-agent/
+Code Reference/
 
 # Transient binary/temp artifacts
 packages/openagt/.*.tmp/
