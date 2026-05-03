@@ -110,6 +110,34 @@ describe("extractCandidateTriples — heuristic fallback over title", () => {
     expect(extractCandidateTriples([fakeNote({ title: "x" })]).length).toBe(0)
     expect(extractCandidateTriples([fakeNote({ title: "Random observation" })]).length).toBe(0)
   })
+
+  test("recognises Chinese verbs (C1: multilingual heuristic)", () => {
+    const cases: Array<{ title: string; subject: string; predicate: string; object: string }> = [
+      { title: "Drizzle 依赖 bun-sqlite", subject: "Drizzle", predicate: "依赖", object: "bun-sqlite" },
+      { title: "TypeScript 用于 编写类型安全的代码", subject: "TypeScript", predicate: "用于", object: "编写类型安全的代码" },
+      { title: "PostgreSQL 是 关系型数据库", subject: "PostgreSQL", predicate: "是", object: "关系型数据库" },
+      { title: "Effect 实现 类型化错误通道", subject: "Effect", predicate: "实现", object: "类型化错误通道" },
+    ]
+    for (const c of cases) {
+      const triples = extractCandidateTriples([fakeNote({ title: c.title })])
+      expect(triples.length).toBe(1)
+      expect(triples[0]!.subject).toBe(c.subject)
+      expect(triples[0]!.predicate).toBe(c.predicate)
+      expect(triples[0]!.object).toBe(c.object)
+    }
+  })
+
+  test("longest CJK verb wins (依赖于 beats 依赖)", () => {
+    const note = fakeNote({ title: "ModuleA 依赖于 ModuleB" })
+    const triples = extractCandidateTriples([note])
+    expect(triples.length).toBe(1)
+    expect(triples[0]!.predicate).toBe("依赖于")
+    expect(triples[0]!.object).toBe("ModuleB")
+  })
+
+  test("Chinese title with no whitelisted verb yields no triple", () => {
+    expect(extractCandidateTriples([fakeNote({ title: "随便说一句话" })]).length).toBe(0)
+  })
 })
 
 describe("groupTriples — aggregates by canonical key", () => {
@@ -408,7 +436,7 @@ describe("MemoryConsolidator runOnce integration", () => {
     ),
   )
 
-  it.live("keep decay advances the update timestamp so repeated runs do not compound age", () =>
+  it.live("keep decay is lazy: leaves time_updated and metadata untouched (B2 fix)", () =>
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const personal = yield* PersonalAgent.Service
@@ -443,10 +471,58 @@ describe("MemoryConsolidator runOnce integration", () => {
         const after = (yield* personal.listMemory({ scope: "semantic" })).find((note) => note.id === fact.note_id)
         const metadata = after?.metadata as Record<string, unknown> | undefined
 
+        // Action is "keep" — accounted in the report counter — but the row was not written.
         expect(report.decayed).toBeGreaterThanOrEqual(1)
-        expect(after?.time.updated).toBeGreaterThan(old)
-        expect(metadata?.decay_action).toBe("keep")
-        expect(metadata?.decayed_at).toBe(after?.time.updated)
+        // Lazy: time_updated and importance untouched, no decay metadata appended.
+        expect(after?.time.updated).toBe(old)
+        expect(after?.importance).toBe(8)
+        expect(metadata?.decay_action).toBeUndefined()
+        expect(metadata?.decayed_at).toBeUndefined()
+      }),
+    ),
+  )
+
+  it.live("age accumulates across runs (latent bug fix: consolidator no longer resets age)", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const personal = yield* PersonalAgent.Service
+        const threeLayer = yield* ThreeLayerMemory.Service
+        const consolidator = yield* MemoryConsolidatorService
+        const fact = yield* threeLayer.recordSemanticFact({
+          domain: "coding",
+          subject: "StaleFact",
+          predicate: "is",
+          object: "old",
+          confidence: 0.9,
+          source_note_ids: [],
+          rehearsal_count: 0,
+        })
+        // Pre-age the row to 60 days old with importance 8 — well past the
+        // ~120-day demote horizon under a 30-day half-life with no rehearsal.
+        const aged = Date.now() - 60 * 24 * 60 * 60 * 1000
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(PersonalMemoryNoteTable)
+              .set({ time_updated: aged, importance: 8 })
+              .where(eq(PersonalMemoryNoteTable.id, MemoryNoteID.zod.parse(fact.note_id)))
+              .run(),
+          ),
+        )
+
+        // Run the consolidator twice in a row. Under the old buggy design the
+        // first run reset time_updated to ~now, so the second run saw ageDays≈0
+        // and could never push the importance below the demote threshold. Under
+        // the lazy design, the first run is a no-op (still keep at decay≈2),
+        // so on the second run age is still ~60 days — same outcome — proving
+        // age never gets reset.
+        yield* consolidator.runOnce({ replay_window_hours: 1, decay_half_life_days: 30 })
+        const between = (yield* personal.listMemory({ scope: "semantic" })).find((note) => note.id === fact.note_id)
+        expect(between?.time.updated).toBe(aged)
+
+        yield* consolidator.runOnce({ replay_window_hours: 1, decay_half_life_days: 30 })
+        const after = (yield* personal.listMemory({ scope: "semantic" })).find((note) => note.id === fact.note_id)
+        expect(after?.time.updated).toBe(aged)
       }),
     ),
   )
