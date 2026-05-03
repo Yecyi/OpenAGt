@@ -128,16 +128,58 @@ function domainFromTags(tags: readonly string[]): string | undefined {
   return undefined
 }
 
+// English verbs are matched with surrounding spaces so "is" doesn't fire inside
+// "this" / "his". CJK verbs are matched without spaces because Chinese doesn't
+// use whitespace between words; the verbs are deliberately ≥ 2 chars and
+// distinctive enough that intra-word collisions are rare.
+const HEURISTIC_VERBS_EN: readonly string[] = [
+  "is",
+  "uses",
+  "has",
+  "supports",
+  "requires",
+  "prevents",
+  "depends on",
+  "applies to",
+]
+
+const HEURISTIC_VERBS_CJK: readonly string[] = [
+  "是",
+  "用于",
+  "包含",
+  "依赖于",
+  "依赖",
+  "需要",
+  "防止",
+  "适用于",
+  "实现",
+  "基于",
+  "调用",
+  "支持",
+  "属于",
+]
+
 function heuristicTriple(title: string): { subject: string; predicate: string; object: string } | undefined {
   const trimmed = title.trim()
-  if (trimmed.length < 6) return undefined
-  // Look for "<subject> <verb> <object>" with a verb in a small whitelist.
-  const verbs = ["is", "uses", "has", "supports", "requires", "prevents", "depends on", "applies to"]
-  for (const verb of verbs) {
-    const idx = trimmed.toLowerCase().indexOf(` ${verb} `)
+  if (trimmed.length < 4) return undefined
+  // Pass 1: English verbs require surrounding spaces.
+  const lower = trimmed.toLowerCase()
+  for (const verb of HEURISTIC_VERBS_EN) {
+    const idx = lower.indexOf(` ${verb} `)
     if (idx > 0) {
       const subject = trimmed.slice(0, idx).trim()
       const object = trimmed.slice(idx + verb.length + 2).trim()
+      if (subject && object) return { subject, predicate: verb, object }
+    }
+  }
+  // Pass 2: CJK verbs match without spaces. Iterate longest-first so
+  // "依赖于" beats "依赖" when both are present.
+  const cjkSorted = [...HEURISTIC_VERBS_CJK].sort((a, b) => b.length - a.length)
+  for (const verb of cjkSorted) {
+    const idx = trimmed.indexOf(verb)
+    if (idx > 0 && idx + verb.length < trimmed.length) {
+      const subject = trimmed.slice(0, idx).trim()
+      const object = trimmed.slice(idx + verb.length).trim()
       if (subject && object) return { subject, predicate: verb, object }
     }
   }
@@ -396,7 +438,21 @@ export const layer = Layer.effect(
           }
         }
 
-        // Phase 3 — Decay
+        // Phase 3 — Decay (lazy)
+        //
+        // Previously every semantic note was UPDATEd on every consolidator run, even
+        // when the action was "keep". That had two problems:
+        //   1. Write amplification: O(N_semantic) writes per run, ~95% of which
+        //      were no-ops persisting derived `decay_importance`.
+        //   2. Latent bug: `time_updated: now` reset `ageMs = now - time.updated`
+        //      between runs, so a note "aged 30 days" but consolidated daily
+        //      computed scoreDecay against ageDays≈1, never reaching the demote
+        //      or delete thresholds. Frequent consolidator runs prevented decay.
+        //
+        // The fix: `decay_importance` is a pure function of stored inputs
+        // (importance column, time_updated, rehearsal_count, half_life). Don't
+        // persist what you can compute. Only write on state transitions
+        // (demote / delete) — keep is a no-op.
         const semanticNotes = yield* personal.listMemory({ scope: "semantic" })
         const now = Date.now()
         let decayed = 0
@@ -411,31 +467,11 @@ export const layer = Layer.effect(
             half_life_days: config.decay_half_life_days,
           })
           const action = classifyDecayAction(newImportance, config)
-          const importance = Math.max(0, Math.min(10, Math.round(newImportance)))
           if (action === "keep") {
-            yield* Effect.sync(() =>
-              Database.use((db) =>
-                db
-                  .update(PersonalMemoryNoteTable)
-                  .set({
-                    metadata: {
-                      ...(meta ?? {}),
-                      decay_action: "keep",
-                      decay_importance: newImportance,
-                      decayed_at: now,
-                    },
-                    importance,
-                    time_updated: now,
-                  })
-                  .where(eq(PersonalMemoryNoteTable.id, note.id))
-                  .run(),
-              ),
-            )
             decayed++
-            writes++
-            if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
             continue
           }
+          const importance = Math.max(0, Math.min(10, Math.round(newImportance)))
           yield* Effect.sync(() =>
             Database.use((db) =>
               db
