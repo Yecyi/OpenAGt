@@ -77,7 +77,7 @@ function makeTask(input: {
   write_scope?: string[]
 }): TaskRuntime.TaskRecord {
   return {
-    id: input.id,
+    task_id: input.id,
     parent_session_id: "ses_test",
     status: input.status,
     task_kind: "implement",
@@ -128,7 +128,7 @@ test("disjoint write_scope across same parallel_group: both selected", () => {
     ceilingHit: false,
     softBudgetHit: false,
   })
-  expect(result.selected.map((item) => item.id)).toEqual(["t1", "t2"])
+  expect(result.selected.map((item) => String(item.task_id))).toEqual(["t1", "t2"])
 })
 
 test("overlapping write_scope in same round: only first selected (regression: EBI #8)", () => {
@@ -158,7 +158,7 @@ test("overlapping write_scope in same round: only first selected (regression: EB
     softBudgetHit: false,
   })
   // t2 is filtered because its scope (src/shared/foo) overlaps with t1's (src/shared)
-  expect(result.selected.map((item) => item.id)).toEqual(["t1"])
+  expect(result.selected.map((item) => String(item.task_id))).toEqual(["t1"])
 })
 
 test("overlap with running task is blocked", () => {
@@ -193,7 +193,7 @@ test("overlap with running task is blocked", () => {
     ceilingHit: false,
     softBudgetHit: false,
   })
-  expect(result.selected.map((item) => item.id)).toEqual([])
+  expect(result.selected.map((item) => String(item.task_id))).toEqual([])
 })
 
 test("read-only candidate (empty write_scope) is never blocked by disjoint check", () => {
@@ -216,7 +216,7 @@ test("read-only candidate (empty write_scope) is never blocked by disjoint check
     ceilingHit: false,
     softBudgetHit: false,
   })
-  expect(result.selected.map((item) => item.id)).toEqual(["t1", "tro"])
+  expect(result.selected.map((item) => String(item.task_id))).toEqual(["t1", "tro"])
 })
 
 test("policy disabled: overlapping writes are dispatched anyway", () => {
@@ -239,5 +239,5 @@ test("policy disabled: overlapping writes are dispatched anyway", () => {
     ceilingHit: false,
     softBudgetHit: false,
   })
-  expect(result.selected.map((item) => item.id)).toEqual(["t1", "t2"])
+  expect(result.selected.map((item) => String(item.task_id))).toEqual(["t1", "t2"])
 })
