@@ -120,6 +120,10 @@ function groupKey(parentSessionID: SessionID, groupID: string) {
   return ["task_group", parentSessionID, groupID]
 }
 
+function isMpacrCritic(task: TaskRecord) {
+  return task.metadata?.mpacr_role === "critic" || task.metadata?.role === "red-team-critic"
+}
+
 export interface Interface {
   readonly create: (input: {
     parentSessionID: SessionID
@@ -255,7 +259,9 @@ export const layer = Layer.effect(
       return !running.some(
         (item) =>
           (item.task_kind === "implement" && scopeOverlap(item.write_scope, input.task.read_scope)) ||
-          (item.task_kind === "verify" && scopedReadOverlap(item.read_scope, input.task.read_scope)),
+          (item.task_kind === "verify" &&
+            scopedReadOverlap(item.read_scope, input.task.read_scope) &&
+            !(isMpacrCritic(item) && isMpacrCritic(input.task))),
       )
     })
 
