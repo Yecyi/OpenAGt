@@ -306,6 +306,28 @@ export function subtractResourceLimit(left: ResourceLimitType, right: ResourceLi
   })
 }
 
+export function resourceLimitDelta(current: ResourceLimitType, previous: ResourceLimitType) {
+  return ResourceLimit.parse({
+    max_rounds: Math.max(0, current.max_rounds - previous.max_rounds),
+    max_model_calls: Math.max(0, current.max_model_calls - previous.max_model_calls),
+    max_tool_calls: Math.max(0, current.max_tool_calls - previous.max_tool_calls),
+    max_subagents: Math.max(0, current.max_subagents - previous.max_subagents),
+    max_wallclock_ms: Math.max(0, current.max_wallclock_ms - previous.max_wallclock_ms),
+    max_estimated_tokens: Math.max(0, current.max_estimated_tokens - previous.max_estimated_tokens),
+  })
+}
+
+export function resourceLimitMeetsAnyMinimum(usage: ResourceLimitType, minimum: ResourceLimitType) {
+  return (
+    usage.max_rounds >= minimum.max_rounds ||
+    usage.max_model_calls >= minimum.max_model_calls ||
+    usage.max_tool_calls >= minimum.max_tool_calls ||
+    usage.max_subagents >= minimum.max_subagents ||
+    usage.max_wallclock_ms >= minimum.max_wallclock_ms ||
+    usage.max_estimated_tokens >= minimum.max_estimated_tokens
+  )
+}
+
 export function resourceLimitSlots(usage: ResourceLimitType, limit: ResourceLimitType) {
   if (usage.max_wallclock_ms >= limit.max_wallclock_ms) return 0
   if (usage.max_estimated_tokens >= limit.max_estimated_tokens) return 0

@@ -6,7 +6,14 @@ import { Database, eq } from "@/storage"
 import { Effect, Option } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { addResourceLimit, scaleResourceLimit } from "./budget-governance"
-import { planWithRuntimeState, runtimeStateFor, taskLeaseFor } from "./runtime-state"
+import {
+  planWithRuntimeState,
+  resourceLimitDelta,
+  resourceLimitMeetsAnyMinimum,
+  resourceUsageFor,
+  runtimeStateFor,
+  taskLeaseFor,
+} from "./runtime-state"
 import { CoordinatorPlan, BudgetProfile, BudgetState, ResourceLimit } from "./schema"
 import type {
   AutoContinuePolicy as AutoContinuePolicyType,
@@ -219,9 +226,29 @@ export class CoordinatorRunMutations {
     const taskList = yield* this.deps.relevantTasks(runOpt.value)
     const runtime = runtimeStateFor(runOpt.value, taskList)
     const requested = input.budgetDelta ?? runtime.continuation_request?.requested_budget_delta
+    const hasContinuationRequest = runtime.budget_state.budget_limited || runtime.budget_state.ceiling_hit
+    if (!hasContinuationRequest) {
+      return yield* Effect.fail(
+        new Error("Coordinator continue denied: no active continuation request or budget checkpoint"),
+      )
+    }
     if (!requested) {
       return yield* Effect.fail(
         new Error("Coordinator continue requires an active continuation request or explicit budgetDelta"),
+      )
+    }
+    const usage = resourceUsageFor(runOpt.value, taskList)
+    const continuationState = runOpt.value.plan.budget_profile.continuation_state
+    const consumedSinceLastApproval = resourceLimitDelta(usage, continuationState.last_approved_usage)
+    if (
+      continuationState.approved_count > 0 &&
+      !resourceLimitMeetsAnyMinimum(
+        consumedSinceLastApproval,
+        ResourceLimit.parse(BudgetTuning.continuation.minConsumedBeforeContinue),
+      )
+    ) {
+      return yield* Effect.fail(
+        new Error("Coordinator continue denied: insufficient progress since the previous approved continuation"),
       )
     }
     const delta = requested
@@ -246,12 +273,17 @@ export class CoordinatorRunMutations {
         runOpt.value.plan.budget_profile.checkpoint_reserve,
         scaleResourceLimit(fullDelta, 0.1),
       ),
+      continuation_state: {
+        approved_count: continuationState.approved_count + 1,
+        last_approved_usage: usage,
+      },
     })
     const plan = CoordinatorPlan.parse({
       ...planWithRuntimeState(runOpt.value.plan, runtime),
       budget_profile,
       budget_state: BudgetState.parse({}),
       continuation_request: undefined,
+      budget_limited: false,
     })
     yield* Effect.sync(() =>
       Database.use((db) =>

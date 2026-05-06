@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Exit, Layer } from "effect"
 import { Agent } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config"
@@ -604,6 +604,22 @@ describe("coordinator runtime", () => {
         expect(continued.state).toBe("active")
         const resumed = yield* coordinator.projection(run.id)
         expect(resumed.budget_state.ceiling_hit).toBe(false)
+        expect(resumed.budget_state.budget_limited).toBe(false)
+
+        const repeated = yield* Effect.exit(
+          coordinator.continueRun({
+            id: run.id,
+            budgetDelta: {
+              max_rounds: 4,
+              max_model_calls: 4,
+              max_tool_calls: 8,
+              max_subagents: 4,
+              max_wallclock_ms: 60_000,
+              max_estimated_tokens: 50_000,
+            },
+          }),
+        )
+        expect(Exit.isFailure(repeated)).toBe(true)
       }),
     ),
   )

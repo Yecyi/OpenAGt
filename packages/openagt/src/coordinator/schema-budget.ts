@@ -24,6 +24,22 @@ export const defaultResourceLimit = {
   max_estimated_tokens: 500_000,
 } as const satisfies ResourceLimit
 
+export const zeroResourceLimit = {
+  max_rounds: 0,
+  max_model_calls: 0,
+  max_tool_calls: 0,
+  max_subagents: 0,
+  max_wallclock_ms: 0,
+  max_estimated_tokens: 0,
+} as const satisfies ResourceLimit
+
+export const BudgetContinuationState = z.object({
+  approved_count: z.number().int().min(0).default(0),
+  last_approved_usage: ResourceLimit.default(zeroResourceLimit),
+  last_denied_reason: z.string().optional(),
+})
+export type BudgetContinuationState = z.infer<typeof BudgetContinuationState>
+
 export const BudgetProfile = z.object({
   scale: BudgetScale.default("normal"),
   auto_continue: AutoContinuePolicy.default("checkpoint"),
@@ -60,6 +76,7 @@ export const BudgetProfile = z.object({
       min_new_evidence_items: 3,
       min_quality_delta: 0.03,
     }),
+  continuation_state: BudgetContinuationState.default(() => BudgetContinuationState.parse({})),
 })
 export type BudgetProfile = z.infer<typeof BudgetProfile>
 
