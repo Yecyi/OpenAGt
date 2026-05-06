@@ -7,11 +7,14 @@ import { Coordinator } from "../../src/coordinator/coordinator"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { createMemoryOps } from "../../src/personal/memory-ops"
+import { PersonalMemoryIdempotencyTable } from "../../src/personal/personal.sql"
 import { PersonalAgent } from "../../src/personal/personal"
+import { MemoryNoteID } from "../../src/personal/schema"
 import { ThreeLayerMemory } from "../../src/personal/three-layer"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { TaskRuntime } from "../../src/session/task-runtime"
+import { Database } from "../../src/storage"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -763,6 +766,38 @@ describe("personal agent core", () => {
         )
         const matches = (yield* personal.listMemory()).filter((note) => note.tags.includes(tag))
         expect(matches.length).toBe(1)
+      }),
+    ),
+  )
+
+  it.live("synthesizeOnce respects the database-level idempotency claim", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const bus = yield* Bus.Service
+        const personal = yield* PersonalAgent.Service
+        const memory = createMemoryOps(bus)
+        const tag = "synthesize-once-db-claim-test"
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .insert(PersonalMemoryIdempotencyTable)
+              .values({
+                tag,
+                note_id: MemoryNoteID.ascending(),
+                time_created: Date.now(),
+              })
+              .run(),
+          ),
+        )
+        yield* memory.synthesizeOnce({
+          kind: "verify_completed",
+          title: "DB idempotency regression",
+          content: "preclaimed synthesizeOnce tag should not insert a note",
+          tag,
+          tags: [tag],
+        })
+        const matches = (yield* personal.listMemory()).filter((note) => note.tags.includes(tag))
+        expect(matches.length).toBe(0)
       }),
     ),
   )

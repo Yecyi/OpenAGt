@@ -35,6 +35,16 @@ export const PersonalMemoryNoteTable = sqliteTable(
   ],
 )
 
+export const PersonalMemoryIdempotencyTable = sqliteTable(
+  "personal_memory_idempotency",
+  {
+    tag: text().primaryKey(),
+    note_id: text().$type<MemoryNoteID>().notNull(),
+    time_created: integer().notNull(),
+  },
+  (table) => [index("personal_memory_idempotency_note_idx").on(table.note_id)],
+)
+
 export const InboxItemTable = sqliteTable(
   "inbox_item",
   {

@@ -6,7 +6,7 @@ import { SessionID } from "@/session/schema"
 import { Database, desc, eq, sql } from "@/storage"
 import { Client as DatabaseClient } from "@/storage/db"
 import { Effect } from "effect"
-import { PersonalMemoryNoteTable } from "./personal.sql"
+import { PersonalMemoryIdempotencyTable, PersonalMemoryNoteTable } from "./personal.sql"
 import {
   MemoryNoteID,
   MemorySearchResult,
@@ -32,6 +32,11 @@ function privacySafeContent(content: string) {
     /password\s*[:=]/i,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   ].some((pattern) => pattern.test(content))
+}
+
+function changed(result: unknown) {
+  if (typeof result !== "object" || result === null || !("changes" in result)) return true
+  return typeof result.changes === "number" ? result.changes > 0 : true
 }
 
 export type SynthesizeKind =
@@ -302,12 +307,10 @@ export function createMemoryOps(bus: Bus.Interface) {
   })
 
   const synthesizeOnce = Effect.fn("PersonalAgent.synthesizeOnce")(function* (input: SynthesizeOnceInput) {
-    // Atomic check-and-insert. The previous implementation called
-    // `hasMemoryTag(tag)` followed by `synthesize(...)` across separate
-    // Effect yields, which let two concurrent calls both pass the existence
-    // check and double-insert (TOCTOU). Wrapping the SELECT-then-INSERT in
-    // a single SQLite transaction serializes concurrent invocations so only
-    // the first to commit gets the row in.
+    // DB-level idempotency. The old path scanned note.tags and then inserted
+    // the note in the same process. A second OpenAGt process could race that
+    // scan. Claiming the tag through a primary-key table makes the database
+    // the source of truth.
     if (!privacySafeContent(input.content)) return yield* Effect.fail(new Error("Memory content failed privacy filter"))
     const scope: MemoryScopeType =
       input.kind === "manual_preference" ? "profile" : input.projectID ? "workspace" : "profile"
@@ -328,33 +331,40 @@ export function createMemoryOps(bus: Bus.Interface) {
     const id = MemoryNoteID.ascending()
     const timestamp = now()
     const inserted = yield* Effect.sync(() =>
-      Database.transaction((db) => {
-        const exists = db
-          .select()
-          .from(PersonalMemoryNoteTable)
-          .all()
-          .some((row) => row.tags.includes(input.tag))
-        if (exists) return false
-        db.insert(PersonalMemoryNoteTable)
-          .values({
-            id,
-            scope,
-            kind: "belief",
-            project_id: input.projectID,
-            session_id: input.sessionID,
-            title: input.title,
-            content: input.content,
-            tags: [...new Set([input.tag, ...(input.tags ?? [])])],
-            metadata: input.metadata ?? {},
-            source,
-            importance: input.importance ?? (input.kind === "verify_completed" ? 7 : 6),
-            pinned: 0,
-            time_created: timestamp,
-            time_updated: timestamp,
-          })
-          .run()
-        return true
-      }),
+      Database.transaction(
+        (db) => {
+          const claimed = db
+            .insert(PersonalMemoryIdempotencyTable)
+            .values({
+              tag: input.tag,
+              note_id: id,
+              time_created: timestamp,
+            })
+            .onConflictDoNothing()
+            .run()
+          if (!changed(claimed)) return false
+          db.insert(PersonalMemoryNoteTable)
+            .values({
+              id,
+              scope,
+              kind: "belief",
+              project_id: input.projectID,
+              session_id: input.sessionID,
+              title: input.title,
+              content: input.content,
+              tags: [...new Set([input.tag, ...(input.tags ?? [])])],
+              metadata: input.metadata ?? {},
+              source,
+              importance: input.importance ?? (input.kind === "verify_completed" ? 7 : 6),
+              pinned: 0,
+              time_created: timestamp,
+              time_updated: timestamp,
+            })
+            .run()
+          return true
+        },
+        { behavior: "immediate" },
+      ),
     )
     if (!inserted) return
     const note = yield* Effect.sync(() =>
