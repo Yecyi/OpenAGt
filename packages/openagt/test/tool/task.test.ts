@@ -511,8 +511,13 @@ describe("tool.task", () => {
           },
         )
         expect(got.output).toContain("completed")
+        expect(got.output).toContain("outcome_id:")
+        expect(got.output).toContain("attempt: 1")
         expect(got.output).toContain('<task_result status="completed">')
         expect(got.output).toContain("researched")
+        if (!got.metadata.found) throw new Error("Missing task_get metadata")
+        expect(got.metadata.outcome?.attempt_no).toBe(1)
+        expect(got.metadata.outcome?.has_result_text).toBe(true)
 
         const waited = yield* taskWait.execute(
           { task_ids: [taskID], mode: "all", timeout_ms: 1000 },

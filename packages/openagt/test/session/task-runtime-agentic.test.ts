@@ -1,5 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { Config } from "../../src/config"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { Instance } from "../../src/project/instance"
@@ -253,6 +253,61 @@ describe("task runtime agentic scheduling", () => {
         expect((yield* tasks.list(parent.id)).find((item) => item.task_id === task.task_id)?.usage?.totalTokens).toBe(
           160,
         )
+      }),
+    ),
+  )
+
+  it.live("persists terminal task outcomes and links retry attempts", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "Task outcome runtime" })
+        const task = yield* tasks.create({
+          parentSessionID: parent.id,
+          childSessionID: "ses_outcome_chain" as never,
+          taskKind: "research",
+          subagentType: "general",
+          description: "outcome task",
+          prompt: "gather evidence",
+          dependsOn: [],
+          acceptanceChecks: ["architecture", "algorithms"],
+        })
+
+        yield* tasks.partial({
+          taskID: task.task_id,
+          parentSessionID: parent.id,
+          output: "partial architecture notes",
+          reason: "step_budget",
+          remainingScope: ["algorithms"],
+        })
+
+        const first = yield* tasks.latestOutcome({ taskID: task.task_id, parentSessionID: parent.id })
+        expect(Option.isSome(first)).toBe(true)
+        if (Option.isNone(first)) throw new Error("Missing first task outcome")
+        expect(first.value.status).toBe("partial")
+        expect(first.value.attempt_no).toBe(1)
+        expect(first.value.retryable).toBe(1)
+        expect(first.value.limit_reason).toBe("step_budget")
+        expect(first.value.result_text).toBe("partial architecture notes")
+
+        yield* tasks.retry({ taskID: task.task_id, parentSessionID: parent.id })
+        yield* tasks.complete({
+          taskID: task.task_id,
+          parentSessionID: parent.id,
+          output: "complete architecture and algorithm outline",
+        })
+
+        const latest = yield* tasks.latestOutcome({ taskID: task.task_id, parentSessionID: parent.id })
+        const history = yield* tasks.listOutcomes({ parentSessionID: parent.id, taskID: task.task_id })
+
+        expect(Option.isSome(latest)).toBe(true)
+        if (Option.isNone(latest)) throw new Error("Missing latest task outcome")
+        expect(latest.value.status).toBe("completed")
+        expect(latest.value.attempt_no).toBe(2)
+        expect(latest.value.previous_outcome_id).toBe(first.value.id)
+        expect(latest.value.result_text).toBe("complete architecture and algorithm outline")
+        expect(history.map((item) => item.status)).toEqual(["completed", "partial"])
       }),
     ),
   )

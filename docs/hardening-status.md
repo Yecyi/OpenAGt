@@ -21,7 +21,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Coordinator dangling dependencies | implemented | Plan validation rejects missing `depends_on` targets. |
 | Coordinator cycles | implemented | Plan validation reports explicit dependency cycle path. |
 | Subagent max-step partial | implemented | Step-budget and timeout results are stored as retryable `partial`, not `completed`. |
-| Task result retrieval | implemented | Full result text is persisted and returned through task metadata/tool output. |
+| Task result retrieval | implemented | Full result text is persisted in `task_outcome`, linked across retry attempts, and returned through `task_get`. |
 | Anthropic token accounting | implemented | Task usage uses provider-normalized total tokens. |
 | Permission deny precedence | implemented | Matching deny rules override allow/ask. |
 | Chinese intent dictionary | implemented | Mojibake terms replaced with valid bilingual workflow/risk terms. |

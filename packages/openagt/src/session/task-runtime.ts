@@ -11,6 +11,7 @@ import {
   scopeOverlap,
   scopedReadOverlap,
 } from "./task-runtime-helpers"
+import { latestTaskOutcome, listTaskOutcomes, type TaskOutcome } from "./task-outcomes"
 import { createTaskWriteOps } from "./task-runtime-write-ops"
 
 export const TaskStatus = z.enum(["pending", "running", "completed", "partial", "failed", "cancelled"])
@@ -181,6 +182,14 @@ export interface Interface {
     reason?: string
   }) => Effect.Effect<TaskRecord, Error>
   readonly retry: (input: { taskID: SessionID; parentSessionID: SessionID }) => Effect.Effect<TaskRecord, Error>
+  readonly latestOutcome: (input: {
+    taskID: SessionID
+    parentSessionID: SessionID
+  }) => Effect.Effect<Option.Option<TaskOutcome>, Error>
+  readonly listOutcomes: (input: {
+    parentSessionID: SessionID
+    taskID?: SessionID
+  }) => Effect.Effect<TaskOutcome[], Error>
   readonly get: (input: {
     taskID: SessionID
     parentSessionID: SessionID
@@ -314,6 +323,8 @@ export const layer = Layer.effect(
       fail: writeOps.fail,
       cancel: writeOps.cancel,
       retry: writeOps.retry,
+      latestOutcome: latestTaskOutcome,
+      listOutcomes: listTaskOutcomes,
       get,
       list,
       wait,

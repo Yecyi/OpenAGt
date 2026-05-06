@@ -2,6 +2,7 @@ import z from "zod"
 import { Effect, Option } from "effect"
 import * as Tool from "./tool"
 import { TaskRuntime, type TaskRecord } from "@/session/task-runtime"
+import type { TaskOutcome } from "@/session/task-outcomes"
 import { SessionID } from "@/session/schema"
 
 const parameters = z.object({
@@ -16,9 +17,13 @@ type TaskGetMetadata =
   | {
       found: true
       task: Tool.Metadata
+      outcome?: Tool.Metadata
     }
 
-function storedResult(record: TaskRecord) {
+function storedResult(record: TaskRecord, outcome?: TaskOutcome) {
+  if (outcome?.result_text?.trim()) return outcome.result_text
+  if (outcome?.error_text?.trim()) return outcome.error_text
+  if (outcome?.summary?.trim()) return outcome.summary
   const resultText =
     typeof record.metadata?.result_text === "string" && record.metadata.result_text.trim()
       ? record.metadata.result_text
@@ -28,6 +33,22 @@ function storedResult(record: TaskRecord) {
       ? record.metadata.partial_summary
       : undefined
   return resultText ?? partialSummary ?? record.result_summary ?? record.error_summary ?? `Task is ${record.status}.`
+}
+
+function outcomeMetadata(outcome: TaskOutcome | undefined) {
+  if (!outcome) return undefined
+  return Tool.toMetadata({
+    id: outcome.id,
+    status: outcome.status,
+    attempt_no: outcome.attempt_no,
+    previous_outcome_id: outcome.previous_outcome_id,
+    retryable: outcome.retryable === 1,
+    limit_reason: outcome.limit_reason,
+    summary: outcome.summary,
+    has_result_text: Boolean(outcome.result_text),
+    has_error_text: Boolean(outcome.error_text),
+    time_recorded: outcome.time_recorded,
+  })
 }
 
 export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskRuntime.Service>(
@@ -54,7 +75,12 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
             }
           }
 
-          const result = storedResult(record.value)
+          const outcome = yield* tasks.latestOutcome({
+            taskID: record.value.task_id,
+            parentSessionID: record.value.parent_session_id,
+          })
+          const latestOutcome = Option.isSome(outcome) ? outcome.value : undefined
+          const result = storedResult(record.value, latestOutcome)
 
           return {
             title: "Task Status",
@@ -63,6 +89,9 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
               `status: ${record.value.status}`,
               `kind: ${record.value.task_kind}`,
               `description: ${record.value.description}`,
+              ...(latestOutcome
+                ? [`outcome_id: ${latestOutcome.id}`, `attempt: ${latestOutcome.attempt_no}`]
+                : []),
               "",
               `<task_result status="${record.value.status}">`,
               result,
@@ -74,6 +103,7 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
             metadata: {
               found: true as const,
               task: Tool.toMetadata(record.value),
+              outcome: outcomeMetadata(latestOutcome),
             } satisfies TaskGetMetadata,
           }
         }).pipe(Effect.orDie),

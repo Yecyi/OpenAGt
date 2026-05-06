@@ -12,6 +12,7 @@ import {
   resultFromRecord,
   summarizeMessage,
 } from "./task-runtime-helpers"
+import { recordTaskOutcome } from "./task-outcomes"
 import type { GroupStrategy, TaskGroup, TaskKind, TaskOrigin, TaskPriority, TaskRecord } from "./task-runtime"
 
 function taskKey(parentSessionID: SessionID, taskID: SessionID) {
@@ -258,7 +259,7 @@ export function createTaskWriteOps(deps: {
   })
 
   const complete = Effect.fn("TaskRuntime.complete")(function* (input: CompleteInput) {
-    return yield* update(input.parentSessionID, input.taskID, (draft) => {
+    const record = yield* update(input.parentSessionID, input.taskID, (draft) => {
       const text = input.output ?? input.result?.parts.findLast((item) => item.type === "text")?.text
       draft.status = "completed"
       draft.finished_at = Date.now()
@@ -286,10 +287,12 @@ export function createTaskWriteOps(deps: {
         }
       }
     })
+    yield* recordTaskOutcome(record)
+    return record
   })
 
   const partial = Effect.fn("TaskRuntime.partial")(function* (input: PartialInput) {
-    return yield* update(input.parentSessionID, input.taskID, (draft) => {
+    const record = yield* update(input.parentSessionID, input.taskID, (draft) => {
       const text = input.output ?? input.result?.parts.findLast((item) => item.type === "text")?.text
       draft.status = "partial"
       draft.finished_at = Date.now()
@@ -317,10 +320,12 @@ export function createTaskWriteOps(deps: {
         }
       }
     })
+    yield* recordTaskOutcome(record)
+    return record
   })
 
   const fail = Effect.fn("TaskRuntime.fail")(function* (input: FailInput) {
-    return yield* update(input.parentSessionID, input.taskID, (draft) => {
+    const record = yield* update(input.parentSessionID, input.taskID, (draft) => {
       draft.status = "failed"
       draft.finished_at = Date.now()
       draft.error_summary = input.error.slice(0, 400)
@@ -329,6 +334,8 @@ export function createTaskWriteOps(deps: {
         ...(input.metadata ?? {}),
       }
     })
+    yield* recordTaskOutcome(record)
+    return record
   })
 
   const cancel = Effect.fn("TaskRuntime.cancel")(function* (input: CancelInput) {
@@ -344,6 +351,7 @@ export function createTaskWriteOps(deps: {
       cancelHandlers.delete(key)
       handler?.()
     })
+    yield* recordTaskOutcome(record)
     return record
   })
 

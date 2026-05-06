@@ -19,6 +19,7 @@ const prefixes = {
   memory: "mem",
   calibration: "cal",
   promptOutcome: "pmo",
+  taskOutcome: "tko",
 } as const
 
 export function schema(prefix: keyof typeof prefixes) {
