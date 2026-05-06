@@ -38,8 +38,8 @@ const runtimeTests = [
 ]
 
 async function assertGeneratedFileCurrent(label: string, current: string, generated: string) {
-  const currentText = await Bun.file(current).text()
-  const generatedText = await Bun.file(generated).text()
+  const currentText = (await Bun.file(current).text()).replace(/\r\n?/g, "\n")
+  const generatedText = (await Bun.file(generated).text()).replace(/\r\n?/g, "\n")
   if (currentText === generatedText) return
   throw new Error(`${label} is out of date. Run bun run script/schema.ts in packages/openagt and commit the result.`)
 }
