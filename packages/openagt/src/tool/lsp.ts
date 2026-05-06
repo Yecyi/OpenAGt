@@ -32,6 +32,12 @@ type Metadata = {
   result: readonly Tool.MetadataValue[]
 }
 
+function resultItems(result: unknown) {
+  if (Array.isArray(result)) return result.filter((item) => item !== null && item !== undefined)
+  if (result === null || result === undefined) return []
+  return [result]
+}
+
 export const LspTool = Tool.define<typeof parameters, Metadata, LSP.Service | AppFileSystem.Service>(
   "lsp",
   Effect.gen(function* () {
@@ -63,28 +69,30 @@ export const LspTool = Tool.define<typeof parameters, Metadata, LSP.Service | Ap
 
           yield* lsp.touchFile(file, true)
 
-          const result: unknown[] = yield* (() => {
-            switch (args.operation) {
-              case "goToDefinition":
-                return lsp.definition(position)
-              case "findReferences":
-                return lsp.references(position)
-              case "hover":
-                return lsp.hover(position)
-              case "documentSymbol":
-                return lsp.documentSymbol(uri)
-              case "workspaceSymbol":
-                return lsp.workspaceSymbol("")
-              case "goToImplementation":
-                return lsp.implementation(position)
-              case "prepareCallHierarchy":
-                return lsp.prepareCallHierarchy(position)
-              case "incomingCalls":
-                return lsp.incomingCalls(position)
-              case "outgoingCalls":
-                return lsp.outgoingCalls(position)
-            }
-          })()
+          const result = resultItems(
+            yield* (() => {
+              switch (args.operation) {
+                case "goToDefinition":
+                  return lsp.definition(position)
+                case "findReferences":
+                  return lsp.references(position)
+                case "hover":
+                  return lsp.hover(position)
+                case "documentSymbol":
+                  return lsp.documentSymbol(uri)
+                case "workspaceSymbol":
+                  return lsp.workspaceSymbol("")
+                case "goToImplementation":
+                  return lsp.implementation(position)
+                case "prepareCallHierarchy":
+                  return lsp.prepareCallHierarchy(position)
+                case "incomingCalls":
+                  return lsp.incomingCalls(position)
+                case "outgoingCalls":
+                  return lsp.outgoingCalls(position)
+              }
+            })(),
+          )
 
           return {
             title,

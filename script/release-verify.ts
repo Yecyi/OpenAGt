@@ -33,6 +33,7 @@ const runtimeTests = [
   "test/security/exec-policy.test.ts",
   "test/security/shell-security.test.ts",
   "test/tool/webfetch.test.ts",
+  "test/tool/lsp.test.ts",
   "test/util/process.test.ts",
   "test/util/sanitize-output.test.ts",
 ]
