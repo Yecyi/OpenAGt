@@ -36,6 +36,11 @@ export const zeroResourceLimit = {
 export const BudgetContinuationState = z.object({
   approved_count: z.number().int().min(0).default(0),
   last_approved_usage: ResourceLimit.default(zeroResourceLimit),
+  last_approved_progress_score: z.number().min(0).max(1).default(0),
+  last_approved_completed_todo_weight: z.number().min(0).max(1).default(0),
+  last_approved_evidence_count: z.number().int().min(0).default(0),
+  last_approved_verifier_quality: z.number().min(0).max(1).default(0),
+  last_approved_failure_penalty: z.number().min(0).max(1).default(0),
   last_denied_reason: z.string().optional(),
 })
 export type BudgetContinuationState = z.infer<typeof BudgetContinuationState>

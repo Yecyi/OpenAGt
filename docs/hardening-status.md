@@ -39,7 +39,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Coordinator DAG correctness | implemented | Duplicate ids, dangling dependencies, and cycles are covered by validation. Suitable for `v1.17.0-rc`. |
 | Revise insertion topo safety | regression-covered | Deep effort revise gates and checkpoint synthesis are covered by coordinator intent/runtime tests. |
 | Token usage normalization | implemented | Anthropic cache double-count is addressed for task runtime usage. Suitable for RC. |
-| Continue budget velocity floor | partial | Continuation now requires an active budget checkpoint and records last approved usage so repeated no-progress budget growth is denied. Full progress/evidence velocity scoring remains future work. |
+| Continue budget velocity floor | implemented | Continuation requires an active checkpoint, resource consumption, and progress/evidence/verifier-quality improvement since the previous approved continuation. |
 | Absolute ceiling enforcement | partial | Runtime now exposes `limit_reason`, `limited_resource`, and `limited_todo_id`, and dispatch blocks ready work when todo/phase/mission/checkpoint reserve gates deny all candidates. Deeper reserve tuning remains future work. |
 | Partial/max-step semantics | implemented | Partial is terminal but not success. Suitable for RC, with continued coordinator retry/checkpoint tests. |
 | Full result text for review verdict parsing | implemented | Runtime persists full result text; reviewers are no longer limited to first-line summaries. |

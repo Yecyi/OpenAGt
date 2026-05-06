@@ -10,6 +10,7 @@ import {
   ResourceLimit,
   TodoTimeline,
   type BudgetLimitReason as BudgetLimitReasonType,
+  type BudgetProfile as BudgetProfileType,
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
   type ProgressSnapshot as ProgressSnapshotType,
@@ -256,6 +257,65 @@ function progressSnapshotFor(input: {
     failure_penalty,
     confidence: progress_score >= 0.8 && verifier_quality >= 0.6 ? "high" : progress_score >= 0.4 ? "medium" : "low",
   })
+}
+
+function completedTodoWeightRatio(todoTimeline: TodoTimelineType) {
+  const totalWeight = todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
+  if (totalWeight <= 0) return 0
+  return (
+    todoTimeline.todos
+      .filter((item) => item.status === "done")
+      .reduce((acc, item) => acc + item.budget_weight, 0) / totalWeight
+  )
+}
+
+export function continuationVelocityFor(input: {
+  budgetProfile: BudgetProfileType
+  todoTimeline: TodoTimelineType
+  progressSnapshot: ProgressSnapshotType
+}) {
+  const state = input.budgetProfile.continuation_state
+  const completed_todo_weight = completedTodoWeightRatio(input.todoTimeline)
+  const evidence_count = input.todoTimeline.evidence_ledger.length
+  const completed_todo_weight_delta = Math.max(0, completed_todo_weight - state.last_approved_completed_todo_weight)
+  const evidence_delta = Math.max(0, evidence_count - state.last_approved_evidence_count)
+  const verifier_quality_delta = Math.max(0, input.progressSnapshot.verifier_quality - state.last_approved_verifier_quality)
+  const progress_score_delta = Math.max(0, input.progressSnapshot.progress_score - state.last_approved_progress_score)
+  const failure_penalty_delta = input.progressSnapshot.failure_penalty - state.last_approved_failure_penalty
+  const todo_improved =
+    completed_todo_weight_delta >= input.budgetProfile.no_progress_stop.min_new_completed_todo_weight
+  const evidence_improved = evidence_delta >= input.budgetProfile.no_progress_stop.min_new_evidence_items
+  const verifier_improved = verifier_quality_delta >= input.budgetProfile.no_progress_stop.min_quality_delta
+  const failure_worsened = failure_penalty_delta > 0.2 && input.progressSnapshot.tool_success_rate < 0.5
+  const has_progress = todo_improved || evidence_improved || verifier_improved || progress_score_delta >= 0.05
+  const continuation_score = Math.max(
+    0,
+    Math.min(
+      1,
+      completed_todo_weight_delta * 0.45 +
+        Math.min(1, evidence_delta / Math.max(1, input.budgetProfile.no_progress_stop.min_new_evidence_items)) * 0.25 +
+        verifier_quality_delta * 0.2 +
+        progress_score_delta * 0.1 -
+        Math.max(0, failure_penalty_delta) * 0.3,
+    ),
+  )
+  const reason = failure_worsened
+    ? "tool failure rate worsened since the previous approved continuation"
+    : has_progress
+      ? "todo, evidence, or verifier quality improved since the previous approved continuation"
+      : "no new todo completion, evidence, or verifier quality improvement since the previous approved continuation"
+  return {
+    allowed: state.approved_count === 0 || (has_progress && !failure_worsened),
+    reason,
+    continuation_score,
+    completed_todo_weight,
+    completed_todo_weight_delta,
+    evidence_count,
+    evidence_delta,
+    verifier_quality_delta,
+    progress_score_delta,
+    failure_penalty_delta,
+  }
 }
 
 export function resourceUsageFor(run: CoordinatorRunType, taskList: TaskRuntime.TaskRecord[], extraStarts = 0) {

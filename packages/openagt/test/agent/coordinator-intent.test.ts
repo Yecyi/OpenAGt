@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 import { isBroadAgentTask } from "../../src/agent/task-classifier"
-import { runtimeStateFor, taskLeaseFor } from "../../src/coordinator/runtime-state"
+import { continuationVelocityFor, runtimeStateFor, taskLeaseFor } from "../../src/coordinator/runtime-state"
 import { buildTaskPrompt } from "../../src/coordinator/task-prompt"
-import type { CoordinatorRun } from "../../src/coordinator/schema"
+import { BudgetProfile, ProgressSnapshot, TodoTimeline, type CoordinatorRun } from "../../src/coordinator/schema"
 import type { TaskRuntime } from "../../src/session/task-runtime"
 
 describe("coordinator intent planning", () => {
@@ -441,5 +441,106 @@ describe("coordinator intent planning", () => {
     expect(runtime.todo_timeline.evidence_ledger).toHaveLength(50)
     expect(runtime.todo_timeline.checkpoints).toHaveLength(100)
     expect(runtime.todo_timeline.evidence_ledger.at(-1)?.summary).toBe("result 119")
+  })
+
+  test("continuation velocity requires progress, evidence, or verifier quality improvement", () => {
+    const budgetProfile = BudgetProfile.parse({
+      no_progress_stop: {
+        checkpoint_window: 5,
+        min_new_completed_todo_weight: 0.05,
+        min_new_evidence_items: 3,
+        min_quality_delta: 0.03,
+      },
+      continuation_state: {
+        approved_count: 1,
+        last_approved_progress_score: 0.5,
+        last_approved_completed_todo_weight: 0.5,
+        last_approved_evidence_count: 2,
+        last_approved_verifier_quality: 0.4,
+        last_approved_failure_penalty: 0.1,
+      },
+    })
+    const stale = continuationVelocityFor({
+      budgetProfile,
+      todoTimeline: TodoTimeline.parse({
+        todos: [
+          { id: "done", title: "Done", status: "done", budget_weight: 1 },
+          { id: "pending", title: "Pending", status: "pending", budget_weight: 1 },
+        ],
+        evidence_ledger: [
+          { id: "e1", source_id: "t1", summary: "old evidence", created_at: 1 },
+          { id: "e2", source_id: "t2", summary: "old evidence", created_at: 2 },
+        ],
+      }),
+      progressSnapshot: ProgressSnapshot.parse({
+        progress_score: 0.5,
+        verifier_quality: 0.4,
+        tool_success_rate: 1,
+        failure_penalty: 0.1,
+      }),
+    })
+    const improvedEvidence = continuationVelocityFor({
+      budgetProfile,
+      todoTimeline: TodoTimeline.parse({
+        todos: [
+          { id: "done", title: "Done", status: "done", budget_weight: 1 },
+          { id: "pending", title: "Pending", status: "pending", budget_weight: 1 },
+        ],
+        evidence_ledger: Array.from({ length: 5 }, (_, index) => ({
+          id: `e${index}`,
+          source_id: `t${index}`,
+          summary: "new evidence",
+          created_at: index,
+        })),
+      }),
+      progressSnapshot: ProgressSnapshot.parse({
+        progress_score: 0.5,
+        verifier_quality: 0.4,
+        tool_success_rate: 1,
+        failure_penalty: 0.1,
+      }),
+    })
+
+    expect(stale.allowed).toBe(false)
+    expect(stale.reason).toContain("no new todo completion")
+    expect(improvedEvidence.allowed).toBe(true)
+    expect(improvedEvidence.evidence_delta).toBe(3)
+  })
+
+  test("continuation velocity blocks obvious failure-rate regression", () => {
+    const budgetProfile = BudgetProfile.parse({
+      continuation_state: {
+        approved_count: 1,
+        last_approved_progress_score: 0.5,
+        last_approved_completed_todo_weight: 0.5,
+        last_approved_evidence_count: 2,
+        last_approved_verifier_quality: 0.4,
+        last_approved_failure_penalty: 0.1,
+      },
+    })
+    const velocity = continuationVelocityFor({
+      budgetProfile,
+      todoTimeline: TodoTimeline.parse({
+        todos: [
+          { id: "done", title: "Done", status: "done", budget_weight: 3 },
+          { id: "pending", title: "Pending", status: "pending", budget_weight: 2 },
+        ],
+        evidence_ledger: Array.from({ length: 6 }, (_, index) => ({
+          id: `e${index}`,
+          source_id: `t${index}`,
+          summary: "evidence",
+          created_at: index,
+        })),
+      }),
+      progressSnapshot: ProgressSnapshot.parse({
+        progress_score: 0.6,
+        verifier_quality: 0.45,
+        tool_success_rate: 0.4,
+        failure_penalty: 0.5,
+      }),
+    })
+
+    expect(velocity.allowed).toBe(false)
+    expect(velocity.reason).toContain("failure rate worsened")
   })
 })

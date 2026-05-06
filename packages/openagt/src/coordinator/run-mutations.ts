@@ -8,8 +8,8 @@ import { CoordinatorRunTable } from "./coordinator.sql"
 import { addResourceLimit, scaleResourceLimit } from "./budget-governance"
 import {
   planWithRuntimeState,
+  continuationVelocityFor,
   resourceLimitDelta,
-  resourceLimitMeetsAnyMinimum,
   resourceUsageFor,
   runtimeStateFor,
   taskLeaseFor,
@@ -240,15 +240,52 @@ export class CoordinatorRunMutations {
     const usage = resourceUsageFor(runOpt.value, taskList)
     const continuationState = runOpt.value.plan.budget_profile.continuation_state
     const consumedSinceLastApproval = resourceLimitDelta(usage, continuationState.last_approved_usage)
-    if (
-      continuationState.approved_count > 0 &&
-      !resourceLimitMeetsAnyMinimum(
-        consumedSinceLastApproval,
-        ResourceLimit.parse(BudgetTuning.continuation.minConsumedBeforeContinue),
+    const consumedEnough =
+      consumedSinceLastApproval.max_rounds >= BudgetTuning.continuation.minConsumedBeforeContinue.max_rounds ||
+      consumedSinceLastApproval.max_model_calls >=
+        BudgetTuning.continuation.minConsumedBeforeContinue.max_model_calls ||
+      consumedSinceLastApproval.max_tool_calls >= BudgetTuning.continuation.minConsumedBeforeContinue.max_tool_calls ||
+      consumedSinceLastApproval.max_subagents >= BudgetTuning.continuation.minConsumedBeforeContinue.max_subagents ||
+      consumedSinceLastApproval.max_wallclock_ms >=
+        BudgetTuning.continuation.minConsumedBeforeContinue.max_wallclock_ms ||
+      consumedSinceLastApproval.max_estimated_tokens >=
+        BudgetTuning.continuation.minConsumedBeforeContinue.max_estimated_tokens
+    const velocity = continuationVelocityFor({
+      budgetProfile: runOpt.value.plan.budget_profile,
+      todoTimeline: runtime.todo_timeline,
+      progressSnapshot: runtime.progress_snapshot,
+    })
+    if (continuationState.approved_count > 0 && (!consumedEnough || !velocity.allowed)) {
+      const deniedReason = !consumedEnough
+        ? "insufficient resource consumption since the previous approved continuation"
+        : velocity.reason
+      const plan = CoordinatorPlan.parse({
+        ...planWithRuntimeState(runOpt.value.plan, runtime),
+        budget_profile: BudgetProfile.parse({
+          ...runOpt.value.plan.budget_profile,
+          continuation_state: {
+            ...continuationState,
+            last_denied_reason: deniedReason,
+          },
+        }),
+      })
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(CoordinatorRunTable)
+            .set({
+              summary: `Coordinator continue denied: ${deniedReason}`,
+              plan,
+              time_updated: this.deps.now(),
+            })
+            .where(eq(CoordinatorRunTable.id, input.id))
+            .run(),
+        ),
       )
-    ) {
+      const updated = yield* this.deps.runStore.readAfterUpdate(input.id)
+      yield* this.deps.publishUpdated(updated)
       return yield* Effect.fail(
-        new Error("Coordinator continue denied: insufficient progress since the previous approved continuation"),
+        new Error(`Coordinator continue denied: ${deniedReason}`),
       )
     }
     const delta = requested
@@ -276,6 +313,11 @@ export class CoordinatorRunMutations {
       continuation_state: {
         approved_count: continuationState.approved_count + 1,
         last_approved_usage: usage,
+        last_approved_progress_score: runtime.progress_snapshot.progress_score,
+        last_approved_completed_todo_weight: velocity.completed_todo_weight,
+        last_approved_evidence_count: velocity.evidence_count,
+        last_approved_verifier_quality: runtime.progress_snapshot.verifier_quality,
+        last_approved_failure_penalty: runtime.progress_snapshot.failure_penalty,
       },
     })
     const plan = CoordinatorPlan.parse({
