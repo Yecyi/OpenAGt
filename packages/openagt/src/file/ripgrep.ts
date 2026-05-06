@@ -24,7 +24,7 @@ import type {
   SearchInput as RipgrepSearchInput,
   TreeInput as RipgrepTreeInput,
 } from "./ripgrep-contracts"
-import { clean, parse, row } from "./ripgrep-output"
+import { clean, parse, row, skipped } from "./ripgrep-output"
 import { env, error, fail, raceAbort } from "./ripgrep-runtime"
 
 export const Begin = BeginSchema
@@ -258,9 +258,16 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
               return yield* Effect.fail(error(stderr, code))
             }
 
+            const skippedPaths = skipped(stderr)
+            if (code === 2 && skippedPaths.count === 0) {
+              return yield* Effect.fail(error(stderr, code))
+            }
+
             return {
               items: code === 1 ? [] : items,
-              partial: code === 2,
+              partial: code === 2 || skippedPaths.count > 0,
+              skipped_count: skippedPaths.count,
+              skipped_reason_sample: skippedPaths.sample,
             }
           }),
         )

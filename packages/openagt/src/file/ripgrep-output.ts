@@ -25,3 +25,15 @@ export function parse(line: string) {
     catch: (cause) => new Error("invalid ripgrep output", { cause }),
   })
 }
+
+export function skipped(stderr: string) {
+  const lines = stderr
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  const skipped = lines.filter((line) => /^rg(?:\.exe)?:/i.test(line))
+  return {
+    count: skipped.length,
+    sample: skipped[0],
+  }
+}

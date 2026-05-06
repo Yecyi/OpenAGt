@@ -17,7 +17,7 @@ export function filesArgs(input: FilesInput): string[] {
 }
 
 export function searchArgs(input: SearchInput): string[] {
-  const args = ["--no-config", "--json", "--hidden", "--glob=!.git/*", "--no-messages"]
+  const args = ["--no-config", "--json", "--hidden", "--glob=!.git/*"]
   if (input.follow) args.push("--follow")
   if (input.glob) {
     for (const glob of input.glob) args.push(`--glob=${glob}`)

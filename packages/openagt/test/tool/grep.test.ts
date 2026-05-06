@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import path from "path"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Stream } from "effect"
 import { GrepTool } from "../../src/tool/grep"
 import { provideInstance, provideTmpdirInstance } from "../fixture/fixture"
 import { SessionID, MessageID } from "../../src/session/schema"
@@ -16,6 +16,37 @@ const it = testEffect(
     CrossSpawnSpawner.defaultLayer,
     AppFileSystem.defaultLayer,
     Ripgrep.defaultLayer,
+    Truncate.defaultLayer,
+    Agent.defaultLayer,
+  ),
+)
+
+const itPartial = testEffect(
+  Layer.mergeAll(
+    CrossSpawnSpawner.defaultLayer,
+    AppFileSystem.defaultLayer,
+    Layer.succeed(
+      Ripgrep.Service,
+      Ripgrep.Service.of({
+        files: () => Stream.empty,
+        tree: () => Effect.succeed(""),
+        search: () =>
+          Effect.succeed({
+            items: [
+              {
+                path: { text: "found.txt" },
+                lines: { text: "needle\n" },
+                line_number: 1,
+                absolute_offset: 0,
+                submatches: [],
+              },
+            ],
+            partial: true,
+            skipped_count: 2,
+            skipped_reason_sample: "rg: skipped.txt: Access is denied. (os error 5)",
+          }),
+      }),
+    ),
     Truncate.defaultLayer,
     Agent.defaultLayer,
   ),
@@ -108,6 +139,30 @@ describe("tool.grep", () => {
         expect(result.metadata.matches).toBe(1)
         expect(result.output).toContain(file)
         expect(result.output).toContain("Line 2: line2")
+      }),
+    ),
+  )
+
+  itPartial.live("surfaces skipped path metadata for partial searches", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => Bun.write(path.join(dir, "found.txt"), "needle\n"))
+        const info = yield* GrepTool
+        const grep = yield* info.init()
+        const result = yield* grep.execute(
+          {
+            pattern: "needle",
+            path: dir,
+          },
+          ctx,
+        )
+
+        expect(result.metadata.partial).toBe(true)
+        expect(result.metadata.search_complete).toBe(false)
+        expect(result.metadata.skipped_count).toBe(2)
+        expect(result.metadata.skipped_reason_sample).toContain("skipped.txt")
+        expect(result.output).toContain("Search incomplete")
+        expect(result.output).toContain("2 paths skipped")
       }),
     ),
   )

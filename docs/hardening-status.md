@@ -27,7 +27,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Chinese intent dictionary | implemented | Mojibake terms replaced with valid bilingual workflow/risk terms. |
 | AsyncQueue close/abort | implemented | Queue supports close, abortable take, and bounded capacity. |
 | CRLF byte accounting | partial | Read/truncate account for CRLF, patch updates preserve source CRLF, and mixed/new-file EOL convention remains future hardening. |
-| Grep partial metadata | partial | Tool result now exposes `partial`; skipped count needs ripgrep stderr parsing. |
+| Grep partial metadata | implemented | Ripgrep stderr diagnostics now flow through `partial`, `skipped_count`, `skipped_reason_sample`, and `search_complete` metadata. |
 | Edit LSP feedback | implemented | Edit now returns structured `lsp_feedback` metadata with before/after diagnostics, deltas, trend, workspace counts, and report text. Automatic fix/retry loops remain future work. |
 | Local `.claude` state | implemented | `.claude/` is ignored; the old tracked local gitlink is removed from the index so machine state does not pollute release status. |
 

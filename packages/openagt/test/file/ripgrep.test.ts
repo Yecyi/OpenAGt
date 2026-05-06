@@ -112,6 +112,30 @@ describe("file.ripgrep", () => {
     expect(result.items[0]?.path.text).toBe(file)
   })
 
+  test("search reports skipped explicit targets while preserving matches", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(path.join(dir, "match.ts"), "const value = 'needle'\n")
+      },
+    })
+
+    const result = await run(
+      Ripgrep.Service.use((rg) =>
+        rg.search({
+          cwd: tmp.path,
+          pattern: "needle",
+          file: ["match.ts", "missing.ts"],
+        }),
+      ),
+    )
+
+    expect(result.partial).toBe(true)
+    expect(result.skipped_count).toBeGreaterThan(0)
+    expect(result.skipped_reason_sample).toContain("missing.ts")
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]?.path.text).toBe("match.ts")
+  })
+
   test("files returns empty when glob matches no files", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {

@@ -87,6 +87,8 @@ export type Row = Match["data"]
 export interface SearchResult {
   items: Item[]
   partial: boolean
+  skipped_count: number
+  skipped_reason_sample?: string
 }
 
 export interface FilesInput {

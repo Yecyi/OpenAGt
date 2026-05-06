@@ -25,11 +25,24 @@ export const GrepTool = Tool.define(
       }),
       execute: (params: { pattern: string; path?: string; include?: string }, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          const empty = {
+          const empty = (partial = false, skippedCount = 0, skippedReasonSample: string | undefined = undefined) => ({
             title: params.pattern,
-            metadata: { matches: 0, truncated: false },
-            output: "No files found",
-          }
+            metadata: {
+              matches: 0,
+              truncated: false,
+              partial,
+              skipped_count: skippedCount,
+              skipped_reason_sample: skippedReasonSample,
+              search_complete: !partial,
+            },
+            output: partial
+              ? [
+                  "No files found",
+                  "",
+                  `(Search incomplete: ${skippedCount} path${skippedCount === 1 ? "" : "s"} skipped${skippedReasonSample ? `; ${skippedReasonSample}` : ""}.)`,
+                ].join("\n")
+              : "No files found",
+          })
           if (!params.pattern) {
             throw new Error("pattern is required")
           }
@@ -65,7 +78,9 @@ export const GrepTool = Tool.define(
             file,
             signal: ctx.abort,
           })
-          if (result.items.length === 0) return empty
+          if (result.items.length === 0) {
+            return empty(result.partial, result.skipped_count, result.skipped_reason_sample)
+          }
 
           const rows = result.items.map((item) => ({
             path: AppFileSystem.resolve(
@@ -102,7 +117,9 @@ export const GrepTool = Tool.define(
           const limit = 100
           const truncated = matches.length > limit
           const final = truncated ? matches.slice(0, limit) : matches
-          if (final.length === 0) return empty
+          if (final.length === 0) {
+            return empty(result.partial, result.skipped_count, result.skipped_reason_sample)
+          }
 
           const total = matches.length
           const output = [`Found ${total} matches${truncated ? ` (showing first ${limit})` : ""}`]
@@ -128,7 +145,9 @@ export const GrepTool = Tool.define(
 
           if (result.partial) {
             output.push("")
-            output.push("(Some paths were inaccessible and skipped)")
+            output.push(
+              `(Search incomplete: ${result.skipped_count} path${result.skipped_count === 1 ? "" : "s"} skipped${result.skipped_reason_sample ? `; ${result.skipped_reason_sample}` : ""}.)`,
+            )
           }
 
           return {
@@ -137,8 +156,9 @@ export const GrepTool = Tool.define(
               matches: total,
               truncated,
               partial: result.partial,
-              skipped_count: result.partial ? undefined : 0,
-              skipped_reason_sample: result.partial ? "ripgrep reported inaccessible or skipped paths" : undefined,
+              skipped_count: result.skipped_count,
+              skipped_reason_sample: result.skipped_reason_sample,
+              search_complete: !result.partial,
             },
             output: output.join("\n"),
           }
