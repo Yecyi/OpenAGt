@@ -1,4 +1,4 @@
-import type { AuthOAuthResult, Hooks } from "@openagt/plugin"
+import type { AuthOAuthResult, AuthOAuthTokenResult, Hooks } from "@openagt/plugin"
 import { NamedError } from "@openagt/shared/util/error"
 import { Auth } from "@/auth"
 import { InstanceState } from "@/effect"
@@ -104,6 +104,7 @@ export interface Interface {
     } & AuthorizeInput,
   ) => Effect.Effect<Authorization | undefined, Error>
   readonly callback: (input: { providerID: ProviderID } & CallbackInput) => Effect.Effect<void, Error>
+  readonly refresh: (providerID: ProviderID) => Effect.Effect<boolean, Error>
 }
 
 interface State {
@@ -224,7 +225,38 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
       }
     })
 
-    return Service.of({ methods, authorize, callback })
+    const persistOAuth = Effect.fn("ProviderAuth.persistOAuth")(function* (
+      providerID: ProviderID,
+      current: Extract<Auth.Info, { type: "oauth" }>,
+      result: AuthOAuthTokenResult,
+    ) {
+      if (result.type !== "success") return false
+      const { type: _, provider: __, refresh, access, expires, ...extra } = result
+      yield* auth.set(providerID, {
+        type: "oauth",
+        access,
+        refresh,
+        expires,
+        accountId: current.accountId,
+        enterpriseUrl: current.enterpriseUrl,
+        ...extra,
+      })
+      return true
+    })
+
+    const refresh = Effect.fn("ProviderAuth.refresh")(function* (providerID: ProviderID) {
+      const { hooks } = yield* InstanceState.get(state)
+      const hook = hooks[providerID]
+      if (!hook?.refresh) return false
+      const current = yield* auth.get(providerID)
+      if (current?.type !== "oauth") return false
+      if (current.expires > Date.now()) return true
+      return yield* Effect.promise(() => hook.refresh!(current)).pipe(
+        Effect.flatMap((result) => persistOAuth(providerID, current, result)),
+      )
+    })
+
+    return Service.of({ methods, authorize, callback, refresh })
   }),
 )
 

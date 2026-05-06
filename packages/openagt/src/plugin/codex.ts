@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@openagt/plugin"
+import type { AuthOAuthTokenResult, Hooks, PluginInput } from "@openagt/plugin"
 import { Log } from "../util"
 import { Installation } from "../installation"
 import { InstallationVersion } from "../installation/version"
@@ -27,6 +27,16 @@ const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 
+async function refreshCodexAuth(auth: { refresh: string; accountId?: string }): Promise<AuthOAuthTokenResult> {
+  const tokens = await refreshAccessToken(auth.refresh)
+  return {
+    type: "success",
+    refresh: tokens.refresh_token,
+    access: tokens.access_token,
+    expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+    accountId: extractAccountId(tokens) || auth.accountId,
+  }
+}
 
 interface PendingOAuth {
   pkce: PkceCodes
@@ -154,6 +164,7 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
   return {
     auth: {
       provider: "openai",
+      refresh: refreshCodexAuth,
       async loader(getAuth, provider) {
         const auth = await getAuth()
         if (auth.type !== "oauth") return {}
@@ -218,20 +229,21 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
             // Check if token needs refresh
             if (!currentAuth.access || currentAuth.expires < Date.now()) {
               log.info("refreshing codex access token")
-              const tokens = await refreshAccessToken(currentAuth.refresh)
-              const newAccountId = extractAccountId(tokens) || authWithAccount.accountId
+              const tokens = await refreshCodexAuth(authWithAccount)
               await input.client.auth.set({
                 providerID: "openai",
                 auth: {
                   type: "oauth",
-                  refresh: tokens.refresh_token,
-                  access: tokens.access_token,
-                  expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
-                  ...(newAccountId && { accountId: newAccountId }),
+                  refresh: tokens.type === "success" ? tokens.refresh : currentAuth.refresh,
+                  access: tokens.type === "success" ? tokens.access : currentAuth.access,
+                  expires: tokens.type === "success" ? tokens.expires : currentAuth.expires,
+                  ...(tokens.type === "success" && tokens.accountId && { accountId: tokens.accountId }),
                 },
               })
-              currentAuth.access = tokens.access_token
-              authWithAccount.accountId = newAccountId
+              if (tokens.type === "success") {
+                currentAuth.access = tokens.access
+                authWithAccount.accountId = tokens.accountId
+              }
             }
 
             // Build headers

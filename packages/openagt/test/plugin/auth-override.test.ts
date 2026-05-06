@@ -6,6 +6,7 @@ import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { ProviderAuth } from "../../src/provider"
 import { ProviderID } from "../../src/provider/schema"
+import { Auth } from "../../src/auth"
 
 describe("plugin.auth-override", () => {
   test("user plugin overrides built-in github-copilot auth", async () => {
@@ -112,6 +113,66 @@ describe("plugin.auth-override", () => {
             expect(second._tag).toBe("Failure")
             if (second._tag === "Failure") expect(Cause.pretty(second.cause)).toContain("ProviderAuthOauthMissing")
           }).pipe(Effect.provide(ProviderAuth.defaultLayer)),
+        )
+      },
+    })
+  }, 30000)
+
+  test("oauth refresh hook updates expired stored auth", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const pluginDir = path.join(dir, ".opencode", "plugin")
+        await fs.mkdir(pluginDir, { recursive: true })
+
+        await Bun.write(
+          path.join(pluginDir, "refresh-oauth.ts"),
+          [
+            "export default {",
+            '  id: "demo.refresh-oauth",',
+            "  server: async () => ({",
+            "    auth: {",
+            '      provider: "refresh-oauth",',
+            "      methods: [],",
+            "      refresh: async (auth) => ({",
+            '        type: "success",',
+            '        refresh: `${auth.refresh}-new`,',
+            '        access: "new-access",',
+            "        expires: 123456789,",
+            '        accountId: auth.accountId || "existing-account",',
+            "      }),",
+            "    },",
+            "  }),",
+            "}",
+            "",
+          ].join("\n"),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const providerID = ProviderID.make("refresh-oauth")
+        await Effect.runPromise(
+          Effect.gen(function* () {
+            const auth = yield* Auth.Service
+            const svc = yield* ProviderAuth.Service
+            yield* auth.set(providerID, {
+              type: "oauth",
+              refresh: "old-refresh",
+              access: "old-access",
+              expires: 0,
+              accountId: "old-account",
+            })
+            expect(yield* svc.refresh(providerID)).toBe(true)
+            expect(yield* auth.get(providerID)).toMatchObject({
+              type: "oauth",
+              refresh: "old-refresh-new",
+              access: "new-access",
+              expires: 123456789,
+              accountId: "old-account",
+            })
+          }).pipe(Effect.provide(Auth.defaultLayer), Effect.provide(ProviderAuth.defaultLayer)),
         )
       },
     })

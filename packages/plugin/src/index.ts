@@ -92,6 +92,7 @@ type Rule = {
 export type AuthHook = {
   provider: string
   loader?: (auth: () => Promise<Auth>, provider: Provider) => Promise<Record<string, any>>
+  refresh?: (auth: Extract<Auth, { type: "oauth" }>) => Promise<AuthOAuthTokenResult>
   methods: (
     | {
         type: "oauth"
@@ -164,6 +165,21 @@ export type AuthHook = {
       }
   )[]
 }
+
+export type AuthOAuthTokenResult =
+  | ({
+      type: "success"
+      provider?: string
+    } & {
+      refresh: string
+      access: string
+      expires: number
+      accountId?: string
+      enterpriseUrl?: string
+    })
+  | {
+      type: "failed"
+    }
 
 export type AuthOAuthResult = { url: string; instructions: string } & (
   | {
