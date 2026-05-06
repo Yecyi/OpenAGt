@@ -13,6 +13,7 @@ import { Instance } from "../project/instance"
 import { InstanceState } from "@/effect"
 import { Log } from "@/util"
 import { canonicalPath, containsCanonicalPath } from "@/util/path-canonical"
+import { truncateCodePoints } from "@/util/text"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "@/util/media"
@@ -378,7 +379,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number; ex
         continue
       }
 
-      const line = text.length > MAX_LINE_LENGTH ? text.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : text
+      const line = truncateCodePoints(text, MAX_LINE_LENGTH, MAX_LINE_SUFFIX)
       const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? newline : 0)
       if (bytes + size > MAX_BYTES) {
         cut = true

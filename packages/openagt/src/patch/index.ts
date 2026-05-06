@@ -3,6 +3,7 @@ import * as path from "path"
 import * as fs from "fs/promises"
 import { readFileSync } from "fs"
 import { Log } from "../util"
+import { joinLinesWithEol, splitLinesForPatch } from "../util/text"
 import { parsePatch } from "./parser"
 import type { Hunk, UpdateFileChunk } from "./parser"
 import { applyReplacements, computeReplacements, generateUnifiedDiff } from "./line-replace"
@@ -133,22 +134,10 @@ export function deriveNewContentsFromChunks(filePath: string, chunks: UpdateFile
     throw new Error(`Failed to read file ${filePath}: ${error}`, { cause: error })
   }
 
-  let originalLines = originalContent.split("\n")
+  const original = splitLinesForPatch(originalContent)
 
-  // Drop trailing empty element for consistent line counting
-  if (originalLines.length > 0 && originalLines[originalLines.length - 1] === "") {
-    originalLines.pop()
-  }
-
-  const replacements = computeReplacements(originalLines, filePath, chunks)
-  let newLines = applyReplacements(originalLines, replacements)
-
-  // Ensure trailing newline
-  if (newLines.length === 0 || newLines[newLines.length - 1] !== "") {
-    newLines.push("")
-  }
-
-  const newContent = newLines.join("\n")
+  const replacements = computeReplacements(original.lines, filePath, chunks)
+  const newContent = joinLinesWithEol(applyReplacements(original.lines, replacements), original.eol)
 
   // Generate unified diff
   const unifiedDiff = generateUnifiedDiff(originalContent, newContent)

@@ -61,6 +61,19 @@ describe("Patch namespace", () => {
       expect(result.hunks[1].type).toBe("update")
     })
 
+    test("should parse CRLF patch text without carrying carriage returns", () => {
+      const patchText = "*** Begin Patch\r\n*** Add File: crlf.txt\r\n+hello\r\n*** End Patch"
+
+      const result = Patch.parsePatch(patchText)
+      expect(result.hunks).toEqual([
+        {
+          type: "add",
+          path: "crlf.txt",
+          contents: "hello",
+        },
+      ])
+    })
+
     test("should parse file move operation", () => {
       const patchText = `*** Begin Patch
 *** Update File: old-name.txt
@@ -188,6 +201,24 @@ PATCH`
 
       const content = await fs.readFile(filePath, "utf-8")
       expect(content).toBe("line 1\nline 2 updated\nline 3\n")
+    })
+
+    test("should preserve CRLF line endings when updating a file", async () => {
+      const filePath = path.join(tempDir, "crlf-update.txt")
+      await fs.writeFile(filePath, "line 1\r\nline 2\r\nline 3\r\n")
+
+      const patchText = `*** Begin Patch
+*** Update File: ${filePath}
+@@
+ line 1
+-line 2
++line 2 updated
+ line 3
+*** End Patch`
+
+      const result = await Patch.applyPatch(patchText)
+      expect(result.modified).toEqual([filePath])
+      expect(await fs.readFile(filePath, "utf-8")).toBe("line 1\r\nline 2 updated\r\nline 3\r\n")
     })
 
     test("should move and update a file", async () => {

@@ -236,6 +236,25 @@ describe("tool.apply_patch freeform", () => {
     })
   })
 
+  test("preserves CRLF line endings on update", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await Instance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "crlf.txt")
+        await fs.writeFile(target, "alpha\r\nbeta\r\nomega\r\n", "utf-8")
+
+        const patchText = "*** Begin Patch\n*** Update File: crlf.txt\n@@\n-alpha\n+ALPHA\n*** End Patch"
+
+        await execute({ patchText }, ctx)
+
+        expect(await fs.readFile(target, "utf-8")).toBe("ALPHA\r\nbeta\r\nomega\r\n")
+      },
+    })
+  })
+
   test("moves file to a new directory", async () => {
     await using fixture = await tmpdir()
     const { ctx } = makeCtx()

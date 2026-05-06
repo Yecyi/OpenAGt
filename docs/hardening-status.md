@@ -26,7 +26,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Permission deny precedence | implemented | Matching deny rules override allow/ask. |
 | Chinese intent dictionary | implemented | Mojibake terms replaced with valid bilingual workflow/risk terms. |
 | AsyncQueue close/abort | implemented | Queue supports close, abortable take, and bounded capacity. |
-| CRLF byte accounting | partial | Read/truncate account for CRLF; patch/edit EOL preservation remains open. |
+| CRLF byte accounting | partial | Read/truncate account for CRLF, patch updates preserve source CRLF, and mixed/new-file EOL convention remains future hardening. |
 | Grep partial metadata | partial | Tool result now exposes `partial`; skipped count needs ripgrep stderr parsing. |
 | Edit LSP feedback | implemented | Edit now returns structured `lsp_feedback` metadata with before/after diagnostics, deltas, trend, workspace counts, and report text. Automatic fix/retry loops remain future work. |
 | Local `.claude` state | implemented | `.claude/` is ignored; the old tracked local gitlink is removed from the index so machine state does not pollute release status. |
@@ -49,7 +49,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Coordinator split | deferred | Do not block `v1.17.0-rc`; required for v1.20 maintainability. |
 | Workflow/role coverage | deferred | Public enum/template audit belongs to v1.20 unless a visible workflow is broken. |
 | Runtime efficiency O(n2) fetches | deferred | Not RC-blocking unless full test or real usage shows stalls. |
-| CRLF/Unicode handling | partial | Read/truncate improved; patch/edit round-trip remains future hardening work. |
+| CRLF/Unicode handling | partial | Patch updates preserve source CRLF and read long-line truncation is codepoint-safe; broader binary/mixed-EOL patch round-trip remains future hardening work. |
 | Permission deny-overrides-allow | implemented | Suitable for RC. |
 | Sandbox process labeling | implemented | Process backend status now calls out process-level enforcement instead of implying OS-native isolation. Full OS-native sandboxing remains roadmap work. |
 | WebFetch redirect SSRF guard | implemented | Redirect hops are checked and private/local/metadata targets are blocked by default. |

@@ -1,6 +1,8 @@
 // Parses the textual apply_patch grammar into hunks.
 // It does not read files, apply replacements, or verify filesystem correctness.
 
+import { normalizeEol } from "../util/text"
+
 export type Hunk =
   | { type: "add"; path: string; contents: string }
   | { type: "delete"; path: string }
@@ -121,7 +123,7 @@ function stripHeredoc(input: string): string {
 }
 
 export function parsePatch(patchText: string): { hunks: Hunk[] } {
-  const lines = stripHeredoc(patchText.trim()).split("\n")
+  const lines = normalizeEol(stripHeredoc(patchText.trim())).split("\n")
   const hunks: Hunk[] = []
   let i = 0
 

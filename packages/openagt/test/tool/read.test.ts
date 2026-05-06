@@ -415,6 +415,19 @@ describe("tool.read truncation", () => {
     }),
   )
 
+  it.live("truncates long lines without splitting surrogate pairs", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      yield* put(path.join(dir, "unicode-long-line.txt"), `${"x".repeat(1999)}😀tail`)
+
+      const result = yield* exec(dir, { filePath: path.join(dir, "unicode-long-line.txt") })
+      expect(result.output).toContain("😀")
+      expect(result.output).toContain("(line truncated to 2000 chars)")
+      expect(result.output).not.toContain("\uFFFD")
+      expect(result.output).not.toContain("tail")
+    }),
+  )
+
   it.live("image files set truncated to false", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()
