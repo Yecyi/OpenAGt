@@ -6,6 +6,7 @@ import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { TaskRuntime } from "@/session/task-runtime"
 import { Cause, Effect, Option } from "effect"
+import { Log } from "@/util"
 import {
   isMpacrCriticTask,
   isMpacrReviewTask,
@@ -37,6 +38,8 @@ interface CoordinatorTaskExecutorInput {
     verdict: CriticalReviewVerdictType | undefined,
   ) => Effect.Effect<void, Error>
 }
+
+const log = Log.create({ service: "coordinator.task-executor" })
 
 export class CoordinatorTaskExecutor {
   constructor(private readonly input: CoordinatorTaskExecutorInput) {}
@@ -86,7 +89,17 @@ export class CoordinatorTaskExecutor {
           goal_hash: started.prompt_hash,
           started_at: started.started_at ?? Date.now(),
         }),
-      ).pipe(Effect.ignore)
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            log.warn("behavior event publish failed", {
+              event: "subagent.dispatched",
+              node_id: String(started.task_id),
+              cause: Cause.pretty(cause),
+            }),
+          ),
+        ),
+      )
       const dependencies = (yield* input.tasks.list(started.parent_session_id)).filter((item) =>
         started.depends_on.includes(item.task_id),
       )

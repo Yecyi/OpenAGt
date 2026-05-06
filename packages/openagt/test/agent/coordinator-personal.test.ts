@@ -6,6 +6,7 @@ import { Config } from "../../src/config"
 import { Coordinator } from "../../src/coordinator/coordinator"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
+import { createMemoryOps } from "../../src/personal/memory-ops"
 import { PersonalAgent } from "../../src/personal/personal"
 import { ThreeLayerMemory } from "../../src/personal/three-layer"
 import { Instance } from "../../src/project/instance"
@@ -730,6 +731,38 @@ describe("personal agent core", () => {
         expect(seen).toContain("scheduler.scheduled")
         expect(seen).toContain("scheduler.fired")
         unsub()
+      }),
+    ),
+  )
+
+  it.live("synthesizeOnce inserts exactly one row even under concurrent calls (TOCTOU regression)", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        // Pre-fix, hasMemoryTag -> synthesize ran across separate Effect yields
+        // and two concurrent calls both passed the existence check, double-
+        // inserting. With the transaction fix only one call wins; the rest
+        // observe the inserted row and short-circuit.
+        // The Service does not expose synthesizeOnce directly, so exercise
+        // the underlying memory ops factory which is what personal.ts calls
+        // internally for "remember-once" style writes.
+        const bus = yield* Bus.Service
+        const personal = yield* PersonalAgent.Service
+        const memory = createMemoryOps(bus)
+        const tag = "synthesize-once-race-test"
+        yield* Effect.all(
+          Array.from({ length: 8 }, () =>
+            memory.synthesizeOnce({
+              kind: "verify_completed",
+              title: "Race regression",
+              content: "concurrent synthesizeOnce should produce one row",
+              tag,
+              tags: [tag],
+            }),
+          ),
+          { concurrency: 8 },
+        )
+        const matches = (yield* personal.listMemory()).filter((note) => note.tags.includes(tag))
+        expect(matches.length).toBe(1)
       }),
     ),
   )

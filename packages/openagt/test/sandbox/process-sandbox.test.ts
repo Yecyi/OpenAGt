@@ -112,6 +112,25 @@ describe("spawnWithSandboxSync", () => {
   })
 })
 
+describe("combined output cap (apr.4.6 regression)", () => {
+  test("flips outputBytesTruncated when stdout+stderr together exceed maxOutputBytes", async () => {
+    // Per-stream cap is generous; the combined cap is the only limit that
+    // can fire here. Without the SharedBudget plumbing this would silently
+    // succeed with `outputBytesTruncated: false` (the dead-code state).
+    const command = isWindows
+      ? "cmd /c \"echo aaaaaaaaaaaaaaaaaaaaaaaa & echo bbbbbbbbbbbbbbbbbbbbbbbb 1>&2\""
+      : "printf 'aaaaaaaaaaaaaaaaaaaaaaaa' && printf 'bbbbbbbbbbbbbbbbbbbbbbbb' 1>&2"
+    const result = await spawnWithSandbox(command, {
+      timeoutMs: 5000,
+      shell: isWindows ? "cmd.exe" : "/bin/sh",
+      limits: { maxFileSize: 1024, maxOutputBytes: 16 },
+    })
+    expect(result.outputBytesTruncated).toBe(true)
+    expect(result.outputTruncated).toBe(true)
+    expect(result.stdout.length + result.stderr.length).toBeLessThanOrEqual(16)
+  })
+})
+
 describe("killAllProcesses", () => {
   test("kills all running processes", async () => {
     resetSandboxStats()

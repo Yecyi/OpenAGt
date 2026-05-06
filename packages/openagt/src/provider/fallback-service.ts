@@ -268,21 +268,16 @@ export const layer: Layer.Layer<Service, never, Config.Service | Provider.Servic
       }
 
       if (!shouldRetry) {
-        if (parsed.message.includes("rate limit")) {
+        // Use else-if so a single error message that mentions multiple
+        // signals (e.g. "rate limit: too many requests") classifies
+        // exactly once rather than double-incrementing fallbackByReason.
+        if (parsed.message.includes("rate limit") || parsed.message.includes("too many requests")) {
           shouldRetry = fallbackState.retryOnRateLimit
           if (shouldRetry) {
             runtimeState.metrics.fallbackByReason["rate_limit"] =
               (runtimeState.metrics.fallbackByReason["rate_limit"] ?? 0) + 1
           }
-        }
-        if (parsed.message.includes("too many requests")) {
-          shouldRetry = fallbackState.retryOnRateLimit
-          if (shouldRetry) {
-            runtimeState.metrics.fallbackByReason["rate_limit"] =
-              (runtimeState.metrics.fallbackByReason["rate_limit"] ?? 0) + 1
-          }
-        }
-        if (parsed.message.includes("overloaded")) {
+        } else if (parsed.message.includes("overloaded")) {
           shouldRetry = fallbackState.retryOnServerError
           if (shouldRetry) {
             runtimeState.metrics.fallbackByReason["overloaded"] =

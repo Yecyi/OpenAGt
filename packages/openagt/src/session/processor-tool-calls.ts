@@ -1,8 +1,9 @@
 // Manages tool-call part lifecycle for one assistant message stream.
 // It does not consume LLM events, retry streams, or decide session completion.
-import { Deferred, Effect } from "effect"
+import { Cause, Deferred, Effect } from "effect"
 import { Permission } from "@/permission"
 import { Question } from "@/question"
+import { Log } from "@/util"
 import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
 import { MessageV2 } from "./message-v2"
@@ -10,6 +11,8 @@ import * as Session from "./session"
 import { completeInterruptedBashFor, isAbortLikeError, isShellRunnerBash } from "./processor-helpers"
 import * as Bus from "@/bus"
 import { Event as BehaviorEvent } from "@/bus/behavior-events"
+
+const log = Log.create({ service: "session.processor-tool-calls" })
 
 export type ProcessorToolCall = {
   partID: MessageV2.ToolPart["id"]
@@ -115,7 +118,9 @@ export class ProcessorToolCalls {
         },
       })
       // Wave 6: emit behavior.tool.completed for the audit stream. Errors in
-      // publish must not affect tool-call lifecycle, so we ignore them.
+      // publish must not affect tool-call lifecycle, but we log them so
+      // telemetry loss (e.g. inc.processor-effect-failures) is visible
+      // instead of silently dropping behavior events.
       yield* Effect.promise(() =>
         Bus.publish(BehaviorEvent.ToolCompleted, {
           tool_id: match.part.tool,
@@ -126,7 +131,18 @@ export class ProcessorToolCalls {
           output_size: output.output.length,
           duration_ms: Math.max(0, end - start),
         }),
-      ).pipe(Effect.ignore)
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            log.warn("behavior event publish failed", {
+              event: "tool.completed",
+              tool: match.part.tool,
+              success: true,
+              cause: Cause.pretty(cause),
+            }),
+          ),
+        ),
+      )
       yield* settle(toolCallID)
     })
   }
@@ -181,7 +197,19 @@ export class ProcessorToolCalls {
           duration_ms: Math.max(0, end - start),
           error_kind: errorKind,
         }),
-      ).pipe(Effect.ignore)
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            log.warn("behavior event publish failed", {
+              event: "tool.completed",
+              tool: match.part.tool,
+              success: false,
+              error_kind: errorKind,
+              cause: Cause.pretty(cause),
+            }),
+          ),
+        ),
+      )
       if (error instanceof Permission.RejectedError || error instanceof Question.RejectedError) {
         deps.context.blocked = deps.context.shouldBreak
       }

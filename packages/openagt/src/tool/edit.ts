@@ -5,7 +5,7 @@
 
 import z from "zod"
 import * as path from "path"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import * as Tool from "./tool"
 import { LSP } from "../lsp"
 import { createTwoFilesPatch, diffLines } from "diff"
@@ -16,11 +16,14 @@ import { Bus } from "../bus"
 import { Event as BehaviorEvent } from "../bus/behavior-events"
 import { Format } from "../format"
 import { Instance } from "../project/instance"
+import { Log } from "@/util"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { replace, trimDiff } from "./edit-replace"
 export * from "./edit-replace"
+
+const log = Log.create({ service: "tool.edit" })
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -145,7 +148,18 @@ export const EditTool = Tool.define(
                 tool_call_id: ctx.callID,
                 bytes: contentNew.length,
               })
-              .pipe(Effect.ignore)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.sync(() =>
+                    log.warn("behavior event publish failed", {
+                      event: "file.touched",
+                      kind: "edit",
+                      path: filePath,
+                      cause: Cause.pretty(cause),
+                    }),
+                  ),
+                ),
+              )
             contentNew = yield* afs.readFileString(filePath)
             diff = trimDiff(
               createTwoFilesPatch(

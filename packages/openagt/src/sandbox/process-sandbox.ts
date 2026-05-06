@@ -29,7 +29,7 @@ export type {
   ResourceLimits,
   ResourceUsage,
 } from "./process-sandbox-contracts"
-import { collectStream, truncateOutput } from "./process-sandbox-output"
+import { collectStream, truncateOutput, type SharedBudget } from "./process-sandbox-output"
 
 const log = Log.create({ service: "process-sandbox" })
 
@@ -120,10 +120,14 @@ export async function spawnWithSandbox(
 
   let timedOut = false
   let killed = false
-  let outputBytesTruncated = false
 
-  // Combined output byte limit (stdout + stderr)
+  // Combined stdout+stderr cap. Defaults to 2x maxFileSize when only the
+  // per-stream cap is set, matching the prior intent. Shared between both
+  // collectStream calls via a SharedBudget so the cooperative limit is
+  // actually enforced (was dead code prior to this change: apr.4.6).
   const maxOutputBytes = limits?.maxOutputBytes ?? (limits?.maxFileSize ? limits.maxFileSize * 2 : undefined)
+  const combinedBudget: SharedBudget | undefined =
+    maxOutputBytes !== undefined ? { remaining: maxOutputBytes, truncated: false } : undefined
 
   return new Promise<ProcessSandboxResult>((resolve) => {
     const child = spawn({
@@ -135,11 +139,8 @@ export async function spawnWithSandbox(
       stdin: "ignore",
     })
 
-    const stdoutPromise = collectStream(child.stdout, limits?.maxFileSize)
-    const stderrPromise = collectStream(child.stderr, limits?.maxFileSize)
-
-    // Track total bytes emitted across both streams for combined limit
-    let totalOutputBytes = 0
+    const stdoutPromise = collectStream(child.stdout, limits?.maxFileSize, combinedBudget)
+    const stderrPromise = collectStream(child.stderr, limits?.maxFileSize, combinedBudget)
 
     const timer =
       timeoutMs > 0
@@ -164,8 +165,8 @@ export async function spawnWithSandbox(
           exitCode,
           timedOut,
           killed,
-          outputTruncated: stdout.truncated || stderr.truncated,
-          outputBytesTruncated,
+          outputTruncated: stdout.truncated || stderr.truncated || (combinedBudget?.truncated ?? false),
+          outputBytesTruncated: combinedBudget?.truncated ?? false,
         })
       })
       .catch(async (error) => {
@@ -179,8 +180,8 @@ export async function spawnWithSandbox(
           exitCode: -1,
           timedOut,
           killed,
-          outputTruncated: stdout.truncated || stderr.truncated,
-          outputBytesTruncated,
+          outputTruncated: stdout.truncated || stderr.truncated || (combinedBudget?.truncated ?? false),
+          outputBytesTruncated: combinedBudget?.truncated ?? false,
         })
       })
   })

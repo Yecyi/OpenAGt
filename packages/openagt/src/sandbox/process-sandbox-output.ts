@@ -1,4 +1,18 @@
-export async function collectStream(stream: ReadableStream<Uint8Array> | null, maxSize?: number) {
+// Shared budget for combined stdout+stderr cap. Both collectStream invocations
+// inside one spawn pass the same SharedBudget instance so the per-stream
+// truncation cooperates with the combined cap. The reader still drains the
+// underlying stream once the budget is exhausted to avoid blocking the child
+// process; only the chunk-keeping stops.
+export interface SharedBudget {
+  remaining: number
+  truncated: boolean
+}
+
+export async function collectStream(
+  stream: ReadableStream<Uint8Array> | null,
+  maxSize?: number,
+  combined?: SharedBudget,
+) {
   if (!stream) {
     return { text: "", truncated: false }
   }
@@ -13,26 +27,28 @@ export async function collectStream(stream: ReadableStream<Uint8Array> | null, m
     if (next.done || !next.value) break
 
     const chunk = next.value
-    if (!maxSize) {
-      chunks.push(chunk)
+    const perStreamRemaining = maxSize === undefined ? Infinity : maxSize - total
+    const combinedRemaining = combined ? combined.remaining : Infinity
+    const allowed = Math.min(chunk.byteLength, perStreamRemaining, combinedRemaining)
+
+    if (allowed <= 0) {
+      if (perStreamRemaining <= 0) truncated = true
+      if (combined && combinedRemaining <= 0) combined.truncated = true
       continue
     }
 
-    const remaining = maxSize - total
-    if (remaining <= 0) {
-      truncated = true
-      continue
-    }
-
-    if (chunk.byteLength > remaining) {
-      chunks.push(chunk.slice(0, remaining))
-      total += remaining
-      truncated = true
+    if (allowed < chunk.byteLength) {
+      chunks.push(chunk.slice(0, allowed))
+      total += allowed
+      if (combined) combined.remaining -= allowed
+      if (allowed === perStreamRemaining) truncated = true
+      if (combined && allowed === combinedRemaining) combined.truncated = true
       continue
     }
 
     chunks.push(chunk)
-    total += chunk.byteLength
+    total += allowed
+    if (combined) combined.remaining -= allowed
   }
 
   return {

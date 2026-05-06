@@ -1,5 +1,5 @@
 import z from "zod"
-import { Effect, Option, Scope } from "effect"
+import { Cause, Effect, Option, Scope } from "effect"
 import { createReadStream } from "fs"
 import * as path from "path"
 import { createInterface } from "readline"
@@ -10,9 +10,14 @@ import DESCRIPTION from "./read.txt"
 import * as Bus from "../bus"
 import { Event as BehaviorEvent } from "../bus/behavior-events"
 import { Instance } from "../project/instance"
+import { InstanceState } from "@/effect"
+import { Log } from "@/util"
+import { canonicalPath, containsCanonicalPath } from "@/util/path-canonical"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+
+const log = Log.create({ service: "tool.read" })
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -76,13 +81,26 @@ export const ReadTool = Tool.define(
 
     const list = Effect.fn("ReadTool.list")(function* (filepath: string) {
       const items = yield* fs.readDirectoryEntries(filepath)
+      const ins = yield* InstanceState.context
       return yield* Effect.forEach(
         items,
         Effect.fnUntraced(function* (item) {
           if (item.type === "directory") return item.name + "/"
           if (item.type !== "symlink") return item.name
 
-          const target = yield* fs.stat(path.join(filepath, item.name)).pipe(Effect.catch(() => Effect.void))
+          // Resolve the symlink target to its real path and check whether it
+          // stays inside the instance directory or worktree before stat-ing
+          // it. A symlink pointing to /etc/passwd would otherwise let us
+          // probe the target's type during a directory listing, which is undesirable
+          // even though a follow-up read is gated by assertExternalDirectory.
+          const fullPath = path.join(filepath, item.name)
+          const resolvedTarget = canonicalPath(fullPath)
+          const insideBoundary =
+            containsCanonicalPath(ins.directory, resolvedTarget) ||
+            (ins.worktree !== "/" && containsCanonicalPath(ins.worktree, resolvedTarget))
+          if (!insideBoundary) return item.name
+
+          const target = yield* fs.stat(fullPath).pipe(Effect.catch(() => Effect.void))
           if (target?.type === "Directory") return item.name + "/"
           return item.name
         }),
@@ -297,7 +315,18 @@ export const ReadTool = Tool.define(
           tool_call_id: ctx.callID,
           bytes: output.length,
         }),
-      ).pipe(Effect.ignore)
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.sync(() =>
+            log.warn("behavior event publish failed", {
+              event: "file.touched",
+              kind: "read",
+              path: filepath,
+              cause: Cause.pretty(cause),
+            }),
+          ),
+        ),
+      )
 
       return {
         title,

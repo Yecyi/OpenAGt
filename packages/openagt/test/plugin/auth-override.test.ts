@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
 import fs from "fs/promises"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { ProviderAuth } from "../../src/provider"
@@ -61,6 +61,61 @@ describe("plugin.auth-override", () => {
     expect(copilot[0].label).toBe("Test Override Auth")
     expect(plainMethods[ProviderID.make("github-copilot")][0].label).not.toBe("Test Override Auth")
   }, 30000) // Increased timeout for plugin installation
+
+  test("oauth callback cleanup runs when callback throws", async () => {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const pluginDir = path.join(dir, ".opencode", "plugin")
+        await fs.mkdir(pluginDir, { recursive: true })
+
+        await Bun.write(
+          path.join(pluginDir, "throwing-oauth.ts"),
+          [
+            "export default {",
+            '  id: "demo.throwing-oauth",',
+            "  server: async () => ({",
+            "    auth: {",
+            '      provider: "throw-oauth",',
+            "      methods: [",
+            "        {",
+            '          type: "oauth",',
+            '          label: "Throwing OAuth",',
+            "          authorize: async () => ({",
+            '            url: "https://example.com/auth",',
+            '            instructions: "test",',
+            '            method: "auto",',
+            "            callback: async () => { throw new Error('callback exploded') },",
+            "          }),",
+            "        },",
+            "      ],",
+            "    },",
+            "  }),",
+            "}",
+            "",
+          ].join("\n"),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const providerID = ProviderID.make("throw-oauth")
+        await Effect.runPromise(
+          Effect.gen(function* () {
+            const svc = yield* ProviderAuth.Service
+            yield* svc.authorize({ providerID, method: 0 })
+            const first = yield* Effect.exit(svc.callback({ providerID, method: 0 }))
+            expect(first._tag).toBe("Failure")
+            if (first._tag === "Failure") expect(Cause.pretty(first.cause)).toContain("callback exploded")
+            const second = yield* Effect.exit(svc.callback({ providerID, method: 0 }))
+            expect(second._tag).toBe("Failure")
+            if (second._tag === "Failure") expect(Cause.pretty(second.cause)).toContain("ProviderAuthOauthMissing")
+          }).pipe(Effect.provide(ProviderAuth.defaultLayer)),
+        )
+      },
+    })
+  }, 30000)
 })
 
 const file = path.join(import.meta.dir, "../../src/plugin/index.ts")

@@ -302,17 +302,65 @@ export function createMemoryOps(bus: Bus.Interface) {
   })
 
   const synthesizeOnce = Effect.fn("PersonalAgent.synthesizeOnce")(function* (input: SynthesizeOnceInput) {
-    if (yield* hasMemoryTag(input.tag)) return
-    yield* synthesize({
-      kind: input.kind,
-      projectID: input.projectID,
-      sessionID: input.sessionID,
-      title: input.title,
-      content: input.content,
-      importance: input.importance,
-      tags: [...new Set([input.tag, ...(input.tags ?? [])])],
-      metadata: input.metadata,
-    })
+    // Atomic check-and-insert. The previous implementation called
+    // `hasMemoryTag(tag)` followed by `synthesize(...)` across separate
+    // Effect yields, which let two concurrent calls both pass the existence
+    // check and double-insert (TOCTOU). Wrapping the SELECT-then-INSERT in
+    // a single SQLite transaction serializes concurrent invocations so only
+    // the first to commit gets the row in.
+    if (!privacySafeContent(input.content)) return yield* Effect.fail(new Error("Memory content failed privacy filter"))
+    const scope: MemoryScopeType =
+      input.kind === "manual_preference" ? "profile" : input.projectID ? "workspace" : "profile"
+    const source =
+      input.kind === "manual_preference"
+        ? "manual"
+        : input.kind === "follow_up_completed"
+          ? "scheduler"
+          : input.kind === "coordinator_run_completed"
+            ? "coordinator"
+            : input.kind === "expert_output"
+              ? "expert"
+              : input.kind === "reviser_pattern"
+                ? "reviser"
+                : input.kind === "reducer_summary"
+                  ? "reducer"
+                  : "verifier"
+    const id = MemoryNoteID.ascending()
+    const timestamp = now()
+    const inserted = yield* Effect.sync(() =>
+      Database.transaction((db) => {
+        const exists = db
+          .select()
+          .from(PersonalMemoryNoteTable)
+          .all()
+          .some((row) => row.tags.includes(input.tag))
+        if (exists) return false
+        db.insert(PersonalMemoryNoteTable)
+          .values({
+            id,
+            scope,
+            kind: "belief",
+            project_id: input.projectID,
+            session_id: input.sessionID,
+            title: input.title,
+            content: input.content,
+            tags: [...new Set([input.tag, ...(input.tags ?? [])])],
+            metadata: input.metadata ?? {},
+            source,
+            importance: input.importance ?? (input.kind === "verify_completed" ? 7 : 6),
+            pinned: 0,
+            time_created: timestamp,
+            time_updated: timestamp,
+          })
+          .run()
+        return true
+      }),
+    )
+    if (!inserted) return
+    const note = yield* Effect.sync(() =>
+      Database.use((db) => db.select().from(PersonalMemoryNoteTable).where(eq(PersonalMemoryNoteTable.id, id)).get()),
+    ).pipe(Effect.map((row) => memoryFromRow(row!)))
+    yield* bus.publish(MemoryUpdated, note)
   })
 
   return { remember, listMemory, searchMemory, synthesize, synthesizeOnce, hasMemoryTag } as {

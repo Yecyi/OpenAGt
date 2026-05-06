@@ -1,6 +1,6 @@
 import z from "zod"
 import * as path from "path"
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import * as Tool from "./tool"
 import { LSP } from "../lsp"
 import { createTwoFilesPatch } from "diff"
@@ -12,9 +12,11 @@ import { FileWatcher } from "../file/watcher"
 import { Format } from "../format"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { Instance } from "../project/instance"
+import { Log } from "@/util"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 
+const log = Log.create({ service: "tool.write" })
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 
 export const WriteTool = Tool.define(
@@ -70,7 +72,18 @@ export const WriteTool = Tool.define(
               tool_call_id: ctx.callID,
               bytes: params.content.length,
             })
-            .pipe(Effect.ignore)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.sync(() =>
+                  log.warn("behavior event publish failed", {
+                    event: "file.touched",
+                    kind: "write",
+                    path: filepath,
+                    cause: Cause.pretty(cause),
+                  }),
+                ),
+              ),
+            )
 
           let output = "Wrote file successfully."
           yield* lsp.touchFile(filepath, true)

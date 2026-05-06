@@ -4,7 +4,7 @@ import { InstanceState } from "@/effect"
 import { PermissionTable } from "@/session/session.sql"
 import { Database, eq } from "@/storage"
 import { Log, Wildcard } from "@/util"
-import { Context, Deferred, Effect, Layer, Schema } from "effect"
+import { Cause, Context, Deferred, Effect, Layer, Schema } from "effect"
 import { truncateForAudit, writeAuditLog } from "./audit"
 import { CorrectedError, DeniedError, RejectedError, Request } from "./contracts"
 import type { AskInput, Error, Reply, ReplyInput, Rule, Ruleset } from "./contracts"
@@ -27,7 +27,18 @@ function publishBehaviorDecision(bus: Bus.Interface, request: Request, reply: Re
       risk_level: typeof request.metadata?.riskLevel === "string" ? request.metadata.riskLevel : undefined,
       cascade,
     })
-    .pipe(Effect.ignore)
+    .pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() =>
+          log.warn("behavior event publish failed", {
+            event: "permission.decided",
+            request_id: String(request.id),
+            action: reply,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      ),
+    )
 }
 
 export interface Interface {

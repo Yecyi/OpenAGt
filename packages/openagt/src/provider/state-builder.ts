@@ -36,6 +36,10 @@ const log = Log.create({ service: "provider" })
 
 export interface ProviderState {
   models: Map<string, LanguageModelV3>
+  // OAuth `expires` (ms timestamp) for cached models whose provider auth is
+  // OAuth. Read on every getLanguage call, populated when the cache entry is
+  // built. Avoids touching auth.json on the hot path.
+  modelExpiry: Map<string, number>
   providers: Record<ProviderID, Info>
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
@@ -269,6 +273,7 @@ export class ProviderStateBuilder {
 
       return {
         models: languages,
+        modelExpiry: new Map<string, number>(),
         providers,
         sdk,
         modelLoaders,

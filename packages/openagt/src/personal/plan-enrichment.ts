@@ -6,10 +6,13 @@
 // if the search yields nothing — never produces an empty-but-tagged context
 // that would mislead downstream consumers.
 
-import { Effect } from "effect"
+import { Cause, Effect } from "effect"
 import * as Bus from "@/bus"
 import { Event as BehaviorEvent } from "@/bus/behavior-events"
+import { Log } from "@/util"
 import { Service, enrichMemoryContext, taskSignatureFor } from "./three-layer"
+
+const log = Log.create({ service: "personal.plan-enrichment" })
 
 // Stable djb2 hash of the plan goal so audit consumers can correlate
 // behavior.memory.injected with downstream behavior.subagent.dispatched
@@ -74,6 +77,16 @@ export const enrichPlanMemory = <P extends PlanLike>(
         kind_breakdown: { fact: totalNotes, preference: 0, belief: 0 },
         source: "plan_enrichment",
       }),
-    ).pipe(Effect.ignore)
+    ).pipe(
+      Effect.catchCause((cause) =>
+        Effect.sync(() =>
+          log.warn("behavior event publish failed", {
+            event: "memory.injected",
+            source: "plan_enrichment",
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      ),
+    )
     return { ...plan, memory_context: enriched }
   })

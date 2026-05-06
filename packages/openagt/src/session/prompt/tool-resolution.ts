@@ -103,6 +103,7 @@ export function createToolScheduler(options?: { maxParallelSafeTasks?: number })
   }
 
   const withSafeTaskSlot = async <T>(execute: () => Promise<T>) => {
+    // oxlint-disable-next-line no-unmodified-loop-condition -- activeSafeTasks is mutated by the finally block of other concurrent invocations via the safeTaskWaiters resolver chain
     while (activeSafeTasks >= maxParallelSafeTasks) {
       await new Promise<void>((resolve) => safeTaskWaiters.push(resolve))
     }

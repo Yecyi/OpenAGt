@@ -238,7 +238,7 @@
     },
     "packages/openagt": {
       "name": "openagt",
-      "version": "1.20.2",
+      "version": "1.21.0",
       "bin": {
         "openagt": "./bin/openagt",
         "opencode": "./bin/opencode",
@@ -418,7 +418,7 @@
     },
     "packages/sdk/js": {
       "name": "@openagt/sdk",
-      "version": "1.20.0",
+      "version": "1.21.0",
       "dependencies": {
         "cross-spawn": "catalog:",
       },

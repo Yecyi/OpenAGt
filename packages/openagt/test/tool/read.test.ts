@@ -1,6 +1,7 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Cause, Effect, Exit, Layer } from "effect"
 import path from "path"
+import fs from "fs/promises"
 import { Agent } from "../../src/agent/agent"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { AppFileSystem } from "@openagt/shared/filesystem"
@@ -372,6 +373,34 @@ describe("tool.read truncation", () => {
       const result = yield* exec(dir, { filePath: path.join(dir, "dir"), offset: 6, limit: 5 })
       expect(result.metadata.truncated).toBe(false)
       expect(result.output).not.toContain("Showing 5 of 10 entries")
+    }),
+  )
+
+  it.live("does not expose out-of-boundary symlink target directory type", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      const external = yield* tmpdirScoped()
+      yield* Effect.promise(() => fs.mkdir(path.join(dir, "inside-target"), { recursive: true }))
+      yield* Effect.promise(() => fs.mkdir(path.join(external, "target"), { recursive: true }))
+      yield* Effect.promise(() =>
+        fs.symlink(
+          path.join(dir, "inside-target"),
+          path.join(dir, "inside-link"),
+          process.platform === "win32" ? "junction" : "dir",
+        ),
+      )
+      yield* Effect.promise(() =>
+        fs.symlink(
+          path.join(external, "target"),
+          path.join(dir, "external-link"),
+          process.platform === "win32" ? "junction" : "dir",
+        ),
+      )
+
+      const result = yield* exec(dir, { filePath: dir })
+      expect(result.output).toContain("inside-link/")
+      expect(result.output).toContain("external-link")
+      expect(result.output).not.toContain("external-link/")
     }),
   )
 

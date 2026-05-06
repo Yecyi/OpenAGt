@@ -200,8 +200,10 @@ export const layer: Layer.Layer<Service, never, Auth.Service | Plugin.Service> =
 
       const result = yield* Effect.promise(() =>
         match.method === "code" ? match.callback(input.code!) : match.callback(),
-      )
-      if (!result || result.type !== "success") return yield* Effect.fail(new OauthCallbackFailed({}))
+      ).pipe(Effect.ensuring(Effect.sync(() => pending.delete(input.providerID))))
+      if (!result || result.type !== "success") {
+        return yield* Effect.fail(new OauthCallbackFailed({}))
+      }
 
       if ("key" in result) {
         yield* auth.set(input.providerID, {
