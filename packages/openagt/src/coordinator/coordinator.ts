@@ -289,7 +289,7 @@ export const layer = Layer.effect(
       const summary =
         reason === "absolute"
           ? "Coordinator budget absolute ceiling reached; continuation requires user approval"
-          : "Coordinator mission budget reached; checkpoint or continuation is required"
+          : `Coordinator budget checkpoint reached (${runtime.budget_state.limit_reason}); checkpoint or continuation is required`
       yield* Effect.sync(() =>
         Database.use((db) =>
           db

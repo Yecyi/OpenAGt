@@ -9,10 +9,12 @@ import {
   ProgressSnapshot,
   ResourceLimit,
   TodoTimeline,
+  type BudgetLimitReason as BudgetLimitReasonType,
   type CoordinatorPlan as CoordinatorPlanType,
   type CoordinatorRun as CoordinatorRunType,
   type ProgressSnapshot as ProgressSnapshotType,
   type ResourceLimit as ResourceLimitType,
+  type ResourceLimitKey as ResourceLimitKeyType,
   type TodoTimeline as TodoTimelineType,
 } from "./schema"
 import { nodeIDForTask } from "./task-record"
@@ -27,6 +29,14 @@ function now() {
 const checkpointLimit = 100
 const evidenceLimit = 50
 const memorySliceLimit = 50
+const resourceLimitKeys = [
+  "max_rounds",
+  "max_model_calls",
+  "max_tool_calls",
+  "max_subagents",
+  "max_wallclock_ms",
+  "max_estimated_tokens",
+] as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -284,6 +294,16 @@ function limitUsed(usage: ResourceLimitType, limit: ResourceLimitType) {
   )
 }
 
+function limitedResourceFor(usage: ResourceLimitType, limit: ResourceLimitType): ResourceLimitKeyType | undefined {
+  return resourceLimitKeys
+    .map((key) => ({
+      key,
+      used: limit[key] <= 0 ? (usage[key] > 0 ? 1 : 0) : usage[key] / limit[key],
+    }))
+    .filter((item) => item.used >= 1)
+    .toSorted((a, b) => b.used - a.used)[0]?.key
+}
+
 export function subtractResourceLimit(left: ResourceLimitType, right: ResourceLimitType) {
   return ResourceLimit.parse({
     max_rounds: left.max_rounds > right.max_rounds ? left.max_rounds - right.max_rounds : left.max_rounds,
@@ -368,14 +388,60 @@ function budgetStateFor(input: {
   const usage = resourceUsageFor(input.run, input.taskList)
   const softBudgetUsed = limitUsed(usage, input.plan.budget_profile.mission_ceiling)
   const absoluteUsed = limitUsed(usage, input.plan.budget_profile.absolute_ceiling)
+  const normalAbsoluteLimit = subtractResourceLimit(
+    input.plan.budget_profile.absolute_ceiling,
+    input.plan.budget_profile.checkpoint_reserve,
+  )
+  const absoluteResource = limitedResourceFor(usage, input.plan.budget_profile.absolute_ceiling)
+  const reserveResource = limitedResourceFor(usage, normalAbsoluteLimit)
+  const missionResource = limitedResourceFor(usage, input.plan.budget_profile.mission_ceiling)
+  const phaseResource = limitedResourceFor(usage, input.plan.budget_profile.phase_ceiling)
+  const limitedTodo = input.plan.todo_timeline.todos
+    .map((todo) => {
+      const todoTasks = input.taskList.filter((item) => {
+        const nodeID = nodeIDForTask(item)
+        return nodeID ? todo.node_ids.includes(nodeID) : false
+      })
+      return {
+        id: todo.id,
+        status: todoStatusFromTasks(todoTasks),
+        resource: limitedResourceFor(
+          todoUsageFor(input.run, input.taskList, todo.id),
+          input.plan.budget_profile.todo_budget[todo.id] ?? input.plan.budget_profile.mission_ceiling,
+        ),
+      }
+    })
+    .filter((item) => item.status !== "done" && item.status !== "skipped")
+    .find((item) => item.resource)
+  const limitReason: BudgetLimitReasonType = absoluteResource
+    ? "absolute"
+    : reserveResource
+      ? "checkpoint_reserve"
+      : missionResource
+        ? "mission"
+        : phaseResource
+          ? "phase"
+          : limitedTodo
+            ? "todo"
+            : input.plan.budget_limited
+              ? "mission"
+              : "none"
   return BudgetState.parse({
     soft_budget_used: softBudgetUsed,
     absolute_ceiling_used: absoluteUsed,
     checkpoint_count: input.taskList.filter(
       (item) => item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis" && item.status === "completed",
     ).length,
-    budget_limited: input.plan.budget_limited || softBudgetUsed >= 1,
+    budget_limited:
+      input.plan.budget_limited ||
+      softBudgetUsed >= 1 ||
+      Boolean(reserveResource) ||
+      Boolean(phaseResource) ||
+      limitReason === "todo",
     ceiling_hit: absoluteUsed >= 1,
+    limit_reason: limitReason,
+    limited_resource: absoluteResource ?? reserveResource ?? missionResource ?? phaseResource ?? limitedTodo?.resource,
+    limited_todo_id: limitedTodo?.id,
   })
 }
 

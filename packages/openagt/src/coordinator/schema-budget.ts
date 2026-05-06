@@ -40,6 +40,19 @@ export const BudgetContinuationState = z.object({
 })
 export type BudgetContinuationState = z.infer<typeof BudgetContinuationState>
 
+export const BudgetLimitReason = z.enum(["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"])
+export type BudgetLimitReason = z.infer<typeof BudgetLimitReason>
+
+export const ResourceLimitKey = z.enum([
+  "max_rounds",
+  "max_model_calls",
+  "max_tool_calls",
+  "max_subagents",
+  "max_wallclock_ms",
+  "max_estimated_tokens",
+])
+export type ResourceLimitKey = z.infer<typeof ResourceLimitKey>
+
 export const BudgetProfile = z.object({
   scale: BudgetScale.default("normal"),
   auto_continue: AutoContinuePolicy.default("checkpoint"),
@@ -86,6 +99,9 @@ export const BudgetState = z.object({
   checkpoint_count: z.number().int().min(0).default(0),
   budget_limited: z.boolean().default(false),
   ceiling_hit: z.boolean().default(false),
+  limit_reason: BudgetLimitReason.default("none"),
+  limited_resource: ResourceLimitKey.optional(),
+  limited_todo_id: z.string().optional(),
 })
 export type BudgetState = z.infer<typeof BudgetState>
 

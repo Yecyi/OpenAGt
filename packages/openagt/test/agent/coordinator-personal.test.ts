@@ -584,6 +584,8 @@ describe("coordinator runtime", () => {
         const blocked = yield* coordinator.projection(run.id)
         expect(blocked.run.state).toBe("blocked")
         expect(blocked.budget_state.ceiling_hit).toBe(true)
+        expect(blocked.budget_state.limit_reason).toBe("absolute")
+        expect(blocked.budget_state.limited_resource).toBe("max_rounds")
         expect(blocked.continuation_request?.requires_user_approval).toBe(true)
 
         const continued = yield* coordinator.continueRun({

@@ -69,22 +69,23 @@ export function dispatchSelectionFor(input: {
           resourceLimitSlots(input.usage, input.run.plan.budget_profile.mission_ceiling),
           resourceLimitSlots(input.usage, input.run.plan.budget_profile.phase_ceiling),
         )
-  const withinTodoBudget = (item: TaskRuntime.TaskRecord) => {
+  const todoBudgetFor = (item: TaskRuntime.TaskRecord) => {
     if (item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis") return true
     const todo = todoForNode(input.run.plan, nodeFor(item))
     const budget = todo ? input.run.plan.budget_profile.todo_budget[todo.id] : undefined
     if (!todo || !budget) return true
     return resourceLimitSlots(todoUsageFor(input.run, input.allTasks, todo.id), budget) > 0
   }
-  const preselected = (
+  const candidates = (
     input.run.plan.parallel_policy.mode === "off"
       ? orderedReady.slice(0, Math.min(slots, 1))
       : targetGroup
         ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
         : orderedReady.slice(0, Math.min(slots, 1))
   )
-    .filter(withinTodoBudget)
     .slice(0, budgetSlots)
+  const todoBudgetBlocked = candidates.some((item) => !todoBudgetFor(item))
+  const preselected = candidates.filter(todoBudgetFor)
 
   // Apply write-scope disjointness if the policy requires it. We must consider both
   // already-running tasks and tasks accepted earlier in this same dispatch round, so
@@ -95,5 +96,5 @@ export function dispatchSelectionFor(input: {
     if (enforceDisjoint && hasWriteScopeConflict(candidate, [...running, ...selected])) continue
     selected.push(candidate)
   }
-  return { orderedReady, budgetSlots, selected }
+  return { orderedReady, budgetSlots, selected, todoBudgetBlocked }
 }

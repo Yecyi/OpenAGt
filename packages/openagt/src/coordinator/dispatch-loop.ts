@@ -59,7 +59,7 @@ export class CoordinatorDispatchLoop {
       const runtime = runtimeStateFor(run, allTasks)
       const checkpointReady = ready.find((item) => item.metadata?.coordinator_node_id === "budget_checkpoint_synthesis")
       const ceilingHit = runtime.budget_state.ceiling_hit
-      const softBudgetHit = runtime.budget_state.soft_budget_used >= 1
+      const budgetLimited = runtime.budget_state.budget_limited
       const usage = resourceUsageFor(run, allTasks)
       const normalAbsoluteLimit = subtractResourceLimit(
         run.plan.budget_profile.absolute_ceiling,
@@ -73,7 +73,7 @@ export class CoordinatorDispatchLoop {
           dispatched: 0,
         }
       }
-      if (softBudgetHit && !checkpointReady) {
+      if (budgetLimited && !checkpointReady) {
         const blocked = yield* input.blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
         return {
           run: blocked,
@@ -89,10 +89,17 @@ export class CoordinatorDispatchLoop {
         normalAbsoluteLimit,
         checkpointSlots,
         ceilingHit,
-        softBudgetHit,
+        softBudgetHit: budgetLimited,
       })
       if (selection.budgetSlots === 0 && selection.orderedReady.length > 0) {
-        const blocked = yield* input.blockRunForBudget(run, "absolute")
+        const blocked = yield* input.blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
+        return {
+          run: blocked,
+          dispatched: 0,
+        }
+      }
+      if (selection.todoBudgetBlocked && selection.selected.length === 0 && selection.orderedReady.length > 0) {
+        const blocked = yield* input.blockRunForBudget(run, "soft")
         return {
           run: blocked,
           dispatched: 0,

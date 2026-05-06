@@ -40,7 +40,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Revise insertion topo safety | regression-covered | Deep effort revise gates and checkpoint synthesis are covered by coordinator intent/runtime tests. |
 | Token usage normalization | implemented | Anthropic cache double-count is addressed for task runtime usage. Suitable for RC. |
 | Continue budget velocity floor | partial | Continuation now requires an active budget checkpoint and records last approved usage so repeated no-progress budget growth is denied. Full progress/evidence velocity scoring remains future work. |
-| Absolute ceiling enforcement | partial | Current work improves budget semantics, but all resource dimensions still need a dedicated enforcement pass. Keep out of RC scope unless a regression appears. |
+| Absolute ceiling enforcement | partial | Runtime now exposes `limit_reason`, `limited_resource`, and `limited_todo_id`, and dispatch blocks ready work when todo/phase/mission/checkpoint reserve gates deny all candidates. Deeper reserve tuning remains future work. |
 | Partial/max-step semantics | implemented | Partial is terminal but not success. Suitable for RC, with continued coordinator retry/checkpoint tests. |
 | Full result text for review verdict parsing | implemented | Runtime persists full result text; reviewers are no longer limited to first-line summaries. |
 | Unified bilingual classifier | implemented | Mojibake fixed and broad-task overmatch reduced. More LLM fallback/classifier confidence work belongs to v1.20. |

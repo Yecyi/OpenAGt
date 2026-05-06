@@ -43,10 +43,12 @@ export {
 export {
   BudgetProfile,
   BudgetState,
+  BudgetLimitReason,
   ContinuationRequest,
   defaultResourceLimit,
   ProgressSnapshot,
   ResourceLimit,
+  ResourceLimitKey,
 } from "./schema-budget"
 export { CheckpointMemorySummary, MemoryContext } from "./schema-memory"
 export { CriticalReviewVerdict, QualityGate, RevisePoint } from "./schema-review"
