@@ -21,6 +21,7 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { replace, trimDiff } from "./edit-replace"
+import { buildDiagnosticFeedback } from "../lsp/feedback"
 export * from "./edit-replace"
 
 const log = Log.create({ service: "tool.edit" })
@@ -70,6 +71,7 @@ export const EditTool = Tool.define(
             ? params.filePath
             : path.join(Instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
+          const diagnosticsBefore = yield* lsp.diagnostics()
 
           let diff = ""
           let contentOld = ""
@@ -194,12 +196,26 @@ export const EditTool = Tool.define(
           yield* lsp.touchFile(filePath, true)
           const diagnostics = yield* lsp.diagnostics()
           const normalizedFilePath = AppFileSystem.normalizePath(filePath)
-          const block = LSP.Diagnostic.report(filePath, diagnostics[normalizedFilePath] ?? [])
-          if (block) output += `\n\nLSP errors detected in this file, please fix:\n${block}`
+          const lspFeedback = buildDiagnosticFeedback({
+            file: filePath,
+            normalizedFile: normalizedFilePath,
+            before: diagnosticsBefore,
+            after: diagnostics,
+          })
+          if (lspFeedback.report) output += `\n\nLSP errors detected in this file, please fix:\n${lspFeedback.report}`
+          yield* ctx.metadata({
+            metadata: {
+              diff,
+              filediff,
+              diagnostics,
+              lsp_feedback: lspFeedback,
+            },
+          })
 
           return {
             metadata: {
               diagnostics,
+              lsp_feedback: lspFeedback,
               diff,
               filediff,
             },

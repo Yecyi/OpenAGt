@@ -28,6 +28,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | AsyncQueue close/abort | implemented | Queue supports close, abortable take, and bounded capacity. |
 | CRLF byte accounting | partial | Read/truncate account for CRLF; patch/edit EOL preservation remains open. |
 | Grep partial metadata | partial | Tool result now exposes `partial`; skipped count needs ripgrep stderr parsing. |
+| Edit LSP feedback | implemented | Edit now returns structured `lsp_feedback` metadata with before/after diagnostics, deltas, trend, workspace counts, and report text. Automatic fix/retry loops remain future work. |
 | Local `.claude` state | implemented | `.claude/` is ignored; the old tracked local gitlink is removed from the index so machine state does not pollute release status. |
 
 ## Plan / EBI Check
@@ -58,6 +59,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | Prompt timeout / child env stripping | implemented | Prompt steps use local timeout; child processes strip OpenAGt auth-content env values. |
 | Static prompt cache-control / token estimates | implemented | System-prompt zones are marked for cache-control transforms and non-ASCII token estimates are safer. |
 | Path canonicalization | implemented | External-directory grants and path-overlap checks use canonical path comparison. |
+| Edit + LSP feedback loop | partial | Structured diagnostics feedback is available to agents/UI after edits; automatic LSP-driven retry/fix loops remain a later feature. |
 | Storage/event snapshots/indexes | deferred | Scalability work for a later expert-runtime release line. |
 | Personal memory SQL pushdown/wakeup claim | deferred | Scalability/correctness work for a later expert-runtime release line. |
 
