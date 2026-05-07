@@ -59,10 +59,7 @@ function processBackendStatus(capabilities: SandboxBackendStatus[]) {
 }
 
 function backendFallback(input: { preference: SandboxBackendPreference; capabilities: SandboxBackendStatus[] }) {
-  const preferred = preferredBackendStatus(input.preference, input.capabilities)
-  if (input.preference !== "auto") return preferred
-  if (preferred?.available) return preferred
-  return processBackendStatus(input.capabilities) ?? preferred
+  return preferredBackendStatus(input.preference, input.capabilities)
 }
 
 export function backendAvailability(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
@@ -105,6 +102,25 @@ function sandboxDecision(input: {
   privilegeEscalation: boolean
 }) {
   if (input.preliminaryDecision === "block") return
+  if (nativeUnavailable({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {
+    const backendLabel =
+      input.policy.backend_preference === "auto" ? "sandbox backend" : `sandbox backend ${input.policy.backend_preference}`
+    if (input.policy.sandbox.failure_policy === "closed") {
+      return {
+        decision: "block" as const,
+        reason:
+          input.policy.backend_preference === "auto"
+            ? `Required sandbox backend is unavailable${unavailableReason(input.policy.backend_preference, input.capabilities)}.`
+            : `Required sandbox backend ${input.policy.backend_preference} is unavailable${unavailableReason(input.policy.backend_preference, input.capabilities)}.`,
+      }
+    }
+    if (input.policy.sandbox.failure_policy === "confirm_downgrade" || isRisky(input.riskLevel)) {
+      return {
+        decision: "confirm" as const,
+        reason: `${backendLabel[0]?.toUpperCase()}${backendLabel.slice(1)} is unavailable; confirmation required before downgrade.`,
+      }
+    }
+  }
   if (isRisky(input.riskLevel) && processOnly({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {
     if (input.policy.sandbox.failure_policy === "closed") {
       return {
@@ -115,18 +131,6 @@ function sandboxDecision(input: {
     return {
       decision: "confirm" as const,
       reason: "Only process-level sandbox is available; confirmation required before running without OS-native isolation.",
-    }
-  }
-  if (isRisky(input.riskLevel) && nativeUnavailable({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {
-    if (input.policy.sandbox.failure_policy === "closed") {
-      return {
-        decision: "block" as const,
-        reason: `Required sandbox backend is unavailable${unavailableReason(input.policy.backend_preference, input.capabilities)}.`,
-      }
-    }
-    return {
-      decision: "confirm" as const,
-      reason: "Sandbox backend is unavailable; confirmation required before downgrade.",
     }
   }
   if (

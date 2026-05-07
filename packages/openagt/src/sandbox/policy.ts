@@ -3,6 +3,7 @@ import { Context, Effect, Layer } from "effect"
 import { Config } from "@/config"
 import { Instance } from "@/project/instance"
 import * as Truncate from "@/tool/truncate"
+import { canonicalSandboxPath } from "@/util/path-canonical"
 import type { ShellDecision, ShellRiskLevel, ShellSecurityResult } from "@/security/shell-security"
 import type {
   SandboxBackendPreference,
@@ -34,7 +35,7 @@ function normalizePaths(input: string[]) {
   return Array.from(
     new Set(
       input
-        .map((item) => path.resolve(item))
+        .map((item) => canonicalSandboxPath(item))
         .filter(Boolean)
         .sort((a, b) => a.length - b.length)
         .filter((item, index, list) => !list.some((other, i) => i < index && item.startsWith(other + path.sep))),
@@ -61,7 +62,6 @@ export function resolvePathScopes(cwd: string, externalPaths: string[], internal
   return {
     allowed,
     writable,
-    compatWritable: allowed,
   }
 }
 
@@ -83,7 +83,7 @@ export const layer = Layer.effect(
       return {
         enabled: sandbox?.enabled ?? true,
         backend: sandbox?.backend ?? "auto",
-        failure_policy: sandbox?.failure_policy ?? "closed",
+        failure_policy: sandbox?.failure_policy ?? (process.platform === "win32" ? "fallback" : "closed"),
         report_only: sandbox?.report_only ?? false,
         broker_idle_ttl_ms: sandbox?.broker_idle_ttl_ms ?? 300_000,
       } satisfies SandboxConfig
@@ -101,11 +101,7 @@ export const layer = Layer.effect(
         filesystem_policy: "workspace_write",
         network_policy: needsNetwork ? "full" : "none",
         allowed_paths: pathScopes.allowed,
-        // Compatibility: the current process backend is advisory and existing
-        // metadata consumers expect approved external paths here. Native
-        // sandbox helpers should enforce `pathScopes.writable` after they can
-        // distinguish read-only external inputs from write targets.
-        writable_paths: pathScopes.compatWritable,
+        writable_paths: pathScopes.writable,
         needs_network_permission: needsNetwork,
       } satisfies ResolvedPolicy
     })

@@ -1,5 +1,6 @@
 import { createFrameParser, encodeFrame } from "./protocol"
 import { autoBackendName, detectBackends } from "./backends"
+import { selectBackend } from "./backend-selection"
 import { SANDBOX_PROTOCOL_VERSION, type SandboxBrokerRequestFrame } from "./types"
 
 const backends = new Map(detectBackends().map((item) => [item.status.name, item]))
@@ -22,13 +23,6 @@ async function send(frame: unknown) {
   Bun.stdout.write(encodeFrame(frame as never))
 }
 
-function backendFor(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"]) {
-  if (frame.backend_preference !== "auto") return backends.get(frame.backend_preference)
-  const preferred = backends.get(autoBackendName())
-  if (preferred?.status.available) return preferred
-  return backends.get("process") ?? preferred
-}
-
 function policyAdvisory(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"], reportOnly: boolean) {
   return {
     enforcement: frame.enforcement,
@@ -39,6 +33,8 @@ function policyAdvisory(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.
     writablePaths: frame.writable_paths,
     reportOnly,
     enforced: false,
+    filesystemEnforced: false,
+    networkEnforced: false,
   }
 }
 
@@ -90,14 +86,30 @@ const parser = createFrameParser((frame) => {
     })
     return
   }
-  const backend = backendFor(frame.request)
+  const selection = selectBackend({
+    backends,
+    backendPreference: frame.request.backend_preference,
+    failurePolicy: frame.request.failure_policy,
+    autoBackendName: autoBackendName(),
+  })
+  if (selection.type === "deny") {
+    void send({
+      type: "exec.error",
+      protocol_version: SANDBOX_PROTOCOL_VERSION,
+      request_id: frame.request.request_id,
+      backend_used: selection.backendUsed,
+      error: selection.reason,
+    })
+    return
+  }
+  const backend = backends.get(selection.backend.name)
   if (!backend) {
     void send({
       type: "exec.error",
       protocol_version: SANDBOX_PROTOCOL_VERSION,
       request_id: frame.request.request_id,
-      backend_used: "process",
-      error: "Sandbox backend not found",
+      backend_used: selection.backend.name,
+      error: `Sandbox backend not found: ${selection.backend.name}`,
     })
     return
   }
@@ -122,7 +134,13 @@ const parser = createFrameParser((frame) => {
       void send({
         type: "exec.exit",
         protocol_version: SANDBOX_PROTOCOL_VERSION,
-        result,
+        result: {
+          ...result,
+          policy_advisory: {
+            ...result.policy_advisory,
+            ...(selection.downgradeReason ? { downgradeReason: selection.downgradeReason } : {}),
+          },
+        },
       })
     },
     onError: (error, backendUsed) => {

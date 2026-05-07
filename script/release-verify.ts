@@ -30,11 +30,16 @@ const runtimeTests = [
   "test/session/compaction.test.ts",
   "test/agent/coordinator-personal.test.ts",
   "test/server/security-middleware.test.ts",
+  "test/security/decision-pipeline.test.ts",
   "test/security/exec-policy.test.ts",
   "test/security/shell-security.test.ts",
+  "test/sandbox/broker.test.ts",
+  "test/sandbox/policy.test.ts",
+  "test/shell/runner.test.ts",
   "test/tool/webfetch.test.ts",
   "test/tool/lsp.test.ts",
   "test/util/process.test.ts",
+  "test/util/path-canonical.test.ts",
   "test/util/sanitize-output.test.ts",
 ]
 

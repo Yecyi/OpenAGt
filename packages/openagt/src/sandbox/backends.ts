@@ -2,6 +2,7 @@ import path from "path"
 import { Global } from "@/global"
 import { Flag } from "@/flag/flag"
 import { spawn } from "child_process"
+import { probeWindowsHelper, resolveWindowsHelperPath } from "./windows-helper"
 import type {
   SandboxBackendName,
   SandboxBackendStatus,
@@ -40,15 +41,24 @@ function advisory(request: SandboxExecRequest, reportOnly: boolean): SandboxPoli
     writablePaths: request.writable_paths,
     reportOnly,
     enforced: false,
+    filesystemEnforced: false,
+    networkEnforced: false,
   }
 }
 
-function helperStatus(name: SandboxBackendName, helper: string | undefined, available: boolean, reason?: string) {
+function helperStatus(
+  name: SandboxBackendName,
+  helper: string | undefined,
+  available: boolean,
+  reason?: string,
+  extra?: Partial<SandboxBackendStatus>,
+) {
   return {
     name,
     available,
     ...(helper ? { helper } : {}),
     ...(reason ? { reason } : {}),
+    ...extra,
   } satisfies SandboxBackendStatus
 }
 
@@ -64,15 +74,22 @@ function unavailable(name: SandboxBackendName, reason: string) {
 
 export function autoBackendName(platform = process.platform): SandboxBackendName {
   if (platform === "darwin") return "seatbelt"
-  if (platform === "win32") return "process"
+  if (platform === "win32") return "windows_native"
   if (platform === "linux") return "landlock"
   return "process"
+}
+
+export function powershellEncodedCommand(command: string) {
+  return Buffer.from(command, "utf16le").toString("base64")
 }
 
 function shellArgs(request: SandboxExecRequest) {
   if (process.platform === "win32") {
     if (request.shell_family === "powershell") {
-      return [request.shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", request.command]] as const
+      return [
+        request.shell,
+        ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", powershellEncodedCommand(request.command)],
+      ] as const
     }
     if (request.shell_family === "posix") {
       return [request.shell, ["-c", request.command]] as const
@@ -183,16 +200,26 @@ function processBackend(): SandboxBackend {
 
 export function detectBackends() {
   const seatbeltHelper = Flag.OPENCODE_SANDBOX_SEATBELT_HELPER
-  const windowsHelper = Flag.OPENCODE_SANDBOX_WINDOWS_HELPER
+  const windowsHelper = Flag.OPENAGT_SANDBOX_WINDOWS_HELPER
   const landlockHelper = Flag.OPENCODE_SANDBOX_LANDLOCK_HELPER
+  const resolvedWindowsHelper = resolveWindowsHelperPath({ override: windowsHelper })
+  const windowsNative =
+    process.platform === "win32" && resolvedWindowsHelper.path
+      ? {
+          ...unavailable("windows_native", "Windows native helper execution is not implemented yet"),
+          status: {
+            ...probeWindowsHelper(resolvedWindowsHelper.path),
+            available: false,
+            reason: "Windows native helper run loop is not implemented yet",
+          },
+        }
+      : unavailable("windows_native", resolvedWindowsHelper.reason ?? "Windows native helper unavailable")
   return [
     processBackend(),
     process.platform === "darwin" && seatbeltHelper
       ? unavailable("seatbelt", `Seatbelt helper not implemented yet: ${seatbeltHelper}`)
       : unavailable("seatbelt", "Seatbelt helper unavailable"),
-    process.platform === "win32" && windowsHelper
-      ? unavailable("windows_native", `Windows helper not implemented yet: ${windowsHelper}`)
-      : unavailable("windows_native", "Windows native helper unavailable"),
+    windowsNative,
     process.platform === "linux" && landlockHelper
       ? unavailable("landlock", `Landlock helper not implemented yet: ${landlockHelper}`)
       : unavailable("landlock", "Landlock helper unavailable"),

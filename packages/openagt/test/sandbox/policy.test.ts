@@ -10,7 +10,6 @@ describe("resolvePathScopes", () => {
 
     expect(scopes.allowed).toContain(external)
     expect(scopes.writable).not.toContain(external)
-    expect(scopes.compatWritable).toContain(external)
     expect(scopes.writable).toContain(cwd)
   })
 })

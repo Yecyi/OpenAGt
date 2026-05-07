@@ -255,7 +255,7 @@ describe("tool.bash", () => {
     })
   })
 
-  test.skipIf(process.platform !== "win32")("auto sandbox uses process backend on Windows", async () => {
+  test.skipIf(process.platform !== "win32")("auto sandbox with closed policy blocks unavailable Windows native backend", async () => {
     await Instance.provide({
       directory: projectRoot,
       fn: async () => {
@@ -316,9 +316,9 @@ describe("tool.bash", () => {
             ctx,
           ),
         )
-        expect(result.metadata.exit).toBe(0)
-        expect(result.metadata.backendUsed).toBe("process")
-        expect(result.output).toContain("sandbox-auto")
+        expect(result.metadata.exit).toBeNull()
+        expect(result.metadata.decision).toBe("block")
+        expect(result.output).toContain("Blocked: Required sandbox backend is unavailable")
       },
     })
   })

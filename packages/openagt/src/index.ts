@@ -34,6 +34,7 @@ import { CalCommand } from "./cli/cmd/cal"
 import { PromptCommand } from "./cli/cmd/prompt"
 import { MemCommand } from "./cli/cmd/mem"
 import { MissionCommand } from "./cli/cmd/mission"
+import { SandboxCommand } from "./cli/cmd/sandbox"
 import path from "path"
 import { Global } from "./global"
 import { JsonMigration } from "./storage"
@@ -196,6 +197,7 @@ const cli = yargs(args)
   .command(PromptCommand)
   .command(MemCommand)
   .command(MissionCommand)
+  .command(SandboxCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

@@ -1,4 +1,4 @@
-export const SANDBOX_PROTOCOL_VERSION = 1
+export const SANDBOX_PROTOCOL_VERSION = 2
 
 export type SandboxBackendName = "process" | "seatbelt" | "windows_native" | "landlock"
 export type SandboxEnforcement = "required" | "advisory"
@@ -14,6 +14,11 @@ export type SandboxBackendStatus = {
   available: boolean
   helper?: string
   reason?: string
+  setup_required?: boolean
+  setup_reason?: string
+  helper_protocol_version?: number
+  filesystem_enforced?: boolean
+  network_enforced?: boolean
 }
 
 // Renamed from SandboxPolicySummary to make explicit that this is *advisory*
@@ -29,6 +34,10 @@ export type SandboxPolicyAdvisory = {
   writablePaths: string[]
   reportOnly: boolean
   enforced: boolean
+  filesystemEnforced?: boolean
+  networkEnforced?: boolean
+  windowsSandboxMode?: "restricted_token" | "elevated_user"
+  downgradeReason?: string
 }
 
 export type SandboxExecRequest = {
@@ -43,6 +52,7 @@ export type SandboxExecRequest = {
   env_policy: SandboxEnvPolicy
   enforcement: SandboxEnforcement
   backend_preference: SandboxBackendPreference
+  failure_policy: SandboxFailurePolicy
   filesystem_policy: SandboxFilesystemPolicy
   allowed_paths: string[]
   writable_paths: string[]

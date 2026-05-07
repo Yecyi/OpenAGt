@@ -22,8 +22,8 @@ export function classifyApprovalKind(input: {
 }): ShellApprovalKind {
   if (input.privilegeEscalation) return "privilege_escalation"
   if (input.matchedRules?.length) return "exec_policy_rule"
-  if (input.decision === "block") return "dangerous_command"
   if (input.sandboxEscalation) return "sandbox_escalation"
+  if (input.decision === "block") return "dangerous_command"
   if (input.needsNetworkPermission) return "network_access"
   return "dangerous_command"
 }

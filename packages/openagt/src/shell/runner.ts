@@ -4,13 +4,13 @@ import type { ShellFamily } from "@/security/shell-security"
 import type { Tool } from "@/tool"
 import * as Truncate from "@/tool/truncate"
 import { SandboxBroker } from "@/sandbox/broker"
+import { autoBackendName } from "@/sandbox/backends"
 import type {
   SandboxBackendPreference,
   SandboxEnforcement,
   SandboxFilesystemPolicy,
   SandboxNetworkPolicy,
 } from "@/sandbox/types"
-import { autoBackendName } from "@/sandbox/backends"
 import { Log } from "@/util"
 import { ShellOutputBuffer } from "./output-buffer"
 
@@ -89,22 +89,13 @@ export const layer = Layer.effect(
         input.backendPreference === "auto"
           ? capabilities.find((item) => item.name === autoBackendName())
           : capabilities.find((item) => item.name === input.backendPreference)
-      const processBackend = capabilities.find((item) => item.name === "process")
-      const executionBackendPreference =
-        !preferred?.available &&
-        processBackend?.available &&
-        (input.backendPreference === "auto" || input.failurePolicy !== "closed")
-          ? "process"
-          : input.backendPreference
-      const executionBackend =
-        executionBackendPreference === "process" ? processBackend : preferred
 
       // B-P0-4: Advisory refusal on medium+ risk when broker absent
       // If enforcement is advisory and no preferred backend is available and risk is medium or high, refuse
       const MEDIUM_RISK_LEVELS = ["medium", "high"]
       if (
         input.enforcement === "advisory" &&
-        !executionBackend?.available &&
+        !preferred?.available &&
         input.riskLevel &&
         MEDIUM_RISK_LEVELS.includes(input.riskLevel)
       ) {
@@ -117,8 +108,8 @@ export const layer = Layer.effect(
       if (
         input.enforcement === "required" &&
         input.failurePolicy === "closed" &&
-        !preferred?.available &&
-        (input.backendPreference !== "auto" || (input.riskLevel && MEDIUM_RISK_LEVELS.includes(input.riskLevel)))
+        input.backendPreference !== "auto" &&
+        !preferred?.available
       ) {
         throw new Error(preferred?.reason ?? "Required sandbox backend unavailable")
       }
@@ -184,7 +175,8 @@ export const layer = Layer.effect(
             env,
             env_policy: "sanitize",
             enforcement: input.enforcement,
-            backend_preference: executionBackendPreference,
+            backend_preference: input.backendPreference,
+            failure_policy: input.failurePolicy,
             filesystem_policy: input.filesystemPolicy,
             allowed_paths: input.allowedPaths,
             writable_paths: input.writablePaths,

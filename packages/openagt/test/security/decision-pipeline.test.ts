@@ -27,6 +27,14 @@ const policy = (
 })
 
 const processOnly: SandboxBackendStatus[] = [{ name: "process", available: true }]
+const windowsNativeUnavailable: SandboxBackendStatus[] = [
+  {
+    name: "windows_native",
+    available: false,
+    reason: "Windows native helper run loop is not implemented yet",
+  },
+  { name: "process", available: true },
+]
 
 describe("execution decision pipeline", () => {
   test("keeps strictest shell and exec-policy decision", () => {
@@ -78,6 +86,57 @@ describe("execution decision pipeline", () => {
 
     expect(decision.finalDecision).toBe("allow")
     expect(decision.backendAvailability).toContain("no OS-native isolation")
+  })
+
+  test("blocks auto native-unavailable commands when failure policy is closed", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "closed"),
+      capabilities: windowsNativeUnavailable,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("block")
+    expect(decision.policySource).toBe("sandbox_policy")
+    expect(decision.approvalKind).toBe("sandbox_escalation")
+    expect(decision.finalReason).toContain("Required sandbox backend is unavailable")
+  })
+
+  test("allows safe auto commands to fall back when failure policy permits fallback", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "fallback"),
+      capabilities: windowsNativeUnavailable,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("allow")
+    expect(decision.policySource).toBe("shell_security")
+    expect(decision.backendAvailability).toContain("windows_native:unavailable")
+    expect(decision.sandboxEscalationReason).toBeUndefined()
+  })
+
+  test("confirms risky auto fallback when native backend is unavailable", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "medium",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "fallback"),
+      capabilities: windowsNativeUnavailable,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("confirm")
+    expect(decision.policySource).toBe("sandbox_policy")
+    expect(decision.approvalKind).toBe("sandbox_escalation")
+    expect(decision.finalReason).toContain("confirmation required before downgrade")
   })
 
   test("preserves exec-policy rule source when it is the strictest decision", () => {
