@@ -2,4 +2,5 @@ export { AccountTable, AccountStateTable, ControlAccountTable } from "../account
 export { ProjectTable } from "../project/project.sql"
 export { SessionTable, MessageTable, PartTable, TodoTable, PermissionTable } from "../session/session.sql"
 export { TaskOutcomeTable } from "../session/task-outcome.sql"
+export { CoordinatorEventTable } from "../coordinator/coordinator-events.sql"
 export { WorkspaceTable } from "../control-plane/workspace.sql"

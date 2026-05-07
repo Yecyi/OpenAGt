@@ -7,6 +7,8 @@ import { SessionPrompt } from "@/session/prompt"
 import { TaskRuntime } from "@/session/task-runtime"
 import { Cause, Effect, Option } from "effect"
 import { Log } from "@/util"
+import { CoordinatorEvents } from "./events"
+import { failureSignature } from "./failure-signature"
 import {
   isMpacrCriticTask,
   isMpacrReviewTask,
@@ -18,6 +20,7 @@ import {
 } from "./review-verdict"
 import { buildTaskPrompt, messageText } from "./task-prompt"
 import { mpacrCriticTimeoutMs, taskModel, taskVariant } from "./task-record"
+import { aggregateVerifierSignals, collectVerifierSignals } from "./verifier-aggregator"
 import type {
   CoordinatorRun as CoordinatorRunType,
   CoordinatorRunID as CoordinatorRunIDType,
@@ -40,6 +43,38 @@ interface CoordinatorTaskExecutorInput {
 }
 
 const log = Log.create({ service: "coordinator.task-executor" })
+
+function metadataString(record: TaskRuntime.TaskRecord, key: string) {
+  const value = record.metadata?.[key]
+  return typeof value === "string" ? value : undefined
+}
+
+function emitTaskEvent(
+  record: TaskRuntime.TaskRecord,
+  event_kind: "task_dispatched" | "task_finished" | "review_verdict" | "revise_triggered",
+  payload: Record<string, unknown>,
+) {
+  return CoordinatorEvents.emit({
+    session_id: String(record.parent_session_id),
+    run_id: record.group_id,
+    task_id: String(record.task_id),
+    expert_id: metadataString(record, "expert_id") ?? record.subagent_type,
+    workflow: metadataString(record, "workflow"),
+    effort: metadataString(record, "effort"),
+    event_kind,
+    payload: {
+      node_id: metadataString(record, "coordinator_node_id"),
+      role: metadataString(record, "role"),
+      task_kind: record.task_kind,
+      subagent_type: record.subagent_type,
+      ...payload,
+    },
+  }).pipe(Effect.ignore)
+}
+
+function isVerificationTask(record: TaskRuntime.TaskRecord) {
+  return record.task_kind === "verify" && record.metadata?.output_schema === "verification"
+}
 
 export class CoordinatorTaskExecutor {
   constructor(private readonly input: CoordinatorTaskExecutorInput) {}
@@ -67,7 +102,84 @@ export class CoordinatorTaskExecutor {
               mpacr_skip_reason: reason,
             },
           })
+          yield* emitTaskEvent(completed, "task_finished", {
+            status: completed.status,
+            reason,
+            mpacr_skipped: true,
+          })
           yield* input.recordPromptOutcome(completed, false)
+          yield* settleDependentMpacrSynthesis(completed)
+        })
+      const partialMpacrQuorumTask = (
+        item: TaskRuntime.TaskRecord,
+        quorumEscalation: NonNullable<ReturnType<typeof mpacrQuorumEscalation>>,
+      ) =>
+        Effect.gen(function* () {
+          const partial = yield* input.tasks.partial({
+            taskID: item.task_id,
+            parentSessionID: item.parent_session_id,
+            output: JSON.stringify(quorumEscalation.verdict),
+            reason: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
+            retryable: true,
+            remainingScope: quorumEscalation.missing,
+            metadata: mpacrVerdictMetadata(quorumEscalation.verdict, {
+              mpacr_quorum_pending: true,
+              mpacr_quorum_required: quorumEscalation.quorum,
+              mpacr_quorum_substantive_count: quorumEscalation.substantive,
+              mpacr_missing_critic_node_ids: quorumEscalation.missing,
+            }),
+          })
+          yield* emitTaskEvent(partial, "review_verdict", {
+            verdict: quorumEscalation.verdict.verdict,
+            confidence: quorumEscalation.verdict.confidence,
+            failure_signature: failureSignature({
+              verdict: quorumEscalation.verdict.verdict,
+              unsupportedClaims: quorumEscalation.verdict.unsupported_claims,
+              missingEvidence: quorumEscalation.verdict.missing_evidence,
+              contradictions: quorumEscalation.verdict.contradictions,
+              requiredChanges: quorumEscalation.verdict.required_changes,
+            }),
+            missing_evidence: quorumEscalation.verdict.missing_evidence,
+            required_changes: quorumEscalation.verdict.required_changes,
+            mpacr_quorum_pending: true,
+          })
+          yield* emitTaskEvent(partial, "task_finished", {
+            status: partial.status,
+            retryable: true,
+            reason: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
+          })
+          yield* input.recordCalibrationOutcome(partial, quorumEscalation.verdict)
+          yield* input.recordPromptOutcome(partial, false)
+        })
+      const settleDependentMpacrSynthesis = (critic: TaskRuntime.TaskRecord): Effect.Effect<void, Error> =>
+        Effect.gen(function* () {
+          if (!isMpacrCriticTask(critic.metadata)) return
+          const all = yield* input.tasks.list(critic.parent_session_id)
+          const pendingSynthesis = all.filter(
+            (item) =>
+              item.status === "pending" &&
+              item.depends_on.includes(critic.task_id) &&
+              item.metadata?.output_schema === "revise" &&
+              item.metadata?.mpacr_role === "synthesis",
+          )
+          yield* Effect.forEach(
+            pendingSynthesis,
+            (item) =>
+              Effect.gen(function* () {
+                const dependencies = all.filter((candidate) => item.depends_on.includes(candidate.task_id))
+                if (
+                  !item.depends_on.every((taskID) =>
+                    dependencies.some((candidate) => candidate.task_id === taskID && candidate.status === "completed"),
+                  )
+                ) {
+                  return
+                }
+                const quorumEscalation = mpacrQuorumEscalation(item, dependencies)
+                if (!quorumEscalation) return
+                yield* partialMpacrQuorumTask(item, quorumEscalation)
+              }),
+            { concurrency: 4 },
+          )
         })
       const started = yield* input.tasks.tryStartPending(record.task_id, record.parent_session_id)
       if (!started) return
@@ -100,27 +212,16 @@ export class CoordinatorTaskExecutor {
           ),
         ),
       )
+      yield* emitTaskEvent(started, "task_dispatched", {
+        status: started.status,
+        depends_on: started.depends_on,
+      })
       const dependencies = (yield* input.tasks.list(started.parent_session_id)).filter((item) =>
         started.depends_on.includes(item.task_id),
       )
       const quorumEscalation = mpacrQuorumEscalation(started, dependencies)
       if (quorumEscalation) {
-        const partial = yield* input.tasks.partial({
-          taskID: started.task_id,
-          parentSessionID: started.parent_session_id,
-          output: JSON.stringify(quorumEscalation.verdict),
-          reason: reviewFailureMessage(quorumEscalation.verdict) ?? "MPACR quorum unmet",
-          retryable: true,
-          remainingScope: quorumEscalation.missing,
-          metadata: mpacrVerdictMetadata(quorumEscalation.verdict, {
-            mpacr_quorum_pending: true,
-            mpacr_quorum_required: quorumEscalation.quorum,
-            mpacr_quorum_substantive_count: quorumEscalation.substantive,
-            mpacr_missing_critic_node_ids: quorumEscalation.missing,
-          }),
-        })
-        yield* input.recordCalibrationOutcome(partial, quorumEscalation.verdict)
-        yield* input.recordPromptOutcome(partial, false)
+        yield* partialMpacrQuorumTask(started, quorumEscalation)
         yield* continueGroup()
         return
       }
@@ -137,6 +238,10 @@ export class CoordinatorTaskExecutor {
           taskID: started.task_id,
           parentSessionID: started.parent_session_id,
           error: "Coordinator executor unavailable: SessionPrompt.Service is not available",
+        })
+        yield* emitTaskEvent(failed, "task_finished", {
+          status: failed.status,
+          reason: "Coordinator executor unavailable: SessionPrompt.Service is not available",
         })
         yield* input.recordPromptOutcome(failed, false)
         yield* continueGroup()
@@ -179,7 +284,79 @@ export class CoordinatorTaskExecutor {
                 )
               : Effect.succeed({ message, verdict: firstReview.verdict })
             const reviewFailure = isMpacrCriticTask(started.metadata) ? undefined : reviewFailureMessage(final.verdict)
+            if (firstReview.retryPrompt) {
+              yield* emitTaskEvent(started, "revise_triggered", {
+                round_index: 1,
+                reason: "review schema or evidence repair requested",
+              })
+            }
+            if (final.verdict) {
+              yield* emitTaskEvent(started, "review_verdict", {
+                verdict: final.verdict.verdict,
+                confidence: final.verdict.confidence,
+                failure_signature: failureSignature({
+                  verdict: final.verdict.verdict,
+                  text: messageText(final.message),
+                  unsupportedClaims: final.verdict.unsupported_claims,
+                  missingEvidence: final.verdict.missing_evidence,
+                  contradictions: final.verdict.contradictions,
+                  requiredChanges: final.verdict.required_changes,
+                }),
+                unsupported_claims: final.verdict.unsupported_claims,
+                missing_evidence: final.verdict.missing_evidence,
+                contradictions: final.verdict.contradictions,
+                required_changes: final.verdict.required_changes,
+                posterior: final.verdict.posterior,
+              })
+            }
+            const verifierSignals = isVerificationTask(started)
+              ? yield* collectVerifierSignals({ childSessionID: started.child_session_id })
+              : []
+            const verifierAggregate = verifierSignals.length > 0 ? aggregateVerifierSignals(verifierSignals) : undefined
+            if (verifierAggregate) {
+              yield* emitTaskEvent(started, "review_verdict", {
+                verdict: verifierAggregate.verdict,
+                confidence: verifierAggregate.confidence,
+                failure_signature: failureSignature({
+                  verdict: verifierAggregate.verdict,
+                  text: verifierAggregate.evidence.join("\n"),
+                  requiredChanges: verifierAggregate.hard_fail_sources.map(
+                    (source) => `${source} reported a hard verifier failure`,
+                  ),
+                }),
+                hard_fail_sources: verifierAggregate.hard_fail_sources,
+                warning_sources: verifierAggregate.warning_sources,
+                unavailable_sources: verifierAggregate.unavailable_sources,
+              })
+            }
             yield* input.recordCalibrationOutcome(started, final.verdict)
+            if (verifierAggregate?.verdict === "revise_required") {
+              const reason = [
+                "Verifier aggregate requires revision",
+                verifierAggregate.hard_fail_sources.length
+                  ? `hard failures: ${verifierAggregate.hard_fail_sources.join(", ")}`
+                  : undefined,
+                verifierAggregate.evidence.at(0),
+              ]
+                .filter((item): item is string => Boolean(item))
+                .join(". ")
+              const failed = yield* input.tasks.fail({
+                taskID: started.task_id,
+                parentSessionID: started.parent_session_id,
+                error: reason,
+                metadata: {
+                  verifier_signals: verifierSignals,
+                  verifier_aggregate: verifierAggregate,
+                },
+              })
+              yield* emitTaskEvent(failed, "task_finished", {
+                status: failed.status,
+                reason,
+                verifier_aggregate: verifierAggregate,
+              })
+              yield* input.recordPromptOutcome(failed, false)
+              return
+            }
             if (reviewFailure) {
               const failed = yield* input.tasks.fail({
                 taskID: started.task_id,
@@ -187,6 +364,10 @@ export class CoordinatorTaskExecutor {
                 error: reviewFailure,
                 metadata:
                   final.verdict && isMpacrReviewTask(started.metadata) ? mpacrVerdictMetadata(final.verdict) : undefined,
+              })
+              yield* emitTaskEvent(failed, "task_finished", {
+                status: failed.status,
+                reason: reviewFailure,
               })
               yield* input.recordPromptOutcome(failed, false)
               return
@@ -201,7 +382,12 @@ export class CoordinatorTaskExecutor {
                   mpacr_skip_reason: final.verdict.unsupported_claims.join("; ") || "MPACR critic skipped",
                 },
               })
+              yield* emitTaskEvent(completed, "task_finished", {
+                status: completed.status,
+                mpacr_skipped: true,
+              })
               yield* input.recordPromptOutcome(completed, false)
+              yield* settleDependentMpacrSynthesis(completed)
               return
             }
             const completed = yield* input.tasks.complete(
@@ -216,9 +402,20 @@ export class CoordinatorTaskExecutor {
                     taskID: started.task_id,
                     parentSessionID: started.parent_session_id,
                     result: final.message,
+                    metadata: verifierAggregate
+                      ? {
+                          verifier_signals: verifierSignals,
+                          verifier_aggregate: verifierAggregate,
+                        }
+                      : undefined,
                   },
             )
+            yield* emitTaskEvent(completed, "task_finished", {
+              status: completed.status,
+              success: true,
+            })
             yield* input.recordPromptOutcome(completed, true)
+            yield* settleDependentMpacrSynthesis(completed)
           }),
         ),
         Effect.catchCause((cause) => {
@@ -233,6 +430,10 @@ export class CoordinatorTaskExecutor {
               taskID: started.task_id,
               parentSessionID: started.parent_session_id,
               error: reason,
+            })
+            yield* emitTaskEvent(failed, "task_finished", {
+              status: failed.status,
+              reason,
             })
             yield* input.recordPromptOutcome(failed, false)
           })

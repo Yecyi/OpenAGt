@@ -238,7 +238,11 @@ export const layer = Layer.effect(
       if (Option.isNone(promptTemplates)) return { prompt: node.prompt }
       const roleAndVariant = promptTemplateRoleAndVariant(node)
       const picked = yield* promptTemplates.value
-        .pickVariant({ ...roleAndVariant, seed: `${runID}:${node.id}` }, promptTemplateVars(node), () => node.prompt)
+        .pickVariant(
+          { ...roleAndVariant, seed: `${runID}:${node.id}`, expertID: node.expert_id },
+          promptTemplateVars(node),
+          () => node.prompt,
+        )
         .pipe(Effect.catch(() => Effect.succeed({ template: undefined, rendered: node.prompt })))
       return {
         prompt: picked.rendered || node.prompt,
@@ -400,9 +404,11 @@ export const layer = Layer.effect(
           ? "active"
           : "awaiting_approval"
       const runID = CoordinatorRunID.ascending()
+      const parent = yield* sessions.get(input.sessionID)
       const created = yield* runFactory.create({
         runID,
         sessionID: input.sessionID,
+        projectID: parent.projectID,
         goal: input.goal,
         intent,
         mode,

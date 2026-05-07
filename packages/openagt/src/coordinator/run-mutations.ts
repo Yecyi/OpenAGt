@@ -6,6 +6,7 @@ import { Database, eq } from "@/storage"
 import { Effect, Option } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { addResourceLimit, scaleResourceLimit } from "./budget-governance"
+import { CoordinatorEvents } from "./events"
 import {
   planWithRuntimeState,
   continuationVelocityFor,
@@ -259,6 +260,22 @@ export class CoordinatorRunMutations {
       const deniedReason = !consumedEnough
         ? "insufficient resource consumption since the previous approved continuation"
         : velocity.reason
+      yield* CoordinatorEvents.emit({
+        session_id: runOpt.value.sessionID,
+        run_id: runOpt.value.id,
+        workflow: runOpt.value.workflow,
+        effort: runOpt.value.plan.effort,
+        event_kind: "continuation_decision",
+        payload: {
+          decision: "denied",
+          reason: deniedReason,
+          has_progress: velocity.allowed,
+          continuation_score: velocity.continuation_score,
+          consumed_enough: consumedEnough,
+          usage,
+          requested,
+        },
+      }).pipe(Effect.ignore)
       const plan = CoordinatorPlan.parse({
         ...planWithRuntimeState(runOpt.value.plan, runtime),
         budget_profile: BudgetProfile.parse({
@@ -320,6 +337,22 @@ export class CoordinatorRunMutations {
         last_approved_failure_penalty: runtime.progress_snapshot.failure_penalty,
       },
     })
+    yield* CoordinatorEvents.emit({
+      session_id: runOpt.value.sessionID,
+      run_id: runOpt.value.id,
+      workflow: runOpt.value.workflow,
+      effort: runOpt.value.plan.effort,
+      event_kind: "continuation_decision",
+      payload: {
+        decision: "approved",
+        reason: velocity.reason,
+        has_progress: velocity.allowed,
+        continuation_score: velocity.continuation_score,
+        consumed_enough: true,
+        usage,
+        requested: fullDelta,
+      },
+    }).pipe(Effect.ignore)
     const plan = CoordinatorPlan.parse({
       ...planWithRuntimeState(runOpt.value.plan, runtime),
       budget_profile,

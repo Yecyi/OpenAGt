@@ -79,6 +79,8 @@ const REQUIRED_MIGRATIONS = [
   "20260428120000_schema_version_table",
   "20260428180000_advisory_locks",
   "20260430000000_prompt_outcomes",
+  "20260507120000_coordinator_events",
+  "20260507120500_coordinator_event_indexes",
 ]
 
 async function verifyMigrations(): Promise<StepResult> {
@@ -126,17 +128,15 @@ const focusedTests = [
   "test/session/task-runtime-agentic.test.ts",
   // v1.21 streams.
   "test/agent/coordinator-intent.test.ts",
+  "test/agent/coordinator-events.test.ts",
+  "test/agent/coordinator-learning-loop.test.ts",
   "test/agent/coordinator-runner.test.ts",
   "test/agent/coordinator-v121-pipeline.test.ts",
   "test/agent/coordinator-personal.test.ts",
   "test/agent/expert-additive.test.ts",
   "test/agent/calibration.test.ts",
   "test/agent/mpacr-governance.test.ts",
-  // mpacr-partial-failure: 22/23 pass; the `synthesis enforces quorum`
-  // case has a 5s timeout race that pre-dates Wave 11 and reproduces on
-  // main. Tracked as `inc.mpacr-quorum-timeout`. Excluded here so the
-  // gate doesn't return a false-negative blocking the v1.21.0 cut.
-  // "test/agent/mpacr-partial-failure.test.ts",
+  "test/agent/mpacr-partial-failure.test.ts",
   "test/agent/mpacr-schema.test.ts",
   "test/agent/mpacr-shape.test.ts",
   "test/agent/mpacr-validation.test.ts",

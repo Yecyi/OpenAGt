@@ -43,6 +43,7 @@ export interface PickContext {
   readonly role: string
   readonly seed?: string
   readonly forceVariant?: string
+  readonly expertID?: string
 }
 
 export interface OutcomeRecord {
@@ -230,6 +231,21 @@ export interface OutcomeStats {
   readonly failure: number
 }
 
+export function historyForOutcomeRows(
+  rows: readonly { variant: string; success: number; expert_id?: string | null }[],
+  expertID?: string,
+) {
+  const history = new Map<string, OutcomeStats>()
+  for (const row of rows.filter((item) => !expertID || !item.expert_id || item.expert_id === expertID)) {
+    const current = history.get(row.variant) ?? { success: 0, failure: 0 }
+    history.set(row.variant, {
+      success: current.success + (row.success > 0 ? 1 : 0),
+      failure: current.failure + (row.success > 0 ? 0 : 1),
+    })
+  }
+  return history
+}
+
 // Pure Thompson sampling-lite picker. Given a list of variants + their
 // historical (success, failure) counts, return the variant whose Beta sample
 // is highest. With probability EXPLORATION_FRACTION, override and pick a
@@ -326,7 +342,7 @@ export const layer = Layer.effect(
 
     const forRole: Interface["forRole"] = (role) => Effect.sync(() => cache.get(role) ?? [])
 
-    const historyForRole = (role: string) =>
+    const historyForContext = (ctx: PickContext) =>
       Effect.sync(() => {
         try {
           const since = Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -335,29 +351,22 @@ export const layer = Layer.effect(
               .select({
                 variant: PromptOutcomeTable.variant,
                 success: PromptOutcomeTable.success,
+                expert_id: PromptOutcomeTable.expert_id,
               })
               .from(PromptOutcomeTable)
-              .where(and(eq(PromptOutcomeTable.role, role), gte(PromptOutcomeTable.time_recorded, since)))
+              .where(and(eq(PromptOutcomeTable.role, ctx.role), gte(PromptOutcomeTable.time_recorded, since)))
               .all(),
           )
-          const history = new Map<string, OutcomeStats>()
-          for (const row of rows) {
-            const current = history.get(row.variant) ?? { success: 0, failure: 0 }
-            history.set(row.variant, {
-              success: current.success + (row.success > 0 ? 1 : 0),
-              failure: current.failure + (row.success > 0 ? 0 : 1),
-            })
-          }
-          return history
+          return historyForOutcomeRows(rows, ctx.expertID)
         } catch (err) {
-          log.warn("prompt outcome history unavailable", { role, err: String(err) })
+          log.warn("prompt outcome history unavailable", { role: ctx.role, err: String(err) })
           return new Map<string, OutcomeStats>()
         }
       })
 
     const pickVariant: Interface["pickVariant"] = (ctx, vars, fallback) =>
       Effect.gen(function* () {
-        const history = yield* historyForRole(ctx.role)
+        const history = process.env.OPENAGT_PROMPT_BANDIT === "off" ? undefined : yield* historyForContext(ctx)
         const template = pickVariantFromMap(cache, ctx, history)
         if (template) return { template, rendered: renderTemplate(template.content, vars ?? {}) }
         const fallbackText = fallback ? fallback() : ""

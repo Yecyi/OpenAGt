@@ -1,10 +1,12 @@
 // Owns coordinator run row and task record creation.
 // It does not decide approval state, dispatch tasks, or publish coordinator events.
 import type { SessionID } from "@/session/schema"
+import type { ProjectID } from "@/project/schema"
 import { TaskRuntime } from "@/session/task-runtime"
 import { Database, eq } from "@/storage"
 import { Effect } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
+import { reviewMemoryPatternsForNode } from "./expert-memory-context"
 import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import type {
@@ -39,6 +41,7 @@ export class CoordinatorRunFactory {
   create(params: {
     runID: CoordinatorRunIDType
     sessionID: SessionID
+    projectID?: ProjectID
     goal: string
     intent: IntentProfileType
     mode: CoordinatorModeType
@@ -56,6 +59,13 @@ export class CoordinatorRunFactory {
         const taskID = nodeTaskIDs.get(node.id)
         if (!taskID) continue
         const selectedPrompt = yield* deps.promptTemplateSelection(params.runID, node)
+        const reviewMemoryPatterns = yield* Effect.sync(() =>
+          reviewMemoryPatternsForNode({
+            projectID: params.projectID,
+            node,
+            workflow: node.workflow ?? params.planned.workflow,
+          }),
+        ).pipe(Effect.catch(() => Effect.succeed([])))
         yield* deps.tasks.create({
           parentSessionID: params.sessionID,
           childSessionID: taskID,
@@ -110,6 +120,7 @@ export class CoordinatorRunFactory {
             mpacr_per_critic_timeout_ms: node.mpacr_per_critic_timeout_ms,
             mpacr_degraded: node.mpacr_degraded,
             memory_namespace: node.memory_namespace,
+            review_memory_patterns: reviewMemoryPatterns,
             confidence: node.confidence,
             revise_policy: node.revise_policy,
             intent: params.intent,

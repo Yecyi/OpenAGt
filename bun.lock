@@ -568,7 +568,7 @@
     "fast-xml-parser": "5.7.1",
     "file-type": "22.0.1",
     "h3": "2.0.1-rc.20",
-    "hono": "4.12.14",
+    "hono": "4.12.16",
     "ip-address": "10.2.0",
     "minimatch": "10.2.5",
     "protobufjs": "8.0.1",
@@ -616,7 +616,7 @@
     "drizzle-orm": "1.0.0-beta.19-d95b7a4",
     "effect": "4.0.0-beta.48",
     "fuzzysort": "3.1.0",
-    "hono": "4.12.14",
+    "hono": "4.12.16",
     "hono-openapi": "1.1.2",
     "luxon": "3.6.1",
     "marked": "17.0.1",
@@ -2632,7 +2632,7 @@
 
     "heap-snapshot-toolkit": ["heap-snapshot-toolkit@1.1.3", "", {}, "sha512-joThu2rEsDu8/l4arupRDI1qP4CZXNG+J6Wr348vnbLGSiBkwRdqZ6aOHl5BzEiC+Dc8OTbMlmWjD0lbXD5K2Q=="],
 
-    "hono": ["hono@4.12.14", "", {}, "sha512-am5zfg3yu6sqn5yjKBNqhnTX7Cv+m00ox+7jbaKkrLMRJ4rAdldd1xPd/JzbBWspqaQv6RSTrgFN95EsfhC+7w=="],
+    "hono": ["hono@4.12.16", "", {}, "sha512-jN0ZewiNAWSe5khM3EyCmBb250+b40wWbwNILNfEvq84VREWwOIkuUsFONk/3i3nqkz7Oe1PcpM2mwQEK2L9Kg=="],
 
     "hono-openapi": ["hono-openapi@1.1.2", "", { "peerDependencies": { "@hono/standard-validator": "^0.2.0", "@standard-community/standard-json": "^0.3.5", "@standard-community/standard-openapi": "^0.2.9", "@types/json-schema": "^7.0.15", "hono": "^4.8.3", "openapi-types": "^12.1.3" }, "optionalPeers": ["@hono/standard-validator", "hono"] }, "sha512-toUcO60MftRBxqcVyxsHNYs2m4vf4xkQaiARAucQx3TiBPDtMNNkoh+C4I1vAretQZiGyaLOZNWn1YxfSyUA5g=="],
 

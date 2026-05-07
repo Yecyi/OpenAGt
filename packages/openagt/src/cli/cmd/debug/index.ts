@@ -11,6 +11,7 @@ import { SnapshotCommand } from "./snapshot"
 import { AgentCommand } from "./agent"
 import { BundleCommand } from "./bundle"
 import { DoctorCommand } from "./doctor"
+import { StatsCommand } from "./stats"
 
 export const DebugCommand = cmd({
   command: "debug",
@@ -27,6 +28,7 @@ export const DebugCommand = cmd({
       .command(AgentCommand)
       .command(DoctorCommand)
       .command(BundleCommand)
+      .command(StatsCommand)
       .command(PathsCommand)
       .command({
         command: "wait",

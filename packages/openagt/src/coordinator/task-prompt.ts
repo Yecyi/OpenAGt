@@ -90,6 +90,21 @@ export function buildTaskPrompt(record: TaskRuntime.TaskRecord, dependencies: Ta
   const dependencySummaries = dependencies.length
     ? `\n\nCompleted dependency handoff:\n${dependencies.map((item) => `- ${item.description}: ${item.result_summary ?? item.error_summary ?? item.status}`).join("\n")}`
     : ""
+  const reviewMemoryPatterns =
+    Array.isArray(metadata.review_memory_patterns) && metadata.review_memory_patterns.length
+      ? `\n\nPrior verifier/reviser notes:\n${metadata.review_memory_patterns
+          .slice(0, 3)
+          .map((item) =>
+            isRecord(item) && typeof item.content === "string"
+              ? `- ${typeof item.title === "string" ? `${item.title}: ` : ""}${item.content
+                  .split("\n")
+                  .slice(0, 4)
+                  .join("; ")}`
+              : undefined,
+          )
+          .filter((item): item is string => Boolean(item))
+          .join("\n")}`
+      : ""
   const roleContract =
     metadata.role === "reducer"
       ? "\n\nReducer contract: output compact_synthesis, conflicts, recommended_next_nodes, evidence_coverage, and confidence. Do not pass through full raw transcripts."
@@ -118,5 +133,5 @@ export function buildTaskPrompt(record: TaskRuntime.TaskRecord, dependencies: Ta
           .map((item) => `- ${String(item)}`)
           .join("\n")}`
       : ""
-  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${roleContract}${checks}${acceptableFailure}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
+  return `${promptText}${role}${workflow}${effort}${expert}${risk}${output}${memoryNamespace}${revisePolicy}${longTask}${todoTimeline}${parallelGroup}${assignedScope}${excludedScope}${dependencySummaries}${reviewMemoryPatterns}${roleContract}${checks}${acceptableFailure}\n\nBefore finalizing, list assumptions, check evidence support, identify missing context, and choose proceed, retry, ask_user, or handoff. Return a concise structured result with summary, evidence, assumptions, missing_context, risks, confidence, and next_step.`
 }

@@ -7,6 +7,7 @@ import { TaskRuntime } from "@/session/task-runtime"
 import { Effect, Option, Scope } from "effect"
 import { BudgetTuning } from "@/agent/budget-tuning"
 import { dispatchSelectionFor } from "./dispatch-selection"
+import { CoordinatorEvents } from "./events"
 import { resourceLimitSlots, resourceUsageFor, runtimeStateFor, subtractResourceLimit } from "./runtime-state"
 import type { CoordinatorRun as CoordinatorRunType, CoordinatorRunID as CoordinatorRunIDType } from "./schema"
 
@@ -66,7 +67,23 @@ export class CoordinatorDispatchLoop {
         run.plan.budget_profile.checkpoint_reserve,
       )
       const checkpointSlots = resourceLimitSlots(usage, run.plan.budget_profile.absolute_ceiling)
+      const emitBudgetBreach = (reason: "soft" | "absolute") =>
+        CoordinatorEvents.emit({
+          session_id: run.sessionID,
+          run_id: run.id,
+          workflow: run.workflow,
+          effort: run.plan.effort,
+          event_kind: "budget_breach",
+          payload: {
+            reason,
+            budget_limited: runtime.budget_state.budget_limited,
+            ceiling_hit: runtime.budget_state.ceiling_hit,
+            limited_resource: runtime.budget_state.limited_resource,
+            usage,
+          },
+        }).pipe(Effect.ignore)
       if (ceilingHit || checkpointSlots === 0) {
+        yield* emitBudgetBreach("absolute")
         const blocked = yield* input.blockRunForBudget(run, "absolute")
         return {
           run: blocked,
@@ -74,6 +91,7 @@ export class CoordinatorDispatchLoop {
         }
       }
       if (budgetLimited && !checkpointReady) {
+        yield* emitBudgetBreach(ceilingHit ? "absolute" : "soft")
         const blocked = yield* input.blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
         return {
           run: blocked,
@@ -92,6 +110,7 @@ export class CoordinatorDispatchLoop {
         softBudgetHit: budgetLimited,
       })
       if (selection.budgetSlots === 0 && selection.orderedReady.length > 0) {
+        yield* emitBudgetBreach(ceilingHit ? "absolute" : "soft")
         const blocked = yield* input.blockRunForBudget(run, ceilingHit ? "absolute" : "soft")
         return {
           run: blocked,
@@ -99,6 +118,7 @@ export class CoordinatorDispatchLoop {
         }
       }
       if (selection.todoBudgetBlocked && selection.selected.length === 0 && selection.orderedReady.length > 0) {
+        yield* emitBudgetBreach("soft")
         const blocked = yield* input.blockRunForBudget(run, "soft")
         return {
           run: blocked,
