@@ -94,6 +94,31 @@ struct FilesystemGrantPlan {
     deny_write_paths: Vec<String>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FilesystemAclAccess {
+    DenyWrite,
+    AllowRead,
+    AllowWrite,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FilesystemAclEntry {
+    path: String,
+    principal_sid: String,
+    access: FilesystemAclAccess,
+    inherit_children: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FilesystemAclTransaction {
+    principal_sid: String,
+    backup_paths: Vec<String>,
+    entries: Vec<FilesystemAclEntry>,
+}
+
 fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
     println!(
         "{}",
@@ -211,6 +236,52 @@ fn filesystem_grant_plan(request: &ExecRequest) -> Result<FilesystemGrantPlan, S
         read_paths,
         writable_paths,
         deny_write_paths,
+    })
+}
+
+#[allow(dead_code)]
+fn filesystem_acl_transaction(
+    grant: &FilesystemGrantPlan,
+    principal_sid: &str,
+) -> Result<FilesystemAclTransaction, String> {
+    if principal_sid.trim().is_empty() {
+        return Err("ACL transaction requires a sandbox principal SID".to_string());
+    }
+    let backup_paths = sort_dedup(
+        grant
+            .deny_write_paths
+            .iter()
+            .chain(grant.read_paths.iter())
+            .chain(grant.writable_paths.iter())
+            .cloned()
+            .collect(),
+    );
+    let entries = grant
+        .deny_write_paths
+        .iter()
+        .map(|path| FilesystemAclEntry {
+            path: path.clone(),
+            principal_sid: principal_sid.to_string(),
+            access: FilesystemAclAccess::DenyWrite,
+            inherit_children: true,
+        })
+        .chain(grant.read_paths.iter().map(|path| FilesystemAclEntry {
+            path: path.clone(),
+            principal_sid: principal_sid.to_string(),
+            access: FilesystemAclAccess::AllowRead,
+            inherit_children: true,
+        }))
+        .chain(grant.writable_paths.iter().map(|path| FilesystemAclEntry {
+            path: path.clone(),
+            principal_sid: principal_sid.to_string(),
+            access: FilesystemAclAccess::AllowWrite,
+            inherit_children: true,
+        }))
+        .collect();
+    Ok(FilesystemAclTransaction {
+        principal_sid: principal_sid.to_string(),
+        backup_paths,
+        entries,
     })
 }
 
@@ -980,7 +1051,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{filesystem_grant_plan, is_allowed_drive_colon, path_text_issue, ExecRequest};
+    use super::{
+        filesystem_acl_transaction, filesystem_grant_plan, is_allowed_drive_colon, path_text_issue,
+        ExecRequest, FilesystemAclAccess,
+    };
     use std::collections::BTreeMap;
     use std::fs;
     use std::path::PathBuf;
@@ -1105,6 +1179,71 @@ mod tests {
             .deny_write_paths
             .iter()
             .any(|item| item.ends_with("\\.openagt")));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn acl_transaction_orders_deny_entries_before_allow_entries() {
+        let dir = temp_case("acl-order");
+        let plan = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        ))
+        .unwrap();
+        let transaction = filesystem_acl_transaction(&plan, "S-1-15-2-1").unwrap();
+        let first_allow = transaction
+            .entries
+            .iter()
+            .position(|entry| entry.access != FilesystemAclAccess::DenyWrite)
+            .unwrap();
+
+        assert!(first_allow > 0);
+        assert!(transaction.entries[..first_allow]
+            .iter()
+            .all(|entry| entry.access == FilesystemAclAccess::DenyWrite));
+        assert!(transaction.entries[first_allow..]
+            .iter()
+            .all(|entry| entry.access != FilesystemAclAccess::DenyWrite));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn acl_transaction_records_backup_paths_for_rollback() {
+        let dir = temp_case("acl-rollback");
+        let readonly = dir.join("readonly");
+        fs::create_dir_all(&readonly).unwrap();
+        let plan = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone(), readonly.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        ))
+        .unwrap();
+        let transaction = filesystem_acl_transaction(&plan, "S-1-15-2-1").unwrap();
+
+        assert!(transaction.backup_paths.iter().any(|item| item.ends_with("readonly")));
+        assert!(transaction.backup_paths.iter().any(|item| item.ends_with("\\.git")));
+        assert!(transaction.backup_paths.iter().any(|item| item == &plan.writable_paths[0]));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn acl_transaction_requires_principal_sid() {
+        let dir = temp_case("acl-sid");
+        let plan = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        ))
+        .unwrap();
+
+        assert_eq!(
+            filesystem_acl_transaction(&plan, " ").unwrap_err(),
+            "ACL transaction requires a sandbox principal SID"
+        );
         let _ = fs::remove_dir_all(dir);
     }
 }
