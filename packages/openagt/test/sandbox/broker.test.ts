@@ -159,12 +159,13 @@ describe("Windows helper discovery", () => {
         restricted_token_supported: true,
         job_object_supported: true,
         filesystem_enforced: false,
+        setup_reason: "Filesystem ACL enforcement is disabled by policy",
       }),
     ).toMatchObject({
       name: "windows_native",
       available: false,
       filesystem_enforced: false,
-      reason: "Windows helper filesystem enforcement is not enabled",
+      reason: "Filesystem ACL enforcement is disabled by policy",
     })
   })
 

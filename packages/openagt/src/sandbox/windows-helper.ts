@@ -107,7 +107,7 @@ export function statusFromProbe(helper: string, probe: WindowsSandboxHelperProbe
       setup_version: probe.setup_version,
       filesystem_enforced: false,
       network_enforced: probe.network_enforced ?? false,
-      reason: "Windows helper filesystem enforcement is not enabled",
+      reason: probe.setup_reason ?? "Windows helper filesystem enforcement is not enabled",
     }
   }
   return {
