@@ -6,8 +6,28 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 const HELPER_PROTOCOL_VERSION: u32 = 1;
-const SETUP_VERSION: &str = "0";
+const SETUP_VERSION: &str = "1";
 const ACL_APPLY_MODE_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_APPLY_ACL";
+const SETUP_PROVIDER_DATA: &[u8] = b"openagt-windows-sandbox-setup-v1";
+
+#[cfg(windows)]
+const OPENAGT_WFP_PROVIDER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x4a9b3b8a_2d85_4d24_9b2d_80f1f14f82a1);
+#[cfg(windows)]
+const OPENAGT_WFP_SUBLAYER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x6ac6d548_a75e_45f1_9dfd_9e4af422edaf);
+#[cfg(windows)]
+const OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x7a2868b1_6e82_4640_9be5_b6d90c2a6e4d);
+#[cfg(windows)]
+const OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x94100b26_8d7d_4c2a_9aef_7e415a98de77);
+#[cfg(windows)]
+const OPENAGT_WFP_INBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x2d933b33_4f21_4790_8506_676e8c55d8df);
+#[cfg(windows)]
+const OPENAGT_WFP_INBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xaaa2eb49_c0dc_4c43_97d7_269c50fc9717);
 
 #[derive(Debug, Deserialize)]
 struct ExecRequest {
@@ -39,8 +59,13 @@ struct ProbeOutput {
     setup_version: String,
     setup_required: bool,
     setup_reason: Option<String>,
+    filesystem_ready: bool,
     filesystem_enforced: bool,
+    filesystem_reason: Option<String>,
+    network_ready: bool,
     network_enforced: bool,
+    network_reason: Option<String>,
+    network_policies_enforced: Vec<String>,
     capabilities: Vec<String>,
 }
 
@@ -56,8 +81,13 @@ struct SetupOutput {
     restricted_token_supported: bool,
     job_object_supported: bool,
     wfp_supported: bool,
+    filesystem_ready: bool,
     filesystem_enforced: bool,
+    filesystem_reason: Option<String>,
+    network_ready: bool,
     network_enforced: bool,
+    network_reason: Option<String>,
+    network_policies_enforced: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -176,17 +206,85 @@ fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WfpSetupState {
+    engine_available: bool,
+    provider_installed: bool,
+    sublayer_installed: bool,
+    outbound_v4_filter_installed: bool,
+    outbound_v6_filter_installed: bool,
+    inbound_v4_filter_installed: bool,
+    inbound_v6_filter_installed: bool,
+    setup_version: String,
+    reason: Option<String>,
+}
+
+impl WfpSetupState {
+    fn installed(&self) -> bool {
+        self.engine_available
+            && self.provider_installed
+            && self.sublayer_installed
+            && self.outbound_v4_filter_installed
+            && self.outbound_v6_filter_installed
+            && self.inbound_v4_filter_installed
+            && self.inbound_v6_filter_installed
+            && self.setup_version == SETUP_VERSION
+    }
+
+    fn setup_required(&self) -> bool {
+        !self.installed()
+    }
+
+    fn network_reason(&self) -> Option<String> {
+        if self.installed() {
+            return None;
+        }
+        self.reason.clone().or_else(|| {
+            Some(
+                "Windows WFP setup is not installed or does not match this helper version"
+                    .to_string(),
+            )
+        })
+    }
+
+    fn enforced_policies(&self) -> Vec<String> {
+        if self.installed() {
+            return vec!["none".to_string()];
+        }
+        Vec::new()
+    }
+}
+
+fn filesystem_status(restricted_token_supported: bool) -> (bool, bool, Option<String>) {
+    if !restricted_token_supported {
+        return (
+            false,
+            false,
+            Some(
+                "Restricted token launch privilege is not available in this helper process"
+                    .to_string(),
+            ),
+        );
+    }
+    if acl_apply_mode_from_env() == FilesystemAclApplyMode::Apply {
+        return (true, true, None);
+    }
+    (
+        true,
+        false,
+        Some(
+            "Filesystem ACL enforcement is available only when OPENAGT_SANDBOX_WINDOWS_APPLY_ACL=apply is explicitly set"
+                .to_string(),
+        ),
+    )
+}
+
 fn probe() -> ProbeOutput {
     let restricted_token_supported = restricted_token_launch_supported();
-    let filesystem_enforced =
-        restricted_token_supported && acl_apply_mode_from_env() == FilesystemAclApplyMode::Apply;
-    let setup_reason = if !restricted_token_supported {
-        "Restricted token launch privilege is not available in this helper process"
-    } else if !filesystem_enforced {
-        "Filesystem ACL enforcement is available only when OPENAGT_SANDBOX_WINDOWS_APPLY_ACL=apply is explicitly set"
-    } else {
-        "WFP network enforcement setup is not installed in this helper build"
-    };
+    let (filesystem_ready, filesystem_enforced, filesystem_reason) =
+        filesystem_status(restricted_token_supported);
+    let wfp = wfp_setup_state();
+    let setup_reason = wfp.network_reason();
     let capabilities = [
         Some("probe".to_string()),
         Some("exec".to_string()),
@@ -194,6 +292,7 @@ fn probe() -> ProbeOutput {
         Some("path-preflight".to_string()),
         restricted_token_supported.then(|| "restricted-token".to_string()),
         filesystem_enforced.then(|| "filesystem-acl-enforcement".to_string()),
+        wfp.installed().then(|| "wfp-network-none".to_string()),
         Some("setup-status".to_string()),
     ]
     .into_iter()
@@ -207,32 +306,38 @@ fn probe() -> ProbeOutput {
         restricted_token_supported,
         job_object_supported: cfg!(windows),
         wfp_supported: cfg!(windows),
-        setup_installed: filesystem_enforced,
-        setup_version: SETUP_VERSION.to_string(),
-        setup_required: !filesystem_enforced,
-        setup_reason: Some(setup_reason.to_string()),
+        setup_installed: wfp.installed(),
+        setup_version: wfp.setup_version.clone(),
+        setup_required: wfp.setup_required(),
+        setup_reason,
+        filesystem_ready,
         filesystem_enforced,
-        network_enforced: false,
+        filesystem_reason,
+        network_ready: wfp.engine_available,
+        network_enforced: wfp.installed(),
+        network_reason: wfp.network_reason(),
+        network_policies_enforced: wfp.enforced_policies(),
         capabilities,
     }
 }
 
 fn setup(mode: &str) -> SetupOutput {
-    let status = probe();
-    let setup_reason = match mode {
-        "status" => status.setup_reason,
-        "install" => Some(
-            "Windows WFP setup install is not implemented in this helper build; no machine state was changed"
-                .to_string(),
-        ),
-        "uninstall" => Some(
-            "Windows WFP setup uninstall is not implemented in this helper build; no machine state was changed"
-                .to_string(),
-        ),
-        _ => Some("Unknown Windows sandbox setup mode".to_string()),
+    let action = match mode {
+        "install" => install_wfp_setup(),
+        "uninstall" => uninstall_wfp_setup(),
+        "status" => Ok(()),
+        _ => Err("Unknown Windows sandbox setup mode".to_string()),
     };
+    let action_ok = action.is_ok();
+    let action_error = action.err();
+    let status = probe();
+    let setup_reason = action_error.or(status.setup_reason);
+    let ok = action_ok
+        && (mode == "status"
+            || (mode == "install" && status.setup_installed)
+            || mode == "uninstall");
     SetupOutput {
-        ok: mode == "status",
+        ok,
         mode: mode.to_string(),
         setup_installed: status.setup_installed,
         setup_version: status.setup_version,
@@ -242,9 +347,464 @@ fn setup(mode: &str) -> SetupOutput {
         restricted_token_supported: status.restricted_token_supported,
         job_object_supported: status.job_object_supported,
         wfp_supported: status.wfp_supported,
+        filesystem_ready: status.filesystem_ready,
         filesystem_enforced: status.filesystem_enforced,
+        filesystem_reason: status.filesystem_reason,
+        network_ready: status.network_ready,
         network_enforced: status.network_enforced,
+        network_reason: status.network_reason,
+        network_policies_enforced: status.network_policies_enforced,
     }
+}
+
+#[cfg(not(windows))]
+fn wfp_setup_state() -> WfpSetupState {
+    WfpSetupState {
+        engine_available: false,
+        provider_installed: false,
+        sublayer_installed: false,
+        outbound_v4_filter_installed: false,
+        outbound_v6_filter_installed: false,
+        inbound_v4_filter_installed: false,
+        inbound_v6_filter_installed: false,
+        setup_version: "0".to_string(),
+        reason: Some("Windows Filtering Platform is only available on Windows".to_string()),
+    }
+}
+
+#[cfg(not(windows))]
+fn install_wfp_setup() -> Result<(), String> {
+    Err("Windows WFP setup install is only available on Windows".to_string())
+}
+
+#[cfg(not(windows))]
+fn uninstall_wfp_setup() -> Result<(), String> {
+    Err("Windows WFP setup uninstall is only available on Windows".to_string())
+}
+
+#[cfg(windows)]
+fn wfp_setup_state() -> WfpSetupState {
+    match query_wfp_setup_state() {
+        Ok(state) => state,
+        Err(error) => WfpSetupState {
+            engine_available: false,
+            provider_installed: false,
+            sublayer_installed: false,
+            outbound_v4_filter_installed: false,
+            outbound_v6_filter_installed: false,
+            inbound_v4_filter_installed: false,
+            inbound_v6_filter_installed: false,
+            setup_version: "0".to_string(),
+            reason: Some(error),
+        },
+    }
+}
+
+#[cfg(windows)]
+struct WfpEngine(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl Drop for WfpEngine {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FwpmEngineClose0(
+                self.0,
+            );
+        }
+    }
+}
+
+#[cfg(windows)]
+fn open_wfp_engine() -> Result<WfpEngine, String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FwpmEngineOpen0;
+    use windows_sys::Win32::System::Rpc::RPC_C_AUTHN_WINNT;
+
+    unsafe {
+        let mut engine = 0;
+        let result = FwpmEngineOpen0(
+            std::ptr::null(),
+            RPC_C_AUTHN_WINNT,
+            std::ptr::null(),
+            std::ptr::null(),
+            &mut engine,
+        );
+        if result != 0 {
+            return Err(format!("FwpmEngineOpen0 failed: {result}"));
+        }
+        Ok(WfpEngine(engine))
+    }
+}
+
+#[cfg(windows)]
+fn query_wfp_setup_state() -> Result<WfpSetupState, String> {
+    let engine = open_wfp_engine()?;
+    let provider = wfp_provider_status(&engine)?;
+    let sublayer_installed = wfp_sublayer_installed(&engine)?;
+    let outbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY)?;
+    let outbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY)?;
+    let inbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_INBOUND_V4_FILTER_KEY)?;
+    let inbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_INBOUND_V6_FILTER_KEY)?;
+    let state = WfpSetupState {
+        engine_available: true,
+        provider_installed: provider.0,
+        sublayer_installed,
+        outbound_v4_filter_installed,
+        outbound_v6_filter_installed,
+        inbound_v4_filter_installed,
+        inbound_v6_filter_installed,
+        setup_version: provider.1,
+        reason: None,
+    };
+    if state.installed() {
+        return Ok(state);
+    }
+    Ok(WfpSetupState {
+        reason: Some(wfp_missing_reason(&state)),
+        ..state
+    })
+}
+
+#[cfg(windows)]
+fn wfp_missing_reason(state: &WfpSetupState) -> String {
+    let missing = [
+        (!state.provider_installed).then_some("provider"),
+        (!state.sublayer_installed).then_some("sublayer"),
+        (!state.outbound_v4_filter_installed).then_some("outbound_v4_filter"),
+        (!state.outbound_v6_filter_installed).then_some("outbound_v6_filter"),
+        (!state.inbound_v4_filter_installed).then_some("inbound_v4_filter"),
+        (!state.inbound_v6_filter_installed).then_some("inbound_v6_filter"),
+        (state.setup_version != SETUP_VERSION).then_some("version"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    format!(
+        "Windows WFP setup is incomplete or stale: {}",
+        missing.join(", ")
+    )
+}
+
+#[cfg(windows)]
+fn install_wfp_setup() -> Result<(), String> {
+    if !process_is_elevated() {
+        return Err(
+            "Windows WFP setup install requires an elevated Administrator terminal".to_string(),
+        );
+    }
+    let engine = open_wfp_engine()?;
+    wfp_transaction(&engine, || {
+        remove_wfp_setup_objects(&engine)?;
+        add_wfp_provider(&engine)?;
+        add_wfp_sublayer(&engine)?;
+        add_wfp_filter(&engine, OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_CONNECT_V4, "OpenAGt block outbound IPv4")?;
+        add_wfp_filter(&engine, OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_CONNECT_V6, "OpenAGt block outbound IPv6")?;
+        add_wfp_filter(&engine, OPENAGT_WFP_INBOUND_V4_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, "OpenAGt block inbound IPv4")?;
+        add_wfp_filter(&engine, OPENAGT_WFP_INBOUND_V6_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, "OpenAGt block inbound IPv6")?;
+        Ok(())
+    })
+}
+
+#[cfg(windows)]
+fn uninstall_wfp_setup() -> Result<(), String> {
+    if !process_is_elevated() {
+        return Err(
+            "Windows WFP setup uninstall requires an elevated Administrator terminal".to_string(),
+        );
+    }
+    let engine = open_wfp_engine()?;
+    wfp_transaction(&engine, || remove_wfp_setup_objects(&engine))
+}
+
+#[cfg(windows)]
+fn wfp_transaction<F>(engine: &WfpEngine, body: F) -> Result<(), String>
+where
+    F: FnOnce() -> Result<(), String>,
+{
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmTransactionAbort0, FwpmTransactionBegin0, FwpmTransactionCommit0,
+    };
+
+    unsafe {
+        let begin = FwpmTransactionBegin0(engine.0, 0);
+        if begin != 0 {
+            return Err(format!("FwpmTransactionBegin0 failed: {begin}"));
+        }
+        match body() {
+            Ok(()) => {
+                let commit = FwpmTransactionCommit0(engine.0);
+                if commit != 0 {
+                    return Err(format!("FwpmTransactionCommit0 failed: {commit}"));
+                }
+                Ok(())
+            }
+            Err(error) => {
+                FwpmTransactionAbort0(engine.0);
+                Err(error)
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn is_wfp_missing(result: u32) -> bool {
+    use windows_sys::Win32::Foundation::{
+        FWP_E_FILTER_NOT_FOUND, FWP_E_NOT_FOUND, FWP_E_PROVIDER_NOT_FOUND, FWP_E_SUBLAYER_NOT_FOUND,
+    };
+    matches!(
+        result as i32,
+        FWP_E_NOT_FOUND
+            | FWP_E_PROVIDER_NOT_FOUND
+            | FWP_E_SUBLAYER_NOT_FOUND
+            | FWP_E_FILTER_NOT_FOUND
+    )
+}
+
+#[cfg(windows)]
+fn wfp_provider_status(engine: &WfpEngine) -> Result<(bool, String), String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmFreeMemory0, FwpmProviderGetByKey0, FWPM_PROVIDER0,
+    };
+
+    unsafe {
+        let mut provider: *mut FWPM_PROVIDER0 = std::ptr::null_mut();
+        let result = FwpmProviderGetByKey0(engine.0, &OPENAGT_WFP_PROVIDER_KEY, &mut provider);
+        if is_wfp_missing(result) {
+            return Ok((false, "0".to_string()));
+        }
+        if result != 0 {
+            return Err(format!("FwpmProviderGetByKey0 failed: {result}"));
+        }
+        let setup_version = if provider.is_null() || (*provider).providerData.data.is_null() {
+            "0".to_string()
+        } else {
+            let bytes = std::slice::from_raw_parts(
+                (*provider).providerData.data,
+                (*provider).providerData.size as usize,
+            );
+            if bytes == SETUP_PROVIDER_DATA {
+                SETUP_VERSION.to_string()
+            } else {
+                "stale".to_string()
+            }
+        };
+        FwpmFreeMemory0(&mut provider as *mut _ as *mut _);
+        Ok((true, setup_version))
+    }
+}
+
+#[cfg(windows)]
+fn wfp_sublayer_installed(engine: &WfpEngine) -> Result<bool, String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmFreeMemory0, FwpmSubLayerGetByKey0, FWPM_SUBLAYER0,
+    };
+
+    unsafe {
+        let mut sublayer: *mut FWPM_SUBLAYER0 = std::ptr::null_mut();
+        let result = FwpmSubLayerGetByKey0(engine.0, &OPENAGT_WFP_SUBLAYER_KEY, &mut sublayer);
+        if is_wfp_missing(result) {
+            return Ok(false);
+        }
+        if result != 0 {
+            return Err(format!("FwpmSubLayerGetByKey0 failed: {result}"));
+        }
+        FwpmFreeMemory0(&mut sublayer as *mut _ as *mut _);
+        Ok(true)
+    }
+}
+
+#[cfg(windows)]
+fn wfp_filter_installed(engine: &WfpEngine, key: &windows_sys::core::GUID) -> Result<bool, String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmFilterGetByKey0, FwpmFreeMemory0, FWPM_FILTER0,
+    };
+
+    unsafe {
+        let mut filter: *mut FWPM_FILTER0 = std::ptr::null_mut();
+        let result = FwpmFilterGetByKey0(engine.0, key, &mut filter);
+        if is_wfp_missing(result) {
+            return Ok(false);
+        }
+        if result != 0 {
+            return Err(format!("FwpmFilterGetByKey0 failed: {result}"));
+        }
+        FwpmFreeMemory0(&mut filter as *mut _ as *mut _);
+        Ok(true)
+    }
+}
+
+#[cfg(windows)]
+fn remove_wfp_setup_objects(engine: &WfpEngine) -> Result<(), String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmFilterDeleteByKey0, FwpmProviderDeleteByKey0, FwpmSubLayerDeleteByKey0,
+    };
+
+    unsafe {
+        for key in [
+            OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY,
+            OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY,
+            OPENAGT_WFP_INBOUND_V4_FILTER_KEY,
+            OPENAGT_WFP_INBOUND_V6_FILTER_KEY,
+        ] {
+            let result = FwpmFilterDeleteByKey0(engine.0, &key);
+            if result != 0 && !is_wfp_missing(result) {
+                return Err(format!("FwpmFilterDeleteByKey0 failed: {result}"));
+            }
+        }
+        let sublayer = FwpmSubLayerDeleteByKey0(engine.0, &OPENAGT_WFP_SUBLAYER_KEY);
+        if sublayer != 0 && !is_wfp_missing(sublayer) {
+            return Err(format!("FwpmSubLayerDeleteByKey0 failed: {sublayer}"));
+        }
+        let provider = FwpmProviderDeleteByKey0(engine.0, &OPENAGT_WFP_PROVIDER_KEY);
+        if provider != 0 && !is_wfp_missing(provider) {
+            return Err(format!("FwpmProviderDeleteByKey0 failed: {provider}"));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn add_wfp_provider(engine: &WfpEngine) -> Result<(), String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmProviderAdd0, FWPM_DISPLAY_DATA0, FWPM_PROVIDER0, FWP_BYTE_BLOB,
+    };
+
+    let mut name = wide_null("OpenAGt Windows Sandbox");
+    let mut description = wide_null("OpenAGt native Windows sandbox WFP provider");
+    let mut provider_data = SETUP_PROVIDER_DATA.to_vec();
+    let provider = FWPM_PROVIDER0 {
+        providerKey: OPENAGT_WFP_PROVIDER_KEY,
+        displayData: FWPM_DISPLAY_DATA0 {
+            name: name.as_mut_ptr(),
+            description: description.as_mut_ptr(),
+        },
+        flags: 0,
+        providerData: FWP_BYTE_BLOB {
+            size: provider_data.len() as u32,
+            data: provider_data.as_mut_ptr(),
+        },
+        serviceName: std::ptr::null_mut(),
+    };
+    unsafe {
+        let result = FwpmProviderAdd0(engine.0, &provider, std::ptr::null_mut());
+        if result != 0 {
+            return Err(format!("FwpmProviderAdd0 failed: {result}"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn add_wfp_sublayer(engine: &WfpEngine) -> Result<(), String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmSubLayerAdd0, FWPM_DISPLAY_DATA0, FWPM_SUBLAYER0, FWP_BYTE_BLOB,
+    };
+
+    let mut name = wide_null("OpenAGt Windows Sandbox");
+    let mut description = wide_null("OpenAGt restricted-token network policy sublayer");
+    let mut provider_key = OPENAGT_WFP_PROVIDER_KEY;
+    let sublayer = FWPM_SUBLAYER0 {
+        subLayerKey: OPENAGT_WFP_SUBLAYER_KEY,
+        displayData: FWPM_DISPLAY_DATA0 {
+            name: name.as_mut_ptr(),
+            description: description.as_mut_ptr(),
+        },
+        flags: 0,
+        providerKey: &mut provider_key,
+        providerData: FWP_BYTE_BLOB {
+            size: 0,
+            data: std::ptr::null_mut(),
+        },
+        weight: 0x7fff,
+    };
+    unsafe {
+        let result = FwpmSubLayerAdd0(engine.0, &sublayer, std::ptr::null_mut());
+        if result != 0 {
+            return Err(format!("FwpmSubLayerAdd0 failed: {result}"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn add_wfp_filter(
+    engine: &WfpEngine,
+    filter_key: windows_sys::core::GUID,
+    layer_key: windows_sys::core::GUID,
+    description_text: &str,
+) -> Result<(), String> {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FwpmFilterAdd0, FWPM_ACTION0, FWPM_ACTION0_0, FWPM_CONDITION_ALE_USER_ID,
+        FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER0_0, FWPM_FILTER_CONDITION0,
+        FWPM_FILTER_FLAG_PERSISTENT, FWP_ACTION_BLOCK, FWP_BYTE_BLOB, FWP_CONDITION_VALUE0,
+        FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL, FWP_SID, FWP_UINT8, FWP_VALUE0, FWP_VALUE0_0,
+    };
+
+    let mut name = wide_null(description_text);
+    let mut description =
+        wide_null("Blocks network for OpenAGt restricted-token sandbox processes");
+    let mut provider_key = OPENAGT_WFP_PROVIDER_KEY;
+    let mut sid = restricted_code_sid()?;
+    let mut condition = FWPM_FILTER_CONDITION0 {
+        fieldKey: FWPM_CONDITION_ALE_USER_ID,
+        matchType: FWP_MATCH_EQUAL,
+        conditionValue: FWP_CONDITION_VALUE0 {
+            r#type: FWP_SID,
+            Anonymous: FWP_CONDITION_VALUE0_0 {
+                sid: sid.as_mut_ptr().cast(),
+            },
+        },
+    };
+    let filter = FWPM_FILTER0 {
+        filterKey: filter_key,
+        displayData: FWPM_DISPLAY_DATA0 {
+            name: name.as_mut_ptr(),
+            description: description.as_mut_ptr(),
+        },
+        flags: FWPM_FILTER_FLAG_PERSISTENT,
+        providerKey: &mut provider_key,
+        providerData: FWP_BYTE_BLOB {
+            size: 0,
+            data: std::ptr::null_mut(),
+        },
+        layerKey: layer_key,
+        subLayerKey: OPENAGT_WFP_SUBLAYER_KEY,
+        weight: FWP_VALUE0 {
+            r#type: FWP_UINT8,
+            Anonymous: FWP_VALUE0_0 { uint8: 15 },
+        },
+        numFilterConditions: 1,
+        filterCondition: &mut condition,
+        action: FWPM_ACTION0 {
+            r#type: FWP_ACTION_BLOCK,
+            Anonymous: unsafe { std::mem::zeroed::<FWPM_ACTION0_0>() },
+        },
+        Anonymous: FWPM_FILTER0_0 { rawContext: 0 },
+        reserved: std::ptr::null_mut(),
+        filterId: 0,
+        effectiveWeight: FWP_VALUE0 {
+            r#type: FWP_UINT8,
+            Anonymous: FWP_VALUE0_0 { uint8: 0 },
+        },
+    };
+    unsafe {
+        let mut id = 0;
+        let result = FwpmFilterAdd0(engine.0, &filter, std::ptr::null_mut(), &mut id);
+        if result != 0 {
+            return Err(format!(
+                "FwpmFilterAdd0 failed for {description_text}: {result}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn wide_null(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain([0]).collect()
 }
 
 fn protected_workspace_write_names() -> [&'static str; 5] {
@@ -1021,6 +1581,12 @@ fn exec_output(
     stderr: Vec<u8>,
     filesystem_enforced: bool,
 ) -> ExecOutput {
+    let network_enforced = request.network_policy == "none"
+        && wfp_setup_state()
+            .enforced_policies()
+            .iter()
+            .any(|item| item == "none");
+    let enforced = filesystem_enforced || network_enforced;
     ExecOutput {
         request_id: request.request_id.clone(),
         exit_code,
@@ -1036,10 +1602,10 @@ fn exec_output(
             allowed_paths: request.allowed_paths.clone(),
             writable_paths: request.writable_paths.clone(),
             report_only: false,
-            enforced: filesystem_enforced,
+            enforced,
             filesystem_enforced,
-            network_enforced: false,
-            windows_sandbox_mode: if filesystem_enforced {
+            network_enforced,
+            windows_sandbox_mode: if enforced {
                 "restricted_token".to_string()
             } else {
                 "job_object_only".to_string()
@@ -1574,6 +2140,7 @@ mod tests {
     use std::path::PathBuf;
 
     const RUN_WINDOWS_ACL_TESTS_ENV: &str = "OPENAGT_RUN_WINDOWS_ACL_TESTS";
+    const RUN_WINDOWS_WFP_TESTS_ENV: &str = "OPENAGT_RUN_WINDOWS_WFP_TESTS";
 
     #[test]
     fn accepts_normal_drive_paths() {
@@ -1869,8 +2436,52 @@ mod tests {
     }
 
     #[test]
-    fn probe_does_not_claim_network_enforcement() {
-        assert!(!super::probe().network_enforced);
+    fn wfp_setup_state_only_enforces_none_when_complete() {
+        let missing = super::WfpSetupState {
+            engine_available: true,
+            provider_installed: true,
+            sublayer_installed: true,
+            outbound_v4_filter_installed: true,
+            outbound_v6_filter_installed: true,
+            inbound_v4_filter_installed: true,
+            inbound_v6_filter_installed: false,
+            setup_version: super::SETUP_VERSION.to_string(),
+            reason: None,
+        };
+        assert!(!missing.installed());
+        assert!(missing.setup_required());
+        assert!(missing.enforced_policies().is_empty());
+
+        let stale = super::WfpSetupState {
+            inbound_v6_filter_installed: true,
+            setup_version: "0".to_string(),
+            ..missing.clone()
+        };
+        assert!(!stale.installed());
+        assert!(stale.enforced_policies().is_empty());
+
+        let complete = super::WfpSetupState {
+            setup_version: super::SETUP_VERSION.to_string(),
+            ..stale
+        };
+        assert!(complete.installed());
+        assert_eq!(complete.enforced_policies(), vec!["none".to_string()]);
+    }
+
+    #[test]
+    fn probe_network_policy_list_matches_network_enforcement() {
+        let probe = super::probe();
+        assert_eq!(
+            probe.network_enforced,
+            probe
+                .network_policies_enforced
+                .iter()
+                .any(|policy| policy == "none")
+        );
+        assert!(!probe
+            .network_policies_enforced
+            .iter()
+            .any(|policy| policy == "loopback"));
     }
 
     #[test]
@@ -1905,15 +2516,46 @@ mod tests {
         assert_eq!(status.elevated, probe.elevated);
         assert_eq!(status.filesystem_enforced, probe.filesystem_enforced);
         assert_eq!(status.network_enforced, probe.network_enforced);
+        assert_eq!(
+            status.network_policies_enforced,
+            probe.network_policies_enforced
+        );
+        assert_eq!(status.filesystem_ready, probe.filesystem_ready);
+        assert_eq!(status.network_ready, probe.network_ready);
     }
 
     #[test]
-    fn setup_install_and_uninstall_are_explicit_noops() {
+    fn setup_install_and_uninstall_require_opt_in() {
+        if std::env::var(RUN_WINDOWS_WFP_TESTS_ENV).as_deref() != Ok("1") {
+            return;
+        }
+        if !cfg!(windows) {
+            return;
+        }
+        if !super::process_is_elevated() {
+            let install = super::setup("install");
+            assert!(!install.ok);
+            assert!(install.setup_required);
+            assert!(install
+                .setup_reason
+                .unwrap_or_default()
+                .contains("requires elevated"));
+            return;
+        }
+
         let install = super::setup("install");
+        assert!(install.ok, "{install:?}");
+        assert!(install.setup_installed);
+        assert_eq!(install.network_policies_enforced, vec!["none".to_string()]);
+
+        let status = super::setup("status");
+        assert!(status.ok);
+        assert!(status.setup_installed);
+        assert!(status.network_enforced);
+
         let uninstall = super::setup("uninstall");
-        assert!(!install.ok);
-        assert!(!uninstall.ok);
-        assert!(install.setup_reason.unwrap().contains("not implemented"));
-        assert!(uninstall.setup_reason.unwrap().contains("not implemented"));
+        assert!(uninstall.ok, "{uninstall:?}");
+        assert!(!uninstall.setup_installed);
+        assert!(uninstall.setup_required);
     }
 }

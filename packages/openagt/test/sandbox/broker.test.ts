@@ -133,6 +133,57 @@ describe("sandbox backend selection", () => {
       reason: "windows_native does not enforce none network policy",
     })
   })
+
+  test("closed policy accepts explicit native none-network support", () => {
+    expect(
+      selectBackend({
+        backends: backendMap([
+          {
+            name: "windows_native",
+            available: true,
+            filesystem_enforced: true,
+            network_enforced: true,
+            network_policies_enforced: ["none"],
+          },
+          { name: "process", available: true, helper: "bun" },
+        ]),
+        backendPreference: "auto",
+        failurePolicy: "closed",
+        autoBackendName: "windows_native",
+        networkPolicy: "none",
+      }),
+    ).toMatchObject({
+      type: "run",
+      backend: {
+        name: "windows_native",
+      },
+    })
+  })
+
+  test("closed policy denies loopback when native helper only supports none", () => {
+    expect(
+      selectBackend({
+        backends: backendMap([
+          {
+            name: "windows_native",
+            available: true,
+            filesystem_enforced: true,
+            network_enforced: true,
+            network_policies_enforced: ["none"],
+          },
+          { name: "process", available: true, helper: "bun" },
+        ]),
+        backendPreference: "auto",
+        failurePolicy: "closed",
+        autoBackendName: "windows_native",
+        networkPolicy: "loopback",
+      }),
+    ).toEqual({
+      type: "deny",
+      backendUsed: "windows_native",
+      reason: "windows_native does not enforce loopback network policy",
+    })
+  })
 })
 
 describe("Windows helper discovery", () => {
@@ -218,6 +269,7 @@ describe("Windows helper discovery", () => {
         job_object_supported: true,
         filesystem_enforced: true,
         network_enforced: false,
+        network_policies_enforced: [],
       }),
     ).toMatchObject({
       name: "windows_native",
@@ -225,6 +277,7 @@ describe("Windows helper discovery", () => {
       job_object_supported: true,
       filesystem_enforced: true,
       network_enforced: false,
+      network_policies_enforced: [],
     })
   })
 })

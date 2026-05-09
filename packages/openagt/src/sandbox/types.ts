@@ -20,8 +20,13 @@ export type SandboxBackendStatus = {
   setup_version?: string
   helper_protocol_version?: number
   job_object_supported?: boolean
+  filesystem_ready?: boolean
   filesystem_enforced?: boolean
+  filesystem_reason?: string
+  network_ready?: boolean
   network_enforced?: boolean
+  network_reason?: string
+  network_policies_enforced?: SandboxNetworkPolicy[]
 }
 
 // Renamed from SandboxPolicySummary to make explicit that this is *advisory*

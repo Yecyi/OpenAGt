@@ -71,9 +71,9 @@ if (process.platform === "win32") {
   }
   const helperProbeJson = JSON.parse(helperProbe.stdout.toString()) as {
     helper_protocol_version?: number
-    network_enforced?: boolean
+    network_policies_enforced?: string[]
   }
-  if (helperProbeJson.helper_protocol_version !== 1 || helperProbeJson.network_enforced !== false) {
+  if (helperProbeJson.helper_protocol_version !== 1) {
     throw new Error(`Packaged Windows sandbox helper probe returned unexpected capabilities for ${helper}`)
   }
   const helperSetupStatus = await $`${helper} setup --status --json`.quiet()
@@ -83,9 +83,9 @@ if (process.platform === "win32") {
   const helperSetupStatusJson = JSON.parse(helperSetupStatus.stdout.toString()) as {
     mode?: string
     setup_required?: boolean
-    network_enforced?: boolean
+    network_policies_enforced?: string[]
   }
-  if (helperSetupStatusJson.mode !== "status" || helperSetupStatusJson.network_enforced !== false) {
+  if (helperSetupStatusJson.mode !== "status") {
     throw new Error(`Packaged Windows sandbox helper setup status returned unexpected state for ${helper}`)
   }
   const cliProbe = await $`${bin} sandbox windows probe --json`.quiet()

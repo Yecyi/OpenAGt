@@ -28,8 +28,14 @@ export function selectBackend(input: {
   const networkPolicy = input.networkPolicy ?? "full"
   const preferredName = input.backendPreference === "auto" ? input.autoBackendName : input.backendPreference
   const preferred = input.backends.get(preferredName)?.status
+  const networkSupported =
+    networkPolicy === "full" ||
+    Boolean(
+      preferred?.network_policies_enforced?.includes(networkPolicy) ??
+        (preferred?.network_enforced && networkPolicy === "none"),
+    )
   const networkReason =
-    preferred?.available && preferred.name !== "process" && networkPolicy !== "full" && !preferred.network_enforced
+    preferred?.available && preferred.name !== "process" && !networkSupported
       ? `${preferred.name} does not enforce ${networkPolicy} network policy`
       : undefined
   if (preferred?.available && !networkReason) return { type: "run", backend: preferred }

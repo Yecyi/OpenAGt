@@ -50,6 +50,22 @@ const WindowsProbeCommand = cmd({
       UI.println(`  helper protocol: ${status.helper_protocol_version}`)
     }
     if (status.setup_required) UI.println(`  setup required: ${status.setup_reason ?? "yes"}`)
+    if (status.setup_version) UI.println(`  setup version: ${status.setup_version}`)
+    if (status.filesystem_ready !== undefined) {
+      UI.println(`  filesystem ready: ${status.filesystem_ready ? "yes" : "no"}`)
+    }
+    if (status.filesystem_enforced !== undefined) {
+      UI.println(`  filesystem enforcement: ${status.filesystem_enforced ? "yes" : "no"}`)
+    }
+    if (status.network_ready !== undefined) {
+      UI.println(`  network ready: ${status.network_ready ? "yes" : "no"}`)
+    }
+    if (status.network_enforced !== undefined) {
+      UI.println(`  network enforcement: ${status.network_enforced ? "yes" : "no"}`)
+    }
+    if (status.network_policies_enforced?.length) {
+      UI.println(`  network policies: ${status.network_policies_enforced.join(", ")}`)
+    }
     UI.println(`  backend run loop: ${output.backend_run_loop_enabled ? "enabled" : "not enabled"}`)
   },
 })
@@ -111,12 +127,23 @@ const WindowsSetupCommand = cmd({
     if (result.job_object_supported !== undefined) {
       UI.println(`  job object: ${result.job_object_supported ? "yes" : "no"}`)
     }
+    if (result.filesystem_ready !== undefined) {
+      UI.println(`  filesystem ready: ${result.filesystem_ready ? "yes" : "no"}`)
+    }
     if (result.filesystem_enforced !== undefined) {
       UI.println(`  filesystem enforcement: ${result.filesystem_enforced ? "yes" : "no"}`)
+    }
+    if (result.filesystem_reason) UI.println(`  filesystem reason: ${result.filesystem_reason}`)
+    if (result.network_ready !== undefined) {
+      UI.println(`  network ready: ${result.network_ready ? "yes" : "no"}`)
     }
     if (result.network_enforced !== undefined) {
       UI.println(`  network enforcement: ${result.network_enforced ? "yes" : "no"}`)
     }
+    if (result.network_policies_enforced?.length) {
+      UI.println(`  network policies: ${result.network_policies_enforced.join(", ")}`)
+    }
+    if (result.network_reason) UI.println(`  network reason: ${result.network_reason}`)
     if (result.setup_reason) UI.println(`  reason: ${result.setup_reason}`)
   },
 })

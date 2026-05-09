@@ -53,6 +53,16 @@ const windowsNativeFilesystemOnly: SandboxBackendStatus[] = [
   },
   { name: "process", available: true },
 ]
+const windowsNativeNetworkNone: SandboxBackendStatus[] = [
+  {
+    name: "windows_native",
+    available: true,
+    filesystem_enforced: true,
+    network_enforced: true,
+    network_policies_enforced: ["none"],
+  },
+  { name: "process", available: true },
+]
 
 describe("execution decision pipeline", () => {
   test("keeps strictest shell and exec-policy decision", () => {
@@ -154,6 +164,40 @@ describe("execution decision pipeline", () => {
     expect(decision.finalDecision).toBe("block")
     expect(decision.policySource).toBe("sandbox_policy")
     expect(decision.finalReason).toContain("cannot enforce none network policy")
+  })
+
+  test("allows native backend with explicit none-network enforcement", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "closed"),
+      capabilities: windowsNativeNetworkNone,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("allow")
+    expect(decision.policySource).toBe("shell_security")
+  })
+
+  test("blocks loopback when native backend only enforces none", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: {
+        ...policy("auto", "closed"),
+        network_policy: "loopback",
+      },
+      capabilities: windowsNativeNetworkNone,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("block")
+    expect(decision.policySource).toBe("sandbox_policy")
+    expect(decision.finalReason).toContain("cannot enforce loopback network policy")
   })
 
   test("confirms downgrade when native backend lacks requested network enforcement", () => {

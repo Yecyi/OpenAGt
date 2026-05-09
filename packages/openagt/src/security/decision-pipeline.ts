@@ -95,7 +95,10 @@ function nativeNetworkUnsupported(input: {
 }) {
   if (input.networkPolicy === "full") return false
   const backend = preferredBackendStatus(input.preference, input.capabilities)
-  return Boolean(backend?.available && backend.name !== "process" && !backend.network_enforced)
+  const supported =
+    backend?.network_policies_enforced?.includes(input.networkPolicy) ??
+    (backend?.network_enforced && input.networkPolicy === "none")
+  return Boolean(backend?.available && backend.name !== "process" && !supported)
 }
 
 function unavailableReason(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {

@@ -1,6 +1,6 @@
 import path from "path"
 import { existsSync } from "fs"
-import type { SandboxBackendStatus } from "./types"
+import type { SandboxBackendStatus, SandboxNetworkPolicy } from "./types"
 
 export const WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION = 1
 export const WINDOWS_SANDBOX_HELPER_NAME = "openagt-sandbox-win.exe"
@@ -17,8 +17,13 @@ export type WindowsSandboxHelperProbe = {
   setup_version?: string
   setup_required?: boolean
   setup_reason?: string
+  filesystem_ready?: boolean
   filesystem_enforced?: boolean
+  filesystem_reason?: string
+  network_ready?: boolean
   network_enforced?: boolean
+  network_reason?: string
+  network_policies_enforced?: SandboxNetworkPolicy[]
   capabilities?: string[]
 }
 
@@ -33,8 +38,13 @@ export type WindowsSandboxSetupResult = {
   restricted_token_supported?: boolean
   job_object_supported?: boolean
   wfp_supported?: boolean
+  filesystem_ready?: boolean
   filesystem_enforced?: boolean
+  filesystem_reason?: string
+  network_ready?: boolean
   network_enforced?: boolean
+  network_reason?: string
+  network_policies_enforced?: SandboxNetworkPolicy[]
 }
 
 export function helperOverrideAllowed(env = process.env) {
@@ -112,9 +122,14 @@ export function statusFromProbe(helper: string, probe: WindowsSandboxHelperProbe
       setup_reason: probe.setup_reason,
       setup_installed: probe.setup_installed,
       setup_version: probe.setup_version,
+      filesystem_ready: probe.filesystem_ready,
       filesystem_enforced: false,
+      filesystem_reason: probe.filesystem_reason,
+      network_ready: probe.network_ready,
       network_enforced: probe.network_enforced ?? false,
-      reason: probe.setup_reason ?? "Windows helper filesystem enforcement is not enabled",
+      network_reason: probe.network_reason,
+      network_policies_enforced: probe.network_policies_enforced ?? [],
+      reason: probe.filesystem_reason ?? probe.setup_reason ?? "Windows helper filesystem enforcement is not enabled",
     }
   }
   return {
@@ -127,8 +142,13 @@ export function statusFromProbe(helper: string, probe: WindowsSandboxHelperProbe
     setup_reason: probe.setup_reason,
     setup_installed: probe.setup_installed,
     setup_version: probe.setup_version,
+    filesystem_ready: probe.filesystem_ready,
     filesystem_enforced: probe.filesystem_enforced ?? true,
+    filesystem_reason: probe.filesystem_reason,
+    network_ready: probe.network_ready,
     network_enforced: probe.network_enforced ?? false,
+    network_reason: probe.network_reason,
+    network_policies_enforced: probe.network_policies_enforced ?? [],
   }
 }
 
