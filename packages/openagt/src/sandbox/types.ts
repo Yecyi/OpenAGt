@@ -16,7 +16,10 @@ export type SandboxBackendStatus = {
   reason?: string
   setup_required?: boolean
   setup_reason?: string
+  setup_installed?: boolean
+  setup_version?: string
   helper_protocol_version?: number
+  job_object_supported?: boolean
   filesystem_enforced?: boolean
   network_enforced?: boolean
 }

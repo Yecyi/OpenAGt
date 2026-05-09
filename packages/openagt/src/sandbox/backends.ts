@@ -198,21 +198,82 @@ function processBackend(): SandboxBackend {
   }
 }
 
+function windowsNativeBackend(status: SandboxBackendStatus): SandboxBackend {
+  return {
+    status,
+    run(input) {
+      if (!status.helper) {
+        queueMicrotask(() => input.onError("Windows native helper path is missing", "windows_native"))
+        return { kill() {} }
+      }
+      let finished = false
+      const child = Bun.spawn({
+        cmd: [status.helper, "exec"],
+        cwd: input.request.cwd,
+        env: input.request.env,
+        stderr: "pipe",
+        stdout: "pipe",
+        stdin: "pipe",
+      })
+      child.stdin.write(JSON.stringify(input.request))
+      child.stdin.end()
+      const finishError = (message: string) => {
+        if (finished) return
+        finished = true
+        input.onError(message, "windows_native")
+      }
+      const timer = setTimeout(() => {
+        void killProcessTree(child.pid, () => child.exitCode !== null)
+      }, input.request.timeout_ms + 1_000)
+      child.exited
+        .then(async (exitCode) => {
+          clearTimeout(timer)
+          const [stdout, stderr] = await Promise.all([
+            new Response(child.stdout).text().catch(() => ""),
+            new Response(child.stderr).text().catch(() => ""),
+          ])
+          if (exitCode !== 0) {
+            finishError(stderr.trim() || `Windows native helper failed with ${exitCode}`)
+            return
+          }
+          try {
+            const result = JSON.parse(stdout) as SandboxExecResult
+            if (result.stdout_tail) input.onStdout(result.stdout_tail)
+            if (result.stderr_tail) input.onStderr(result.stderr_tail)
+            if (finished) return
+            finished = true
+            input.onExit(result)
+          } catch (error) {
+            finishError(`Windows native helper returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        })
+        .catch((error) => {
+          clearTimeout(timer)
+          finishError(error instanceof Error ? error.message : String(error))
+        })
+      return {
+        kill() {
+          clearTimeout(timer)
+          void killProcessTree(child.pid, () => child.exitCode !== null)
+        },
+      }
+    },
+  }
+}
+
 export function detectBackends() {
   const seatbeltHelper = Flag.OPENCODE_SANDBOX_SEATBELT_HELPER
   const windowsHelper = Flag.OPENAGT_SANDBOX_WINDOWS_HELPER
   const landlockHelper = Flag.OPENCODE_SANDBOX_LANDLOCK_HELPER
   const resolvedWindowsHelper = resolveWindowsHelperPath({ override: windowsHelper })
-  const windowsNative =
+  const windowsNativeStatus =
     process.platform === "win32" && resolvedWindowsHelper.path
-      ? {
-          ...unavailable("windows_native", "Windows native helper execution is not implemented yet"),
-          status: {
-            ...probeWindowsHelper(resolvedWindowsHelper.path),
-            available: false,
-            reason: "Windows native helper run loop is not implemented yet",
-          },
-        }
+      ? probeWindowsHelper(resolvedWindowsHelper.path)
+      : undefined
+  const windowsNative = windowsNativeStatus?.available
+    ? windowsNativeBackend(windowsNativeStatus)
+    : windowsNativeStatus
+      ? { ...unavailable("windows_native", windowsNativeStatus.reason ?? "Windows native helper unavailable"), status: windowsNativeStatus }
       : unavailable("windows_native", resolvedWindowsHelper.reason ?? "Windows native helper unavailable")
   return [
     processBackend(),

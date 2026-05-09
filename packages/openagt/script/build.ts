@@ -3,6 +3,7 @@
 import { $ } from "bun"
 import fs from "fs"
 import path from "path"
+import { createHash } from "crypto"
 import { fileURLToPath } from "url"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 
@@ -84,7 +85,48 @@ async function builtBinaryPath(name: string) {
   throw new Error(`Unable to locate built binary for ${name}`)
 }
 
-function releaseReadme(input: { name: string; os: string; arch: "arm64" | "x64" }) {
+const skipWindowsSandboxHelper = process.env.OPENAGT_SKIP_WINDOWS_SANDBOX_HELPER === "1"
+let windowsSandboxHelperBuild: Promise<string | undefined> | undefined
+
+async function buildWindowsSandboxHelper() {
+  if (!windowsSandboxHelperBuild) {
+    windowsSandboxHelperBuild = (async () => {
+      const manifest = path.resolve(dir, "../openagt-sandbox-win/Cargo.toml")
+      if (!(await Bun.file(manifest).exists())) {
+        if (skipWindowsSandboxHelper) return
+        throw new Error(`Windows sandbox helper manifest is missing: ${manifest}`)
+      }
+      const cargo = await $`cargo --version`.quiet().nothrow()
+      if (cargo.exitCode !== 0) {
+        if (skipWindowsSandboxHelper) return
+        throw new Error("Rust cargo is required to build openagt-sandbox-win.exe")
+      }
+      await $`cargo build --release --manifest-path ${manifest}`
+      const exe = path.resolve(dir, "../openagt-sandbox-win/target/release/openagt-sandbox-win.exe")
+      if (!(await Bun.file(exe).exists())) throw new Error(`Windows sandbox helper build did not produce ${exe}`)
+      return exe
+    })()
+  }
+  return windowsSandboxHelperBuild
+}
+
+async function copyWindowsSandboxHelper(binDir: string) {
+  const helper = await buildWindowsSandboxHelper()
+  if (!helper) return
+  const target = path.join(binDir, "openagt-sandbox-win.exe")
+  await fs.promises.copyFile(helper, target)
+  await Bun.write(
+    path.join(binDir, "openagt-sandbox-win.exe.sha256"),
+    `${createHash("sha256").update(await Bun.file(target).bytes()).digest("hex")}  openagt-sandbox-win.exe\n`,
+  )
+}
+
+function releaseReadme(input: {
+  name: string
+  os: string
+  arch: "arm64" | "x64"
+  windowsSandboxHelperIncluded?: boolean
+}) {
   return [
     `OpenAGt ${Script.version}`,
     ``,
@@ -98,6 +140,14 @@ function releaseReadme(input: { name: string; os: string; arch: "arm64" | "x64" 
     input.os === "win32" ? `  .\\bin\\opencode.cmd --help` : `  ./bin/opencode --help`,
     ``,
     `Installed Windows MSI users should open a new terminal and run: openagt`,
+    ...(input.os === "win32"
+      ? [
+          ``,
+          input.windowsSandboxHelperIncluded
+            ? `Windows sandbox helper: included. Inspect it with .\\bin\\openagt.cmd sandbox windows probe --json`
+            : `Windows sandbox helper: omitted by OPENAGT_SKIP_WINDOWS_SANDBOX_HELPER=1. Native Windows sandbox enforcement is unavailable in this package.`,
+        ]
+      : []),
     ``,
     `This stable release covers the CLI, TUI, and headless server runtime.`,
     `Flutter is not included in this support matrix.`,
@@ -112,7 +162,22 @@ async function createReleasePackage(input: { name: string; os: string; arch: "ar
   const sourceBinary = await builtBinaryPath(input.name)
   const binaryName = input.os === "win32" ? "openagt.exe" : "openagt"
   await fs.promises.copyFile(sourceBinary, path.join(binDir, binaryName))
+  const windowsSandboxHelper =
+    input.os === "win32" ? path.join(path.dirname(sourceBinary), "openagt-sandbox-win.exe") : undefined
+  const windowsSandboxHelperIncluded = windowsSandboxHelper
+    ? await Bun.file(windowsSandboxHelper).exists()
+    : false
   if (input.os === "win32") {
+    const helperSha = `${windowsSandboxHelper}.sha256`
+    if (!windowsSandboxHelperIncluded && !skipWindowsSandboxHelper) {
+      throw new Error("Windows release package is missing openagt-sandbox-win.exe")
+    }
+    if (windowsSandboxHelperIncluded && windowsSandboxHelper) {
+      await fs.promises.copyFile(windowsSandboxHelper, path.join(binDir, "openagt-sandbox-win.exe"))
+    }
+    if (await Bun.file(helperSha).exists()) {
+      await fs.promises.copyFile(helperSha, path.join(binDir, "openagt-sandbox-win.exe.sha256"))
+    }
     await Bun.write(
       path.join(binDir, "openagt.cmd"),
       `@echo off\r\nset SCRIPT_DIR=%~dp0\r\n"%SCRIPT_DIR%openagt.exe" %*\r\n`,
@@ -131,7 +196,7 @@ async function createReleasePackage(input: { name: string; os: string; arch: "ar
       fs.promises.chmod(path.join(binDir, "opencode"), 0o755),
     ])
   }
-  await Bun.write(path.join(releaseDir, "README.txt"), releaseReadme(input))
+  await Bun.write(path.join(releaseDir, "README.txt"), releaseReadme({ ...input, windowsSandboxHelperIncluded }))
   await Bun.write(path.join(releaseDir, "VERSION.txt"), `${Script.version}\n`)
   await Bun.write(path.join(releaseDir, "LICENSE"), await Bun.file("../../LICENSE").text())
   return releaseDir
@@ -319,6 +384,10 @@ for (const item of targets) {
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
     },
   })
+
+  if (item.os === "win32") {
+    await copyWindowsSandboxHelper(`dist/${name}/bin`)
+  }
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {

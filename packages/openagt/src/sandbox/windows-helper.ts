@@ -10,11 +10,24 @@ export type WindowsSandboxHelperProbe = {
   helper_protocol_version: number
   windows_build?: string
   restricted_token_supported?: boolean
+  job_object_supported?: boolean
   wfp_supported?: boolean
+  setup_installed?: boolean
+  setup_version?: string
   setup_required?: boolean
   setup_reason?: string
   filesystem_enforced?: boolean
   network_enforced?: boolean
+  capabilities?: string[]
+}
+
+export type WindowsSandboxSetupResult = {
+  ok: boolean
+  mode: "install" | "uninstall" | "status"
+  setup_installed: boolean
+  setup_version?: string
+  setup_required: boolean
+  setup_reason?: string
 }
 
 export function helperOverrideAllowed(env = process.env) {
@@ -72,13 +85,41 @@ export function statusFromProbe(helper: string, probe: WindowsSandboxHelperProbe
       reason: "Windows helper does not support restricted tokens",
     }
   }
+  if (!probe.job_object_supported) {
+    return {
+      name: "windows_native",
+      available: false,
+      helper,
+      helper_protocol_version: probe.helper_protocol_version,
+      reason: "Windows helper does not support Job Object containment",
+    }
+  }
+  if (!probe.filesystem_enforced) {
+    return {
+      name: "windows_native",
+      available: false,
+      helper,
+      helper_protocol_version: probe.helper_protocol_version,
+      job_object_supported: probe.job_object_supported,
+      setup_required: probe.setup_required,
+      setup_reason: probe.setup_reason,
+      setup_installed: probe.setup_installed,
+      setup_version: probe.setup_version,
+      filesystem_enforced: false,
+      network_enforced: probe.network_enforced ?? false,
+      reason: "Windows helper filesystem enforcement is not enabled",
+    }
+  }
   return {
     name: "windows_native",
     available: true,
     helper,
     helper_protocol_version: probe.helper_protocol_version,
+    job_object_supported: probe.job_object_supported,
     setup_required: probe.setup_required,
     setup_reason: probe.setup_reason,
+    setup_installed: probe.setup_installed,
+    setup_version: probe.setup_version,
     filesystem_enforced: probe.filesystem_enforced ?? true,
     network_enforced: probe.network_enforced ?? false,
   }
@@ -108,6 +149,36 @@ export function probeWindowsHelper(helper: string): SandboxBackendStatus {
       available: false,
       helper,
       reason: `Windows helper probe returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+export function runWindowsHelperSetup(helper: string, mode: WindowsSandboxSetupResult["mode"]): WindowsSandboxSetupResult {
+  const result = Bun.spawnSync({
+    cmd: [helper, "setup", `--${mode}`, "--json"],
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+    timeout: 30_000,
+  })
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      mode,
+      setup_installed: false,
+      setup_required: true,
+      setup_reason: new TextDecoder().decode(result.stderr).trim() || `Windows helper setup failed with ${result.exitCode}`,
+    }
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(result.stdout)) as WindowsSandboxSetupResult
+  } catch (error) {
+    return {
+      ok: false,
+      mode,
+      setup_installed: false,
+      setup_required: true,
+      setup_reason: `Windows helper setup returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }

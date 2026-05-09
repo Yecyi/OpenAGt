@@ -13,9 +13,14 @@ if (-not $Version) {
 $packageRoot = Join-Path $DistRoot "openagt-windows-x64\release"
 $binRoot = Join-Path $packageRoot "bin"
 $exePath = Join-Path $binRoot "openagt.exe"
+$helperPath = Join-Path $binRoot "openagt-sandbox-win.exe"
 
 if (-not (Test-Path $exePath)) {
   throw "Expected Windows release package at $exePath"
+}
+
+if (-not (Test-Path $helperPath)) {
+  throw "Expected Windows sandbox helper at $helperPath"
 }
 
 $wix = Get-Command wix -ErrorAction SilentlyContinue
@@ -105,6 +110,9 @@ $content = @"
     <ComponentGroup Id="OpenAGtFiles">
       <Component Directory="BIN" Guid="*">
         <File Source="$($exePath.Replace('\','\\'))" />
+      </Component>
+      <Component Directory="BIN" Guid="*">
+        <File Source="$($helperPath.Replace('\','\\'))" />
       </Component>
       <Component Directory="BIN" Guid="*">
         <File Source="$((Join-Path $binRoot 'openagt.cmd').Replace('\','\\'))" />

@@ -4,6 +4,8 @@ import { Agent } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config"
 import { Coordinator } from "../../src/coordinator/coordinator"
+import type { CoordinatorProjection } from "../../src/coordinator/projection"
+import type { CoordinatorRunID } from "../../src/coordinator/schema"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { createMemoryOps } from "../../src/personal/memory-ops"
@@ -36,6 +38,21 @@ const it = testEffect(
     ExpertRegistry.defaultLayer,
   ).pipe(Layer.provide(ThreeLayerMemory.defaultLayer), Layer.provide(ExpertRegistry.defaultLayer)),
 )
+
+function waitForProjection(
+  coordinator: Coordinator.Interface,
+  runID: CoordinatorRunID,
+  predicate: (projection: CoordinatorProjection) => boolean,
+) {
+  return Effect.gen(function* () {
+    for (const _ of Array.from({ length: 100 })) {
+      const projection = yield* coordinator.projection(runID)
+      if (predicate(projection)) return projection
+      yield* Effect.sleep("100 millis")
+    }
+    return yield* coordinator.projection(runID)
+  })
+}
 
 describe("coordinator runtime", () => {
   it.live("rejects duplicate custom plan node ids", () =>
@@ -372,8 +389,11 @@ describe("coordinator runtime", () => {
           id: run.id,
           taskID: first.task_id,
         })
-        yield* Effect.sleep("100 millis")
-        const retried = yield* coordinator.projection(run.id)
+        const retried = yield* waitForProjection(
+          coordinator,
+          run.id,
+          (projection) => projection.run.state === "failed",
+        )
         const retriedTask = retried.tasks.find((item) => item.task_id === first.task_id)
 
         expect(retried.run.state).toBe("failed")
@@ -580,8 +600,11 @@ describe("coordinator runtime", () => {
         })
 
         yield* coordinator.approve(run.id)
-        yield* Effect.sleep("100 millis")
-        const blocked = yield* coordinator.projection(run.id)
+        const blocked = yield* waitForProjection(
+          coordinator,
+          run.id,
+          (projection) => projection.run.state === "blocked",
+        )
         expect(blocked.run.state).toBe("blocked")
         expect(blocked.budget_state.ceiling_hit).toBe(true)
         expect(blocked.budget_state.limit_reason).toBe("absolute")

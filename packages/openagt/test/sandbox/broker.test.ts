@@ -150,6 +150,58 @@ describe("Windows helper discovery", () => {
       helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION + 1,
     })
   })
+
+  test("requires filesystem enforcement before marking helper available", () => {
+    expect(
+      statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
+        helper_version: "1.0.0",
+        helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        restricted_token_supported: true,
+        job_object_supported: true,
+        filesystem_enforced: false,
+      }),
+    ).toMatchObject({
+      name: "windows_native",
+      available: false,
+      filesystem_enforced: false,
+      reason: "Windows helper filesystem enforcement is not enabled",
+    })
+  })
+
+  test("keeps Job Object-only helpers unavailable until token and filesystem enforcement exist", () => {
+    expect(
+      statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
+        helper_version: "1.0.0",
+        helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        restricted_token_supported: false,
+        job_object_supported: true,
+        filesystem_enforced: false,
+      }),
+    ).toMatchObject({
+      name: "windows_native",
+      available: false,
+      reason: "Windows helper does not support restricted tokens",
+    })
+  })
+
+  test("accepts helper only when token, job object, and filesystem enforcement are present", () => {
+    expect(
+      statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
+        helper_version: "1.0.0",
+        helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        restricted_token_supported: true,
+        job_object_supported: true,
+        filesystem_enforced: true,
+        network_enforced: false,
+      }),
+    ).toMatchObject({
+      name: "windows_native",
+      available: true,
+      job_object_supported: true,
+      filesystem_enforced: true,
+      network_enforced: false,
+    })
+  })
 })
 
 describe("SandboxBroker abort", () => {

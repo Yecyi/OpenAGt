@@ -1,0 +1,961 @@
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::io::{self, Read};
+#[cfg(not(windows))]
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+const HELPER_PROTOCOL_VERSION: u32 = 1;
+const SETUP_VERSION: &str = "0";
+
+#[derive(Debug, Deserialize)]
+struct ExecRequest {
+    request_id: String,
+    command: String,
+    shell_family: String,
+    shell: String,
+    cwd: String,
+    timeout_ms: u64,
+    env: BTreeMap<String, String>,
+    enforcement: String,
+    backend_preference: String,
+    filesystem_policy: String,
+    allowed_paths: Vec<String>,
+    writable_paths: Vec<String>,
+    network_policy: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ProbeOutput {
+    helper_version: String,
+    helper_protocol_version: u32,
+    windows_build: Option<String>,
+    restricted_token_supported: bool,
+    job_object_supported: bool,
+    wfp_supported: bool,
+    setup_installed: bool,
+    setup_version: String,
+    setup_required: bool,
+    setup_reason: Option<String>,
+    filesystem_enforced: bool,
+    network_enforced: bool,
+    capabilities: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SetupOutput {
+    ok: bool,
+    mode: String,
+    setup_installed: bool,
+    setup_version: String,
+    setup_required: bool,
+    setup_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ExecOutput {
+    request_id: String,
+    exit_code: Option<i32>,
+    termination_reason: String,
+    backend_used: String,
+    stdout_tail: String,
+    stderr_tail: String,
+    policy_advisory: PolicyAdvisory,
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyAdvisory {
+    enforcement: String,
+    #[serde(rename = "backendPreference")]
+    backend_preference: String,
+    #[serde(rename = "filesystemPolicy")]
+    filesystem_policy: String,
+    #[serde(rename = "networkPolicy")]
+    network_policy: String,
+    #[serde(rename = "allowedPaths")]
+    allowed_paths: Vec<String>,
+    #[serde(rename = "writablePaths")]
+    writable_paths: Vec<String>,
+    #[serde(rename = "reportOnly")]
+    report_only: bool,
+    enforced: bool,
+    #[serde(rename = "filesystemEnforced")]
+    filesystem_enforced: bool,
+    #[serde(rename = "networkEnforced")]
+    network_enforced: bool,
+    #[serde(rename = "windowsSandboxMode")]
+    windows_sandbox_mode: String,
+}
+
+fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
+    println!(
+        "{}",
+        serde_json::to_string(value).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn probe() -> ProbeOutput {
+    let restricted_token_supported = restricted_token_launch_supported();
+    let setup_reason = if restricted_token_supported {
+        "Filesystem ACL and WFP setup are not installed in this helper build"
+    } else {
+        "Restricted token launch privilege, filesystem ACL, and WFP setup are not available in this helper build"
+    };
+    let capabilities = [
+        Some("probe".to_string()),
+        Some("exec".to_string()),
+        cfg!(windows).then(|| "job-object".to_string()),
+        Some("path-preflight".to_string()),
+        restricted_token_supported.then(|| "restricted-token".to_string()),
+        Some("setup-status".to_string()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    ProbeOutput {
+        helper_version: env!("CARGO_PKG_VERSION").to_string(),
+        helper_protocol_version: HELPER_PROTOCOL_VERSION,
+        windows_build: windows_build(),
+        restricted_token_supported,
+        job_object_supported: cfg!(windows),
+        wfp_supported: cfg!(windows),
+        setup_installed: false,
+        setup_version: SETUP_VERSION.to_string(),
+        setup_required: true,
+        setup_reason: Some(setup_reason.to_string()),
+        filesystem_enforced: false,
+        network_enforced: false,
+        capabilities,
+    }
+}
+
+fn setup(mode: &str) -> SetupOutput {
+    SetupOutput {
+        ok: mode == "status",
+        mode: mode.to_string(),
+        setup_installed: false,
+        setup_version: SETUP_VERSION.to_string(),
+        setup_required: true,
+        setup_reason: Some(
+            "Native ACL/WFP setup is not implemented in this helper build; windows_native remains unavailable"
+                .to_string(),
+        ),
+    }
+}
+
+fn validate_request_paths(request: &ExecRequest) -> Result<(), String> {
+    canonicalize_sandbox_path("cwd", &request.cwd)?;
+    for item in &request.allowed_paths {
+        canonicalize_sandbox_path("allowed_path", item)?;
+    }
+    for item in &request.writable_paths {
+        canonicalize_sandbox_path("writable_path", item)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn restricted_token_launch_supported() -> bool {
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::Security::TOKEN_ALL_ACCESS;
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token: HANDLE = 0;
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &mut token) == 0 {
+            return false;
+        }
+        let token = OwnedHandle(token);
+        enable_token_privilege(token.0, "SeImpersonatePrivilege").is_ok()
+    }
+}
+
+#[cfg(not(windows))]
+fn restricted_token_launch_supported() -> bool {
+    false
+}
+
+fn path_text_issue(input: &str) -> Option<&'static str> {
+    if input.contains('\0') {
+        return Some("contains NUL byte");
+    }
+    if input.is_empty() {
+        return Some("is empty");
+    }
+    let normalized = input.replace('/', "\\");
+    if normalized.split('\\').any(|segment| {
+        segment.chars().any(|char| char == '~') && segment.chars().any(|char| char.is_ascii_digit())
+    }) {
+        return Some("contains 8.3 short-name segment");
+    }
+    for (index, char) in normalized.char_indices() {
+        if char != ':' {
+            continue;
+        }
+        if is_allowed_drive_colon(&normalized, index) {
+            continue;
+        }
+        return Some("contains alternate data stream marker");
+    }
+    None
+}
+
+fn is_allowed_drive_colon(value: &str, index: usize) -> bool {
+    const DEVICE_PREFIX: &str = "\\\\?\\";
+    const DOS_DEVICE_PREFIX: &str = "\\\\.\\";
+    if index == 1 {
+        return value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphabetic)
+            && value.as_bytes().get(2).is_some_and(|item| *item == b'\\');
+    }
+    if index == 5 && (value.starts_with(DEVICE_PREFIX) || value.starts_with(DOS_DEVICE_PREFIX)) {
+        return value.as_bytes().get(4).is_some_and(u8::is_ascii_alphabetic)
+            && value.as_bytes().get(6).is_some_and(|item| *item == b'\\');
+    }
+    false
+}
+
+#[cfg(windows)]
+fn canonicalize_sandbox_path(label: &str, input: &str) -> Result<String, String> {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        CreateFileW, GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE,
+        FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, VOLUME_NAME_DOS,
+    };
+
+    if let Some(issue) = path_text_issue(input) {
+        return Err(format!("{label} {issue}: {input}"));
+    }
+    let wide = input.encode_utf16().chain([0]).collect::<Vec<_>>();
+    unsafe {
+        let handle = CreateFileW(
+            wide.as_ptr(),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            0,
+        );
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(format!(
+                "{label} cannot be opened for canonicalization: {input}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut buffer = vec![0u16; 32768];
+        let length = GetFinalPathNameByHandleW(
+            handle,
+            buffer.as_mut_ptr(),
+            buffer.len() as u32,
+            VOLUME_NAME_DOS,
+        );
+        CloseHandle(handle);
+        if length == 0 {
+            return Err(format!(
+                "{label} final path lookup failed: {input}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        if length as usize >= buffer.len() {
+            return Err(format!("{label} final path is too long: {input}"));
+        }
+        Ok(String::from_utf16_lossy(&buffer[..length as usize]).to_ascii_lowercase())
+    }
+}
+
+#[cfg(not(windows))]
+fn canonicalize_sandbox_path(label: &str, input: &str) -> Result<String, String> {
+    if let Some(issue) = path_text_issue(input) {
+        return Err(format!("{label} {issue}: {input}"));
+    }
+    std::fs::canonicalize(input)
+        .map(|path| path.to_string_lossy().to_string())
+        .map_err(|error| format!("{label} cannot be canonicalized: {input}: {error}"))
+}
+
+fn shell_args(request: &ExecRequest) -> Vec<String> {
+    if request.shell_family == "powershell" {
+        return vec![
+            "-NoLogo".to_string(),
+            "-NoProfile".to_string(),
+            "-NonInteractive".to_string(),
+            "-EncodedCommand".to_string(),
+            utf16le_base64(&request.command),
+        ];
+    }
+    if request.shell_family == "cmd" {
+        return vec![
+            "/d".to_string(),
+            "/s".to_string(),
+            "/c".to_string(),
+            request.command.clone(),
+        ];
+    }
+    vec!["-c".to_string(), request.command.clone()]
+}
+
+fn exec() -> Result<(), String> {
+    let mut input = String::new();
+    io::stdin()
+        .read_to_string(&mut input)
+        .map_err(|error| error.to_string())?;
+    let request: ExecRequest = serde_json::from_str(&input).map_err(|error| error.to_string())?;
+    validate_request_paths(&request)?;
+    exec_request(request)
+}
+
+#[cfg(windows)]
+fn exec_request(request: ExecRequest) -> Result<(), String> {
+    let started = Instant::now();
+    let process = spawn_restricted_process(&request)?;
+    let timeout = Duration::from_millis(request.timeout_ms);
+    loop {
+        if started.elapsed() >= timeout {
+            terminate_job_object(&process.job);
+            terminate_process(process.process_handle);
+            let (stdout, stderr) = process.wait_output()?;
+            return print_json(&exec_output(&request, None, "timeout", stdout, stderr));
+        }
+        if let Some(exit_code) = process.try_exit_code()? {
+            let (stdout, stderr) = process.wait_output()?;
+            return print_json(&exec_output(
+                &request,
+                Some(exit_code),
+                "exit",
+                stdout,
+                stderr,
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+#[cfg(not(windows))]
+fn exec_request(request: ExecRequest) -> Result<(), String> {
+    let started = Instant::now();
+    let mut command = Command::new(&request.shell);
+    command
+        .args(shell_args(&request))
+        .current_dir(&request.cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env_clear()
+        .envs(&request.env);
+
+    let mut child = command.spawn().map_err(|error| error.to_string())?;
+    let job = assign_job_object(&child)?;
+    let timeout = Duration::from_millis(request.timeout_ms);
+    loop {
+        if started.elapsed() >= timeout {
+            terminate_job_object(&job);
+            let _ = child.kill();
+            let output = child
+                .wait_with_output()
+                .map_err(|error| error.to_string())?;
+            return print_json(&exec_output(
+                &request,
+                None,
+                "timeout",
+                output.stdout,
+                output.stderr,
+            ));
+        }
+        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+            let output = child
+                .wait_with_output()
+                .map_err(|error| error.to_string())?;
+            return print_json(&exec_output(
+                &request,
+                status.code(),
+                "exit",
+                output.stdout,
+                output.stderr,
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn exec_output(
+    request: &ExecRequest,
+    exit_code: Option<i32>,
+    reason: &str,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+) -> ExecOutput {
+    ExecOutput {
+        request_id: request.request_id.clone(),
+        exit_code,
+        termination_reason: reason.to_string(),
+        backend_used: "windows_native".to_string(),
+        stdout_tail: String::from_utf8_lossy(&stdout).to_string(),
+        stderr_tail: String::from_utf8_lossy(&stderr).to_string(),
+        policy_advisory: PolicyAdvisory {
+            enforcement: request.enforcement.clone(),
+            backend_preference: request.backend_preference.clone(),
+            filesystem_policy: request.filesystem_policy.clone(),
+            network_policy: request.network_policy.clone(),
+            allowed_paths: request.allowed_paths.clone(),
+            writable_paths: request.writable_paths.clone(),
+            report_only: false,
+            enforced: false,
+            filesystem_enforced: false,
+            network_enforced: false,
+            windows_sandbox_mode: "job_object_only".to_string(),
+        },
+    }
+}
+
+#[cfg(windows)]
+struct JobHandle(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+struct OwnedHandle(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl Drop for JobHandle {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for OwnedHandle {
+    fn drop(&mut self) {
+        if self.0 != 0 {
+            unsafe {
+                windows_sys::Win32::Foundation::CloseHandle(self.0);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn terminate_job_object(job: &JobHandle) {
+    unsafe {
+        windows_sys::Win32::System::JobObjects::TerminateJobObject(job.0, 1);
+    }
+}
+
+#[cfg(windows)]
+fn terminate_process(process: windows_sys::Win32::Foundation::HANDLE) {
+    unsafe {
+        windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
+    }
+}
+
+#[cfg(windows)]
+fn create_job_object_for_process(
+    process: windows_sys::Win32::Foundation::HANDLE,
+) -> Result<JobHandle, String> {
+    use std::mem::size_of;
+    use std::ptr::null_mut;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    unsafe {
+        let job = CreateJobObjectW(null_mut(), std::ptr::null());
+        if job == 0 {
+            return Err(format!(
+                "CreateJobObjectW failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let handle = JobHandle(job);
+        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        limits.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+        if SetInformationJobObject(
+            handle.0,
+            JobObjectExtendedLimitInformation,
+            &mut limits as *mut _ as *mut _,
+            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) == 0
+        {
+            return Err(format!(
+                "SetInformationJobObject failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        if AssignProcessToJobObject(handle.0, process) == 0 {
+            return Err(format!(
+                "AssignProcessToJobObject failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(handle)
+    }
+}
+
+#[cfg(windows)]
+struct RestrictedProcess {
+    process_handle: windows_sys::Win32::Foundation::HANDLE,
+    _thread_handle: OwnedHandle,
+    stdout_read: OwnedHandle,
+    stderr_read: OwnedHandle,
+    job: JobHandle,
+}
+
+#[cfg(windows)]
+impl Drop for RestrictedProcess {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.process_handle);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl RestrictedProcess {
+    fn try_exit_code(&self) -> Result<Option<i32>, String> {
+        use windows_sys::Win32::Foundation::STILL_ACTIVE;
+        use windows_sys::Win32::System::Threading::GetExitCodeProcess;
+
+        unsafe {
+            let mut exit_code = 0u32;
+            if GetExitCodeProcess(self.process_handle, &mut exit_code) == 0 {
+                return Err(format!(
+                    "GetExitCodeProcess failed: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            if exit_code == STILL_ACTIVE as u32 {
+                return Ok(None);
+            }
+            Ok(Some(exit_code as i32))
+        }
+    }
+
+    fn wait_output(self) -> Result<(Vec<u8>, Vec<u8>), String> {
+        use windows_sys::Win32::System::Threading::{WaitForSingleObject, INFINITE};
+
+        unsafe {
+            WaitForSingleObject(self.process_handle, INFINITE);
+        }
+        Ok((
+            read_pipe_to_end(self.stdout_read.0)?,
+            read_pipe_to_end(self.stderr_read.0)?,
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn spawn_restricted_process(request: &ExecRequest) -> Result<RestrictedProcess, String> {
+    use std::ptr::{null, null_mut};
+    use windows_sys::Win32::Foundation::{HANDLE, TRUE};
+    use windows_sys::Win32::Security::{
+        DuplicateTokenEx, SecurityImpersonation, TokenPrimary, SECURITY_ATTRIBUTES,
+        TOKEN_ALL_ACCESS,
+    };
+    use windows_sys::Win32::System::Threading::{
+        CreateProcessWithTokenW, GetCurrentProcess, OpenProcessToken, CREATE_NO_WINDOW,
+        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, PROCESS_INFORMATION, STARTF_USESTDHANDLES,
+        STARTUPINFOW,
+    };
+
+    unsafe {
+        let mut current_token: HANDLE = 0;
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &mut current_token) == 0 {
+            return Err(format!(
+                "OpenProcessToken failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let current_token = OwnedHandle(current_token);
+        enable_token_privilege(current_token.0, "SeImpersonatePrivilege")?;
+        let mut restricted_token: HANDLE = 0;
+        if DuplicateTokenEx(
+            current_token.0,
+            TOKEN_ALL_ACCESS,
+            null(),
+            SecurityImpersonation,
+            TokenPrimary,
+            &mut restricted_token,
+        ) == 0
+        {
+            return Err(format!(
+                "DuplicateTokenEx failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let restricted_token = create_restricted_token(OwnedHandle(restricted_token))?;
+
+        let mut security = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: null_mut(),
+            bInheritHandle: TRUE,
+        };
+        let (stdout_read, stdout_write) = create_inheritable_pipe(&mut security)?;
+        let (stderr_read, stderr_write) = create_inheritable_pipe(&mut security)?;
+        let (stdin_read, stdin_write) = create_inheritable_pipe(&mut security)?;
+        make_handle_not_inheritable(stdout_read.0)?;
+        make_handle_not_inheritable(stderr_read.0)?;
+        make_handle_not_inheritable(stdin_write.0)?;
+
+        let mut startup: STARTUPINFOW = std::mem::zeroed();
+        startup.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
+        startup.dwFlags = STARTF_USESTDHANDLES;
+        startup.hStdOutput = stdout_write.0;
+        startup.hStdError = stderr_write.0;
+        startup.hStdInput = stdin_read.0;
+        let mut info: PROCESS_INFORMATION = std::mem::zeroed();
+        let mut command_line = windows_command_line(request);
+        let mut cwd = request.cwd.encode_utf16().chain([0]).collect::<Vec<_>>();
+        let mut env = environment_block(&request.env);
+        if CreateProcessWithTokenW(
+            restricted_token.0,
+            0,
+            null(),
+            command_line.as_mut_ptr(),
+            CREATE_NO_WINDOW | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT,
+            env.as_mut_ptr() as *const _,
+            cwd.as_mut_ptr(),
+            &startup,
+            &mut info,
+        ) == 0
+        {
+            return Err(format!(
+                "CreateProcessWithTokenW failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        drop(stdout_write);
+        drop(stderr_write);
+        drop(stdin_read);
+        drop(stdin_write);
+        let job = create_job_object_for_process(info.hProcess)?;
+        windows_sys::Win32::System::Threading::ResumeThread(info.hThread);
+        Ok(RestrictedProcess {
+            process_handle: info.hProcess,
+            _thread_handle: OwnedHandle(info.hThread),
+            stdout_read,
+            stderr_read,
+            job,
+        })
+    }
+}
+
+#[cfg(windows)]
+fn create_restricted_token(token: OwnedHandle) -> Result<OwnedHandle, String> {
+    use windows_sys::Win32::Security::{
+        CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, LUID_AND_ATTRIBUTES, SID_AND_ATTRIBUTES,
+    };
+
+    unsafe {
+        let mut restricted = 0;
+        if CreateRestrictedToken(
+            token.0,
+            DISABLE_MAX_PRIVILEGE,
+            0,
+            std::ptr::null::<SID_AND_ATTRIBUTES>(),
+            0,
+            std::ptr::null::<LUID_AND_ATTRIBUTES>(),
+            0,
+            std::ptr::null::<SID_AND_ATTRIBUTES>(),
+            &mut restricted,
+        ) == 0
+        {
+            return Err(format!(
+                "CreateRestrictedToken failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(OwnedHandle(restricted))
+    }
+}
+
+#[cfg(windows)]
+fn enable_token_privilege(
+    token: windows_sys::Win32::Foundation::HANDLE,
+    privilege_name: &str,
+) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{ERROR_NOT_ALL_ASSIGNED, LUID};
+    use windows_sys::Win32::Security::{
+        AdjustTokenPrivileges, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_PRIVILEGES,
+    };
+
+    unsafe {
+        let mut luid = LUID {
+            LowPart: 0,
+            HighPart: 0,
+        };
+        let wide_name = privilege_name.encode_utf16().chain([0]).collect::<Vec<_>>();
+        if LookupPrivilegeValueW(std::ptr::null(), wide_name.as_ptr(), &mut luid) == 0 {
+            return Err(format!(
+                "LookupPrivilegeValueW failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut privileges = TOKEN_PRIVILEGES {
+            PrivilegeCount: 1,
+            Privileges: [windows_sys::Win32::Security::LUID_AND_ATTRIBUTES {
+                Luid: luid,
+                Attributes: SE_PRIVILEGE_ENABLED,
+            }],
+        };
+        if AdjustTokenPrivileges(
+            token,
+            0,
+            &mut privileges,
+            std::mem::size_of::<TOKEN_PRIVILEGES>() as u32,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        ) == 0
+        {
+            return Err(format!(
+                "AdjustTokenPrivileges failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        if std::io::Error::last_os_error().raw_os_error() == Some(ERROR_NOT_ALL_ASSIGNED as i32) {
+            return Err(format!(
+                "{privilege_name} is not assigned to this process token"
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn create_inheritable_pipe(
+    security: &mut windows_sys::Win32::Security::SECURITY_ATTRIBUTES,
+) -> Result<(OwnedHandle, OwnedHandle), String> {
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::System::Pipes::CreatePipe;
+
+    unsafe {
+        let mut read: HANDLE = 0;
+        let mut write: HANDLE = 0;
+        if CreatePipe(&mut read, &mut write, security, 0) == 0 {
+            return Err(format!(
+                "CreatePipe failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok((OwnedHandle(read), OwnedHandle(write)))
+    }
+}
+
+#[cfg(windows)]
+fn make_handle_not_inheritable(
+    handle: windows_sys::Win32::Foundation::HANDLE,
+) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE_FLAG_INHERIT};
+
+    unsafe {
+        if SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) == 0 {
+            return Err(format!(
+                "SetHandleInformation failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn read_pipe_to_end(handle: windows_sys::Win32::Foundation::HANDLE) -> Result<Vec<u8>, String> {
+    use windows_sys::Win32::Foundation::FALSE;
+    use windows_sys::Win32::Storage::FileSystem::ReadFile;
+
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 8192];
+    loop {
+        let mut read = 0u32;
+        unsafe {
+            if ReadFile(
+                handle,
+                buffer.as_mut_ptr() as *mut _,
+                buffer.len() as u32,
+                &mut read,
+                std::ptr::null_mut(),
+            ) == FALSE
+            {
+                break;
+            }
+        }
+        if read == 0 {
+            break;
+        }
+        output.extend_from_slice(&buffer[..read as usize]);
+    }
+    Ok(output)
+}
+
+#[cfg(windows)]
+fn environment_block(env: &BTreeMap<String, String>) -> Vec<u16> {
+    env.iter()
+        .flat_map(|(key, value)| {
+            format!("{key}={value}")
+                .encode_utf16()
+                .chain([0])
+                .collect::<Vec<_>>()
+        })
+        .chain([0])
+        .collect()
+}
+
+#[cfg(windows)]
+fn windows_command_line(request: &ExecRequest) -> Vec<u16> {
+    std::iter::once(quote_windows_arg(&request.shell))
+        .chain(
+            shell_args(request)
+                .into_iter()
+                .map(|item| quote_windows_arg(&item)),
+        )
+        .collect::<Vec<_>>()
+        .join(" ")
+        .encode_utf16()
+        .chain([0])
+        .collect()
+}
+
+#[cfg(windows)]
+fn quote_windows_arg(input: &str) -> String {
+    if input.is_empty() {
+        return "\"\"".to_string();
+    }
+    if !input
+        .chars()
+        .any(|char| char.is_whitespace() || char == '"')
+    {
+        return input.to_string();
+    }
+    let mut output = String::from("\"");
+    let mut slashes = 0;
+    for char in input.chars() {
+        if char == '\\' {
+            slashes += 1;
+            continue;
+        }
+        if char == '"' {
+            output.push_str(&"\\".repeat(slashes * 2 + 1));
+            output.push('"');
+            slashes = 0;
+            continue;
+        }
+        output.push_str(&"\\".repeat(slashes));
+        slashes = 0;
+        output.push(char);
+    }
+    output.push_str(&"\\".repeat(slashes * 2));
+    output.push('"');
+    output
+}
+
+#[cfg(not(windows))]
+fn assign_job_object(_child: &std::process::Child) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn terminate_job_object(_job: &()) {}
+
+fn utf16le_base64(input: &str) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = input
+        .encode_utf16()
+        .flat_map(|unit| [(unit & 0xff) as u8, (unit >> 8) as u8])
+        .collect::<Vec<_>>();
+    let mut out = String::new();
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = *chunk.get(1).unwrap_or(&0);
+        let b2 = *chunk.get(2).unwrap_or(&0);
+        out.push(TABLE[(b0 >> 2) as usize] as char);
+        out.push(TABLE[(((b0 & 0b11) << 4) | (b1 >> 4)) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            TABLE[(((b1 & 0b1111) << 2) | (b2 >> 6)) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(b2 & 0b11_1111) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
+fn windows_build() -> Option<String> {
+    #[cfg(windows)]
+    {
+        std::env::var("OS").ok()
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+fn run() -> Result<(), String> {
+    let args = std::env::args().collect::<Vec<_>>();
+    match args.get(1).map(String::as_str) {
+        Some("probe") => print_json(&probe()),
+        Some("exec") => exec(),
+        Some("serve") => Err("serve protocol is reserved; use exec for this helper build".to_string()),
+        Some("setup") if args.iter().any(|arg| arg == "--install") => print_json(&setup("install")),
+        Some("setup") if args.iter().any(|arg| arg == "--uninstall") => print_json(&setup("uninstall")),
+        Some("setup") if args.iter().any(|arg| arg == "--status") => print_json(&setup("status")),
+        _ => Err("usage: openagt-sandbox-win <probe --json|exec|setup --install|setup --uninstall|setup --status> [--json]".to_string()),
+    }
+}
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_allowed_drive_colon, path_text_issue};
+
+    #[test]
+    fn accepts_normal_drive_paths() {
+        assert!(path_text_issue(r"C:\Users\Administrator\Desktop\OpenAG").is_none());
+        assert!(is_allowed_drive_colon(r"C:\Users", 1));
+        assert!(is_allowed_drive_colon(r"\\?\C:\Users", 5));
+    }
+
+    #[test]
+    fn rejects_alternate_data_streams() {
+        assert_eq!(
+            path_text_issue(r"C:\Users\Administrator\Desktop\OpenAG\file.txt:hidden"),
+            Some("contains alternate data stream marker")
+        );
+    }
+
+    #[test]
+    fn rejects_drive_relative_paths() {
+        assert_eq!(
+            path_text_issue(r"C:relative\path"),
+            Some("contains alternate data stream marker")
+        );
+    }
+
+    #[test]
+    fn rejects_short_name_segments() {
+        assert_eq!(
+            path_text_issue(r"C:\PROGRA~1\OpenAG"),
+            Some("contains 8.3 short-name segment")
+        );
+    }
+
+    #[test]
+    fn rejects_nul_bytes() {
+        assert_eq!(path_text_issue("C:\\OpenAG\0x"), Some("contains NUL byte"));
+    }
+}

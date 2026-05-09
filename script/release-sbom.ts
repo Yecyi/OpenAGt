@@ -36,6 +36,16 @@ const packages = [
     licenseDeclared: sdkPackage.license ?? "NOASSERTION",
     copyrightText: "NOASSERTION",
   },
+  {
+    name: "openagt-sandbox-win",
+    SPDXID: "SPDXRef-Package-OpenAGt-Windows-Sandbox",
+    versionInfo: openagtPackage.version,
+    downloadLocation: "https://github.com/Yecyi/OpenAGt",
+    filesAnalyzed: false,
+    licenseConcluded: "MIT",
+    licenseDeclared: "MIT",
+    copyrightText: "NOASSERTION",
+  },
 ]
 
 await Bun.write(

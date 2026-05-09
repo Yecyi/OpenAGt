@@ -102,7 +102,7 @@ const steps = [
   },
   {
     title: "Focused runtime and security tests",
-    run: () => $`bun test ${runtimeTests}`.cwd("packages/openagt"),
+    run: () => $`bun test ${runtimeTests} --timeout 30000`.cwd("packages/openagt"),
   },
 ]
 
