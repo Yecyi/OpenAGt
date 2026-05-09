@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 const HELPER_PROTOCOL_VERSION: u32 = 1;
 const SETUP_VERSION: &str = "0";
+const ACL_APPLY_MODE_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_APPLY_ACL";
 
 #[derive(Debug, Deserialize)]
 struct ExecRequest {
@@ -130,6 +131,34 @@ struct AclBackupEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AclBackup {
     entries: Vec<AclBackupEntry>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FilesystemAclApplyMode {
+    Preflight,
+    DryRun,
+    Apply,
+}
+
+struct AppliedAclGuard {
+    backup: Option<AclBackup>,
+}
+
+impl AppliedAclGuard {
+    fn finish(mut self) -> Result<(), String> {
+        if let Some(backup) = self.backup.take() {
+            return rollback_acl(&backup);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for AppliedAclGuard {
+    fn drop(&mut self) {
+        if let Some(backup) = self.backup.take() {
+            let _ = rollback_acl(&backup);
+        }
+    }
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
@@ -339,6 +368,97 @@ fn rollback_acl(backup: &AclBackup) -> Result<(), String> {
         restore_dacl_sddl(&entry.path, &entry.sddl)?;
     }
     Ok(())
+}
+
+fn acl_apply_mode_from_env() -> FilesystemAclApplyMode {
+    match std::env::var(ACL_APPLY_MODE_ENV)
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "1" | "true" | "apply" => FilesystemAclApplyMode::Apply,
+        "dry-run" | "dry_run" | "dryrun" => FilesystemAclApplyMode::DryRun,
+        _ => FilesystemAclApplyMode::Preflight,
+    }
+}
+
+fn prepare_acl_for_exec(
+    request: &ExecRequest,
+    mode: FilesystemAclApplyMode,
+) -> Result<Option<AppliedAclGuard>, String> {
+    let grant_plan = filesystem_grant_plan(request)?;
+    if mode == FilesystemAclApplyMode::Preflight {
+        return Ok(None);
+    }
+    let transaction = filesystem_acl_transaction(&grant_plan, &sandbox_principal_sid()?)?;
+    let backup = apply_acl_transaction(&transaction, mode == FilesystemAclApplyMode::DryRun)?;
+    if mode == FilesystemAclApplyMode::DryRun {
+        return Ok(None);
+    }
+    Ok(backup.map(|backup| AppliedAclGuard {
+        backup: Some(backup),
+    }))
+}
+
+#[cfg(not(windows))]
+fn sandbox_principal_sid() -> Result<String, String> {
+    Ok("dry-run-sid".to_string())
+}
+
+#[cfg(windows)]
+fn sandbox_principal_sid() -> Result<String, String> {
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
+    use windows_sys::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token = 0;
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
+            return Err(format!(
+                "OpenProcessToken failed while resolving ACL principal: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let token = OwnedHandle(token);
+        let mut required = 0;
+        GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut required);
+        if required == 0 {
+            return Err(format!(
+                "GetTokenInformation size lookup failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut buffer = vec![0u8; required as usize];
+        if GetTokenInformation(
+            token.0,
+            TokenUser,
+            buffer.as_mut_ptr().cast(),
+            required,
+            &mut required,
+        ) == 0
+        {
+            return Err(format!(
+                "GetTokenInformation failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let token_user = &*(buffer.as_ptr() as *const TOKEN_USER);
+        let mut sid_text = std::ptr::null_mut();
+        if ConvertSidToStringSidW(token_user.User.Sid, &mut sid_text) == 0 {
+            return Err(format!(
+                "ConvertSidToStringSidW failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut len = 0;
+        while *sid_text.add(len) != 0 {
+            len += 1;
+        }
+        let text = String::from_utf16_lossy(std::slice::from_raw_parts(sid_text, len));
+        LocalFree(sid_text.cast());
+        Ok(text)
+    }
 }
 
 #[cfg(not(windows))]
@@ -731,30 +851,56 @@ fn exec() -> Result<(), String> {
         .read_to_string(&mut input)
         .map_err(|error| error.to_string())?;
     let request: ExecRequest = serde_json::from_str(&input).map_err(|error| error.to_string())?;
-    let _grant_plan = filesystem_grant_plan(&request)?;
     exec_request(request)
 }
 
 #[cfg(windows)]
 fn exec_request(request: ExecRequest) -> Result<(), String> {
+    let acl_guard = prepare_acl_for_exec(&request, acl_apply_mode_from_env())?;
+    let filesystem_enforced = acl_guard.is_some();
+    let result = exec_request_inner(&request, filesystem_enforced);
+    let rollback = match acl_guard {
+        Some(guard) => guard.finish(),
+        None => Ok(()),
+    };
+    match (result, rollback) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(()), Err(rollback_error)) => Err(format!("ACL rollback failed: {rollback_error}")),
+        (Err(error), Err(rollback_error)) => {
+            Err(format!("{error}; ACL rollback failed: {rollback_error}"))
+        }
+    }
+}
+
+#[cfg(windows)]
+fn exec_request_inner(request: &ExecRequest, filesystem_enforced: bool) -> Result<(), String> {
     let started = Instant::now();
-    let process = spawn_restricted_process(&request)?;
+    let process = spawn_restricted_process(request)?;
     let timeout = Duration::from_millis(request.timeout_ms);
     loop {
         if started.elapsed() >= timeout {
             terminate_job_object(&process.job);
             terminate_process(process.process_handle);
             let (stdout, stderr) = process.wait_output()?;
-            return print_json(&exec_output(&request, None, "timeout", stdout, stderr));
+            return print_json(&exec_output(
+                request,
+                None,
+                "timeout",
+                stdout,
+                stderr,
+                filesystem_enforced,
+            ));
         }
         if let Some(exit_code) = process.try_exit_code()? {
             let (stdout, stderr) = process.wait_output()?;
             return print_json(&exec_output(
-                &request,
+                request,
                 Some(exit_code),
                 "exit",
                 stdout,
                 stderr,
+                filesystem_enforced,
             ));
         }
         std::thread::sleep(Duration::from_millis(25));
@@ -763,6 +909,7 @@ fn exec_request(request: ExecRequest) -> Result<(), String> {
 
 #[cfg(not(windows))]
 fn exec_request(request: ExecRequest) -> Result<(), String> {
+    prepare_acl_for_exec(&request, FilesystemAclApplyMode::Preflight)?;
     let started = Instant::now();
     let mut command = Command::new(&request.shell);
     command
@@ -790,6 +937,7 @@ fn exec_request(request: ExecRequest) -> Result<(), String> {
                 "timeout",
                 output.stdout,
                 output.stderr,
+                false,
             ));
         }
         if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
@@ -802,6 +950,7 @@ fn exec_request(request: ExecRequest) -> Result<(), String> {
                 "exit",
                 output.stdout,
                 output.stderr,
+                false,
             ));
         }
         std::thread::sleep(Duration::from_millis(25));
@@ -814,6 +963,7 @@ fn exec_output(
     reason: &str,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
+    filesystem_enforced: bool,
 ) -> ExecOutput {
     ExecOutput {
         request_id: request.request_id.clone(),
@@ -830,10 +980,14 @@ fn exec_output(
             allowed_paths: request.allowed_paths.clone(),
             writable_paths: request.writable_paths.clone(),
             report_only: false,
-            enforced: false,
-            filesystem_enforced: false,
+            enforced: filesystem_enforced,
+            filesystem_enforced,
             network_enforced: false,
-            windows_sandbox_mode: "job_object_only".to_string(),
+            windows_sandbox_mode: if filesystem_enforced {
+                "restricted_token".to_string()
+            } else {
+                "job_object_only".to_string()
+            },
         },
     }
 }
@@ -1350,7 +1504,8 @@ fn main() {
 mod tests {
     use super::{
         apply_acl_transaction, filesystem_acl_transaction, filesystem_grant_plan,
-        is_allowed_drive_colon, path_text_issue, rollback_acl, ExecRequest, FilesystemAclAccess,
+        is_allowed_drive_colon, path_text_issue, prepare_acl_for_exec, rollback_acl, ExecRequest,
+        FilesystemAclAccess, FilesystemAclApplyMode,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -1568,6 +1723,32 @@ mod tests {
         assert!(!backup.entries.is_empty());
         assert!(backup.entries.iter().all(|entry| !entry.sddl.is_empty()));
         rollback_acl(&backup).unwrap();
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn exec_acl_preflight_does_not_create_guard() {
+        let dir = temp_case("exec-acl-preflight");
+        let guard = prepare_acl_for_exec(
+            &request(&dir, vec![dir.clone()], vec![], "read_only"),
+            FilesystemAclApplyMode::Preflight,
+        )
+        .unwrap();
+
+        assert!(guard.is_none());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn exec_acl_dry_run_validates_without_installing_guard() {
+        let dir = temp_case("exec-acl-dry-run");
+        let guard = prepare_acl_for_exec(
+            &request(&dir, vec![dir.clone()], vec![], "read_only"),
+            FilesystemAclApplyMode::DryRun,
+        )
+        .unwrap();
+
+        assert!(guard.is_none());
         let _ = fs::remove_dir_all(dir);
     }
 }
