@@ -9,6 +9,7 @@ export type WindowsSandboxHelperProbe = {
   helper_version: string
   helper_protocol_version: number
   windows_build?: string
+  elevated?: boolean
   restricted_token_supported?: boolean
   job_object_supported?: boolean
   wfp_supported?: boolean
@@ -28,6 +29,7 @@ export type WindowsSandboxSetupResult = {
   setup_version?: string
   setup_required: boolean
   setup_reason?: string
+  elevated?: boolean
   restricted_token_supported?: boolean
   job_object_supported?: boolean
   wfp_supported?: boolean

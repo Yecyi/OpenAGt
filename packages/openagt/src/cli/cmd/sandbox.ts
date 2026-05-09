@@ -102,6 +102,9 @@ const WindowsSetupCommand = cmd({
     UI.println(`  ok: ${result.ok ? "yes" : "no"}`)
     UI.println(`  installed: ${result.setup_installed ? "yes" : "no"}`)
     UI.println(`  setup required: ${result.setup_required ? "yes" : "no"}`)
+    if (result.elevated !== undefined) {
+      UI.println(`  elevated: ${result.elevated ? "yes" : "no"}`)
+    }
     if (result.restricted_token_supported !== undefined) {
       UI.println(`  restricted token: ${result.restricted_token_supported ? "yes" : "no"}`)
     }

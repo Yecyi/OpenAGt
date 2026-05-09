@@ -31,6 +31,7 @@ struct ProbeOutput {
     helper_version: String,
     helper_protocol_version: u32,
     windows_build: Option<String>,
+    elevated: bool,
     restricted_token_supported: bool,
     job_object_supported: bool,
     wfp_supported: bool,
@@ -51,6 +52,7 @@ struct SetupOutput {
     setup_version: String,
     setup_required: bool,
     setup_reason: Option<String>,
+    elevated: bool,
     restricted_token_supported: bool,
     job_object_supported: bool,
     wfp_supported: bool,
@@ -201,6 +203,7 @@ fn probe() -> ProbeOutput {
         helper_version: env!("CARGO_PKG_VERSION").to_string(),
         helper_protocol_version: HELPER_PROTOCOL_VERSION,
         windows_build: windows_build(),
+        elevated: process_is_elevated(),
         restricted_token_supported,
         job_object_supported: cfg!(windows),
         wfp_supported: cfg!(windows),
@@ -235,6 +238,7 @@ fn setup(mode: &str) -> SetupOutput {
         setup_version: status.setup_version,
         setup_required: status.setup_required,
         setup_reason,
+        elevated: status.elevated,
         restricted_token_supported: status.restricted_token_supported,
         job_object_supported: status.job_object_supported,
         wfp_supported: status.wfp_supported,
@@ -741,6 +745,37 @@ fn restricted_token_launch_supported() -> bool {
 
 #[cfg(not(windows))]
 fn restricted_token_launch_supported() -> bool {
+    false
+}
+
+#[cfg(windows)]
+fn process_is_elevated() -> bool {
+    use windows_sys::Win32::Foundation::BOOL;
+    use windows_sys::Win32::Security::{
+        CheckTokenMembership, CreateWellKnownSid, WinBuiltinAdministratorsSid,
+    };
+
+    unsafe {
+        let mut admin_sid = vec![0u8; 68];
+        let mut admin_sid_len = admin_sid.len() as u32;
+        if CreateWellKnownSid(
+            WinBuiltinAdministratorsSid,
+            std::ptr::null_mut(),
+            admin_sid.as_mut_ptr().cast(),
+            &mut admin_sid_len,
+        ) == 0
+        {
+            return false;
+        }
+        admin_sid.truncate(admin_sid_len as usize);
+        let mut is_member: BOOL = 0;
+        CheckTokenMembership(0, admin_sid.as_mut_ptr().cast(), &mut is_member) != 0
+            && is_member != 0
+    }
+}
+
+#[cfg(not(windows))]
+fn process_is_elevated() -> bool {
     false
 }
 
@@ -1867,6 +1902,7 @@ mod tests {
             status.restricted_token_supported,
             probe.restricted_token_supported
         );
+        assert_eq!(status.elevated, probe.elevated);
         assert_eq!(status.filesystem_enforced, probe.filesystem_enforced);
         assert_eq!(status.network_enforced, probe.network_enforced);
     }
