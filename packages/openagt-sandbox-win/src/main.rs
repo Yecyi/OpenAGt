@@ -51,6 +51,11 @@ struct SetupOutput {
     setup_version: String,
     setup_required: bool,
     setup_reason: Option<String>,
+    restricted_token_supported: bool,
+    job_object_supported: bool,
+    wfp_supported: bool,
+    filesystem_enforced: bool,
+    network_enforced: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -230,6 +235,11 @@ fn setup(mode: &str) -> SetupOutput {
         setup_version: status.setup_version,
         setup_required: status.setup_required,
         setup_reason,
+        restricted_token_supported: status.restricted_token_supported,
+        job_object_supported: status.job_object_supported,
+        wfp_supported: status.wfp_supported,
+        filesystem_enforced: status.filesystem_enforced,
+        network_enforced: status.network_enforced,
     }
 }
 
@@ -1853,6 +1863,12 @@ mod tests {
         assert_eq!(status.setup_installed, probe.setup_installed);
         assert_eq!(status.setup_required, probe.setup_required);
         assert_eq!(status.setup_version, probe.setup_version);
+        assert_eq!(
+            status.restricted_token_supported,
+            probe.restricted_token_supported
+        );
+        assert_eq!(status.filesystem_enforced, probe.filesystem_enforced);
+        assert_eq!(status.network_enforced, probe.network_enforced);
     }
 
     #[test]

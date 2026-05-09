@@ -6,6 +6,7 @@ import {
   resolveWindowsHelperPath,
   runWindowsHelperSetup,
   WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+  type WindowsSandboxSetupResult,
 } from "../../sandbox/windows-helper"
 import { Flag } from "../../flag/flag"
 
@@ -83,7 +84,7 @@ const WindowsSetupCommand = cmd({
   handler: (args: { install?: boolean; uninstall?: boolean; status?: boolean; json: boolean }) => {
     const resolved = resolveWindowsHelperPath({ override: Flag.OPENAGT_SANDBOX_WINDOWS_HELPER })
     const mode = args.install ? "install" : args.uninstall ? "uninstall" : "status"
-    const result = resolved.path
+    const result: WindowsSandboxSetupResult = resolved.path
       ? runWindowsHelperSetup(resolved.path, mode)
       : {
           ok: false,
@@ -101,6 +102,18 @@ const WindowsSetupCommand = cmd({
     UI.println(`  ok: ${result.ok ? "yes" : "no"}`)
     UI.println(`  installed: ${result.setup_installed ? "yes" : "no"}`)
     UI.println(`  setup required: ${result.setup_required ? "yes" : "no"}`)
+    if (result.restricted_token_supported !== undefined) {
+      UI.println(`  restricted token: ${result.restricted_token_supported ? "yes" : "no"}`)
+    }
+    if (result.job_object_supported !== undefined) {
+      UI.println(`  job object: ${result.job_object_supported ? "yes" : "no"}`)
+    }
+    if (result.filesystem_enforced !== undefined) {
+      UI.println(`  filesystem enforcement: ${result.filesystem_enforced ? "yes" : "no"}`)
+    }
+    if (result.network_enforced !== undefined) {
+      UI.println(`  network enforcement: ${result.network_enforced ? "yes" : "no"}`)
+    }
     if (result.setup_reason) UI.println(`  reason: ${result.setup_reason}`)
   },
 })

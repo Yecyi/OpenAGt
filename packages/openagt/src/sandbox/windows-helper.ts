@@ -28,6 +28,11 @@ export type WindowsSandboxSetupResult = {
   setup_version?: string
   setup_required: boolean
   setup_reason?: string
+  restricted_token_supported?: boolean
+  job_object_supported?: boolean
+  wfp_supported?: boolean
+  filesystem_enforced?: boolean
+  network_enforced?: boolean
 }
 
 export function helperOverrideAllowed(env = process.env) {
