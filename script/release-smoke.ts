@@ -76,9 +76,29 @@ if (process.platform === "win32") {
   if (helperProbeJson.helper_protocol_version !== 1 || helperProbeJson.network_enforced !== false) {
     throw new Error(`Packaged Windows sandbox helper probe returned unexpected capabilities for ${helper}`)
   }
+  const helperSetupStatus = await $`${helper} setup --status --json`.quiet()
+  if (helperSetupStatus.exitCode !== 0) {
+    throw new Error(`Packaged Windows sandbox helper setup status failed for ${helper}`)
+  }
+  const helperSetupStatusJson = JSON.parse(helperSetupStatus.stdout.toString()) as {
+    mode?: string
+    setup_required?: boolean
+    network_enforced?: boolean
+  }
+  if (helperSetupStatusJson.mode !== "status" || helperSetupStatusJson.network_enforced !== false) {
+    throw new Error(`Packaged Windows sandbox helper setup status returned unexpected state for ${helper}`)
+  }
   const cliProbe = await $`${bin} sandbox windows probe --json`.quiet()
   if (cliProbe.exitCode !== 0 || !cliProbe.stdout.toString().includes("openagt-sandbox-win.exe")) {
     throw new Error(`Packaged Windows sandbox CLI probe failed for ${bin}`)
+  }
+  const cliSetupStatus = await $`${bin} sandbox windows setup --status --json`.quiet()
+  if (
+    cliSetupStatus.exitCode !== 0 ||
+    !cliSetupStatus.stdout.toString().includes("openagt-sandbox-win.exe") ||
+    !cliSetupStatus.stdout.toString().includes('"mode": "status"')
+  ) {
+    throw new Error(`Packaged Windows sandbox CLI setup status failed for ${bin}`)
   }
 }
 

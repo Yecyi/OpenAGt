@@ -170,7 +170,7 @@ flowchart LR
 | Sandbox behavior | enforcement、failure_policy、report_only、broker TTL | Global/Workspace | policy panel |
 | Boundaries | allowedPaths、writablePaths、networkPolicy | Tool/Run | path list + network toggle |
 
-Windows note: current Windows execution uses the `process` backend. It is advisory/audit-only for filesystem and network boundaries (`policy_advisory.enforced=false`), not OS-native isolation. `windows_native` is reserved until a real native backend is implemented.
+Windows note: packaged Windows builds include the `openagt-sandbox-win.exe` helper and expose `openagt sandbox windows probe --json` / `openagt sandbox windows setup --status --json` for diagnostics. Treat `process` as advisory/audit-only (`policy_advisory.enforced=false`). Treat `windows_native` as capability-gated: it is selected only when the helper reports restricted-token, Job Object, and filesystem enforcement support. Network enforcement remains unavailable until WFP setup is implemented and verified.
 
 必须把危险设置分成两层：权限审批和 sandbox 执行边界。`allow bash` 不应该被理解为“关闭 sandbox”。
 
