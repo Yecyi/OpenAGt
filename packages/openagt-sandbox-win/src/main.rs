@@ -740,21 +740,22 @@ fn add_wfp_filter(
         FwpmFilterAdd0, FWPM_ACTION0, FWPM_ACTION0_0, FWPM_CONDITION_ALE_USER_ID,
         FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER0_0, FWPM_FILTER_CONDITION0,
         FWPM_FILTER_FLAG_PERSISTENT, FWP_ACTION_BLOCK, FWP_BYTE_BLOB, FWP_CONDITION_VALUE0,
-        FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL, FWP_SID, FWP_UINT8, FWP_VALUE0, FWP_VALUE0_0,
+        FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL, FWP_SECURITY_DESCRIPTOR_TYPE, FWP_UINT8,
+        FWP_VALUE0, FWP_VALUE0_0,
     };
 
     let mut name = wide_null(description_text);
     let mut description =
         wide_null("Blocks network for OpenAGt restricted-token sandbox processes");
     let mut provider_key = OPENAGT_WFP_PROVIDER_KEY;
-    let mut sid = restricted_code_sid()?;
+    let user_condition = WfpUserMatchCondition::for_restricted_code()?;
     let mut condition = FWPM_FILTER_CONDITION0 {
         fieldKey: FWPM_CONDITION_ALE_USER_ID,
         matchType: FWP_MATCH_EQUAL,
         conditionValue: FWP_CONDITION_VALUE0 {
-            r#type: FWP_SID,
+            r#type: FWP_SECURITY_DESCRIPTOR_TYPE,
             Anonymous: FWP_CONDITION_VALUE0_0 {
-                sid: sid.as_mut_ptr().cast(),
+                sd: &user_condition.blob as *const _ as *mut _,
             },
         },
     };
@@ -800,6 +801,87 @@ fn add_wfp_filter(
         }
     }
     Ok(())
+}
+
+#[cfg(windows)]
+struct WfpUserMatchCondition {
+    security_descriptor: windows_sys::Win32::Security::PSECURITY_DESCRIPTOR,
+    blob: windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_BYTE_BLOB,
+}
+
+#[cfg(windows)]
+impl WfpUserMatchCondition {
+    fn for_restricted_code() -> Result<Self, String> {
+        use std::ptr::{null, null_mut};
+        use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
+        use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+            FWP_ACTRL_MATCH_FILTER, FWP_BYTE_BLOB,
+        };
+        use windows_sys::Win32::Security::Authorization::{
+            BuildSecurityDescriptorW, EXPLICIT_ACCESS_W, GRANT_ACCESS, NO_MULTIPLE_TRUSTEE,
+            TRUSTEE_IS_SID, TRUSTEE_IS_UNKNOWN, TRUSTEE_W,
+        };
+        use windows_sys::Win32::Security::PSECURITY_DESCRIPTOR;
+
+        let restricted_sid = restricted_code_sid()?;
+        let access = EXPLICIT_ACCESS_W {
+            grfAccessPermissions: FWP_ACTRL_MATCH_FILTER,
+            grfAccessMode: GRANT_ACCESS,
+            grfInheritance: 0,
+            Trustee: TRUSTEE_W {
+                pMultipleTrustee: null_mut(),
+                MultipleTrusteeOperation: NO_MULTIPLE_TRUSTEE,
+                TrusteeForm: TRUSTEE_IS_SID,
+                TrusteeType: TRUSTEE_IS_UNKNOWN,
+                ptstrName: restricted_sid.as_ptr() as *mut u16,
+            },
+        };
+
+        let mut security_descriptor: PSECURITY_DESCRIPTOR = null_mut();
+        let mut security_descriptor_len = 0;
+        let result = unsafe {
+            BuildSecurityDescriptorW(
+                null(),
+                null(),
+                1,
+                &access,
+                0,
+                null(),
+                null_mut(),
+                &mut security_descriptor_len,
+                &mut security_descriptor,
+            )
+        };
+        if result != 0 {
+            unsafe {
+                if !security_descriptor.is_null() {
+                    LocalFree(security_descriptor as HLOCAL);
+                }
+            }
+            return Err(format!("BuildSecurityDescriptorW failed: {result}"));
+        }
+
+        Ok(Self {
+            security_descriptor,
+            blob: FWP_BYTE_BLOB {
+                size: security_descriptor_len,
+                data: security_descriptor as *mut u8,
+            },
+        })
+    }
+}
+
+#[cfg(windows)]
+impl Drop for WfpUserMatchCondition {
+    fn drop(&mut self) {
+        use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
+
+        if !self.security_descriptor.is_null() {
+            unsafe {
+                LocalFree(self.security_descriptor as HLOCAL);
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -2387,6 +2469,15 @@ mod tests {
     #[test]
     fn sandbox_principal_uses_restricted_code_sid() {
         assert_eq!(super::sandbox_principal_sid().unwrap(), "S-1-5-12");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn wfp_user_match_condition_uses_security_descriptor_blob() {
+        let condition = super::WfpUserMatchCondition::for_restricted_code().unwrap();
+
+        assert!(condition.blob.size > 0);
+        assert!(!condition.blob.data.is_null());
     }
 
     #[cfg(windows)]
