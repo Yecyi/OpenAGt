@@ -67,6 +67,50 @@ async function verifyConfigSchemas() {
   }
 }
 
+function cargoCandidates() {
+  return [
+    process.env.CARGO,
+    "cargo",
+    process.platform === "win32"
+      ? path.join(os.homedir(), ".cargo", "bin", "cargo.exe")
+      : path.join(os.homedir(), ".cargo", "bin", "cargo"),
+  ].filter((item): item is string => Boolean(item))
+}
+
+function findCargo() {
+  for (const candidate of cargoCandidates()) {
+    const check = Bun.spawnSync({
+      cmd: [candidate, "--version"],
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    if (check.exitCode === 0) return candidate
+  }
+}
+
+async function runCargo(args: string[]) {
+  const cargo = findCargo()
+  if (!cargo) {
+    if (process.platform === "win32") throw new Error("Rust cargo is required to verify the Windows sandbox helper")
+    console.warn("Skipping Windows sandbox helper cargo verification because cargo is not installed")
+    return
+  }
+  const proc = Bun.spawn({
+    cmd: [cargo, ...args],
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  const exitCode = await proc.exited
+  if (exitCode !== 0) throw new Error(`cargo ${args.join(" ")} failed with ${exitCode}`)
+}
+
+async function verifyWindowsSandboxHelper() {
+  const manifest = path.join("packages", "openagt-sandbox-win", "Cargo.toml")
+  if (!(await Bun.file(manifest).exists())) return
+  await runCargo(["check", "--manifest-path", manifest])
+  await runCargo(["test", "--manifest-path", manifest])
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -103,6 +147,10 @@ const steps = [
   {
     title: "Focused runtime and security tests",
     run: () => $`bun test ${runtimeTests} --timeout 30000`.cwd("packages/openagt"),
+  },
+  {
+    title: "Verify Windows sandbox helper",
+    run: verifyWindowsSandboxHelper,
   },
 ]
 

@@ -88,6 +88,39 @@ async function builtBinaryPath(name: string) {
 const skipWindowsSandboxHelper = process.env.OPENAGT_SKIP_WINDOWS_SANDBOX_HELPER === "1"
 let windowsSandboxHelperBuild: Promise<string | undefined> | undefined
 
+function cargoCandidates() {
+  return [
+    process.env.CARGO,
+    "cargo",
+    process.platform === "win32"
+      ? path.join(process.env.USERPROFILE ?? "", ".cargo", "bin", "cargo.exe")
+      : path.join(process.env.HOME ?? "", ".cargo", "bin", "cargo"),
+  ].filter((item): item is string => Boolean(item))
+}
+
+function findCargo() {
+  for (const candidate of cargoCandidates()) {
+    const check = Bun.spawnSync({
+      cmd: [candidate, "--version"],
+      stdout: "ignore",
+      stderr: "ignore",
+    })
+    if (check.exitCode === 0) return candidate
+  }
+}
+
+async function runCargo(args: string[]) {
+  const cargo = findCargo()
+  if (!cargo) return false
+  const proc = Bun.spawn({
+    cmd: [cargo, ...args],
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  if ((await proc.exited) !== 0) throw new Error(`cargo ${args.join(" ")} failed`)
+  return true
+}
+
 async function buildWindowsSandboxHelper() {
   if (!windowsSandboxHelperBuild) {
     windowsSandboxHelperBuild = (async () => {
@@ -96,12 +129,10 @@ async function buildWindowsSandboxHelper() {
         if (skipWindowsSandboxHelper) return
         throw new Error(`Windows sandbox helper manifest is missing: ${manifest}`)
       }
-      const cargo = await $`cargo --version`.quiet().nothrow()
-      if (cargo.exitCode !== 0) {
+      if (!(await runCargo(["build", "--release", "--manifest-path", manifest]))) {
         if (skipWindowsSandboxHelper) return
         throw new Error("Rust cargo is required to build openagt-sandbox-win.exe")
       }
-      await $`cargo build --release --manifest-path ${manifest}`
       const exe = path.resolve(dir, "../openagt-sandbox-win/target/release/openagt-sandbox-win.exe")
       if (!(await Bun.file(exe).exists())) throw new Error(`Windows sandbox helper build did not produce ${exe}`)
       return exe
