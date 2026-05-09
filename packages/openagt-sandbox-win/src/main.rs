@@ -210,16 +210,26 @@ fn probe() -> ProbeOutput {
 }
 
 fn setup(mode: &str) -> SetupOutput {
+    let status = probe();
+    let setup_reason = match mode {
+        "status" => status.setup_reason,
+        "install" => Some(
+            "Windows WFP setup install is not implemented in this helper build; no machine state was changed"
+                .to_string(),
+        ),
+        "uninstall" => Some(
+            "Windows WFP setup uninstall is not implemented in this helper build; no machine state was changed"
+                .to_string(),
+        ),
+        _ => Some("Unknown Windows sandbox setup mode".to_string()),
+    };
     SetupOutput {
         ok: mode == "status",
         mode: mode.to_string(),
-        setup_installed: false,
-        setup_version: SETUP_VERSION.to_string(),
-        setup_required: true,
-        setup_reason: Some(
-            "Native ACL/WFP setup is not implemented in this helper build; windows_native remains unavailable"
-                .to_string(),
-        ),
+        setup_installed: status.setup_installed,
+        setup_version: status.setup_version,
+        setup_required: status.setup_required,
+        setup_reason,
     }
 }
 
@@ -1833,5 +1843,25 @@ mod tests {
             Some(value) => std::env::set_var(super::ACL_APPLY_MODE_ENV, value),
             None => std::env::remove_var(super::ACL_APPLY_MODE_ENV),
         }
+    }
+
+    #[test]
+    fn setup_status_matches_probe_state() {
+        let probe = super::probe();
+        let status = super::setup("status");
+        assert!(status.ok);
+        assert_eq!(status.setup_installed, probe.setup_installed);
+        assert_eq!(status.setup_required, probe.setup_required);
+        assert_eq!(status.setup_version, probe.setup_version);
+    }
+
+    #[test]
+    fn setup_install_and_uninstall_are_explicit_noops() {
+        let install = super::setup("install");
+        let uninstall = super::setup("uninstall");
+        assert!(!install.ok);
+        assert!(!uninstall.ok);
+        assert!(install.setup_reason.unwrap().contains("not implemented"));
+        assert!(uninstall.setup_reason.unwrap().contains("not implemented"));
     }
 }
