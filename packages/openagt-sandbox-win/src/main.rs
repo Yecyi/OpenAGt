@@ -171,10 +171,14 @@ fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
 
 fn probe() -> ProbeOutput {
     let restricted_token_supported = restricted_token_launch_supported();
-    let setup_reason = if restricted_token_supported {
-        "Filesystem ACL and WFP setup are not installed in this helper build"
+    let filesystem_enforced =
+        restricted_token_supported && acl_apply_mode_from_env() == FilesystemAclApplyMode::Apply;
+    let setup_reason = if !restricted_token_supported {
+        "Restricted token launch privilege is not available in this helper process"
+    } else if !filesystem_enforced {
+        "Filesystem ACL enforcement is available only when OPENAGT_SANDBOX_WINDOWS_APPLY_ACL=apply is explicitly set"
     } else {
-        "Restricted token launch privilege, filesystem ACL, and WFP setup are not available in this helper build"
+        "WFP network enforcement setup is not installed in this helper build"
     };
     let capabilities = [
         Some("probe".to_string()),
@@ -182,6 +186,7 @@ fn probe() -> ProbeOutput {
         cfg!(windows).then(|| "job-object".to_string()),
         Some("path-preflight".to_string()),
         restricted_token_supported.then(|| "restricted-token".to_string()),
+        filesystem_enforced.then(|| "filesystem-acl-enforcement".to_string()),
         Some("setup-status".to_string()),
     ]
     .into_iter()
@@ -194,11 +199,11 @@ fn probe() -> ProbeOutput {
         restricted_token_supported,
         job_object_supported: cfg!(windows),
         wfp_supported: cfg!(windows),
-        setup_installed: false,
+        setup_installed: filesystem_enforced,
         setup_version: SETUP_VERSION.to_string(),
-        setup_required: true,
+        setup_required: !filesystem_enforced,
         setup_reason: Some(setup_reason.to_string()),
-        filesystem_enforced: false,
+        filesystem_enforced,
         network_enforced: false,
         capabilities,
     }
@@ -1806,5 +1811,27 @@ mod tests {
         assert!(dir.join("allowed.txt").exists());
         assert!(!git.join("blocked.txt").exists());
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn probe_does_not_claim_network_enforcement() {
+        assert!(!super::probe().network_enforced);
+    }
+
+    #[test]
+    fn probe_filesystem_enforcement_requires_apply_gate() {
+        if !super::restricted_token_launch_supported() {
+            assert!(!super::probe().filesystem_enforced);
+            return;
+        }
+        let previous_mode = std::env::var(super::ACL_APPLY_MODE_ENV).ok();
+        std::env::remove_var(super::ACL_APPLY_MODE_ENV);
+        assert!(!super::probe().filesystem_enforced);
+        std::env::set_var(super::ACL_APPLY_MODE_ENV, "apply");
+        assert!(super::probe().filesystem_enforced);
+        match previous_mode {
+            Some(value) => std::env::set_var(super::ACL_APPLY_MODE_ENV, value),
+            None => std::env::remove_var(super::ACL_APPLY_MODE_ENV),
+        }
     }
 }
