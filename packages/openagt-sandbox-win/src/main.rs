@@ -1513,6 +1513,8 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
+    const RUN_WINDOWS_ACL_TESTS_ENV: &str = "OPENAGT_RUN_WINDOWS_ACL_TESTS";
+
     #[test]
     fn accepts_normal_drive_paths() {
         assert!(path_text_issue(r"C:\Users\Administrator\Desktop\OpenAG").is_none());
@@ -1758,5 +1760,51 @@ mod tests {
     #[test]
     fn sandbox_principal_uses_restricted_code_sid() {
         assert_eq!(super::sandbox_principal_sid().unwrap(), "S-1-5-12");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn gated_acl_enforcement_allows_workspace_write_and_blocks_git_write() {
+        if std::env::var(RUN_WINDOWS_ACL_TESTS_ENV).as_deref() != Ok("1") {
+            return;
+        }
+        if !super::restricted_token_launch_supported() {
+            return;
+        }
+        let dir = temp_case("acl-enforcement");
+        let git = dir.join(".git");
+        fs::create_dir_all(&git).unwrap();
+        let previous_mode = std::env::var(super::ACL_APPLY_MODE_ENV).ok();
+        std::env::set_var(super::ACL_APPLY_MODE_ENV, "apply");
+        let mut exec_request = request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        );
+        exec_request.command =
+            "echo allowed> allowed.txt && echo blocked> .git\\blocked.txt".to_string();
+        exec_request.env = BTreeMap::from([
+            (
+                "ComSpec".to_string(),
+                std::env::var("ComSpec").unwrap_or_default(),
+            ),
+            (
+                "SystemRoot".to_string(),
+                std::env::var("SystemRoot").unwrap_or_default(),
+            ),
+        ]);
+        exec_request.timeout_ms = 10_000;
+
+        let result = super::exec_request(exec_request);
+        match previous_mode {
+            Some(value) => std::env::set_var(super::ACL_APPLY_MODE_ENV, value),
+            None => std::env::remove_var(super::ACL_APPLY_MODE_ENV),
+        }
+
+        result.unwrap();
+        assert!(dir.join("allowed.txt").exists());
+        assert!(!git.join("blocked.txt").exists());
+        let _ = fs::remove_dir_all(dir);
     }
 }
