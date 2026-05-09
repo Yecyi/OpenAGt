@@ -119,6 +119,19 @@ struct FilesystemAclTransaction {
     entries: Vec<FilesystemAclEntry>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AclBackupEntry {
+    path: String,
+    sddl: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AclBackup {
+    entries: Vec<AclBackupEntry>,
+}
+
 fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
     println!(
         "{}",
@@ -191,8 +204,7 @@ fn is_path_or_child(path: &str, parent: &str) -> bool {
         return true;
     }
     let parent = parent.trim_end_matches(['\\', '/']);
-    path.starts_with(&format!("{parent}\\"))
-        || path.starts_with(&format!("{parent}/"))
+    path.starts_with(&format!("{parent}\\")) || path.starts_with(&format!("{parent}/"))
 }
 
 fn child_path(parent: &str, name: &str) -> String {
@@ -218,10 +230,11 @@ fn filesystem_grant_plan(request: &ExecRequest) -> Result<FilesystemGrantPlan, S
     if request.filesystem_policy == "read_only" && !writable_paths.is_empty() {
         return Err("read_only filesystem policy cannot include writable_paths".to_string());
     }
-    if let Some(path) = writable_paths
-        .iter()
-        .find(|path| !read_paths.iter().any(|allowed| is_path_or_child(path, allowed)))
-    {
+    if let Some(path) = writable_paths.iter().find(|path| {
+        !read_paths
+            .iter()
+            .any(|allowed| is_path_or_child(path, allowed))
+    }) {
         return Err(format!("writable_path is not inside allowed_paths: {path}"));
     }
     let deny_write_paths = if request.filesystem_policy == "workspace_write" {
@@ -283,6 +296,290 @@ fn filesystem_acl_transaction(
         backup_paths,
         entries,
     })
+}
+
+#[allow(dead_code)]
+fn backup_acl(transaction: &FilesystemAclTransaction) -> Result<AclBackup, String> {
+    Ok(AclBackup {
+        entries: transaction
+            .backup_paths
+            .iter()
+            .map(|path| {
+                Ok(AclBackupEntry {
+                    path: path.clone(),
+                    sddl: read_dacl_sddl(path)?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+    })
+}
+
+#[allow(dead_code)]
+fn apply_acl_transaction(
+    transaction: &FilesystemAclTransaction,
+    dry_run: bool,
+) -> Result<Option<AclBackup>, String> {
+    if transaction.entries.is_empty() {
+        return Ok(None);
+    }
+    let backup = backup_acl(transaction)?;
+    if dry_run {
+        return Ok(Some(backup));
+    }
+    if let Err(error) = apply_acl_entries(transaction) {
+        let _ = rollback_acl(&backup);
+        return Err(error);
+    }
+    Ok(Some(backup))
+}
+
+#[allow(dead_code)]
+fn rollback_acl(backup: &AclBackup) -> Result<(), String> {
+    for entry in &backup.entries {
+        restore_dacl_sddl(&entry.path, &entry.sddl)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn read_dacl_sddl(path: &str) -> Result<String, String> {
+    Ok(format!("dry-run:{path}"))
+}
+
+#[cfg(windows)]
+fn read_dacl_sddl(path: &str) -> Result<String, String> {
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertSecurityDescriptorToStringSecurityDescriptorW, GetNamedSecurityInfoW, SE_FILE_OBJECT,
+    };
+    use windows_sys::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
+
+    let wide_path = path.encode_utf16().chain([0]).collect::<Vec<_>>();
+    unsafe {
+        let mut security_descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        let result = GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut security_descriptor,
+        );
+        if result != 0 {
+            return Err(format!("GetNamedSecurityInfoW failed for {path}: {result}"));
+        }
+        let mut sddl = std::ptr::null_mut();
+        let mut sddl_len = 0;
+        let converted = ConvertSecurityDescriptorToStringSecurityDescriptorW(
+            security_descriptor,
+            1,
+            DACL_SECURITY_INFORMATION,
+            &mut sddl,
+            &mut sddl_len,
+        );
+        LocalFree(security_descriptor);
+        if converted == 0 {
+            return Err(format!(
+                "ConvertSecurityDescriptorToStringSecurityDescriptorW failed for {path}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let text = String::from_utf16_lossy(std::slice::from_raw_parts(sddl, sddl_len as usize));
+        LocalFree(sddl.cast());
+        Ok(text)
+    }
+}
+
+#[cfg(not(windows))]
+fn restore_dacl_sddl(_path: &str, _sddl: &str) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(windows)]
+fn restore_dacl_sddl(path: &str, sddl: &str) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{LocalFree, BOOL};
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertStringSecurityDescriptorToSecurityDescriptorW, SetNamedSecurityInfoW, SE_FILE_OBJECT,
+    };
+    use windows_sys::Win32::Security::{
+        GetSecurityDescriptorDacl, ACL, DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
+    };
+
+    let wide_path = path.encode_utf16().chain([0]).collect::<Vec<_>>();
+    let wide_sddl = sddl.encode_utf16().chain([0]).collect::<Vec<_>>();
+    unsafe {
+        let mut security_descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            wide_sddl.as_ptr(),
+            1,
+            &mut security_descriptor,
+            std::ptr::null_mut(),
+        ) == 0
+        {
+            return Err(format!(
+                "ConvertStringSecurityDescriptorToSecurityDescriptorW failed for {path}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut present: BOOL = 0;
+        let mut defaulted: BOOL = 0;
+        let mut dacl: *mut ACL = std::ptr::null_mut();
+        if GetSecurityDescriptorDacl(security_descriptor, &mut present, &mut dacl, &mut defaulted)
+            == 0
+        {
+            LocalFree(security_descriptor);
+            return Err(format!(
+                "GetSecurityDescriptorDacl failed for {path}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let result = SetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            dacl,
+            std::ptr::null_mut(),
+        );
+        LocalFree(security_descriptor);
+        if result != 0 {
+            return Err(format!(
+                "SetNamedSecurityInfoW rollback failed for {path}: {result}"
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn apply_acl_entries(_transaction: &FilesystemAclTransaction) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(windows)]
+fn apply_acl_entries(transaction: &FilesystemAclTransaction) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{LocalFree, PSID};
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertStringSidToSidW, GetNamedSecurityInfoW, SetEntriesInAclW, SetNamedSecurityInfoW,
+        DENY_ACCESS, EXPLICIT_ACCESS_W, GRANT_ACCESS, NO_MULTIPLE_TRUSTEE, SE_FILE_OBJECT,
+        TRUSTEE_IS_SID, TRUSTEE_IS_UNKNOWN, TRUSTEE_W,
+    };
+    use windows_sys::Win32::Security::{ACL, DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
+    use windows_sys::Win32::Storage::FileSystem::{
+        DELETE, FILE_DELETE_CHILD, FILE_GENERIC_READ, FILE_GENERIC_WRITE, WRITE_DAC, WRITE_OWNER,
+    };
+
+    let sid_text = transaction
+        .principal_sid
+        .encode_utf16()
+        .chain([0])
+        .collect::<Vec<_>>();
+    unsafe {
+        let mut sid: PSID = std::ptr::null_mut();
+        if ConvertStringSidToSidW(sid_text.as_ptr(), &mut sid) == 0 {
+            return Err(format!(
+                "ConvertStringSidToSidW failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        for path in &transaction.backup_paths {
+            let path_entries = transaction
+                .entries
+                .iter()
+                .filter(|entry| entry.path == *path)
+                .map(|entry| {
+                    let mask = match entry.access {
+                        FilesystemAclAccess::DenyWrite => {
+                            FILE_GENERIC_WRITE
+                                | FILE_DELETE_CHILD
+                                | DELETE
+                                | WRITE_DAC
+                                | WRITE_OWNER
+                        }
+                        FilesystemAclAccess::AllowRead => FILE_GENERIC_READ,
+                        FilesystemAclAccess::AllowWrite => FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+                    };
+                    EXPLICIT_ACCESS_W {
+                        grfAccessPermissions: mask,
+                        grfAccessMode: match entry.access {
+                            FilesystemAclAccess::DenyWrite => DENY_ACCESS,
+                            FilesystemAclAccess::AllowRead | FilesystemAclAccess::AllowWrite => {
+                                GRANT_ACCESS
+                            }
+                        },
+                        grfInheritance: if entry.inherit_children {
+                            windows_sys::Win32::Security::SUB_CONTAINERS_AND_OBJECTS_INHERIT
+                        } else {
+                            windows_sys::Win32::Security::NO_INHERITANCE
+                        },
+                        Trustee: TRUSTEE_W {
+                            pMultipleTrustee: std::ptr::null_mut(),
+                            MultipleTrusteeOperation: NO_MULTIPLE_TRUSTEE,
+                            TrusteeForm: TRUSTEE_IS_SID,
+                            TrusteeType: TRUSTEE_IS_UNKNOWN,
+                            ptstrName: sid as *mut u16,
+                        },
+                    }
+                })
+                .collect::<Vec<_>>();
+            if path_entries.is_empty() {
+                continue;
+            }
+            let wide_path = path.encode_utf16().chain([0]).collect::<Vec<_>>();
+            let mut security_descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+            let mut old_dacl: *mut ACL = std::ptr::null_mut();
+            let read_result = GetNamedSecurityInfoW(
+                wide_path.as_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                &mut old_dacl,
+                std::ptr::null_mut(),
+                &mut security_descriptor,
+            );
+            if read_result != 0 {
+                LocalFree(sid);
+                return Err(format!(
+                    "GetNamedSecurityInfoW failed for {path}: {read_result}"
+                ));
+            }
+            let mut new_dacl: *mut ACL = std::ptr::null_mut();
+            let acl_result = SetEntriesInAclW(
+                path_entries.len() as u32,
+                path_entries.as_ptr(),
+                old_dacl,
+                &mut new_dacl,
+            );
+            if acl_result != 0 {
+                LocalFree(security_descriptor);
+                LocalFree(sid);
+                return Err(format!("SetEntriesInAclW failed for {path}: {acl_result}"));
+            }
+            let write_result = SetNamedSecurityInfoW(
+                wide_path.as_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                new_dacl,
+                std::ptr::null_mut(),
+            );
+            LocalFree(new_dacl.cast());
+            LocalFree(security_descriptor);
+            if write_result != 0 {
+                LocalFree(sid);
+                return Err(format!(
+                    "SetNamedSecurityInfoW failed for {path}: {write_result}"
+                ));
+            }
+        }
+        LocalFree(sid);
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -1052,8 +1349,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        filesystem_acl_transaction, filesystem_grant_plan, is_allowed_drive_colon, path_text_issue,
-        ExecRequest, FilesystemAclAccess,
+        apply_acl_transaction, filesystem_acl_transaction, filesystem_grant_plan,
+        is_allowed_drive_colon, path_text_issue, rollback_acl, ExecRequest, FilesystemAclAccess,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -1096,16 +1393,19 @@ mod tests {
     }
 
     fn temp_case(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "openagt-sandbox-win-{name}-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("openagt-sandbox-win-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
     }
 
-    fn request(cwd: &PathBuf, allowed: Vec<PathBuf>, writable: Vec<PathBuf>, policy: &str) -> ExecRequest {
+    fn request(
+        cwd: &PathBuf,
+        allowed: Vec<PathBuf>,
+        writable: Vec<PathBuf>,
+        policy: &str,
+    ) -> ExecRequest {
         ExecRequest {
             request_id: "test".to_string(),
             command: "echo test".to_string(),
@@ -1155,11 +1455,9 @@ mod tests {
             vec![external.clone()],
             "workspace_write",
         ));
-        assert!(
-            result
-                .unwrap_err()
-                .contains("writable_path is not inside allowed_paths")
-        );
+        assert!(result
+            .unwrap_err()
+            .contains("writable_path is not inside allowed_paths"));
         let _ = fs::remove_dir_all(dir);
         let _ = fs::remove_dir_all(external);
     }
@@ -1174,7 +1472,10 @@ mod tests {
             "workspace_write",
         ))
         .unwrap();
-        assert!(plan.deny_write_paths.iter().any(|item| item.ends_with("\\.git")));
+        assert!(plan
+            .deny_write_paths
+            .iter()
+            .any(|item| item.ends_with("\\.git")));
         assert!(plan
             .deny_write_paths
             .iter()
@@ -1223,9 +1524,18 @@ mod tests {
         .unwrap();
         let transaction = filesystem_acl_transaction(&plan, "S-1-15-2-1").unwrap();
 
-        assert!(transaction.backup_paths.iter().any(|item| item.ends_with("readonly")));
-        assert!(transaction.backup_paths.iter().any(|item| item.ends_with("\\.git")));
-        assert!(transaction.backup_paths.iter().any(|item| item == &plan.writable_paths[0]));
+        assert!(transaction
+            .backup_paths
+            .iter()
+            .any(|item| item.ends_with("readonly")));
+        assert!(transaction
+            .backup_paths
+            .iter()
+            .any(|item| item.ends_with("\\.git")));
+        assert!(transaction
+            .backup_paths
+            .iter()
+            .any(|item| item == &plan.writable_paths[0]));
         let _ = fs::remove_dir_all(dir);
     }
 
@@ -1244,6 +1554,20 @@ mod tests {
             filesystem_acl_transaction(&plan, " ").unwrap_err(),
             "ACL transaction requires a sandbox principal SID"
         );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn acl_transaction_dry_run_captures_backup_without_applying() {
+        let dir = temp_case("acl-dry-run");
+        let plan =
+            filesystem_grant_plan(&request(&dir, vec![dir.clone()], vec![], "read_only")).unwrap();
+        let transaction = filesystem_acl_transaction(&plan, "S-1-15-2-1").unwrap();
+        let backup = apply_acl_transaction(&transaction, true).unwrap().unwrap();
+
+        assert!(!backup.entries.is_empty());
+        assert!(backup.entries.iter().all(|entry| !entry.sddl.is_empty()));
+        rollback_acl(&backup).unwrap();
         let _ = fs::remove_dir_all(dir);
     }
 }
