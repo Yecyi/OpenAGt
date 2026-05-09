@@ -87,6 +87,13 @@ struct PolicyAdvisory {
     windows_sandbox_mode: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FilesystemGrantPlan {
+    read_paths: Vec<String>,
+    writable_paths: Vec<String>,
+    deny_write_paths: Vec<String>,
+}
+
 fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
     println!(
         "{}",
@@ -144,15 +151,67 @@ fn setup(mode: &str) -> SetupOutput {
     }
 }
 
-fn validate_request_paths(request: &ExecRequest) -> Result<(), String> {
-    canonicalize_sandbox_path("cwd", &request.cwd)?;
-    for item in &request.allowed_paths {
-        canonicalize_sandbox_path("allowed_path", item)?;
+fn protected_workspace_write_names() -> [&'static str; 5] {
+    [".git", ".openagt", ".opencode", ".codex", ".agents"]
+}
+
+fn sort_dedup(mut input: Vec<String>) -> Vec<String> {
+    input.sort();
+    input.dedup();
+    input
+}
+
+fn is_path_or_child(path: &str, parent: &str) -> bool {
+    if path == parent {
+        return true;
     }
-    for item in &request.writable_paths {
-        canonicalize_sandbox_path("writable_path", item)?;
+    let parent = parent.trim_end_matches(['\\', '/']);
+    path.starts_with(&format!("{parent}\\"))
+        || path.starts_with(&format!("{parent}/"))
+}
+
+fn child_path(parent: &str, name: &str) -> String {
+    format!("{}\\{}", parent.trim_end_matches(['\\', '/']), name)
+}
+
+fn filesystem_grant_plan(request: &ExecRequest) -> Result<FilesystemGrantPlan, String> {
+    let cwd = canonicalize_sandbox_path("cwd", &request.cwd)?;
+    let read_paths = sort_dedup(
+        request
+            .allowed_paths
+            .iter()
+            .map(|item| canonicalize_sandbox_path("allowed_path", item))
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    let writable_paths = sort_dedup(
+        request
+            .writable_paths
+            .iter()
+            .map(|item| canonicalize_sandbox_path("writable_path", item))
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    if request.filesystem_policy == "read_only" && !writable_paths.is_empty() {
+        return Err("read_only filesystem policy cannot include writable_paths".to_string());
     }
-    Ok(())
+    if let Some(path) = writable_paths
+        .iter()
+        .find(|path| !read_paths.iter().any(|allowed| is_path_or_child(path, allowed)))
+    {
+        return Err(format!("writable_path is not inside allowed_paths: {path}"));
+    }
+    let deny_write_paths = if request.filesystem_policy == "workspace_write" {
+        protected_workspace_write_names()
+            .into_iter()
+            .map(|name| child_path(&cwd, name))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    Ok(FilesystemGrantPlan {
+        read_paths,
+        writable_paths,
+        deny_write_paths,
+    })
 }
 
 #[cfg(windows)]
@@ -304,7 +363,7 @@ fn exec() -> Result<(), String> {
         .read_to_string(&mut input)
         .map_err(|error| error.to_string())?;
     let request: ExecRequest = serde_json::from_str(&input).map_err(|error| error.to_string())?;
-    validate_request_paths(&request)?;
+    let _grant_plan = filesystem_grant_plan(&request)?;
     exec_request(request)
 }
 
@@ -921,7 +980,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_allowed_drive_colon, path_text_issue};
+    use super::{filesystem_grant_plan, is_allowed_drive_colon, path_text_issue, ExecRequest};
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn accepts_normal_drive_paths() {
@@ -957,5 +1019,92 @@ mod tests {
     #[test]
     fn rejects_nul_bytes() {
         assert_eq!(path_text_issue("C:\\OpenAG\0x"), Some("contains NUL byte"));
+    }
+
+    fn temp_case(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "openagt-sandbox-win-{name}-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn request(cwd: &PathBuf, allowed: Vec<PathBuf>, writable: Vec<PathBuf>, policy: &str) -> ExecRequest {
+        ExecRequest {
+            request_id: "test".to_string(),
+            command: "echo test".to_string(),
+            shell_family: "cmd".to_string(),
+            shell: "cmd.exe".to_string(),
+            cwd: cwd.to_string_lossy().to_string(),
+            timeout_ms: 1_000,
+            env: BTreeMap::new(),
+            enforcement: "required".to_string(),
+            backend_preference: "windows_native".to_string(),
+            filesystem_policy: policy.to_string(),
+            allowed_paths: allowed
+                .into_iter()
+                .map(|item| item.to_string_lossy().to_string())
+                .collect(),
+            writable_paths: writable
+                .into_iter()
+                .map(|item| item.to_string_lossy().to_string())
+                .collect(),
+            network_policy: "none".to_string(),
+        }
+    }
+
+    #[test]
+    fn grant_plan_rejects_read_only_writable_paths() {
+        let dir = temp_case("readonly-writable");
+        let result = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "read_only",
+        ));
+        assert_eq!(
+            result.unwrap_err(),
+            "read_only filesystem policy cannot include writable_paths"
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn grant_plan_rejects_writable_paths_outside_allowed_paths() {
+        let dir = temp_case("write-outside-allowed");
+        let external = temp_case("write-outside-allowed-external");
+        let result = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone()],
+            vec![external.clone()],
+            "workspace_write",
+        ));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("writable_path is not inside allowed_paths")
+        );
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(external);
+    }
+
+    #[test]
+    fn grant_plan_adds_workspace_write_deny_paths() {
+        let dir = temp_case("workspace-deny");
+        let plan = filesystem_grant_plan(&request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        ))
+        .unwrap();
+        assert!(plan.deny_write_paths.iter().any(|item| item.ends_with("\\.git")));
+        assert!(plan
+            .deny_write_paths
+            .iter()
+            .any(|item| item.ends_with("\\.openagt")));
+        let _ = fs::remove_dir_all(dir);
     }
 }
