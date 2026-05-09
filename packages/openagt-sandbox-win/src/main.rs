@@ -407,45 +407,41 @@ fn sandbox_principal_sid() -> Result<String, String> {
 
 #[cfg(windows)]
 fn sandbox_principal_sid() -> Result<String, String> {
-    use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
-    use windows_sys::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
-    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    sid_to_string(&restricted_code_sid()?)
+}
 
+#[cfg(windows)]
+fn restricted_code_sid() -> Result<Vec<u8>, String> {
+    use windows_sys::Win32::Security::{CreateWellKnownSid, WinRestrictedCodeSid};
+
+    let mut sid = vec![0u8; 68];
+    let mut sid_len = sid.len() as u32;
     unsafe {
-        let mut token = 0;
-        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
-            return Err(format!(
-                "OpenProcessToken failed while resolving ACL principal: {}",
-                std::io::Error::last_os_error()
-            ));
-        }
-        let token = OwnedHandle(token);
-        let mut required = 0;
-        GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut required);
-        if required == 0 {
-            return Err(format!(
-                "GetTokenInformation size lookup failed: {}",
-                std::io::Error::last_os_error()
-            ));
-        }
-        let mut buffer = vec![0u8; required as usize];
-        if GetTokenInformation(
-            token.0,
-            TokenUser,
-            buffer.as_mut_ptr().cast(),
-            required,
-            &mut required,
+        if CreateWellKnownSid(
+            WinRestrictedCodeSid,
+            std::ptr::null_mut(),
+            sid.as_mut_ptr().cast(),
+            &mut sid_len,
         ) == 0
         {
             return Err(format!(
-                "GetTokenInformation failed: {}",
+                "CreateWellKnownSid(WinRestrictedCodeSid) failed: {}",
                 std::io::Error::last_os_error()
             ));
         }
-        let token_user = &*(buffer.as_ptr() as *const TOKEN_USER);
+    }
+    sid.truncate(sid_len as usize);
+    Ok(sid)
+}
+
+#[cfg(windows)]
+fn sid_to_string(sid: &[u8]) -> Result<String, String> {
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
+
+    unsafe {
         let mut sid_text = std::ptr::null_mut();
-        if ConvertSidToStringSidW(token_user.User.Sid, &mut sid_text) == 0 {
+        if ConvertSidToStringSidW(sid.as_ptr() as _, &mut sid_text) == 0 {
             return Err(format!(
                 "ConvertSidToStringSidW failed: {}",
                 std::io::Error::last_os_error()
@@ -1231,9 +1227,15 @@ fn create_restricted_token(token: OwnedHandle) -> Result<OwnedHandle, String> {
     use windows_sys::Win32::Security::{
         CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, LUID_AND_ATTRIBUTES, SID_AND_ATTRIBUTES,
     };
+    const SE_GROUP_ENABLED: u32 = 0x00000004;
 
     unsafe {
         let mut restricted = 0;
+        let restricted_sid = restricted_code_sid()?;
+        let restricted_sids = [SID_AND_ATTRIBUTES {
+            Sid: restricted_sid.as_ptr() as _,
+            Attributes: SE_GROUP_ENABLED,
+        }];
         if CreateRestrictedToken(
             token.0,
             DISABLE_MAX_PRIVILEGE,
@@ -1241,8 +1243,8 @@ fn create_restricted_token(token: OwnedHandle) -> Result<OwnedHandle, String> {
             std::ptr::null::<SID_AND_ATTRIBUTES>(),
             0,
             std::ptr::null::<LUID_AND_ATTRIBUTES>(),
-            0,
-            std::ptr::null::<SID_AND_ATTRIBUTES>(),
+            restricted_sids.len() as u32,
+            restricted_sids.as_ptr(),
             &mut restricted,
         ) == 0
         {
@@ -1750,5 +1752,11 @@ mod tests {
 
         assert!(guard.is_none());
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn sandbox_principal_uses_restricted_code_sid() {
+        assert_eq!(super::sandbox_principal_sid().unwrap(), "S-1-5-12");
     }
 }
