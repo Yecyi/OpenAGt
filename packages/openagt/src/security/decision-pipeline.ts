@@ -17,7 +17,7 @@ const DECISION_ORDER: Record<ShellDecision, number> = {
 
 type PipelinePolicy = Pick<
   ResolvedPolicy,
-  "sandbox" | "backend_preference" | "needs_network_permission"
+  "sandbox" | "backend_preference" | "network_policy" | "needs_network_permission"
 >
 
 export type ExecutionDecision = {
@@ -88,6 +88,16 @@ function nativeUnavailable(input: { preference: SandboxBackendPreference; capabi
   return native?.name !== "process" && !native?.available
 }
 
+function nativeNetworkUnsupported(input: {
+  preference: SandboxBackendPreference
+  capabilities: SandboxBackendStatus[]
+  networkPolicy: PipelinePolicy["network_policy"]
+}) {
+  if (input.networkPolicy === "full") return false
+  const backend = preferredBackendStatus(input.preference, input.capabilities)
+  return Boolean(backend?.available && backend.name !== "process" && !backend.network_enforced)
+}
+
 function unavailableReason(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
   const backend = preferredBackendStatus(preference, capabilities)
   return backend?.reason ? ` (${backend.reason})` : ""
@@ -119,6 +129,24 @@ function sandboxDecision(input: {
         decision: "confirm" as const,
         reason: `${backendLabel[0]?.toUpperCase()}${backendLabel.slice(1)} is unavailable; confirmation required before downgrade.`,
       }
+    }
+  }
+  if (
+    nativeNetworkUnsupported({
+      preference: input.policy.backend_preference,
+      capabilities: input.capabilities,
+      networkPolicy: input.policy.network_policy,
+    })
+  ) {
+    if (input.policy.sandbox.failure_policy === "closed") {
+      return {
+        decision: "block" as const,
+        reason: `Required sandbox backend cannot enforce ${input.policy.network_policy} network policy.`,
+      }
+    }
+    return {
+      decision: "confirm" as const,
+      reason: `Sandbox backend cannot enforce ${input.policy.network_policy} network policy; confirmation required before downgrade.`,
     }
   }
   if (isRisky(input.riskLevel) && processOnly({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {

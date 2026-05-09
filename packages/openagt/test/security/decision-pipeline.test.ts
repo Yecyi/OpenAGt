@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { resolveExecutionDecision, strictestDecision } from "../../src/security/decision-pipeline"
 import type { EvaluationResult } from "../../src/security/exec-policy"
-import type { SandboxBackendPreference, SandboxBackendStatus, SandboxFailurePolicy } from "../../src/sandbox/types"
+import type {
+  SandboxBackendPreference,
+  SandboxBackendStatus,
+  SandboxFailurePolicy,
+  SandboxNetworkPolicy,
+} from "../../src/sandbox/types"
 
 const evalResult = (decision: EvaluationResult["decision"], matched = false): EvaluationResult => ({
   tokens: ["cmd"],
@@ -14,17 +19,21 @@ const policy = (
   backend: SandboxBackendPreference,
   failurePolicy: SandboxFailurePolicy,
   network = false,
-) => ({
-  sandbox: {
-    enabled: true,
-    backend,
-    failure_policy: failurePolicy,
-    report_only: false,
-    broker_idle_ttl_ms: 300_000,
-  },
-  backend_preference: backend,
-  needs_network_permission: network,
-})
+) => {
+  const networkPolicy: SandboxNetworkPolicy = network ? "full" : "none"
+  return {
+    sandbox: {
+      enabled: true,
+      backend,
+      failure_policy: failurePolicy,
+      report_only: false,
+      broker_idle_ttl_ms: 300_000,
+    },
+    backend_preference: backend,
+    network_policy: networkPolicy,
+    needs_network_permission: network,
+  }
+}
 
 const processOnly: SandboxBackendStatus[] = [{ name: "process", available: true }]
 const windowsNativeUnavailable: SandboxBackendStatus[] = [
@@ -32,6 +41,15 @@ const windowsNativeUnavailable: SandboxBackendStatus[] = [
     name: "windows_native",
     available: false,
     reason: "Windows native helper run loop is not implemented yet",
+  },
+  { name: "process", available: true },
+]
+const windowsNativeFilesystemOnly: SandboxBackendStatus[] = [
+  {
+    name: "windows_native",
+    available: true,
+    filesystem_enforced: true,
+    network_enforced: false,
   },
   { name: "process", available: true },
 ]
@@ -120,6 +138,38 @@ describe("execution decision pipeline", () => {
     expect(decision.policySource).toBe("shell_security")
     expect(decision.backendAvailability).toContain("windows_native:unavailable")
     expect(decision.sandboxEscalationReason).toBeUndefined()
+  })
+
+  test("blocks native backend without requested network enforcement under closed policy", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "closed"),
+      capabilities: windowsNativeFilesystemOnly,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("block")
+    expect(decision.policySource).toBe("sandbox_policy")
+    expect(decision.finalReason).toContain("cannot enforce none network policy")
+  })
+
+  test("confirms downgrade when native backend lacks requested network enforcement", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "fallback"),
+      capabilities: windowsNativeFilesystemOnly,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("confirm")
+    expect(decision.approvalKind).toBe("sandbox_escalation")
+    expect(decision.finalReason).toContain("confirmation required before downgrade")
   })
 
   test("confirms risky auto fallback when native backend is unavailable", () => {

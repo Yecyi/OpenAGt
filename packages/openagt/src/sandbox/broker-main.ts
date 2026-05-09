@@ -91,6 +91,7 @@ const parser = createFrameParser((frame) => {
     backendPreference: frame.request.backend_preference,
     failurePolicy: frame.request.failure_policy,
     autoBackendName: autoBackendName(),
+    networkPolicy: frame.request.network_policy,
   })
   if (selection.type === "deny") {
     void send({

@@ -1,4 +1,10 @@
-import type { SandboxBackendName, SandboxBackendPreference, SandboxBackendStatus, SandboxFailurePolicy } from "./types"
+import type {
+  SandboxBackendName,
+  SandboxBackendPreference,
+  SandboxBackendStatus,
+  SandboxFailurePolicy,
+  SandboxNetworkPolicy,
+} from "./types"
 
 export type BackendSelection =
   | {
@@ -17,11 +23,17 @@ export function selectBackend(input: {
   backendPreference: SandboxBackendPreference
   failurePolicy: SandboxFailurePolicy
   autoBackendName: SandboxBackendName
+  networkPolicy?: SandboxNetworkPolicy
 }): BackendSelection {
+  const networkPolicy = input.networkPolicy ?? "full"
   const preferredName = input.backendPreference === "auto" ? input.autoBackendName : input.backendPreference
   const preferred = input.backends.get(preferredName)?.status
-  if (preferred?.available) return { type: "run", backend: preferred }
-  const reason = preferred?.reason ?? `Sandbox backend unavailable: ${preferredName}`
+  const networkReason =
+    preferred?.available && preferred.name !== "process" && networkPolicy !== "full" && !preferred.network_enforced
+      ? `${preferred.name} does not enforce ${networkPolicy} network policy`
+      : undefined
+  if (preferred?.available && !networkReason) return { type: "run", backend: preferred }
+  const reason = networkReason ?? preferred?.reason ?? `Sandbox backend unavailable: ${preferredName}`
   if (input.failurePolicy === "closed") {
     return {
       type: "deny",

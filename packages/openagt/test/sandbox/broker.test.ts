@@ -109,6 +109,30 @@ describe("sandbox backend selection", () => {
       downgradeReason: "Windows native helper unavailable",
     })
   })
+
+  test("closed policy denies native backend when requested network policy is not enforced", () => {
+    expect(
+      selectBackend({
+        backends: backendMap([
+          {
+            name: "windows_native",
+            available: true,
+            filesystem_enforced: true,
+            network_enforced: false,
+          },
+          { name: "process", available: true, helper: "bun" },
+        ]),
+        backendPreference: "auto",
+        failurePolicy: "closed",
+        autoBackendName: "windows_native",
+        networkPolicy: "none",
+      }),
+    ).toEqual({
+      type: "deny",
+      backendUsed: "windows_native",
+      reason: "windows_native does not enforce none network policy",
+    })
+  })
 })
 
 describe("Windows helper discovery", () => {
