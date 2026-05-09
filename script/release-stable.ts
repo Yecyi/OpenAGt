@@ -33,6 +33,7 @@ if (process.platform === "win32") {
   }
 }
 
+await $`bun run release:smoke`
 await $`bun run script/release-checksums.ts --dir packages/openagt/dist --output packages/openagt/dist/SHA256SUMS.txt`
 await $`bun run script/release-sbom.ts --output packages/openagt/dist/sbom.spdx.json`
 
