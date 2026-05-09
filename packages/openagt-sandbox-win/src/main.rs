@@ -2219,7 +2219,10 @@ mod tests {
     };
     use std::collections::BTreeMap;
     use std::fs;
+    use std::net::TcpListener;
     use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
 
     const RUN_WINDOWS_ACL_TESTS_ENV: &str = "OPENAGT_RUN_WINDOWS_ACL_TESTS";
     const RUN_WINDOWS_WFP_TESTS_ENV: &str = "OPENAGT_RUN_WINDOWS_WFP_TESTS";
@@ -2295,6 +2298,116 @@ mod tests {
                 .collect(),
             network_policy: "none".to_string(),
         }
+    }
+
+    struct EnvVarRestore {
+        key: &'static str,
+        previous: Option<String>,
+    }
+
+    impl EnvVarRestore {
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var(key).ok();
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvVarRestore {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    struct WfpSetupRestore {
+        cleanup: bool,
+    }
+
+    impl WfpSetupRestore {
+        fn install() -> Self {
+            let cleanup = !super::setup("status").setup_installed;
+            let install = super::setup("install");
+            assert!(install.ok, "{install:?}");
+            assert!(install.setup_installed);
+            assert_eq!(install.network_policies_enforced, vec!["none".to_string()]);
+            Self { cleanup }
+        }
+    }
+
+    impl Drop for WfpSetupRestore {
+        fn drop(&mut self) {
+            if self.cleanup {
+                let _ = super::setup("uninstall");
+            }
+        }
+    }
+
+    fn powershell_path() -> String {
+        format!(
+            r"{}\System32\WindowsPowerShell\v1.0\powershell.exe",
+            std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string())
+        )
+    }
+
+    fn powershell_literal(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "''"))
+    }
+
+    fn exec_loopback_connection_attempt(network_policy: &str) -> bool {
+        let dir = temp_case(&format!("wfp-network-{network_policy}"));
+        let marker = dir.join(format!("attempted-{network_policy}.txt"));
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let started = Instant::now();
+            while started.elapsed() < Duration::from_millis(2_000) {
+                match listener.accept() {
+                    Ok(_) => {
+                        let _ = tx.send(true);
+                        return;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(25));
+                    }
+                    Err(_) => break,
+                }
+            }
+            let _ = tx.send(false);
+        });
+
+        let mut exec_request = request(
+            &dir,
+            vec![dir.clone()],
+            vec![dir.clone()],
+            "workspace_write",
+        );
+        exec_request.shell_family = "powershell".to_string();
+        exec_request.shell = powershell_path();
+        exec_request.network_policy = network_policy.to_string();
+        exec_request.timeout_ms = 5_000;
+        exec_request.env = BTreeMap::from([(
+            "SystemRoot".to_string(),
+            std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string()),
+        )]);
+        exec_request.command = format!(
+            "Set-Content -LiteralPath {} -Value attempted; $client = [Net.Sockets.TcpClient]::new(); $async = $client.BeginConnect('127.0.0.1', {}, $null, $null); if ($async.AsyncWaitHandle.WaitOne(800)) {{ try {{ $client.EndConnect($async); exit 42 }} catch {{ exit 0 }} }} else {{ exit 0 }}",
+            powershell_literal(&marker.to_string_lossy()),
+            port
+        );
+
+        let _acl_mode = EnvVarRestore::set(super::ACL_APPLY_MODE_ENV, "apply");
+        super::exec_request(exec_request).unwrap();
+        assert!(marker.exists());
+        let accepted = rx
+            .recv_timeout(Duration::from_millis(3_000))
+            .unwrap_or(false);
+        let _ = fs::remove_dir_all(dir);
+        accepted
     }
 
     #[test]
@@ -2648,5 +2761,20 @@ mod tests {
         assert!(uninstall.ok, "{uninstall:?}");
         assert!(!uninstall.setup_installed);
         assert!(uninstall.setup_required);
+    }
+
+    #[test]
+    fn wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect() {
+        if std::env::var(RUN_WINDOWS_WFP_TESTS_ENV).as_deref() != Ok("1") {
+            return;
+        }
+        if !cfg!(windows) || !super::process_is_elevated() {
+            return;
+        }
+
+        let _wfp = WfpSetupRestore::install();
+
+        assert!(exec_loopback_connection_attempt("full"));
+        assert!(!exec_loopback_connection_attempt("none"));
     }
 }

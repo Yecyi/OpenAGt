@@ -53,7 +53,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 | CRLF/Unicode handling | partial | Patch updates preserve source CRLF and read long-line truncation is codepoint-safe; broader binary/mixed-EOL patch round-trip remains future hardening work. |
 | Permission deny-overrides-allow | implemented | Suitable for RC. |
 | Sandbox process labeling | implemented | Process backend status now calls out process-level enforcement instead of implying OS-native isolation. Full OS-native sandboxing remains roadmap work. |
-| Windows native sandbox helper substrate | partial | `openagt-sandbox-win` crate, setup/probe CLI wiring, packaged-helper discovery, release packaging hooks, Job Object timeout containment, helper-side path preflight, restricted-token launch path, restricted-code SID binding, canonical filesystem grant-plan validation, rollback-aware ACL transaction planning, DACL backup/apply/rollback APIs, an exec-path ACL wrapper, capability-driven filesystem probe, setup/elevation/enforcement diagnostics, gated ACL enforcement integration coverage, WFP setup lifecycle, security-descriptor scoped WFP user conditions, and setup-gated `network_policy=none` capability reporting exist. ACL apply remains explicit-gated, `network_policy=none` requires elevated setup plus integration verification before it is treated as default-ready, and `network_policy=loopback` remains deferred. |
+| Windows native sandbox helper substrate | partial | `openagt-sandbox-win` crate, setup/probe CLI wiring, packaged-helper discovery, release packaging hooks, Job Object timeout containment, helper-side path preflight, restricted-token launch path, restricted-code SID binding, canonical filesystem grant-plan validation, rollback-aware ACL transaction planning, DACL backup/apply/rollback APIs, an exec-path ACL wrapper, capability-driven filesystem probe, setup/elevation/enforcement diagnostics, gated ACL enforcement integration coverage, WFP setup lifecycle, security-descriptor scoped WFP user conditions, setup-gated `network_policy=none` capability reporting, and an admin-gated loopback-block execution test exist. ACL apply remains explicit-gated, `network_policy=none` requires elevated setup plus manual/CI opt-in verification before it is treated as default-ready, and `network_policy=loopback` remains deferred. |
 | WebFetch redirect SSRF guard | implemented | Redirect hops are checked and private/local/metadata targets are blocked by default. |
 | TUI ANSI/OSC sanitization | implemented | Unsafe control sequences are stripped before TUI render. |
 | Server body limit/local bearer auth | implemented | Body limit, JSON depth guard, local origin check, and optional local bearer/cookie support are implemented. |
@@ -67,7 +67,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 
 ## Deferred / Next Pass
 
-- Default-on Windows OS-native sandbox enforcement beyond explicit-gated ACL and setup-gated WFP `network_policy=none`.
+- Default-on Windows OS-native sandbox enforcement beyond explicit-gated ACL and setup-gated WFP `network_policy=none`; run `OPENAGT_RUN_WINDOWS_WFP_TESTS=1 cargo test --manifest-path packages/openagt-sandbox-win/Cargo.toml` from an elevated Windows terminal for the admin-only WFP execution gate.
 - Measured cache-control hit-rate benchmark in CI.
 - Full provider tokenizer integration beyond the safer fallback estimator.
 - Provider/MCP/plugin/LSP/bus scalability work.
