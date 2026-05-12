@@ -2323,26 +2323,65 @@ mod tests {
     }
 
     struct WfpSetupRestore {
-        cleanup: bool,
+        was_installed: bool,
     }
 
     impl WfpSetupRestore {
         fn install() -> Self {
-            let cleanup = !super::setup("status").setup_installed;
+            let was_installed = super::setup("status").setup_installed;
             let install = super::setup("install");
             assert!(install.ok, "{install:?}");
             assert!(install.setup_installed);
             assert_eq!(install.network_policies_enforced, vec!["none".to_string()]);
-            Self { cleanup }
+            Self { was_installed }
         }
     }
 
     impl Drop for WfpSetupRestore {
         fn drop(&mut self) {
-            if self.cleanup {
-                let _ = super::setup("uninstall");
+            if self.was_installed {
+                let _ = super::setup("install");
+                return;
             }
+            let _ = super::setup("uninstall");
         }
+    }
+
+    fn with_wfp_setup_restored(body: impl FnOnce()) {
+        let _restore = WfpSetupRestore::install();
+        body();
+    }
+
+    fn assert_wfp_setup_uninstalls() {
+        let uninstall = super::setup("uninstall");
+        assert!(uninstall.ok, "{uninstall:?}");
+        assert!(!uninstall.setup_installed);
+        assert!(uninstall.setup_required);
+    }
+
+    fn assert_wfp_setup_installs() {
+        let install = super::setup("install");
+        assert!(install.ok, "{install:?}");
+        assert!(install.setup_installed);
+        assert_eq!(install.network_policies_enforced, vec!["none".to_string()]);
+    }
+
+    fn assert_wfp_setup_status_installed() {
+        let status = super::setup("status");
+        assert!(status.ok);
+        assert!(status.setup_installed);
+        assert!(status.network_enforced);
+    }
+
+    fn assert_wfp_setup_status_missing() {
+        if super::setup("status").setup_installed {
+            assert_wfp_setup_uninstalls();
+            return;
+        }
+        let status = super::setup("status");
+        assert!(status.ok);
+        assert!(!status.setup_installed);
+        assert!(status.setup_required);
     }
 
     fn powershell_path() -> String {
@@ -2747,20 +2786,14 @@ mod tests {
             return;
         }
 
-        let install = super::setup("install");
-        assert!(install.ok, "{install:?}");
-        assert!(install.setup_installed);
-        assert_eq!(install.network_policies_enforced, vec!["none".to_string()]);
-
-        let status = super::setup("status");
-        assert!(status.ok);
-        assert!(status.setup_installed);
-        assert!(status.network_enforced);
-
-        let uninstall = super::setup("uninstall");
-        assert!(uninstall.ok, "{uninstall:?}");
-        assert!(!uninstall.setup_installed);
-        assert!(uninstall.setup_required);
+        with_wfp_setup_restored(|| {
+            assert_wfp_setup_installs();
+            assert_wfp_setup_status_installed();
+            assert_wfp_setup_uninstalls();
+            assert_wfp_setup_status_missing();
+            assert_wfp_setup_installs();
+            assert_wfp_setup_status_installed();
+        });
     }
 
     #[test]
@@ -2772,9 +2805,9 @@ mod tests {
             return;
         }
 
-        let _wfp = WfpSetupRestore::install();
-
-        assert!(exec_loopback_connection_attempt("full"));
-        assert!(!exec_loopback_connection_attempt("none"));
+        with_wfp_setup_restored(|| {
+            assert!(exec_loopback_connection_attempt("full"));
+            assert!(!exec_loopback_connection_attempt("none"));
+        });
     }
 }

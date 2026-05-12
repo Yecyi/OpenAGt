@@ -170,7 +170,7 @@ flowchart LR
 | Sandbox behavior | enforcement、failure_policy、report_only、broker TTL | Global/Workspace | policy panel |
 | Boundaries | allowedPaths、writablePaths、networkPolicy | Tool/Run | path list + network toggle |
 
-Windows note: packaged Windows builds include the `openagt-sandbox-win.exe` helper and expose `openagt sandbox windows probe --json` / `openagt sandbox windows setup --status --json` for diagnostics. Treat `process` as advisory/audit-only (`policy_advisory.enforced=false`). Treat `windows_native` as capability-gated: it is selected only when the helper reports restricted-token, Job Object, and filesystem enforcement support. `network_policy=none` is WFP setup-gated and should stay labeled experimental until the admin opt-in execution gate passes; `network_policy=loopback` remains deferred. The admin-only gate is `OPENAGT_RUN_WINDOWS_WFP_TESTS=1 cargo test --manifest-path packages/openagt-sandbox-win/Cargo.toml` from an elevated Windows terminal.
+Windows note: packaged Windows builds include the `openagt-sandbox-win.exe` helper and expose `openagt sandbox windows probe --json` / `openagt sandbox windows setup --status --json` for diagnostics. Treat `process` as advisory/audit-only (`policy_advisory.enforced=false`). Treat `windows_native` as capability-gated: it is selected only when the helper reports restricted-token, Job Object, and filesystem enforcement support. `network_policy=none` is WFP setup-gated and should stay labeled experimental until the admin opt-in execution gate passes; `network_policy=loopback` remains deferred. The admin-only gate is `bun run verify:windows-sandbox-admin` from an elevated Windows terminal.
 
 必须把危险设置分成两层：权限审批和 sandbox 执行边界。`allow bash` 不应该被理解为“关闭 sandbox”。
 

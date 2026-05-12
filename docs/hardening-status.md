@@ -67,7 +67,7 @@ This checklist tracks the large coordinator/subagent/runtime hardening pass. It 
 
 ## Deferred / Next Pass
 
-- Default-on Windows OS-native sandbox enforcement beyond explicit-gated ACL and setup-gated WFP `network_policy=none`; run `OPENAGT_RUN_WINDOWS_WFP_TESTS=1 cargo test --manifest-path packages/openagt-sandbox-win/Cargo.toml` from an elevated Windows terminal for the admin-only WFP execution gate.
+- Default-on Windows OS-native sandbox enforcement beyond explicit-gated ACL and setup-gated WFP `network_policy=none`; run `bun run verify:windows-sandbox-admin` from an elevated Windows terminal for the admin-only WFP execution gate.
 - Measured cache-control hit-rate benchmark in CI.
 - Full provider tokenizer integration beyond the safer fallback estimator.
 - Provider/MCP/plugin/LSP/bus scalability work.
