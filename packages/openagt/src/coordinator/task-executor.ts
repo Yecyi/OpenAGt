@@ -20,6 +20,7 @@ import {
 } from "./review-verdict"
 import { buildTaskPrompt, messageText } from "./task-prompt"
 import { mpacrCriticTimeoutMs, taskModel, taskVariant } from "./task-record"
+import { deterministicChecksForTask, metadataChecks, missingDeterministicSignals } from "./verifier-checks"
 import { aggregateVerifierSignals, collectVerifierSignals } from "./verifier-aggregator"
 import type {
   CoordinatorRun as CoordinatorRunType,
@@ -309,8 +310,22 @@ export class CoordinatorTaskExecutor {
                 posterior: final.verdict.posterior,
               })
             }
-            const verifierSignals = isVerificationTask(started)
+            const observedVerifierSignals = isVerificationTask(started)
               ? yield* collectVerifierSignals({ childSessionID: started.child_session_id })
+              : []
+            const metadataDeterministicChecks = isVerificationTask(started)
+              ? metadataChecks(started.metadata?.deterministic_checks)
+              : []
+            const deterministicChecks = isVerificationTask(started)
+              ? metadataDeterministicChecks.length
+                ? metadataDeterministicChecks
+                : deterministicChecksForTask(started)
+              : []
+            const verifierSignals = isVerificationTask(started)
+              ? [
+                  ...observedVerifierSignals,
+                  ...missingDeterministicSignals(deterministicChecks, observedVerifierSignals),
+                ]
               : []
             const verifierAggregate = verifierSignals.length > 0 ? aggregateVerifierSignals(verifierSignals) : undefined
             if (verifierAggregate) {
@@ -345,6 +360,7 @@ export class CoordinatorTaskExecutor {
                 parentSessionID: started.parent_session_id,
                 error: reason,
                 metadata: {
+                  deterministic_checks: deterministicChecks,
                   verifier_signals: verifierSignals,
                   verifier_aggregate: verifierAggregate,
                 },
@@ -404,6 +420,7 @@ export class CoordinatorTaskExecutor {
                     result: final.message,
                     metadata: verifierAggregate
                       ? {
+                          deterministic_checks: deterministicChecks,
                           verifier_signals: verifierSignals,
                           verifier_aggregate: verifierAggregate,
                         }

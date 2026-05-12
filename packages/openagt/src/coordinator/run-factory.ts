@@ -7,6 +7,7 @@ import { Database, eq } from "@/storage"
 import { Effect } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
 import { reviewMemoryPatternsForNode } from "./expert-memory-context"
+import { deterministicChecksForNode } from "./verifier-checks"
 import { runFromRow } from "./run-row"
 import { CoordinatorTaskSessionFactory } from "./task-session-factory"
 import type {
@@ -121,6 +122,7 @@ export class CoordinatorRunFactory {
             mpacr_degraded: node.mpacr_degraded,
             memory_namespace: node.memory_namespace,
             review_memory_patterns: reviewMemoryPatterns,
+            deterministic_checks: deterministicChecksForNode(node, params.planned.nodes),
             confidence: node.confidence,
             revise_policy: node.revise_policy,
             intent: params.intent,

@@ -316,6 +316,20 @@ describe("coordinator intent planning", () => {
           prompt: node.prompt,
           role: node.role,
           output_schema: node.output_schema,
+          deterministic_checks:
+            node.id === "verify_typecheck"
+              ? [
+                  {
+                    id: "typecheck:packages/openagt",
+                    source: "typecheck",
+                    required: true,
+                    command: "bun typecheck",
+                    workdir: "packages/openagt",
+                    files: ["packages/openagt/src/coordinator/foo.ts"],
+                    reason: "Typecheck evidence is required.",
+                  },
+                ]
+              : [],
           assigned_scope: node.assigned_scope,
           excluded_scope: node.excluded_scope,
           workflow: plan.workflow,
@@ -354,6 +368,8 @@ describe("coordinator intent planning", () => {
     const verifierPrompt = buildTaskPrompt(taskFor("verify_typecheck"), [])
     expect(verifierPrompt).toContain("Verifier contract")
     expect(verifierPrompt).toContain("assigned dimension")
+    expect(verifierPrompt).toContain("Deterministic verifier checks")
+    expect(verifierPrompt).toContain("bun typecheck")
 
     const reviewerPrompt = buildTaskPrompt(taskFor("review"), [
       { ...taskFor("verify_typecheck", "completed"), result_summary: "typecheck evidence" },

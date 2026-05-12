@@ -11,7 +11,12 @@ import {
 } from "../../src/coordinator/failure-signature"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import { historyForOutcomeRows } from "../../src/coordinator/prompt-templates"
+import {
+  deterministicChecksForNode,
+  missingDeterministicSignals,
+} from "../../src/coordinator/verifier-checks"
 import { aggregateVerifierSignals, verifierSignalsFromMessages } from "../../src/coordinator/verifier-aggregator"
+import { node } from "../../src/coordinator/plan-node-factory"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { PersonalAgent } from "../../src/personal/personal"
 import { ThreeLayerMemory } from "../../src/personal/three-layer"
@@ -151,6 +156,48 @@ describe("coordinator learning loop", () => {
     expect(verdict.verdict).toBe("revise_required")
     expect(verdict.hard_fail_sources).toEqual(["typecheck"])
     expect(verdict.warning_sources).toEqual(["lsp_diagnostics"])
+  })
+
+  test("deterministic verifier checks are derived from touched code scopes", () => {
+    const implement = node({
+      id: "implement",
+      description: "Implement",
+      prompt: "Implement",
+      task_kind: "implement",
+      subagent_type: "general",
+      role: "implementer",
+      depends_on: [],
+      write_scope: ["packages/openagt/src/coordinator/foo.ts"],
+      read_scope: [],
+      acceptance_checks: ["implemented"],
+      priority: "high",
+      origin: "coordinator",
+    })
+    const verify = node({
+      id: "verify_typecheck",
+      description: "Verify",
+      prompt: "Verify",
+      task_kind: "verify",
+      subagent_type: "general",
+      role: "verifier",
+      depends_on: ["implement"],
+      write_scope: [],
+      read_scope: [],
+      acceptance_checks: ["typecheck passes"],
+      priority: "high",
+      origin: "coordinator",
+      output_schema: "verification",
+    })
+
+    const checks = deterministicChecksForNode(verify, [implement, verify])
+    const missing = missingDeterministicSignals(checks, [])
+    const verdict = aggregateVerifierSignals(missing)
+
+    expect(checks.some((item) => item.source === "typecheck" && item.workdir === "packages/openagt")).toBe(true)
+    expect(checks.some((item) => item.source === "lsp_diagnostics")).toBe(true)
+    expect(missing.map((item) => item.source)).toEqual(["typecheck"])
+    expect(verdict.verdict).toBe("inconclusive")
+    expect(verdict.confidence).toBe("low")
   })
 
   it.live("stores failed review verdicts as expert memory patterns", () =>
