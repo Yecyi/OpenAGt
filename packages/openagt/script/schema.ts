@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
 
 import { z } from "zod"
-import { Config } from "../src/config"
-import { TuiConfig } from "../src/cli/cmd/tui/config/tui"
 import path from "node:path"
 import fs from "node:fs/promises"
+import os from "node:os"
 
 function generate(schema: z.ZodType) {
   const result = z.toJSONSchema(schema, {
@@ -55,6 +54,17 @@ function generate(schema: z.ZodType) {
 
 const configFile = process.argv[2] ?? path.join(import.meta.dir, "..", "schema", "config.json")
 const tuiFile = process.argv[3] ?? path.join(import.meta.dir, "..", "schema", "tui.json")
+const isolatedHome = await fs.mkdtemp(path.join(os.tmpdir(), "openagt-schema-home-"))
+
+process.env.OPENAGT_TEST_HOME ??= isolatedHome
+process.env.OPENCODE_TEST_HOME ??= isolatedHome
+process.env.XDG_CONFIG_HOME ??= path.join(isolatedHome, ".config")
+process.env.XDG_DATA_HOME ??= path.join(isolatedHome, ".local", "share")
+process.env.XDG_STATE_HOME ??= path.join(isolatedHome, ".local", "state")
+process.env.XDG_CACHE_HOME ??= path.join(isolatedHome, ".cache")
+
+const { Config } = await import("../src/config")
+const { TuiConfig } = await import("../src/cli/cmd/tui/config/tui")
 
 console.log(configFile)
 await fs.mkdir(path.dirname(configFile), { recursive: true })
@@ -65,3 +75,5 @@ if (tuiFile) {
   await fs.mkdir(path.dirname(tuiFile), { recursive: true })
   await Bun.write(tuiFile, JSON.stringify(generate(TuiConfig.Info), null, 2))
 }
+
+await fs.rm(isolatedHome, { recursive: true, force: true })
