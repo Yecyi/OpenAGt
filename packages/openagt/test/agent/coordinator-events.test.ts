@@ -3,6 +3,9 @@ import { Effect } from "effect"
 import { CoordinatorDebugStats } from "../../src/coordinator/debug-stats"
 import { CoordinatorEvents } from "../../src/coordinator/events"
 import { CoordinatorTraceExport } from "../../src/coordinator/trace-export"
+import { MemoryNoteID } from "../../src/personal/schema"
+import { PersonalMemoryNoteTable } from "../../src/personal/personal.sql"
+import { Database } from "../../src/storage"
 
 describe("coordinator telemetry", () => {
   test("records replayable events and exposes standard debug stats", async () => {
@@ -62,6 +65,26 @@ describe("coordinator telemetry", () => {
         { concurrency: 6 },
       ),
     )
+    Database.use((db) =>
+      db
+        .insert(PersonalMemoryNoteTable)
+        .values({
+          id: MemoryNoteID.ascending("mem_telemetry_memory"),
+          scope: "workspace",
+          kind: "belief",
+          title: "Verifier failure pattern",
+          content: "Repeated verifier failure pattern",
+          tags: ["failure-pattern", "workflow:telemetry-workflow"],
+          metadata: {},
+          source: "reviser",
+          importance: 6,
+          pinned: 0,
+          time_created: ts,
+          time_updated: ts,
+        })
+        .onConflictDoNothing()
+        .run(),
+    )
 
     const report = CoordinatorDebugStats.stats(2_000, ts + 1_000)
     const taskRate = report.task_success_rate.find(
@@ -74,6 +97,7 @@ describe("coordinator telemetry", () => {
     )
     const downgrade = report.sandbox_downgrade_count.find((item) => item.reason === "native readiness missing")
     const readiness = report.native_sandbox_readiness.find((item) => item.readiness === "acl_apply_required")
+    const memorySink = report.memory_sink_metrics.find((item) => item.source === "reviser")
 
     expect(taskRate?.total).toBe(2)
     expect(taskRate?.success_rate).toBe(0.75)
@@ -84,6 +108,8 @@ describe("coordinator telemetry", () => {
     expect(budget?.efficiency).toBe(0.25)
     expect(downgrade?.total).toBe(1)
     expect(readiness?.total).toBe(1)
+    expect(memorySink?.total).toBe(1)
+    expect(memorySink?.failure_patterns).toBe(1)
   })
 
   test("exports redacted JSONL traces for a session", async () => {

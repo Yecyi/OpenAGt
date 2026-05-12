@@ -40,6 +40,11 @@ export type DebugStats = {
     readiness: string
     total: number
   }>
+  memory_sink_metrics: Array<{
+    source: string
+    total: number
+    failure_patterns: number
+  }>
 }
 
 type TaskSuccessRow = {
@@ -76,6 +81,12 @@ type SandboxDowngradeRow = {
 type SandboxReadinessRow = {
   readiness: string | null
   total: number
+}
+
+type MemorySinkRow = {
+  source: string | null
+  total: number
+  failure_patterns: number | null
 }
 
 function percentile(values: number[], p: number) {
@@ -250,6 +261,35 @@ export function stats(windowMs: number, now = Date.now()): DebugStats {
       .map((item) => ({
         readiness: item.readiness ?? "unknown",
         total: Number(item.total),
+      })),
+    memory_sink_metrics: sqlite
+      .query<MemorySinkRow, [number]>(
+        `
+        SELECT
+          COALESCE(source, 'unknown') AS source,
+          COUNT(*) AS total,
+          SUM(
+            CASE
+              WHEN EXISTS (
+                SELECT 1 FROM json_each(personal_memory_note.tags)
+                WHERE json_each.value = 'failure-pattern'
+              )
+              THEN 1 ELSE 0
+            END
+          ) AS failure_patterns
+        FROM personal_memory_note
+        WHERE time_created >= ?
+          AND source IN ('expert', 'reviser', 'verifier', 'reducer')
+        GROUP BY COALESCE(source, 'unknown')
+        ORDER BY total DESC
+        LIMIT 50
+        `,
+      )
+      .all(since)
+      .map((item) => ({
+        source: item.source ?? "unknown",
+        total: Number(item.total),
+        failure_patterns: Number(item.failure_patterns ?? 0),
       })),
   }
 }

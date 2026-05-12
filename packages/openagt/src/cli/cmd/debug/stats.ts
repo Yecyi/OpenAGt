@@ -61,6 +61,13 @@ function lines(report: DebugStats, windowLabel: string) {
     ...(report.native_sandbox_readiness.length === 0
       ? ["- no native sandbox readiness events in window"]
       : report.native_sandbox_readiness.map((item) => `- ${item.readiness}: n=${item.total}`)),
+    "",
+    "Memory sink metrics",
+    ...(report.memory_sink_metrics.length === 0
+      ? ["- no expert/verifier/reviser/reducer memory in window"]
+      : report.memory_sink_metrics.map(
+          (item) => `- ${item.source}: n=${item.total}, failure_patterns=${item.failure_patterns}`,
+        )),
   ].join(EOL)
 }
 
