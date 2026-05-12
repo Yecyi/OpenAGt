@@ -52,6 +52,10 @@ export type RunResult = {
     writablePaths: string[]
     backendUsed?: string
     terminationReason?: string
+    sandboxEnforced?: boolean
+    filesystemEnforced?: boolean
+    networkEnforced?: boolean
+    sandboxDowngradeReason?: string
   }
 }
 
@@ -238,6 +242,10 @@ export const layer = Layer.effect(
             writablePaths: input.writablePaths,
             backendUsed,
             terminationReason,
+            sandboxEnforced: result.policy_advisory.enforced,
+            filesystemEnforced: result.policy_advisory.filesystemEnforced,
+            networkEnforced: result.policy_advisory.networkEnforced,
+            sandboxDowngradeReason: result.policy_advisory.downgradeReason,
           },
         }
       }).pipe(Effect.ensuring(cleanupMetadata))

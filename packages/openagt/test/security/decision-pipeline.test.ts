@@ -63,6 +63,17 @@ const windowsNativeNetworkNone: SandboxBackendStatus[] = [
   },
   { name: "process", available: true },
 ]
+const windowsNativeAdminGatePending: SandboxBackendStatus[] = [
+  {
+    name: "windows_native",
+    available: true,
+    readiness: "admin_verification_required",
+    filesystem_enforced: true,
+    network_enforced: true,
+    network_policies_enforced: ["none"],
+  },
+  { name: "process", available: true },
+]
 
 describe("execution decision pipeline", () => {
   test("keeps strictest shell and exec-policy decision", () => {
@@ -164,6 +175,23 @@ describe("execution decision pipeline", () => {
     expect(decision.finalDecision).toBe("block")
     expect(decision.policySource).toBe("sandbox_policy")
     expect(decision.finalReason).toContain("cannot enforce none network policy")
+  })
+
+  test("blocks native backend when readiness gate has not passed under closed policy", () => {
+    const decision = resolveExecutionDecision({
+      securityDecision: "allow",
+      securityReason: "No risky shell features detected.",
+      riskLevel: "safe",
+      policyDecision: evalResult("allow"),
+      policy: policy("auto", "closed"),
+      capabilities: windowsNativeAdminGatePending,
+      privilegeEscalation: false,
+    })
+
+    expect(decision.finalDecision).toBe("block")
+    expect(decision.policySource).toBe("sandbox_policy")
+    expect(decision.backendAvailability).toContain("windows_native:not-ready")
+    expect(decision.finalReason).toContain("admin verification gate has not passed")
   })
 
   test("allows native backend with explicit none-network enforcement", () => {

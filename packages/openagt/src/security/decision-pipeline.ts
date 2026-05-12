@@ -4,6 +4,7 @@ import type {
   SandboxBackendName,
   SandboxBackendPreference,
   SandboxBackendStatus,
+  SandboxNativeReadiness,
 } from "@/sandbox/types"
 import type { EvaluationResult, ExecPolicyDecision } from "./exec-policy"
 import { classifyApprovalKind, type ShellApprovalKind, type ShellDecision, type ShellRiskLevel } from "./shell-security"
@@ -70,6 +71,8 @@ export function backendAvailability(preference: SandboxBackendPreference, capabi
       ? "process:available (auto fallback; no OS-native isolation)"
       : "process:available (no OS-native isolation)"
   }
+  const readinessReason = backend.name !== "process" ? nativeReadinessReason(backend.readiness) : undefined
+  if (backend.available && readinessReason) return `${backend.name}:not-ready (${readinessReason})`
   if (backend.available) return `${backend.name}:available`
   return `${backend.name}:unavailable${backend.reason ? ` (${backend.reason})` : ""}`
 }
@@ -81,11 +84,11 @@ function processOnly(input: { preference: SandboxBackendPreference; capabilities
 
 function nativeUnavailable(input: { preference: SandboxBackendPreference; capabilities: SandboxBackendStatus[] }) {
   if (input.preference !== "auto" && input.preference !== "process") {
-    return !preferredBackendStatus(input.preference, input.capabilities)?.available
+    return !nativeReady(preferredBackendStatus(input.preference, input.capabilities))
   }
   if (input.preference === "process") return false
   const native = preferredBackendStatus(input.preference, input.capabilities)
-  return native?.name !== "process" && !native?.available
+  return native?.name !== "process" && !nativeReady(native)
 }
 
 function nativeNetworkUnsupported(input: {
@@ -103,7 +106,26 @@ function nativeNetworkUnsupported(input: {
 
 function unavailableReason(preference: SandboxBackendPreference, capabilities: SandboxBackendStatus[]) {
   const backend = preferredBackendStatus(preference, capabilities)
+  const readinessReason = backend?.name !== "process" ? nativeReadinessReason(backend?.readiness) : undefined
+  if (readinessReason) return ` (${readinessReason})`
   return backend?.reason ? ` (${backend.reason})` : ""
+}
+
+function nativeReady(backend: SandboxBackendStatus | undefined) {
+  if (!backend?.available) return false
+  if (backend.name === "process") return true
+  return !nativeReadinessReason(backend.readiness)
+}
+
+function nativeReadinessReason(readiness: SandboxNativeReadiness | undefined) {
+  if (!readiness || readiness === "ready") return
+  if (readiness === "helper_missing") return "Windows native helper is missing"
+  if (readiness === "helper_version_mismatch") return "Windows helper protocol or version is incompatible"
+  if (readiness === "setup_required") return "Windows sandbox setup is required before native sandbox can run"
+  if (readiness === "admin_verification_required") return "Windows sandbox admin verification gate has not passed"
+  if (readiness === "acl_apply_required") return "Windows filesystem ACL enforcement is not enabled"
+  if (readiness === "network_policy_unsupported") return "Requested Windows sandbox network policy is not supported"
+  return "Windows native sandbox backend is unavailable"
 }
 
 function sandboxDecision(input: {

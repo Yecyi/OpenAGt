@@ -23,6 +23,7 @@ type StepResult = {
 
 type AdminGateReport = {
   schema_version: 1
+  gate: "windows_sandbox_admin_preflight" | "windows_sandbox_admin_execution"
   generated_at: string
   commit: string
   branch: string
@@ -116,6 +117,7 @@ async function writeReport(report: AdminGateReport) {
       "# Windows Sandbox Admin Gate",
       "",
       `- Status: ${report.status}`,
+      `- Gate: ${report.gate}`,
       `- Commit: ${report.commit}`,
       `- Branch: ${report.branch}`,
       `- Generated: ${report.generated_at}`,
@@ -158,6 +160,7 @@ const preflightFailures = [
 if (preflightOnly || preflightFailures.length) {
   await writeReport({
     schema_version: 1,
+    gate: "windows_sandbox_admin_preflight",
     generated_at: new Date().toISOString(),
     commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
     branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
@@ -178,16 +181,24 @@ if (preflightOnly || preflightFailures.length) {
 }
 
 const results = [
-  await run("Windows sandbox setup status before", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"]),
+  await run("Windows sandbox setup status before", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"], {
+    ...process.env,
+    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
+  }),
   await run("Windows sandbox WFP execution gate", [cargo, "test", "--manifest-path", manifest], {
     ...process.env,
     OPENAGT_RUN_WINDOWS_WFP_TESTS: "1",
+    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
   }),
-  await run("Windows sandbox setup status after", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"]),
+  await run("Windows sandbox setup status after", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"], {
+    ...process.env,
+    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
+  }),
 ]
 
 const report = {
   schema_version: 1,
+  gate: "windows_sandbox_admin_execution",
   generated_at: new Date().toISOString(),
   commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
   branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),

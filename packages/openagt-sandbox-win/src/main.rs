@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 const HELPER_PROTOCOL_VERSION: u32 = 1;
 const SETUP_VERSION: &str = "1";
 const ACL_APPLY_MODE_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_APPLY_ACL";
+const ADMIN_GATE_REPORT_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT";
 const SETUP_PROVIDER_DATA: &[u8] = b"openagt-windows-sandbox-setup-v1";
 
 #[cfg(windows)]
@@ -28,6 +29,14 @@ const OPENAGT_WFP_INBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
 #[cfg(windows)]
 const OPENAGT_WFP_INBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
     windows_sys::core::GUID::from_u128(0xaaa2eb49_c0dc_4c43_97d7_269c50fc9717);
+
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+struct WfpFilterSpec {
+    key: windows_sys::core::GUID,
+    layer: windows_sys::core::GUID,
+    description: &'static str,
+}
 
 #[derive(Debug, Deserialize)]
 struct ExecRequest {
@@ -50,7 +59,11 @@ struct ExecRequest {
 struct ProbeOutput {
     helper_version: String,
     helper_protocol_version: u32,
+    helper_path: Option<String>,
+    helper_sha256: Option<String>,
     windows_build: Option<String>,
+    readiness: String,
+    acl_apply_mode: String,
     elevated: bool,
     restricted_token_supported: bool,
     job_object_supported: bool,
@@ -66,6 +79,9 @@ struct ProbeOutput {
     network_enforced: bool,
     network_reason: Option<String>,
     network_policies_enforced: Vec<String>,
+    admin_verification_required: bool,
+    admin_gate_report_path: Option<String>,
+    admin_gate_verified_at: Option<String>,
     capabilities: Vec<String>,
 }
 
@@ -73,6 +89,7 @@ struct ProbeOutput {
 struct SetupOutput {
     ok: bool,
     mode: String,
+    readiness: String,
     setup_installed: bool,
     setup_version: String,
     setup_required: bool,
@@ -88,6 +105,9 @@ struct SetupOutput {
     network_enforced: bool,
     network_reason: Option<String>,
     network_policies_enforced: Vec<String>,
+    admin_verification_required: bool,
+    admin_gate_report_path: Option<String>,
+    admin_gate_verified_at: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -279,12 +299,90 @@ fn filesystem_status(restricted_token_supported: bool) -> (bool, bool, Option<St
     )
 }
 
+fn acl_apply_mode_label() -> &'static str {
+    match acl_apply_mode_from_env() {
+        FilesystemAclApplyMode::Preflight => "preflight",
+        FilesystemAclApplyMode::DryRun => "dry_run",
+        FilesystemAclApplyMode::Apply => "apply",
+    }
+}
+
+fn helper_path() -> Option<String> {
+    std::env::current_exe()
+        .ok()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+fn helper_sha256() -> Option<String> {
+    None
+}
+
+fn admin_gate_report_path() -> Option<String> {
+    if let Ok(path) = std::env::var(ADMIN_GATE_REPORT_ENV) {
+        return (!path.trim().is_empty()).then_some(path);
+    }
+    std::env::current_dir().ok().map(|cwd| {
+        cwd.join(".artifacts")
+            .join("windows-sandbox")
+            .join("admin-gate-report.json")
+            .to_string_lossy()
+            .to_string()
+    })
+}
+
+fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
+    let path = path?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let value = serde_json::from_str::<serde_json::Value>(&text).ok()?;
+    if value.get("schema_version").and_then(|item| item.as_u64()) != Some(1) {
+        return None;
+    }
+    if value.get("gate").and_then(|item| item.as_str()) != Some("windows_sandbox_admin_execution") {
+        return None;
+    }
+    if value.get("status").and_then(|item| item.as_str()) != Some("passed") {
+        return None;
+    }
+    match value.get("results").and_then(|item| item.as_array()) {
+        Some(items) if !items.is_empty() => {}
+        _ => return None,
+    }
+    value
+        .get("generated_at")
+        .and_then(|item| item.as_str())
+        .map(str::to_string)
+}
+
+fn native_readiness(
+    restricted_token_supported: bool,
+    filesystem_enforced: bool,
+    wfp: &WfpSetupState,
+    admin_verified: bool,
+) -> &'static str {
+    if !cfg!(windows) || !restricted_token_supported {
+        return "backend_unavailable";
+    }
+    if !filesystem_enforced {
+        return "acl_apply_required";
+    }
+    if wfp.setup_required() {
+        return "setup_required";
+    }
+    if !admin_verified {
+        return "admin_verification_required";
+    }
+    "ready"
+}
+
 fn probe() -> ProbeOutput {
     let restricted_token_supported = restricted_token_launch_supported();
     let (filesystem_ready, filesystem_enforced, filesystem_reason) =
         filesystem_status(restricted_token_supported);
     let wfp = wfp_setup_state();
     let setup_reason = wfp.network_reason();
+    let admin_gate_report_path = admin_gate_report_path();
+    let admin_gate_verified_at = admin_gate_verified_at(admin_gate_report_path.as_deref());
+    let admin_verification_required = wfp.installed() && admin_gate_verified_at.is_none();
     let capabilities = [
         Some("probe".to_string()),
         Some("exec".to_string()),
@@ -301,7 +399,17 @@ fn probe() -> ProbeOutput {
     ProbeOutput {
         helper_version: env!("CARGO_PKG_VERSION").to_string(),
         helper_protocol_version: HELPER_PROTOCOL_VERSION,
+        helper_path: helper_path(),
+        helper_sha256: helper_sha256(),
         windows_build: windows_build(),
+        readiness: native_readiness(
+            restricted_token_supported,
+            filesystem_enforced,
+            &wfp,
+            admin_gate_verified_at.is_some(),
+        )
+        .to_string(),
+        acl_apply_mode: acl_apply_mode_label().to_string(),
         elevated: process_is_elevated(),
         restricted_token_supported,
         job_object_supported: cfg!(windows),
@@ -317,6 +425,9 @@ fn probe() -> ProbeOutput {
         network_enforced: wfp.installed(),
         network_reason: wfp.network_reason(),
         network_policies_enforced: wfp.enforced_policies(),
+        admin_verification_required,
+        admin_gate_report_path,
+        admin_gate_verified_at,
         capabilities,
     }
 }
@@ -339,6 +450,7 @@ fn setup(mode: &str) -> SetupOutput {
     SetupOutput {
         ok,
         mode: mode.to_string(),
+        readiness: status.readiness,
         setup_installed: status.setup_installed,
         setup_version: status.setup_version,
         setup_required: status.setup_required,
@@ -354,6 +466,9 @@ fn setup(mode: &str) -> SetupOutput {
         network_enforced: status.network_enforced,
         network_reason: status.network_reason,
         network_policies_enforced: status.network_policies_enforced,
+        admin_verification_required: status.admin_verification_required,
+        admin_gate_report_path: status.admin_gate_report_path,
+        admin_gate_verified_at: status.admin_gate_verified_at,
     }
 }
 
@@ -398,6 +513,37 @@ fn wfp_setup_state() -> WfpSetupState {
             reason: Some(error),
         },
     }
+}
+
+#[cfg(windows)]
+fn wfp_filter_specs() -> [WfpFilterSpec; 4] {
+    use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
+        FWPM_LAYER_ALE_AUTH_CONNECT_V4, FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+        FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+    };
+
+    [
+        WfpFilterSpec {
+            key: OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+            description: "OpenAGt block outbound IPv4",
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+            description: "OpenAGt block outbound IPv6",
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_INBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
+            description: "OpenAGt block inbound IPv4",
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_INBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+            description: "OpenAGt block inbound IPv6",
+        },
+    ]
 }
 
 #[cfg(windows)]
@@ -500,10 +646,9 @@ fn install_wfp_setup() -> Result<(), String> {
         remove_wfp_setup_objects(&engine)?;
         add_wfp_provider(&engine)?;
         add_wfp_sublayer(&engine)?;
-        add_wfp_filter(&engine, OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_CONNECT_V4, "OpenAGt block outbound IPv4")?;
-        add_wfp_filter(&engine, OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_CONNECT_V6, "OpenAGt block outbound IPv6")?;
-        add_wfp_filter(&engine, OPENAGT_WFP_INBOUND_V4_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, "OpenAGt block inbound IPv4")?;
-        add_wfp_filter(&engine, OPENAGT_WFP_INBOUND_V6_FILTER_KEY, windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, "OpenAGt block inbound IPv6")?;
+        for spec in wfp_filter_specs() {
+            add_wfp_filter(&engine, spec)?;
+        }
         Ok(())
     })
 }
@@ -643,13 +788,8 @@ fn remove_wfp_setup_objects(engine: &WfpEngine) -> Result<(), String> {
     };
 
     unsafe {
-        for key in [
-            OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY,
-            OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY,
-            OPENAGT_WFP_INBOUND_V4_FILTER_KEY,
-            OPENAGT_WFP_INBOUND_V6_FILTER_KEY,
-        ] {
-            let result = FwpmFilterDeleteByKey0(engine.0, &key);
+        for spec in wfp_filter_specs() {
+            let result = FwpmFilterDeleteByKey0(engine.0, &spec.key);
             if result != 0 && !is_wfp_missing(result) {
                 return Err(format!("FwpmFilterDeleteByKey0 failed: {result}"));
             }
@@ -730,12 +870,7 @@ fn add_wfp_sublayer(engine: &WfpEngine) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-fn add_wfp_filter(
-    engine: &WfpEngine,
-    filter_key: windows_sys::core::GUID,
-    layer_key: windows_sys::core::GUID,
-    description_text: &str,
-) -> Result<(), String> {
+fn add_wfp_filter(engine: &WfpEngine, spec: WfpFilterSpec) -> Result<(), String> {
     use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
         FwpmFilterAdd0, FWPM_ACTION0, FWPM_ACTION0_0, FWPM_CONDITION_ALE_USER_ID,
         FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER0_0, FWPM_FILTER_CONDITION0,
@@ -744,7 +879,7 @@ fn add_wfp_filter(
         FWP_VALUE0, FWP_VALUE0_0,
     };
 
-    let mut name = wide_null(description_text);
+    let mut name = wide_null(spec.description);
     let mut description =
         wide_null("Blocks network for OpenAGt restricted-token sandbox processes");
     let mut provider_key = OPENAGT_WFP_PROVIDER_KEY;
@@ -760,7 +895,7 @@ fn add_wfp_filter(
         },
     };
     let filter = FWPM_FILTER0 {
-        filterKey: filter_key,
+        filterKey: spec.key,
         displayData: FWPM_DISPLAY_DATA0 {
             name: name.as_mut_ptr(),
             description: description.as_mut_ptr(),
@@ -771,7 +906,7 @@ fn add_wfp_filter(
             size: 0,
             data: std::ptr::null_mut(),
         },
-        layerKey: layer_key,
+        layerKey: spec.layer,
         subLayerKey: OPENAGT_WFP_SUBLAYER_KEY,
         weight: FWP_VALUE0 {
             r#type: FWP_UINT8,
@@ -796,7 +931,8 @@ fn add_wfp_filter(
         let result = FwpmFilterAdd0(engine.0, &filter, std::ptr::null_mut(), &mut id);
         if result != 0 {
             return Err(format!(
-                "FwpmFilterAdd0 failed for {description_text}: {result}"
+                "FwpmFilterAdd0 failed for {}: {result}",
+                spec.description
             ));
         }
     }
@@ -2712,6 +2848,97 @@ mod tests {
     }
 
     #[test]
+    fn native_readiness_distinguishes_setup_and_admin_gate() {
+        let complete = super::WfpSetupState {
+            engine_available: true,
+            provider_installed: true,
+            sublayer_installed: true,
+            outbound_v4_filter_installed: true,
+            outbound_v6_filter_installed: true,
+            inbound_v4_filter_installed: true,
+            inbound_v6_filter_installed: true,
+            setup_version: super::SETUP_VERSION.to_string(),
+            reason: None,
+        };
+        let missing = super::WfpSetupState {
+            inbound_v6_filter_installed: false,
+            ..complete.clone()
+        };
+
+        assert_eq!(
+            super::native_readiness(true, false, &complete, false),
+            "acl_apply_required"
+        );
+        assert_eq!(
+            super::native_readiness(true, true, &missing, false),
+            "setup_required"
+        );
+        assert_eq!(
+            super::native_readiness(true, true, &complete, false),
+            "admin_verification_required"
+        );
+        assert_eq!(
+            super::native_readiness(true, true, &complete, true),
+            "ready"
+        );
+    }
+
+    #[test]
+    fn admin_gate_report_requires_execution_gate() {
+        let dir = temp_case("admin-gate-report");
+        let report = dir.join("admin-gate-report.json");
+
+        fs::write(
+            &report,
+            r#"{"schema_version":1,"gate":"windows_sandbox_admin_preflight","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","results":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            super::admin_gate_verified_at(report.to_str()),
+            None,
+            "preflight-only reports must not satisfy the admin execution gate"
+        );
+
+        fs::write(
+            &report,
+            r#"{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"failed","generated_at":"2026-05-12T00:00:00.000Z","results":[{"status":"failed"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(super::admin_gate_verified_at(report.to_str()), None);
+
+        fs::write(
+            &report,
+            r#"{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","results":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(super::admin_gate_verified_at(report.to_str()), None);
+
+        fs::write(
+            &report,
+            r#"{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","results":[{"status":"passed"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            super::admin_gate_verified_at(report.to_str()),
+            Some("2026-05-12T00:00:00.000Z".to_string())
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn wfp_filter_specs_are_table_driven() {
+        let specs = super::wfp_filter_specs();
+
+        assert_eq!(specs.len(), 4);
+        assert!(specs
+            .iter()
+            .any(|spec| spec.description.contains("outbound IPv4")));
+        assert!(specs
+            .iter()
+            .any(|spec| spec.description.contains("inbound IPv6")));
+    }
+
+    #[test]
     fn probe_network_policy_list_matches_network_enforcement() {
         let probe = super::probe();
         assert_eq!(
@@ -2752,6 +2979,13 @@ mod tests {
         assert_eq!(status.setup_installed, probe.setup_installed);
         assert_eq!(status.setup_required, probe.setup_required);
         assert_eq!(status.setup_version, probe.setup_version);
+        assert_eq!(status.readiness, probe.readiness);
+        assert_eq!(
+            status.admin_verification_required,
+            probe.admin_verification_required
+        );
+        assert_eq!(status.admin_gate_report_path, probe.admin_gate_report_path);
+        assert_eq!(status.admin_gate_verified_at, probe.admin_gate_verified_at);
         assert_eq!(
             status.restricted_token_supported,
             probe.restricted_token_supported

@@ -45,6 +45,10 @@ export type BashMetadata = {
   writablePaths?: string[]
   backendUsed?: string
   terminationReason?: string
+  sandboxEnforced?: boolean
+  filesystemEnforced?: boolean
+  networkEnforced?: boolean
+  sandboxDowngradeReason?: string
 }
 
 export function buildShellPermissionMetadata(input: {

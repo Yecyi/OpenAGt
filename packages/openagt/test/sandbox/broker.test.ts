@@ -141,6 +141,7 @@ describe("sandbox backend selection", () => {
           {
             name: "windows_native",
             available: true,
+            readiness: "ready",
             filesystem_enforced: true,
             network_enforced: true,
             network_policies_enforced: ["none"],
@@ -160,6 +161,32 @@ describe("sandbox backend selection", () => {
     })
   })
 
+  test("closed policy denies native backend when readiness gate has not passed", () => {
+    expect(
+      selectBackend({
+        backends: backendMap([
+          {
+            name: "windows_native",
+            available: true,
+            readiness: "admin_verification_required",
+            filesystem_enforced: true,
+            network_enforced: true,
+            network_policies_enforced: ["none"],
+          },
+          { name: "process", available: true, helper: "bun" },
+        ]),
+        backendPreference: "auto",
+        failurePolicy: "closed",
+        autoBackendName: "windows_native",
+        networkPolicy: "none",
+      }),
+    ).toEqual({
+      type: "deny",
+      backendUsed: "windows_native",
+      reason: "Windows sandbox admin verification gate has not passed",
+    })
+  })
+
   test("closed policy denies loopback when native helper only supports none", () => {
     expect(
       selectBackend({
@@ -167,6 +194,7 @@ describe("sandbox backend selection", () => {
           {
             name: "windows_native",
             available: true,
+            readiness: "ready",
             filesystem_enforced: true,
             network_enforced: true,
             network_policies_enforced: ["none"],
@@ -231,6 +259,7 @@ describe("Windows helper discovery", () => {
       statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
         helper_version: "1.0.0",
         helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        readiness: "acl_apply_required",
         restricted_token_supported: true,
         job_object_supported: true,
         filesystem_enforced: false,
@@ -239,8 +268,36 @@ describe("Windows helper discovery", () => {
     ).toMatchObject({
       name: "windows_native",
       available: false,
+      readiness: "acl_apply_required",
       filesystem_enforced: false,
       reason: "Filesystem ACL enforcement is disabled by policy",
+    })
+  })
+
+  test("keeps helper unavailable until admin gate passes", () => {
+    expect(
+      statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
+        helper_version: "1.0.0",
+        helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        readiness: "admin_verification_required",
+        restricted_token_supported: true,
+        job_object_supported: true,
+        filesystem_enforced: true,
+        setup_installed: true,
+        setup_version: "1",
+        admin_verification_required: true,
+        admin_gate_report_path: "C:\\repo\\.artifacts\\windows-sandbox\\admin-gate-report.json",
+        network_enforced: true,
+        network_policies_enforced: ["none"],
+      }),
+    ).toMatchObject({
+      name: "windows_native",
+      available: false,
+      readiness: "admin_verification_required",
+      admin_verification_required: true,
+      admin_gate_report_path: "C:\\repo\\.artifacts\\windows-sandbox\\admin-gate-report.json",
+      network_policies_enforced: ["none"],
+      reason: "Windows sandbox admin verification gate has not passed",
     })
   })
 
@@ -265,6 +322,9 @@ describe("Windows helper discovery", () => {
       statusFromProbe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe", {
         helper_version: "1.0.0",
         helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        helper_path: "C:\\OpenAGt\\bin\\openagt-sandbox-win.exe",
+        helper_sha256: "a".repeat(64),
+        readiness: "ready",
         restricted_token_supported: true,
         job_object_supported: true,
         filesystem_enforced: true,
@@ -274,6 +334,9 @@ describe("Windows helper discovery", () => {
     ).toMatchObject({
       name: "windows_native",
       available: true,
+      helper_path: "C:\\OpenAGt\\bin\\openagt-sandbox-win.exe",
+      helper_sha256: "a".repeat(64),
+      readiness: "ready",
       job_object_supported: true,
       filesystem_enforced: true,
       network_enforced: false,

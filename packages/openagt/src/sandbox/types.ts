@@ -8,17 +8,34 @@ export type SandboxFilesystemPolicy = "read_only" | "workspace_write" | "explici
 export type SandboxNetworkPolicy = "none" | "loopback" | "full"
 export type SandboxEnvPolicy = "sanitize"
 export type SandboxTerminationReason = "exit" | "timeout" | "abort" | "backend_error" | "policy_denied"
+export type SandboxNativeReadiness =
+  | "ready"
+  | "helper_missing"
+  | "helper_version_mismatch"
+  | "setup_required"
+  | "admin_verification_required"
+  | "acl_apply_required"
+  | "network_policy_unsupported"
+  | "backend_unavailable"
 
 export type SandboxBackendStatus = {
   name: SandboxBackendName
   available: boolean
   helper?: string
+  helper_path?: string
+  helper_version?: string
+  helper_sha256?: string
+  readiness?: SandboxNativeReadiness
   reason?: string
   setup_required?: boolean
   setup_reason?: string
   setup_installed?: boolean
   setup_version?: string
   helper_protocol_version?: number
+  acl_apply_mode?: "preflight" | "dry_run" | "apply"
+  admin_verification_required?: boolean
+  admin_gate_report_path?: string
+  admin_gate_verified_at?: string
   job_object_supported?: boolean
   filesystem_ready?: boolean
   filesystem_enforced?: boolean

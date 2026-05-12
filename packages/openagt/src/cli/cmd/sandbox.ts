@@ -45,12 +45,22 @@ const WindowsProbeCommand = cmd({
     UI.println(`  helper path: ${output.helper_path ?? "(not found)"}`)
     UI.println(`  override used: ${output.helper_override_used ? "yes" : "no"}`)
     UI.println(`  helper available: ${status.available ? "yes" : "no"}`)
+    if (status.readiness) UI.println(`  readiness: ${status.readiness}`)
     if (status.reason) UI.println(`  reason: ${status.reason}`)
     if (status.helper_protocol_version !== undefined) {
       UI.println(`  helper protocol: ${status.helper_protocol_version}`)
     }
+    if (status.helper_version) UI.println(`  helper version: ${status.helper_version}`)
+    if (status.helper_sha256) UI.println(`  helper sha256: ${status.helper_sha256}`)
+    if (status.acl_apply_mode) UI.println(`  acl apply mode: ${status.acl_apply_mode}`)
     if (status.setup_required) UI.println(`  setup required: ${status.setup_reason ?? "yes"}`)
+    if (status.setup_installed !== undefined) UI.println(`  setup installed: ${status.setup_installed ? "yes" : "no"}`)
     if (status.setup_version) UI.println(`  setup version: ${status.setup_version}`)
+    if (status.admin_verification_required !== undefined) {
+      UI.println(`  admin verification required: ${status.admin_verification_required ? "yes" : "no"}`)
+    }
+    if (status.admin_gate_report_path) UI.println(`  admin gate report: ${status.admin_gate_report_path}`)
+    if (status.admin_gate_verified_at) UI.println(`  admin gate verified at: ${status.admin_gate_verified_at}`)
     if (status.filesystem_ready !== undefined) {
       UI.println(`  filesystem ready: ${status.filesystem_ready ? "yes" : "no"}`)
     }
@@ -116,11 +126,18 @@ const WindowsSetupCommand = cmd({
     UI.println(`Windows sandbox setup: ${mode}`)
     UI.println(`  helper path: ${resolved.path ?? "(not found)"}`)
     UI.println(`  ok: ${result.ok ? "yes" : "no"}`)
+    if (result.readiness) UI.println(`  readiness: ${result.readiness}`)
     UI.println(`  installed: ${result.setup_installed ? "yes" : "no"}`)
     UI.println(`  setup required: ${result.setup_required ? "yes" : "no"}`)
+    if (result.setup_version) UI.println(`  setup version: ${result.setup_version}`)
     if (result.elevated !== undefined) {
       UI.println(`  elevated: ${result.elevated ? "yes" : "no"}`)
     }
+    if (result.admin_verification_required !== undefined) {
+      UI.println(`  admin verification required: ${result.admin_verification_required ? "yes" : "no"}`)
+    }
+    if (result.admin_gate_report_path) UI.println(`  admin gate report: ${result.admin_gate_report_path}`)
+    if (result.admin_gate_verified_at) UI.println(`  admin gate verified at: ${result.admin_gate_verified_at}`)
     if (result.restricted_token_supported !== undefined) {
       UI.println(`  restricted token: ${result.restricted_token_supported ? "yes" : "no"}`)
     }
