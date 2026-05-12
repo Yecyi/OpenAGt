@@ -366,23 +366,14 @@ function limitedResourceFor(usage: ResourceLimitType, limit: ResourceLimitType):
 
 export function subtractResourceLimit(left: ResourceLimitType, right: ResourceLimitType) {
   return ResourceLimit.parse({
-    max_rounds: left.max_rounds > right.max_rounds ? left.max_rounds - right.max_rounds : left.max_rounds,
+    max_rounds: Math.max(0, left.max_rounds - right.max_rounds),
     max_model_calls:
-      left.max_model_calls > right.max_model_calls
-        ? left.max_model_calls - right.max_model_calls
-        : left.max_model_calls,
-    max_tool_calls:
-      left.max_tool_calls > right.max_tool_calls ? left.max_tool_calls - right.max_tool_calls : left.max_tool_calls,
-    max_subagents:
-      left.max_subagents > right.max_subagents ? left.max_subagents - right.max_subagents : left.max_subagents,
-    max_wallclock_ms:
-      left.max_wallclock_ms > right.max_wallclock_ms
-        ? left.max_wallclock_ms - right.max_wallclock_ms
-        : left.max_wallclock_ms,
+      Math.max(0, left.max_model_calls - right.max_model_calls),
+    max_tool_calls: Math.max(0, left.max_tool_calls - right.max_tool_calls),
+    max_subagents: Math.max(0, left.max_subagents - right.max_subagents),
+    max_wallclock_ms: Math.max(0, left.max_wallclock_ms - right.max_wallclock_ms),
     max_estimated_tokens:
-      left.max_estimated_tokens > right.max_estimated_tokens
-        ? left.max_estimated_tokens - right.max_estimated_tokens
-        : left.max_estimated_tokens,
+      Math.max(0, left.max_estimated_tokens - right.max_estimated_tokens),
   })
 }
 

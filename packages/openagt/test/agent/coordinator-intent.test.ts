@@ -1,9 +1,21 @@
 import { describe, expect, test } from "bun:test"
 import { defaultPlanForIntent, settleIntentProfile } from "../../src/coordinator/coordinator"
 import { isBroadAgentTask } from "../../src/agent/task-classifier"
-import { continuationVelocityFor, runtimeStateFor, taskLeaseFor } from "../../src/coordinator/runtime-state"
+import {
+  continuationVelocityFor,
+  resourceLimitSlots,
+  runtimeStateFor,
+  subtractResourceLimit,
+  taskLeaseFor,
+} from "../../src/coordinator/runtime-state"
 import { buildTaskPrompt } from "../../src/coordinator/task-prompt"
-import { BudgetProfile, ProgressSnapshot, TodoTimeline, type CoordinatorRun } from "../../src/coordinator/schema"
+import {
+  BudgetProfile,
+  ProgressSnapshot,
+  ResourceLimit,
+  TodoTimeline,
+  type CoordinatorRun,
+} from "../../src/coordinator/schema"
 import type { TaskRuntime } from "../../src/session/task-runtime"
 
 describe("coordinator intent planning", () => {
@@ -558,5 +570,50 @@ describe("coordinator intent planning", () => {
 
     expect(velocity.allowed).toBe(false)
     expect(velocity.reason).toContain("failure rate worsened")
+  })
+
+  test("checkpoint reserve can consume the full normal dispatch budget", () => {
+    const normalLimit = subtractResourceLimit(
+      ResourceLimit.parse({
+        max_rounds: 3,
+        max_model_calls: 3,
+        max_tool_calls: 3,
+        max_subagents: 3,
+        max_wallclock_ms: 3,
+        max_estimated_tokens: 3,
+      }),
+      ResourceLimit.parse({
+        max_rounds: 4,
+        max_model_calls: 3,
+        max_tool_calls: 5,
+        max_subagents: 3,
+        max_wallclock_ms: 10,
+        max_estimated_tokens: 3,
+      }),
+    )
+
+    expect(normalLimit).toEqual(
+      ResourceLimit.parse({
+        max_rounds: 0,
+        max_model_calls: 0,
+        max_tool_calls: 0,
+        max_subagents: 0,
+        max_wallclock_ms: 0,
+        max_estimated_tokens: 0,
+      }),
+    )
+    expect(
+      resourceLimitSlots(
+        ResourceLimit.parse({
+          max_rounds: 0,
+          max_model_calls: 0,
+          max_tool_calls: 0,
+          max_subagents: 0,
+          max_wallclock_ms: 0,
+          max_estimated_tokens: 0,
+        }),
+        normalLimit,
+      ),
+    ).toBe(0)
   })
 })
