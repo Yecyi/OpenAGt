@@ -12,6 +12,7 @@ import { AgentCommand } from "./agent"
 import { BundleCommand } from "./bundle"
 import { DoctorCommand } from "./doctor"
 import { StatsCommand } from "./stats"
+import { TraceCommand } from "./trace"
 
 export const DebugCommand = cmd({
   command: "debug",
@@ -29,6 +30,7 @@ export const DebugCommand = cmd({
       .command(DoctorCommand)
       .command(BundleCommand)
       .command(StatsCommand)
+      .command(TraceCommand)
       .command(PathsCommand)
       .command({
         command: "wait",

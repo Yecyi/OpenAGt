@@ -32,6 +32,14 @@ export type DebugStats = {
     samples: number
     efficiency: number
   }>
+  sandbox_downgrade_count: Array<{
+    reason: string
+    total: number
+  }>
+  native_sandbox_readiness: Array<{
+    readiness: string
+    total: number
+  }>
 }
 
 type TaskSuccessRow = {
@@ -58,6 +66,16 @@ type BudgetRow = {
   effort: string | null
   samples: number
   efficiency: number | null
+}
+
+type SandboxDowngradeRow = {
+  reason: string | null
+  total: number
+}
+
+type SandboxReadinessRow = {
+  readiness: string | null
+  total: number
 }
 
 function percentile(values: number[], p: number) {
@@ -174,6 +192,64 @@ export function stats(windowMs: number, now = Date.now()): DebugStats {
         effort: item.effort ?? "unknown",
         samples: Number(item.samples),
         efficiency: Number(item.efficiency ?? 0),
+      })),
+    sandbox_downgrade_count: sqlite
+      .query<SandboxDowngradeRow, [number]>(
+        `
+        SELECT
+          COALESCE(
+            json_extract(payload_json, '$.sandboxDowngradeReason'),
+            json_extract(payload_json, '$.sandbox_downgrade_reason'),
+            json_extract(payload_json, '$.downgradeReason'),
+            json_extract(payload_json, '$.downgrade_reason'),
+            'unknown'
+          ) AS reason,
+          COUNT(*) AS total
+        FROM coordinator_event
+        WHERE ts >= ?
+          AND (
+            json_extract(payload_json, '$.sandboxDowngradeReason') IS NOT NULL OR
+            json_extract(payload_json, '$.sandbox_downgrade_reason') IS NOT NULL OR
+            json_extract(payload_json, '$.downgradeReason') IS NOT NULL OR
+            json_extract(payload_json, '$.downgrade_reason') IS NOT NULL
+          )
+        GROUP BY reason
+        ORDER BY total DESC
+        LIMIT 50
+        `,
+      )
+      .all(since)
+      .map((item) => ({
+        reason: item.reason ?? "unknown",
+        total: Number(item.total),
+      })),
+    native_sandbox_readiness: sqlite
+      .query<SandboxReadinessRow, [number]>(
+        `
+        SELECT
+          COALESCE(
+            json_extract(payload_json, '$.native_sandbox_readiness'),
+            json_extract(payload_json, '$.sandboxReadiness'),
+            json_extract(payload_json, '$.readiness'),
+            'unknown'
+          ) AS readiness,
+          COUNT(*) AS total
+        FROM coordinator_event
+        WHERE ts >= ?
+          AND (
+            json_extract(payload_json, '$.native_sandbox_readiness') IS NOT NULL OR
+            json_extract(payload_json, '$.sandboxReadiness') IS NOT NULL OR
+            json_extract(payload_json, '$.readiness') IS NOT NULL
+          )
+        GROUP BY readiness
+        ORDER BY total DESC
+        LIMIT 50
+        `,
+      )
+      .all(since)
+      .map((item) => ({
+        readiness: item.readiness ?? "unknown",
+        total: Number(item.total),
       })),
   }
 }

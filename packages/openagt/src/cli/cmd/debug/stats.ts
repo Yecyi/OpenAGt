@@ -51,6 +51,16 @@ function lines(report: DebugStats, windowLabel: string) {
       : report.budget_efficiency.map(
           (item) => `- ${item.workflow}/${item.effort}: ${item.efficiency.toFixed(3)} (n=${item.samples})`,
         )),
+    "",
+    "Sandbox downgrades",
+    ...(report.sandbox_downgrade_count.length === 0
+      ? ["- no sandbox downgrade events in window"]
+      : report.sandbox_downgrade_count.map((item) => `- ${item.reason}: n=${item.total}`)),
+    "",
+    "Native sandbox readiness",
+    ...(report.native_sandbox_readiness.length === 0
+      ? ["- no native sandbox readiness events in window"]
+      : report.native_sandbox_readiness.map((item) => `- ${item.readiness}: n=${item.total}`)),
   ].join(EOL)
 }
 
