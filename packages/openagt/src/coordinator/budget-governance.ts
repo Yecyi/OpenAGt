@@ -62,6 +62,35 @@ export function addResourceLimit(limit: ResourceLimitType, delta?: Partial<Resou
   })
 }
 
+function checkpointReserveCap(limit: ResourceLimitType) {
+  return ResourceLimit.parse({
+    max_rounds: Math.max(0, limit.max_rounds - 1),
+    max_model_calls: Math.max(0, limit.max_model_calls - 1),
+    max_tool_calls: Math.max(0, limit.max_tool_calls - 1),
+    max_subagents: Math.max(0, limit.max_subagents - 1),
+    max_wallclock_ms: Math.max(0, limit.max_wallclock_ms - 1),
+    max_estimated_tokens: Math.max(0, limit.max_estimated_tokens - 1),
+  })
+}
+
+export function capCheckpointReserve(limit: ResourceLimitType, absolute: ResourceLimitType) {
+  return capResourceLimit(limit, checkpointReserveCap(absolute))
+}
+
+export function checkpointReserveFor(limit: ResourceLimitType, multiplier: number) {
+  return capCheckpointReserve(
+    ResourceLimit.parse({
+      max_rounds: Math.round(limit.max_rounds * multiplier),
+      max_model_calls: Math.round(limit.max_model_calls * multiplier),
+      max_tool_calls: Math.round(limit.max_tool_calls * multiplier),
+      max_subagents: Math.round(limit.max_subagents * multiplier),
+      max_wallclock_ms: Math.round(limit.max_wallclock_ms * multiplier),
+      max_estimated_tokens: Math.round(limit.max_estimated_tokens * multiplier),
+    }),
+    limit,
+  )
+}
+
 export function longTaskProfileFor(input: {
   goal: string
   intent: IntentProfileType
@@ -96,8 +125,11 @@ export function budgetProfileFor(input: {
     max_subagents: input.maxSubagents ?? absolute.max_subagents,
     max_wallclock_ms: input.maxWallclockMs ?? absolute.max_wallclock_ms,
   })
-  const mission_ceiling = scaleResourceLimit(absolute_ceiling, 0.65)
-  const phase_ceiling = scaleResourceLimit(absolute_ceiling, input.longTask.is_long_task ? 0.25 : 0.5)
+  const mission_ceiling = capResourceLimit(scaleResourceLimit(absolute_ceiling, 0.65), absolute_ceiling)
+  const phase_ceiling = capResourceLimit(
+    scaleResourceLimit(absolute_ceiling, input.longTask.is_long_task ? 0.25 : 0.5),
+    absolute_ceiling,
+  )
   const totalWeight = input.todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
   return BudgetProfile.parse({
     scale,
@@ -107,10 +139,13 @@ export function budgetProfileFor(input: {
     todo_budget: Object.fromEntries(
       input.todoTimeline.todos.map((item) => [
         item.id,
-        scaleResourceLimit(mission_ceiling, totalWeight > 0 ? item.budget_weight / totalWeight : 1),
+        capResourceLimit(
+          scaleResourceLimit(mission_ceiling, totalWeight > 0 ? item.budget_weight / totalWeight : 1),
+          mission_ceiling,
+        ),
       ]),
     ),
-    checkpoint_reserve: scaleResourceLimit(absolute_ceiling, input.longTask.is_long_task ? 0.08 : 0.05),
+    checkpoint_reserve: checkpointReserveFor(absolute_ceiling, input.longTask.is_long_task ? 0.08 : 0.05),
     absolute_ceiling,
     single_checkpoint_ceiling: capResourceLimit(
       absolute_ceiling,

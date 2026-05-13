@@ -5,7 +5,8 @@ import { TaskRuntime } from "@/session/task-runtime"
 import { Database, eq } from "@/storage"
 import { Effect, Option } from "effect"
 import { CoordinatorRunTable } from "./coordinator.sql"
-import { addResourceLimit, scaleResourceLimit } from "./budget-governance"
+import { addResourceLimit, capCheckpointReserve, checkpointReserveFor, scaleResourceLimit } from "./budget-governance"
+import { capResourceLimit } from "./budget-policy"
 import { CoordinatorEvents } from "./events"
 import {
   planWithRuntimeState,
@@ -314,18 +315,22 @@ export class CoordinatorRunMutations {
       max_wallclock_ms: delta.max_wallclock_ms ?? 0,
       max_estimated_tokens: delta.max_estimated_tokens ?? 0,
     })
+    const absolute_ceiling = addResourceLimit(runOpt.value.plan.budget_profile.absolute_ceiling, delta)
     const budget_profile = BudgetProfile.parse({
       ...runOpt.value.plan.budget_profile,
       auto_continue: input.autoContinue ?? runOpt.value.plan.budget_profile.auto_continue,
-      mission_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.mission_ceiling, delta),
-      absolute_ceiling: addResourceLimit(runOpt.value.plan.budget_profile.absolute_ceiling, delta),
-      phase_ceiling: addResourceLimit(
-        runOpt.value.plan.budget_profile.phase_ceiling,
-        scaleResourceLimit(fullDelta, 0.5),
+      mission_ceiling: capResourceLimit(
+        addResourceLimit(runOpt.value.plan.budget_profile.mission_ceiling, delta),
+        absolute_ceiling,
       ),
-      checkpoint_reserve: addResourceLimit(
-        runOpt.value.plan.budget_profile.checkpoint_reserve,
-        scaleResourceLimit(fullDelta, 0.1),
+      absolute_ceiling,
+      phase_ceiling: capResourceLimit(
+        addResourceLimit(runOpt.value.plan.budget_profile.phase_ceiling, scaleResourceLimit(fullDelta, 0.5)),
+        absolute_ceiling,
+      ),
+      checkpoint_reserve: capCheckpointReserve(
+        addResourceLimit(runOpt.value.plan.budget_profile.checkpoint_reserve, checkpointReserveFor(fullDelta, 0.1)),
+        absolute_ceiling,
       ),
       continuation_state: {
         approved_count: continuationState.approved_count + 1,

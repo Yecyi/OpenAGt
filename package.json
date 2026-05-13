@@ -151,7 +151,7 @@
     "fast-xml-builder": "1.2.0",
     "ip-address": "10.2.0",
     "minimatch": "10.2.5",
-    "protobufjs": "8.0.1",
+    "protobufjs": "8.2.1",
     "react-router": "6.30.3",
     "react-router-dom": "6.30.3",
     "seroval": "1.5.2",
