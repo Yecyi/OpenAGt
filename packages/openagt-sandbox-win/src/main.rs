@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{self, Read};
 #[cfg(not(windows))]
@@ -314,7 +315,13 @@ fn helper_path() -> Option<String> {
 }
 
 fn helper_sha256() -> Option<String> {
-    None
+    let bytes = std::fs::read(std::env::current_exe().ok()?).ok()?;
+    Some(
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+    )
 }
 
 fn admin_gate_report_path() -> Option<String> {
@@ -2999,6 +3006,15 @@ mod tests {
         );
         assert_eq!(status.filesystem_ready, probe.filesystem_ready);
         assert_eq!(status.network_ready, probe.network_ready);
+    }
+
+    #[test]
+    fn probe_reports_helper_sha256() {
+        let value = super::probe()
+            .helper_sha256
+            .expect("helper sha256 should be available for the running helper binary");
+        assert_eq!(value.len(), 64);
+        assert!(value.chars().all(|item| item.is_ascii_hexdigit()));
     }
 
     #[test]
