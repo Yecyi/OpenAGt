@@ -714,6 +714,25 @@ export const dict = {
   "settings.section.server": "Server",
   "settings.tab.general": "General",
   "settings.tab.shortcuts": "Shortcuts",
+  "settings.sandbox.title": "Sandbox",
+  "settings.sandbox.description":
+    "Control command isolation, backend fallback behavior, and Windows native sandbox readiness.",
+  "settings.sandbox.section.runtime": "Runtime",
+  "settings.sandbox.section.windows": "Windows native sandbox",
+  "settings.sandbox.row.enabled.title": "Enable sandbox",
+  "settings.sandbox.row.enabled.description": "Apply sandbox policy to shell and tool execution when supported.",
+  "settings.sandbox.row.backend.title": "Backend",
+  "settings.sandbox.row.backend.description": "Choose the preferred sandbox backend. Auto picks the platform default.",
+  "settings.sandbox.row.failurePolicy.title": "Failure policy",
+  "settings.sandbox.row.failurePolicy.description":
+    "Choose whether OpenAGt may downgrade when the requested backend cannot enforce policy.",
+  "settings.sandbox.row.reportOnly.title": "Report only",
+  "settings.sandbox.row.reportOnly.description":
+    "Record sandbox decisions without treating advisory process isolation as OS-native enforcement.",
+  "settings.sandbox.row.aclMode.title": "Filesystem ACL mode",
+  "settings.sandbox.row.aclMode.description":
+    "Windows native filesystem enforcement mode. Changes apply to newly started sandbox brokers.",
+  "settings.sandbox.toast.updateFailed.title": "Sandbox settings were not saved",
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "WSL integration",
   "settings.desktop.wsl.description": "Run the OpenAGt server inside WSL on Windows.",

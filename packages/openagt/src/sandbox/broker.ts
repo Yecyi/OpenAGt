@@ -9,6 +9,7 @@ import {
   type SandboxExecResult,
 } from "./types"
 import { OPENCODE_PROCESS_ROLE, OPENCODE_RUN_ID, ensureRunID, sanitizedProcessEnv } from "@/util/opencode-process"
+import { Config } from "@/config"
 
 type Pending = {
   onStdout: (chunk: string) => void
@@ -68,13 +69,18 @@ async function stopBrokerProcess(proc: ReturnType<typeof Bun.spawn>, reader: Rea
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const config = yield* Config.Service
+    const cfg = yield* config.getGlobal()
+    const brokerEnv = sanitizedProcessEnv({
+      [OPENCODE_PROCESS_ROLE]: "broker",
+      [OPENCODE_RUN_ID]: ensureRunID(),
+    })
+    const windowsAclApplyMode = cfg.experimental?.sandbox?.windows_acl_apply_mode
+    if (windowsAclApplyMode) brokerEnv.OPENAGT_SANDBOX_WINDOWS_APPLY_ACL = windowsAclApplyMode
     const proc = Bun.spawn({
       cmd: brokerCommand(),
       cwd: process.cwd(),
-      env: sanitizedProcessEnv({
-        [OPENCODE_PROCESS_ROLE]: "broker",
-        [OPENCODE_RUN_ID]: ensureRunID(),
-      }),
+      env: brokerEnv,
       stderr: "inherit",
       stdout: "pipe",
       stdin: "pipe",
@@ -234,7 +240,7 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer
+export const defaultLayer = layer.pipe(Layer.provide(Config.defaultLayer))
 export const SandboxBroker = {
   Service,
   layer,

@@ -1540,6 +1540,10 @@ export class Global2 extends HeyApiClient {
           failure_policy?: "closed" | "confirm_downgrade" | "fallback"
           report_only?: boolean
           broker_idle_ttl_ms?: number
+          /**
+           * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
+           */
+          windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
         }
         /**
          * Session memory configuration
@@ -3513,6 +3517,11 @@ export class Plan extends HeyApiClient {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -3568,6 +3577,7 @@ export class Plan extends HeyApiClient {
         >
         expected_output: string
         permission_expectations: Array<string>
+        domain?: string
       }
       effort?: "low" | "medium" | "high" | "deep"
       workflow?:
@@ -3763,6 +3773,11 @@ export class Coordinator extends HeyApiClient {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -3818,6 +3833,7 @@ export class Coordinator extends HeyApiClient {
         >
         expected_output: string
         permission_expectations: Array<string>
+        domain?: string
       }
       effort?: "low" | "medium" | "high" | "deep"
       workflow?:
@@ -4008,6 +4024,11 @@ export class Coordinator extends HeyApiClient {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -4063,6 +4084,7 @@ export class Coordinator extends HeyApiClient {
         >
         expected_output: string
         permission_expectations: Array<string>
+        domain?: string
       }
       effort?: "low" | "medium" | "high" | "deep"
       workflow?:

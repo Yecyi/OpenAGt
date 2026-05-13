@@ -172,7 +172,10 @@ function processBackend(): SandboxBackend {
       child.exited
         .then(async (exitCode) => {
           clearTimeout(timer)
-          await Promise.race([Promise.allSettled([stdout, stderr]), new Promise((resolve) => setTimeout(resolve, 1000))])
+          await Promise.race([
+            Promise.allSettled([stdout, stderr]),
+            new Promise((resolve) => setTimeout(resolve, 1000)),
+          ])
           exit({
             request_id: input.request.request_id,
             exit_code: terminationReason === "exit" ? exitCode : null,
@@ -210,7 +213,10 @@ function windowsNativeBackend(status: SandboxBackendStatus): SandboxBackend {
       const child = Bun.spawn({
         cmd: [status.helper, "exec"],
         cwd: input.request.cwd,
-        env: input.request.env,
+        env: {
+          ...input.request.env,
+          ...(status.acl_apply_mode ? { OPENAGT_SANDBOX_WINDOWS_APPLY_ACL: status.acl_apply_mode } : {}),
+        },
         stderr: "pipe",
         stdout: "pipe",
         stdin: "pipe",
@@ -244,7 +250,9 @@ function windowsNativeBackend(status: SandboxBackendStatus): SandboxBackend {
             finished = true
             input.onExit(result)
           } catch (error) {
-            finishError(`Windows native helper returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`)
+            finishError(
+              `Windows native helper returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+            )
           }
         })
         .catch((error) => {
@@ -273,7 +281,10 @@ export function detectBackends() {
   const windowsNative = windowsNativeStatus?.available
     ? windowsNativeBackend(windowsNativeStatus)
     : windowsNativeStatus
-      ? { ...unavailable("windows_native", windowsNativeStatus.reason ?? "Windows native helper unavailable"), status: windowsNativeStatus }
+      ? {
+          ...unavailable("windows_native", windowsNativeStatus.reason ?? "Windows native helper unavailable"),
+          status: windowsNativeStatus,
+        }
       : unavailable("windows_native", resolvedWindowsHelper.reason ?? "Windows native helper unavailable")
   return [
     processBackend(),

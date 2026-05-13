@@ -7,6 +7,7 @@ export type SandboxBackendPreference = SandboxBackendName | "auto"
 export type SandboxFilesystemPolicy = "read_only" | "workspace_write" | "explicit_paths"
 export type SandboxNetworkPolicy = "none" | "loopback" | "full"
 export type SandboxEnvPolicy = "sanitize"
+export type SandboxWindowsAclApplyMode = "preflight" | "dry_run" | "apply"
 export type SandboxTerminationReason = "exit" | "timeout" | "abort" | "backend_error" | "policy_denied"
 export type SandboxNativeReadiness =
   | "ready"
@@ -163,4 +164,5 @@ export type SandboxConfig = {
   failure_policy: SandboxFailurePolicy
   report_only: boolean
   broker_idle_ttl_ms: number
+  windows_acl_apply_mode: SandboxWindowsAclApplyMode
 }

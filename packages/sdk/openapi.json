@@ -2185,6 +2185,11 @@
                             "type": "integer",
                             "exclusiveMinimum": 0,
                             "maximum": 9007199254740991
+                          },
+                          "windows_acl_apply_mode": {
+                            "description": "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
+                            "type": "string",
+                            "enum": ["preflight", "dry_run", "apply"]
                           }
                         }
                       },
@@ -5977,6 +5982,10 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "domain": {
+                      "default": "general",
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -6302,6 +6311,28 @@
                           },
                           "memory_namespace": {
                             "type": "string"
+                          },
+                          "personal_memory_access": {
+                            "default": "full",
+                            "type": "string",
+                            "enum": ["full", "facts_only", "blind"]
+                          },
+                          "acceptable_failure": {
+                            "type": "object",
+                            "properties": {
+                              "conditions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "on_match": {
+                                "default": "give_up",
+                                "type": "string",
+                                "enum": ["give_up", "escalate"]
+                              }
+                            },
+                            "required": ["conditions"]
                           },
                           "confidence": {
                             "type": "string",
@@ -7225,6 +7256,22 @@
                           "min_new_completed_todo_weight": 0.05,
                           "min_new_evidence_items": 3,
                           "min_quality_delta": 0.03
+                        },
+                        "continuation_state": {
+                          "approved_count": 0,
+                          "last_approved_usage": {
+                            "max_rounds": 0,
+                            "max_model_calls": 0,
+                            "max_tool_calls": 0,
+                            "max_subagents": 0,
+                            "max_wallclock_ms": 0,
+                            "max_estimated_tokens": 0
+                          },
+                          "last_approved_progress_score": 0,
+                          "last_approved_completed_todo_weight": 0,
+                          "last_approved_evidence_count": 0,
+                          "last_approved_verifier_quality": 0,
+                          "last_approved_failure_penalty": 0
                         }
                       },
                       "type": "object",
@@ -7578,6 +7625,117 @@
                               "maximum": 1
                             }
                           }
+                        },
+                        "continuation_state": {
+                          "default": {
+                            "approved_count": 0,
+                            "last_approved_usage": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "last_approved_progress_score": 0,
+                            "last_approved_completed_todo_weight": 0,
+                            "last_approved_evidence_count": 0,
+                            "last_approved_verifier_quality": 0,
+                            "last_approved_failure_penalty": 0
+                          },
+                          "type": "object",
+                          "properties": {
+                            "approved_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_usage": {
+                              "default": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "last_approved_progress_score": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_completed_todo_weight": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_evidence_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_verifier_quality": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_failure_penalty": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_denied_reason": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     },
@@ -7587,7 +7745,8 @@
                         "absolute_ceiling_used": 0,
                         "checkpoint_count": 0,
                         "budget_limited": false,
-                        "ceiling_hit": false
+                        "ceiling_hit": false,
+                        "limit_reason": "none"
                       },
                       "type": "object",
                       "properties": {
@@ -7616,6 +7775,25 @@
                         "ceiling_hit": {
                           "default": false,
                           "type": "boolean"
+                        },
+                        "limit_reason": {
+                          "default": "none",
+                          "type": "string",
+                          "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                        },
+                        "limited_resource": {
+                          "type": "string",
+                          "enum": [
+                            "max_rounds",
+                            "max_model_calls",
+                            "max_tool_calls",
+                            "max_subagents",
+                            "max_wallclock_ms",
+                            "max_estimated_tokens"
+                          ]
+                        },
+                        "limited_todo_id": {
+                          "type": "string"
                         }
                       }
                     },
@@ -8201,6 +8379,28 @@
                         "memory_namespace": {
                           "type": "string"
                         },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
+                        },
                         "confidence": {
                           "type": "string",
                           "enum": ["low", "medium", "high"]
@@ -8321,6 +8521,10 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "domain": {
+                        "default": "general",
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -8716,6 +8920,28 @@
                           "memory_namespace": {
                             "type": "string"
                           },
+                          "personal_memory_access": {
+                            "default": "full",
+                            "type": "string",
+                            "enum": ["full", "facts_only", "blind"]
+                          },
+                          "acceptable_failure": {
+                            "type": "object",
+                            "properties": {
+                              "conditions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "on_match": {
+                                "default": "give_up",
+                                "type": "string",
+                                "enum": ["give_up", "escalate"]
+                              }
+                            },
+                            "required": ["conditions"]
+                          },
                           "confidence": {
                             "type": "string",
                             "enum": ["low", "medium", "high"]
@@ -9638,6 +9864,22 @@
                           "min_new_completed_todo_weight": 0.05,
                           "min_new_evidence_items": 3,
                           "min_quality_delta": 0.03
+                        },
+                        "continuation_state": {
+                          "approved_count": 0,
+                          "last_approved_usage": {
+                            "max_rounds": 0,
+                            "max_model_calls": 0,
+                            "max_tool_calls": 0,
+                            "max_subagents": 0,
+                            "max_wallclock_ms": 0,
+                            "max_estimated_tokens": 0
+                          },
+                          "last_approved_progress_score": 0,
+                          "last_approved_completed_todo_weight": 0,
+                          "last_approved_evidence_count": 0,
+                          "last_approved_verifier_quality": 0,
+                          "last_approved_failure_penalty": 0
                         }
                       },
                       "type": "object",
@@ -9991,6 +10233,117 @@
                               "maximum": 1
                             }
                           }
+                        },
+                        "continuation_state": {
+                          "default": {
+                            "approved_count": 0,
+                            "last_approved_usage": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "last_approved_progress_score": 0,
+                            "last_approved_completed_todo_weight": 0,
+                            "last_approved_evidence_count": 0,
+                            "last_approved_verifier_quality": 0,
+                            "last_approved_failure_penalty": 0
+                          },
+                          "type": "object",
+                          "properties": {
+                            "approved_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_usage": {
+                              "default": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "last_approved_progress_score": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_completed_todo_weight": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_evidence_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_verifier_quality": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_failure_penalty": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_denied_reason": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     },
@@ -10000,7 +10353,8 @@
                         "absolute_ceiling_used": 0,
                         "checkpoint_count": 0,
                         "budget_limited": false,
-                        "ceiling_hit": false
+                        "ceiling_hit": false,
+                        "limit_reason": "none"
                       },
                       "type": "object",
                       "properties": {
@@ -10029,6 +10383,25 @@
                         "ceiling_hit": {
                           "default": false,
                           "type": "boolean"
+                        },
+                        "limit_reason": {
+                          "default": "none",
+                          "type": "string",
+                          "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                        },
+                        "limited_resource": {
+                          "type": "string",
+                          "enum": [
+                            "max_rounds",
+                            "max_model_calls",
+                            "max_tool_calls",
+                            "max_subagents",
+                            "max_wallclock_ms",
+                            "max_estimated_tokens"
+                          ]
+                        },
+                        "limited_todo_id": {
+                          "type": "string"
                         }
                       }
                     },
@@ -10614,6 +10987,28 @@
                         "memory_namespace": {
                           "type": "string"
                         },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
+                        },
                         "confidence": {
                           "type": "string",
                           "enum": ["low", "medium", "high"]
@@ -10734,6 +11129,10 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "domain": {
+                        "default": "general",
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -10996,6 +11395,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -11385,6 +11788,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -12308,6 +12733,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -12661,6 +13102,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -12670,7 +13222,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -12699,6 +13252,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -13324,6 +13896,28 @@
                         "memory_namespace": {
                           "type": "string"
                         },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
+                        },
                         "confidence": {
                           "type": "string",
                           "enum": ["low", "medium", "high"]
@@ -13444,6 +14038,10 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "domain": {
+                        "default": "general",
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -13708,6 +14306,10 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "domain": {
+                              "default": "general",
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -14097,6 +14699,28 @@
                                   },
                                   "memory_namespace": {
                                     "type": "string"
+                                  },
+                                  "personal_memory_access": {
+                                    "default": "full",
+                                    "type": "string",
+                                    "enum": ["full", "facts_only", "blind"]
+                                  },
+                                  "acceptable_failure": {
+                                    "type": "object",
+                                    "properties": {
+                                      "conditions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "on_match": {
+                                        "default": "give_up",
+                                        "type": "string",
+                                        "enum": ["give_up", "escalate"]
+                                      }
+                                    },
+                                    "required": ["conditions"]
                                   },
                                   "confidence": {
                                     "type": "string",
@@ -15020,6 +15644,22 @@
                                   "min_new_completed_todo_weight": 0.05,
                                   "min_new_evidence_items": 3,
                                   "min_quality_delta": 0.03
+                                },
+                                "continuation_state": {
+                                  "approved_count": 0,
+                                  "last_approved_usage": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "last_approved_progress_score": 0,
+                                  "last_approved_completed_todo_weight": 0,
+                                  "last_approved_evidence_count": 0,
+                                  "last_approved_verifier_quality": 0,
+                                  "last_approved_failure_penalty": 0
                                 }
                               },
                               "type": "object",
@@ -15373,6 +16013,117 @@
                                       "maximum": 1
                                     }
                                   }
+                                },
+                                "continuation_state": {
+                                  "default": {
+                                    "approved_count": 0,
+                                    "last_approved_usage": {
+                                      "max_rounds": 0,
+                                      "max_model_calls": 0,
+                                      "max_tool_calls": 0,
+                                      "max_subagents": 0,
+                                      "max_wallclock_ms": 0,
+                                      "max_estimated_tokens": 0
+                                    },
+                                    "last_approved_progress_score": 0,
+                                    "last_approved_completed_todo_weight": 0,
+                                    "last_approved_evidence_count": 0,
+                                    "last_approved_verifier_quality": 0,
+                                    "last_approved_failure_penalty": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "approved_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_usage": {
+                                      "default": {
+                                        "max_rounds": 0,
+                                        "max_model_calls": 0,
+                                        "max_tool_calls": 0,
+                                        "max_subagents": 0,
+                                        "max_wallclock_ms": 0,
+                                        "max_estimated_tokens": 0
+                                      },
+                                      "type": "object",
+                                      "properties": {
+                                        "max_rounds": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_model_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 20000
+                                        },
+                                        "max_tool_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000
+                                        },
+                                        "max_subagents": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_wallclock_ms": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1209600000
+                                        },
+                                        "max_estimated_tokens": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000000
+                                        }
+                                      },
+                                      "required": [
+                                        "max_rounds",
+                                        "max_model_calls",
+                                        "max_tool_calls",
+                                        "max_subagents",
+                                        "max_wallclock_ms",
+                                        "max_estimated_tokens"
+                                      ]
+                                    },
+                                    "last_approved_progress_score": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_completed_todo_weight": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_evidence_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_verifier_quality": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_failure_penalty": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_denied_reason": {
+                                      "type": "string"
+                                    }
+                                  }
                                 }
                               }
                             },
@@ -15382,7 +16133,8 @@
                                 "absolute_ceiling_used": 0,
                                 "checkpoint_count": 0,
                                 "budget_limited": false,
-                                "ceiling_hit": false
+                                "ceiling_hit": false,
+                                "limit_reason": "none"
                               },
                               "type": "object",
                               "properties": {
@@ -15411,6 +16163,25 @@
                                 "ceiling_hit": {
                                   "default": false,
                                   "type": "boolean"
+                                },
+                                "limit_reason": {
+                                  "default": "none",
+                                  "type": "string",
+                                  "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                                },
+                                "limited_resource": {
+                                  "type": "string",
+                                  "enum": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "limited_todo_id": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -15929,6 +16700,10 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "domain": {
+                            "default": "general",
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -16318,6 +17093,28 @@
                                 },
                                 "memory_namespace": {
                                   "type": "string"
+                                },
+                                "personal_memory_access": {
+                                  "default": "full",
+                                  "type": "string",
+                                  "enum": ["full", "facts_only", "blind"]
+                                },
+                                "acceptable_failure": {
+                                  "type": "object",
+                                  "properties": {
+                                    "conditions": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "on_match": {
+                                      "default": "give_up",
+                                      "type": "string",
+                                      "enum": ["give_up", "escalate"]
+                                    }
+                                  },
+                                  "required": ["conditions"]
                                 },
                                 "confidence": {
                                   "type": "string",
@@ -17241,6 +18038,22 @@
                                 "min_new_completed_todo_weight": 0.05,
                                 "min_new_evidence_items": 3,
                                 "min_quality_delta": 0.03
+                              },
+                              "continuation_state": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
                               }
                             },
                             "type": "object",
@@ -17594,6 +18407,117 @@
                                     "maximum": 1
                                   }
                                 }
+                              },
+                              "continuation_state": {
+                                "default": {
+                                  "approved_count": 0,
+                                  "last_approved_usage": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "last_approved_progress_score": 0,
+                                  "last_approved_completed_todo_weight": 0,
+                                  "last_approved_evidence_count": 0,
+                                  "last_approved_verifier_quality": 0,
+                                  "last_approved_failure_penalty": 0
+                                },
+                                "type": "object",
+                                "properties": {
+                                  "approved_count": {
+                                    "default": 0,
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "last_approved_usage": {
+                                    "default": {
+                                      "max_rounds": 0,
+                                      "max_model_calls": 0,
+                                      "max_tool_calls": 0,
+                                      "max_subagents": 0,
+                                      "max_wallclock_ms": 0,
+                                      "max_estimated_tokens": 0
+                                    },
+                                    "type": "object",
+                                    "properties": {
+                                      "max_rounds": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 10000
+                                      },
+                                      "max_model_calls": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 20000
+                                      },
+                                      "max_tool_calls": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100000
+                                      },
+                                      "max_subagents": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 10000
+                                      },
+                                      "max_wallclock_ms": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 1209600000
+                                      },
+                                      "max_estimated_tokens": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100000000
+                                      }
+                                    },
+                                    "required": [
+                                      "max_rounds",
+                                      "max_model_calls",
+                                      "max_tool_calls",
+                                      "max_subagents",
+                                      "max_wallclock_ms",
+                                      "max_estimated_tokens"
+                                    ]
+                                  },
+                                  "last_approved_progress_score": {
+                                    "default": 0,
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "last_approved_completed_todo_weight": {
+                                    "default": 0,
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "last_approved_evidence_count": {
+                                    "default": 0,
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "last_approved_verifier_quality": {
+                                    "default": 0,
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "last_approved_failure_penalty": {
+                                    "default": 0,
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "last_denied_reason": {
+                                    "type": "string"
+                                  }
+                                }
                               }
                             }
                           },
@@ -17603,7 +18527,8 @@
                               "absolute_ceiling_used": 0,
                               "checkpoint_count": 0,
                               "budget_limited": false,
-                              "ceiling_hit": false
+                              "ceiling_hit": false,
+                              "limit_reason": "none"
                             },
                             "type": "object",
                             "properties": {
@@ -17632,6 +18557,25 @@
                               "ceiling_hit": {
                                 "default": false,
                                 "type": "boolean"
+                              },
+                              "limit_reason": {
+                                "default": "none",
+                                "type": "string",
+                                "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                              },
+                              "limited_resource": {
+                                "type": "string",
+                                "enum": [
+                                  "max_rounds",
+                                  "max_model_calls",
+                                  "max_tool_calls",
+                                  "max_subagents",
+                                  "max_wallclock_ms",
+                                  "max_estimated_tokens"
+                                ]
+                              },
+                              "limited_todo_id": {
+                                "type": "string"
                               }
                             }
                           },
@@ -18144,6 +19088,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -18533,6 +19481,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -19456,6 +20426,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -19809,6 +20795,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -19818,7 +20915,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -19847,6 +20945,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -20358,6 +21475,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -20747,6 +21868,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -21670,6 +22813,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -22023,6 +23182,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -22032,7 +23302,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -22061,6 +23332,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -22572,6 +23862,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -22961,6 +24255,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -23884,6 +25200,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -24237,6 +25569,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -24246,7 +25689,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -24275,6 +25719,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -24814,6 +26277,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -25203,6 +26670,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -26126,6 +27615,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -26479,6 +27984,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -26488,7 +28104,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -26517,6 +28134,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -27145,6 +28781,10 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "domain": {
+                              "default": "general",
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -27534,6 +29174,28 @@
                                   },
                                   "memory_namespace": {
                                     "type": "string"
+                                  },
+                                  "personal_memory_access": {
+                                    "default": "full",
+                                    "type": "string",
+                                    "enum": ["full", "facts_only", "blind"]
+                                  },
+                                  "acceptable_failure": {
+                                    "type": "object",
+                                    "properties": {
+                                      "conditions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "on_match": {
+                                        "default": "give_up",
+                                        "type": "string",
+                                        "enum": ["give_up", "escalate"]
+                                      }
+                                    },
+                                    "required": ["conditions"]
                                   },
                                   "confidence": {
                                     "type": "string",
@@ -28457,6 +30119,22 @@
                                   "min_new_completed_todo_weight": 0.05,
                                   "min_new_evidence_items": 3,
                                   "min_quality_delta": 0.03
+                                },
+                                "continuation_state": {
+                                  "approved_count": 0,
+                                  "last_approved_usage": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "last_approved_progress_score": 0,
+                                  "last_approved_completed_todo_weight": 0,
+                                  "last_approved_evidence_count": 0,
+                                  "last_approved_verifier_quality": 0,
+                                  "last_approved_failure_penalty": 0
                                 }
                               },
                               "type": "object",
@@ -28810,6 +30488,117 @@
                                       "maximum": 1
                                     }
                                   }
+                                },
+                                "continuation_state": {
+                                  "default": {
+                                    "approved_count": 0,
+                                    "last_approved_usage": {
+                                      "max_rounds": 0,
+                                      "max_model_calls": 0,
+                                      "max_tool_calls": 0,
+                                      "max_subagents": 0,
+                                      "max_wallclock_ms": 0,
+                                      "max_estimated_tokens": 0
+                                    },
+                                    "last_approved_progress_score": 0,
+                                    "last_approved_completed_todo_weight": 0,
+                                    "last_approved_evidence_count": 0,
+                                    "last_approved_verifier_quality": 0,
+                                    "last_approved_failure_penalty": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "approved_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_usage": {
+                                      "default": {
+                                        "max_rounds": 0,
+                                        "max_model_calls": 0,
+                                        "max_tool_calls": 0,
+                                        "max_subagents": 0,
+                                        "max_wallclock_ms": 0,
+                                        "max_estimated_tokens": 0
+                                      },
+                                      "type": "object",
+                                      "properties": {
+                                        "max_rounds": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_model_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 20000
+                                        },
+                                        "max_tool_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000
+                                        },
+                                        "max_subagents": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_wallclock_ms": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1209600000
+                                        },
+                                        "max_estimated_tokens": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000000
+                                        }
+                                      },
+                                      "required": [
+                                        "max_rounds",
+                                        "max_model_calls",
+                                        "max_tool_calls",
+                                        "max_subagents",
+                                        "max_wallclock_ms",
+                                        "max_estimated_tokens"
+                                      ]
+                                    },
+                                    "last_approved_progress_score": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_completed_todo_weight": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_evidence_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_verifier_quality": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_failure_penalty": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_denied_reason": {
+                                      "type": "string"
+                                    }
+                                  }
                                 }
                               }
                             },
@@ -28819,7 +30608,8 @@
                                 "absolute_ceiling_used": 0,
                                 "checkpoint_count": 0,
                                 "budget_limited": false,
-                                "ceiling_hit": false
+                                "ceiling_hit": false,
+                                "limit_reason": "none"
                               },
                               "type": "object",
                               "properties": {
@@ -28848,6 +30638,25 @@
                                 "ceiling_hit": {
                                   "default": false,
                                   "type": "boolean"
+                                },
+                                "limit_reason": {
+                                  "default": "none",
+                                  "type": "string",
+                                  "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                                },
+                                "limited_resource": {
+                                  "type": "string",
+                                  "enum": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "limited_todo_id": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -29370,6 +31179,10 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "domain": {
+                              "default": "general",
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -29759,6 +31572,28 @@
                                   },
                                   "memory_namespace": {
                                     "type": "string"
+                                  },
+                                  "personal_memory_access": {
+                                    "default": "full",
+                                    "type": "string",
+                                    "enum": ["full", "facts_only", "blind"]
+                                  },
+                                  "acceptable_failure": {
+                                    "type": "object",
+                                    "properties": {
+                                      "conditions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "on_match": {
+                                        "default": "give_up",
+                                        "type": "string",
+                                        "enum": ["give_up", "escalate"]
+                                      }
+                                    },
+                                    "required": ["conditions"]
                                   },
                                   "confidence": {
                                     "type": "string",
@@ -30682,6 +32517,22 @@
                                   "min_new_completed_todo_weight": 0.05,
                                   "min_new_evidence_items": 3,
                                   "min_quality_delta": 0.03
+                                },
+                                "continuation_state": {
+                                  "approved_count": 0,
+                                  "last_approved_usage": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "last_approved_progress_score": 0,
+                                  "last_approved_completed_todo_weight": 0,
+                                  "last_approved_evidence_count": 0,
+                                  "last_approved_verifier_quality": 0,
+                                  "last_approved_failure_penalty": 0
                                 }
                               },
                               "type": "object",
@@ -31035,6 +32886,117 @@
                                       "maximum": 1
                                     }
                                   }
+                                },
+                                "continuation_state": {
+                                  "default": {
+                                    "approved_count": 0,
+                                    "last_approved_usage": {
+                                      "max_rounds": 0,
+                                      "max_model_calls": 0,
+                                      "max_tool_calls": 0,
+                                      "max_subagents": 0,
+                                      "max_wallclock_ms": 0,
+                                      "max_estimated_tokens": 0
+                                    },
+                                    "last_approved_progress_score": 0,
+                                    "last_approved_completed_todo_weight": 0,
+                                    "last_approved_evidence_count": 0,
+                                    "last_approved_verifier_quality": 0,
+                                    "last_approved_failure_penalty": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "approved_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_usage": {
+                                      "default": {
+                                        "max_rounds": 0,
+                                        "max_model_calls": 0,
+                                        "max_tool_calls": 0,
+                                        "max_subagents": 0,
+                                        "max_wallclock_ms": 0,
+                                        "max_estimated_tokens": 0
+                                      },
+                                      "type": "object",
+                                      "properties": {
+                                        "max_rounds": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_model_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 20000
+                                        },
+                                        "max_tool_calls": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000
+                                        },
+                                        "max_subagents": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 10000
+                                        },
+                                        "max_wallclock_ms": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1209600000
+                                        },
+                                        "max_estimated_tokens": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100000000
+                                        }
+                                      },
+                                      "required": [
+                                        "max_rounds",
+                                        "max_model_calls",
+                                        "max_tool_calls",
+                                        "max_subagents",
+                                        "max_wallclock_ms",
+                                        "max_estimated_tokens"
+                                      ]
+                                    },
+                                    "last_approved_progress_score": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_completed_todo_weight": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_evidence_count": {
+                                      "default": 0,
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "last_approved_verifier_quality": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_approved_failure_penalty": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 1
+                                    },
+                                    "last_denied_reason": {
+                                      "type": "string"
+                                    }
+                                  }
                                 }
                               }
                             },
@@ -31044,7 +33006,8 @@
                                 "absolute_ceiling_used": 0,
                                 "checkpoint_count": 0,
                                 "budget_limited": false,
-                                "ceiling_hit": false
+                                "ceiling_hit": false,
+                                "limit_reason": "none"
                               },
                               "type": "object",
                               "properties": {
@@ -31073,6 +33036,25 @@
                                 "ceiling_hit": {
                                   "default": false,
                                   "type": "boolean"
+                                },
+                                "limit_reason": {
+                                  "default": "none",
+                                  "type": "string",
+                                  "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                                },
+                                "limited_resource": {
+                                  "type": "string",
+                                  "enum": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "limited_todo_id": {
+                                  "type": "string"
                                 }
                               }
                             },
@@ -32727,6 +34709,117 @@
                               "maximum": 1
                             }
                           }
+                        },
+                        "continuation_state": {
+                          "default": {
+                            "approved_count": 0,
+                            "last_approved_usage": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "last_approved_progress_score": 0,
+                            "last_approved_completed_todo_weight": 0,
+                            "last_approved_evidence_count": 0,
+                            "last_approved_verifier_quality": 0,
+                            "last_approved_failure_penalty": 0
+                          },
+                          "type": "object",
+                          "properties": {
+                            "approved_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_usage": {
+                              "default": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "max_rounds": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_model_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 20000
+                                },
+                                "max_tool_calls": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000
+                                },
+                                "max_subagents": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_wallclock_ms": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1209600000
+                                },
+                                "max_estimated_tokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 100000000
+                                }
+                              },
+                              "required": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "last_approved_progress_score": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_completed_todo_weight": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_evidence_count": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "last_approved_verifier_quality": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_approved_failure_penalty": {
+                              "default": 0,
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "last_denied_reason": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     },
@@ -32758,6 +34851,25 @@
                         "ceiling_hit": {
                           "default": false,
                           "type": "boolean"
+                        },
+                        "limit_reason": {
+                          "default": "none",
+                          "type": "string",
+                          "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                        },
+                        "limited_resource": {
+                          "type": "string",
+                          "enum": [
+                            "max_rounds",
+                            "max_model_calls",
+                            "max_tool_calls",
+                            "max_subagents",
+                            "max_wallclock_ms",
+                            "max_estimated_tokens"
+                          ]
+                        },
+                        "limited_todo_id": {
+                          "type": "string"
                         }
                       }
                     },
@@ -33221,6 +35333,10 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "domain": {
+                          "default": "general",
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -33610,6 +35726,28 @@
                               },
                               "memory_namespace": {
                                 "type": "string"
+                              },
+                              "personal_memory_access": {
+                                "default": "full",
+                                "type": "string",
+                                "enum": ["full", "facts_only", "blind"]
+                              },
+                              "acceptable_failure": {
+                                "type": "object",
+                                "properties": {
+                                  "conditions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "on_match": {
+                                    "default": "give_up",
+                                    "type": "string",
+                                    "enum": ["give_up", "escalate"]
+                                  }
+                                },
+                                "required": ["conditions"]
                               },
                               "confidence": {
                                 "type": "string",
@@ -34533,6 +36671,22 @@
                               "min_new_completed_todo_weight": 0.05,
                               "min_new_evidence_items": 3,
                               "min_quality_delta": 0.03
+                            },
+                            "continuation_state": {
+                              "approved_count": 0,
+                              "last_approved_usage": {
+                                "max_rounds": 0,
+                                "max_model_calls": 0,
+                                "max_tool_calls": 0,
+                                "max_subagents": 0,
+                                "max_wallclock_ms": 0,
+                                "max_estimated_tokens": 0
+                              },
+                              "last_approved_progress_score": 0,
+                              "last_approved_completed_todo_weight": 0,
+                              "last_approved_evidence_count": 0,
+                              "last_approved_verifier_quality": 0,
+                              "last_approved_failure_penalty": 0
                             }
                           },
                           "type": "object",
@@ -34886,6 +37040,117 @@
                                   "maximum": 1
                                 }
                               }
+                            },
+                            "continuation_state": {
+                              "default": {
+                                "approved_count": 0,
+                                "last_approved_usage": {
+                                  "max_rounds": 0,
+                                  "max_model_calls": 0,
+                                  "max_tool_calls": 0,
+                                  "max_subagents": 0,
+                                  "max_wallclock_ms": 0,
+                                  "max_estimated_tokens": 0
+                                },
+                                "last_approved_progress_score": 0,
+                                "last_approved_completed_todo_weight": 0,
+                                "last_approved_evidence_count": 0,
+                                "last_approved_verifier_quality": 0,
+                                "last_approved_failure_penalty": 0
+                              },
+                              "type": "object",
+                              "properties": {
+                                "approved_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_usage": {
+                                  "default": {
+                                    "max_rounds": 0,
+                                    "max_model_calls": 0,
+                                    "max_tool_calls": 0,
+                                    "max_subagents": 0,
+                                    "max_wallclock_ms": 0,
+                                    "max_estimated_tokens": 0
+                                  },
+                                  "type": "object",
+                                  "properties": {
+                                    "max_rounds": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_model_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20000
+                                    },
+                                    "max_tool_calls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000
+                                    },
+                                    "max_subagents": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "max_wallclock_ms": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 1209600000
+                                    },
+                                    "max_estimated_tokens": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100000000
+                                    }
+                                  },
+                                  "required": [
+                                    "max_rounds",
+                                    "max_model_calls",
+                                    "max_tool_calls",
+                                    "max_subagents",
+                                    "max_wallclock_ms",
+                                    "max_estimated_tokens"
+                                  ]
+                                },
+                                "last_approved_progress_score": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_completed_todo_weight": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_evidence_count": {
+                                  "default": 0,
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "last_approved_verifier_quality": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_approved_failure_penalty": {
+                                  "default": 0,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "last_denied_reason": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           }
                         },
@@ -34895,7 +37160,8 @@
                             "absolute_ceiling_used": 0,
                             "checkpoint_count": 0,
                             "budget_limited": false,
-                            "ceiling_hit": false
+                            "ceiling_hit": false,
+                            "limit_reason": "none"
                           },
                           "type": "object",
                           "properties": {
@@ -34924,6 +37190,25 @@
                             "ceiling_hit": {
                               "default": false,
                               "type": "boolean"
+                            },
+                            "limit_reason": {
+                              "default": "none",
+                              "type": "string",
+                              "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                            },
+                            "limited_resource": {
+                              "type": "string",
+                              "enum": [
+                                "max_rounds",
+                                "max_model_calls",
+                                "max_tool_calls",
+                                "max_subagents",
+                                "max_wallclock_ms",
+                                "max_estimated_tokens"
+                              ]
+                            },
+                            "limited_todo_id": {
+                              "type": "string"
                             }
                           }
                         },
@@ -35415,6 +37700,11 @@
                                 "type": "string",
                                 "enum": ["profile", "workspace", "session", "semantic", "procedural"]
                               },
+                              "kind": {
+                                "default": "belief",
+                                "type": "string",
+                                "enum": ["fact", "preference", "belief"]
+                              },
                               "projectID": {
                                 "type": "string"
                               },
@@ -35560,6 +37850,11 @@
                         "type": "string",
                         "enum": ["profile", "workspace", "session", "semantic", "procedural"]
                       },
+                      "kind": {
+                        "default": "belief",
+                        "type": "string",
+                        "enum": ["fact", "preference", "belief"]
+                      },
                       "projectID": {
                         "type": "string"
                       },
@@ -35670,6 +37965,11 @@
                     "scope": {
                       "type": "string",
                       "enum": ["profile", "workspace", "session", "semantic", "procedural"]
+                    },
+                    "kind": {
+                      "default": "belief",
+                      "type": "string",
+                      "enum": ["fact", "preference", "belief"]
                     },
                     "projectID": {
                       "type": "string"
@@ -35854,6 +38154,11 @@
                         "type": "string",
                         "enum": ["profile", "workspace", "session", "semantic", "procedural"]
                       },
+                      "kind": {
+                        "default": "belief",
+                        "type": "string",
+                        "enum": ["fact", "preference", "belief"]
+                      },
                       "projectID": {
                         "type": "string"
                       },
@@ -36024,6 +38329,11 @@
                     "scope": {
                       "type": "string",
                       "enum": ["profile", "workspace", "session", "semantic", "procedural"]
+                    },
+                    "kind": {
+                      "default": "belief",
+                      "type": "string",
+                      "enum": ["fact", "preference", "belief"]
                     },
                     "projectID": {
                       "type": "string"
@@ -36202,7 +38512,7 @@
                       },
                       "source": {
                         "type": "string",
-                        "enum": ["session", "scheduled", "webhook"]
+                        "enum": ["session", "scheduled", "webhook", "agent"]
                       },
                       "scope": {
                         "type": "string",
@@ -36313,7 +38623,7 @@
                     },
                     "source": {
                       "type": "string",
-                      "enum": ["session", "scheduled", "webhook"]
+                      "enum": ["session", "scheduled", "webhook", "agent"]
                     },
                     "scope": {
                       "type": "string",
@@ -36481,7 +38791,7 @@
                     },
                     "source": {
                       "type": "string",
-                      "enum": ["session", "scheduled", "webhook"]
+                      "enum": ["session", "scheduled", "webhook", "agent"]
                     },
                     "scope": {
                       "type": "string",
@@ -36871,7 +39181,7 @@
                       },
                       "source": {
                         "type": "string",
-                        "enum": ["session", "scheduled", "webhook"]
+                        "enum": ["session", "scheduled", "webhook", "agent"]
                       },
                       "scope": {
                         "type": "string",
@@ -37108,7 +39418,7 @@
                     },
                     "source": {
                       "type": "string",
-                      "enum": ["session", "scheduled", "webhook"]
+                      "enum": ["session", "scheduled", "webhook", "agent"]
                     },
                     "scope": {
                       "type": "string",
@@ -39827,6 +42137,258 @@
         },
         "required": ["type", "properties"]
       },
+      "Event.behavior.tool.invoked": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.tool.invoked"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "tool_id": {
+                "type": "string"
+              },
+              "tool_call_id": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "message_id": {
+                "type": "string"
+              },
+              "args_hash": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "number"
+              },
+              "agent": {
+                "type": "string"
+              }
+            },
+            "required": ["tool_id", "tool_call_id", "session_id", "message_id", "args_hash", "started_at"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
+      "Event.behavior.tool.completed": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.tool.completed"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "tool_id": {
+                "type": "string"
+              },
+              "tool_call_id": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "message_id": {
+                "type": "string"
+              },
+              "success": {
+                "type": "boolean"
+              },
+              "output_size": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "error_kind": {
+                "type": "string"
+              }
+            },
+            "required": ["tool_id", "tool_call_id", "session_id", "message_id", "success", "output_size", "duration_ms"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
+      "Event.behavior.permission.decided": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.permission.decided"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["once", "always", "reject"]
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "risk_level": {
+                "type": "string"
+              },
+              "cascade": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": ["request_id", "session_id", "action"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
+      "Event.behavior.memory.injected": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.memory.injected"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "goal_hash": {
+                "type": "string"
+              },
+              "note_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind_breakdown": {
+                "type": "object",
+                "properties": {
+                  "fact": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "preference": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "belief": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "source": {
+                "default": "plan_enrichment",
+                "type": "string",
+                "enum": ["plan_enrichment", "search_tool", "manual"]
+              }
+            },
+            "required": ["goal_hash", "note_ids", "kind_breakdown"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
+      "Event.behavior.subagent.dispatched": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.subagent.dispatched"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "parent_session_id": {
+                "type": "string"
+              },
+              "child_session_id": {
+                "type": "string"
+              },
+              "node_id": {
+                "type": "string"
+              },
+              "agent": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "isolation_level": {
+                "default": "full",
+                "type": "string",
+                "enum": ["full", "facts_only", "blind"]
+              },
+              "goal_hash": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "number"
+              }
+            },
+            "required": ["parent_session_id", "child_session_id", "node_id", "agent", "goal_hash", "started_at"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
+      "Event.behavior.file.touched": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "behavior.file.touched"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["read", "write", "edit", "patch"]
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "tool_call_id": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["path", "kind", "session_id"]
+          }
+        },
+        "required": ["type", "properties"]
+      },
       "PermissionRequest": {
         "type": "object",
         "properties": {
@@ -41036,6 +43598,11 @@
                 "type": "string",
                 "enum": ["profile", "workspace", "session", "semantic", "procedural"]
               },
+              "kind": {
+                "default": "belief",
+                "type": "string",
+                "enum": ["fact", "preference", "belief"]
+              },
               "projectID": {
                 "type": "string"
               },
@@ -41124,7 +43691,7 @@
               },
               "source": {
                 "type": "string",
-                "enum": ["session", "scheduled", "webhook"]
+                "enum": ["session", "scheduled", "webhook", "agent"]
               },
               "scope": {
                 "type": "string",
@@ -41200,7 +43767,7 @@
               },
               "source": {
                 "type": "string",
-                "enum": ["session", "scheduled", "webhook"]
+                "enum": ["session", "scheduled", "webhook", "agent"]
               },
               "scope": {
                 "type": "string",
@@ -41413,7 +43980,7 @@
                   },
                   "source": {
                     "type": "string",
-                    "enum": ["session", "scheduled", "webhook"]
+                    "enum": ["session", "scheduled", "webhook", "agent"]
                   },
                   "scope": {
                     "type": "string",
@@ -41671,6 +44238,10 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "domain": {
+                    "default": "general",
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -42060,6 +44631,28 @@
                         },
                         "memory_namespace": {
                           "type": "string"
+                        },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
                         },
                         "confidence": {
                           "type": "string",
@@ -42983,6 +45576,22 @@
                         "min_new_completed_todo_weight": 0.05,
                         "min_new_evidence_items": 3,
                         "min_quality_delta": 0.03
+                      },
+                      "continuation_state": {
+                        "approved_count": 0,
+                        "last_approved_usage": {
+                          "max_rounds": 0,
+                          "max_model_calls": 0,
+                          "max_tool_calls": 0,
+                          "max_subagents": 0,
+                          "max_wallclock_ms": 0,
+                          "max_estimated_tokens": 0
+                        },
+                        "last_approved_progress_score": 0,
+                        "last_approved_completed_todo_weight": 0,
+                        "last_approved_evidence_count": 0,
+                        "last_approved_verifier_quality": 0,
+                        "last_approved_failure_penalty": 0
                       }
                     },
                     "type": "object",
@@ -43336,6 +45945,117 @@
                             "maximum": 1
                           }
                         }
+                      },
+                      "continuation_state": {
+                        "default": {
+                          "approved_count": 0,
+                          "last_approved_usage": {
+                            "max_rounds": 0,
+                            "max_model_calls": 0,
+                            "max_tool_calls": 0,
+                            "max_subagents": 0,
+                            "max_wallclock_ms": 0,
+                            "max_estimated_tokens": 0
+                          },
+                          "last_approved_progress_score": 0,
+                          "last_approved_completed_todo_weight": 0,
+                          "last_approved_evidence_count": 0,
+                          "last_approved_verifier_quality": 0,
+                          "last_approved_failure_penalty": 0
+                        },
+                        "type": "object",
+                        "properties": {
+                          "approved_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_usage": {
+                            "default": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "type": "object",
+                            "properties": {
+                              "max_rounds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_model_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 20000
+                              },
+                              "max_tool_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000
+                              },
+                              "max_subagents": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_wallclock_ms": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1209600000
+                              },
+                              "max_estimated_tokens": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000000
+                              }
+                            },
+                            "required": [
+                              "max_rounds",
+                              "max_model_calls",
+                              "max_tool_calls",
+                              "max_subagents",
+                              "max_wallclock_ms",
+                              "max_estimated_tokens"
+                            ]
+                          },
+                          "last_approved_progress_score": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_completed_todo_weight": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_evidence_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_verifier_quality": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_failure_penalty": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_denied_reason": {
+                            "type": "string"
+                          }
+                        }
                       }
                     }
                   },
@@ -43345,7 +46065,8 @@
                       "absolute_ceiling_used": 0,
                       "checkpoint_count": 0,
                       "budget_limited": false,
-                      "ceiling_hit": false
+                      "ceiling_hit": false,
+                      "limit_reason": "none"
                     },
                     "type": "object",
                     "properties": {
@@ -43374,6 +46095,25 @@
                       "ceiling_hit": {
                         "default": false,
                         "type": "boolean"
+                      },
+                      "limit_reason": {
+                        "default": "none",
+                        "type": "string",
+                        "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                      },
+                      "limited_resource": {
+                        "type": "string",
+                        "enum": [
+                          "max_rounds",
+                          "max_model_calls",
+                          "max_tool_calls",
+                          "max_subagents",
+                          "max_wallclock_ms",
+                          "max_estimated_tokens"
+                        ]
+                      },
+                      "limited_todo_id": {
+                        "type": "string"
                       }
                     }
                   },
@@ -43850,6 +46590,10 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "domain": {
+                    "default": "general",
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -44239,6 +46983,28 @@
                         },
                         "memory_namespace": {
                           "type": "string"
+                        },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
                         },
                         "confidence": {
                           "type": "string",
@@ -45162,6 +47928,22 @@
                         "min_new_completed_todo_weight": 0.05,
                         "min_new_evidence_items": 3,
                         "min_quality_delta": 0.03
+                      },
+                      "continuation_state": {
+                        "approved_count": 0,
+                        "last_approved_usage": {
+                          "max_rounds": 0,
+                          "max_model_calls": 0,
+                          "max_tool_calls": 0,
+                          "max_subagents": 0,
+                          "max_wallclock_ms": 0,
+                          "max_estimated_tokens": 0
+                        },
+                        "last_approved_progress_score": 0,
+                        "last_approved_completed_todo_weight": 0,
+                        "last_approved_evidence_count": 0,
+                        "last_approved_verifier_quality": 0,
+                        "last_approved_failure_penalty": 0
                       }
                     },
                     "type": "object",
@@ -45515,6 +48297,117 @@
                             "maximum": 1
                           }
                         }
+                      },
+                      "continuation_state": {
+                        "default": {
+                          "approved_count": 0,
+                          "last_approved_usage": {
+                            "max_rounds": 0,
+                            "max_model_calls": 0,
+                            "max_tool_calls": 0,
+                            "max_subagents": 0,
+                            "max_wallclock_ms": 0,
+                            "max_estimated_tokens": 0
+                          },
+                          "last_approved_progress_score": 0,
+                          "last_approved_completed_todo_weight": 0,
+                          "last_approved_evidence_count": 0,
+                          "last_approved_verifier_quality": 0,
+                          "last_approved_failure_penalty": 0
+                        },
+                        "type": "object",
+                        "properties": {
+                          "approved_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_usage": {
+                            "default": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "type": "object",
+                            "properties": {
+                              "max_rounds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_model_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 20000
+                              },
+                              "max_tool_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000
+                              },
+                              "max_subagents": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_wallclock_ms": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1209600000
+                              },
+                              "max_estimated_tokens": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000000
+                              }
+                            },
+                            "required": [
+                              "max_rounds",
+                              "max_model_calls",
+                              "max_tool_calls",
+                              "max_subagents",
+                              "max_wallclock_ms",
+                              "max_estimated_tokens"
+                            ]
+                          },
+                          "last_approved_progress_score": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_completed_todo_weight": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_evidence_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_verifier_quality": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_failure_penalty": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_denied_reason": {
+                            "type": "string"
+                          }
+                        }
                       }
                     }
                   },
@@ -45524,7 +48417,8 @@
                       "absolute_ceiling_used": 0,
                       "checkpoint_count": 0,
                       "budget_limited": false,
-                      "ceiling_hit": false
+                      "ceiling_hit": false,
+                      "limit_reason": "none"
                     },
                     "type": "object",
                     "properties": {
@@ -45553,6 +48447,25 @@
                       "ceiling_hit": {
                         "default": false,
                         "type": "boolean"
+                      },
+                      "limit_reason": {
+                        "default": "none",
+                        "type": "string",
+                        "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                      },
+                      "limited_resource": {
+                        "type": "string",
+                        "enum": [
+                          "max_rounds",
+                          "max_model_calls",
+                          "max_tool_calls",
+                          "max_subagents",
+                          "max_wallclock_ms",
+                          "max_estimated_tokens"
+                        ]
+                      },
+                      "limited_todo_id": {
+                        "type": "string"
                       }
                     }
                   },
@@ -46029,6 +48942,10 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "domain": {
+                    "default": "general",
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -46418,6 +49335,28 @@
                         },
                         "memory_namespace": {
                           "type": "string"
+                        },
+                        "personal_memory_access": {
+                          "default": "full",
+                          "type": "string",
+                          "enum": ["full", "facts_only", "blind"]
+                        },
+                        "acceptable_failure": {
+                          "type": "object",
+                          "properties": {
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "on_match": {
+                              "default": "give_up",
+                              "type": "string",
+                              "enum": ["give_up", "escalate"]
+                            }
+                          },
+                          "required": ["conditions"]
                         },
                         "confidence": {
                           "type": "string",
@@ -47341,6 +50280,22 @@
                         "min_new_completed_todo_weight": 0.05,
                         "min_new_evidence_items": 3,
                         "min_quality_delta": 0.03
+                      },
+                      "continuation_state": {
+                        "approved_count": 0,
+                        "last_approved_usage": {
+                          "max_rounds": 0,
+                          "max_model_calls": 0,
+                          "max_tool_calls": 0,
+                          "max_subagents": 0,
+                          "max_wallclock_ms": 0,
+                          "max_estimated_tokens": 0
+                        },
+                        "last_approved_progress_score": 0,
+                        "last_approved_completed_todo_weight": 0,
+                        "last_approved_evidence_count": 0,
+                        "last_approved_verifier_quality": 0,
+                        "last_approved_failure_penalty": 0
                       }
                     },
                     "type": "object",
@@ -47694,6 +50649,117 @@
                             "maximum": 1
                           }
                         }
+                      },
+                      "continuation_state": {
+                        "default": {
+                          "approved_count": 0,
+                          "last_approved_usage": {
+                            "max_rounds": 0,
+                            "max_model_calls": 0,
+                            "max_tool_calls": 0,
+                            "max_subagents": 0,
+                            "max_wallclock_ms": 0,
+                            "max_estimated_tokens": 0
+                          },
+                          "last_approved_progress_score": 0,
+                          "last_approved_completed_todo_weight": 0,
+                          "last_approved_evidence_count": 0,
+                          "last_approved_verifier_quality": 0,
+                          "last_approved_failure_penalty": 0
+                        },
+                        "type": "object",
+                        "properties": {
+                          "approved_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_usage": {
+                            "default": {
+                              "max_rounds": 0,
+                              "max_model_calls": 0,
+                              "max_tool_calls": 0,
+                              "max_subagents": 0,
+                              "max_wallclock_ms": 0,
+                              "max_estimated_tokens": 0
+                            },
+                            "type": "object",
+                            "properties": {
+                              "max_rounds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_model_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 20000
+                              },
+                              "max_tool_calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000
+                              },
+                              "max_subagents": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
+                              },
+                              "max_wallclock_ms": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1209600000
+                              },
+                              "max_estimated_tokens": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000000
+                              }
+                            },
+                            "required": [
+                              "max_rounds",
+                              "max_model_calls",
+                              "max_tool_calls",
+                              "max_subagents",
+                              "max_wallclock_ms",
+                              "max_estimated_tokens"
+                            ]
+                          },
+                          "last_approved_progress_score": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_completed_todo_weight": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_evidence_count": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "last_approved_verifier_quality": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_approved_failure_penalty": {
+                            "default": 0,
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "last_denied_reason": {
+                            "type": "string"
+                          }
+                        }
                       }
                     }
                   },
@@ -47703,7 +50769,8 @@
                       "absolute_ceiling_used": 0,
                       "checkpoint_count": 0,
                       "budget_limited": false,
-                      "ceiling_hit": false
+                      "ceiling_hit": false,
+                      "limit_reason": "none"
                     },
                     "type": "object",
                     "properties": {
@@ -47732,6 +50799,25 @@
                       "ceiling_hit": {
                         "default": false,
                         "type": "boolean"
+                      },
+                      "limit_reason": {
+                        "default": "none",
+                        "type": "string",
+                        "enum": ["none", "mission", "absolute", "phase", "todo", "checkpoint_reserve"]
+                      },
+                      "limited_resource": {
+                        "type": "string",
+                        "enum": [
+                          "max_rounds",
+                          "max_model_calls",
+                          "max_tool_calls",
+                          "max_subagents",
+                          "max_wallclock_ms",
+                          "max_estimated_tokens"
+                        ]
+                      },
+                      "limited_todo_id": {
+                        "type": "string"
                       }
                     }
                   },
@@ -49402,6 +52488,9 @@
           },
           "action": {
             "$ref": "#/components/schemas/PermissionAction"
+          },
+          "requires_fresh_context": {
+            "type": "boolean"
           }
         },
         "required": ["permission", "pattern", "action"]
@@ -50102,6 +53191,24 @@
               },
               {
                 "$ref": "#/components/schemas/Event.message.part.delta"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.tool.invoked"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.tool.completed"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.permission.decided"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.memory.injected"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.subagent.dispatched"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.file.touched"
               },
               {
                 "$ref": "#/components/schemas/Event.permission.asked"
@@ -51425,6 +54532,11 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "windows_acl_apply_mode": {
+                    "description": "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
+                    "type": "string",
+                    "enum": ["preflight", "dry_run", "apply"]
                   }
                 }
               },
@@ -52679,6 +55791,24 @@
               },
               {
                 "$ref": "#/components/schemas/Event.message.part.delta"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.tool.invoked"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.tool.completed"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.permission.decided"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.memory.injected"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.subagent.dispatched"
+              },
+              {
+                "$ref": "#/components/schemas/Event.behavior.file.touched"
               },
               {
                 "$ref": "#/components/schemas/Event.permission.asked"

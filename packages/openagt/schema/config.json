@@ -7672,6 +7672,15 @@
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
+            },
+            "windows_acl_apply_mode": {
+              "description": "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
+              "type": "string",
+              "enum": [
+                "preflight",
+                "dry_run",
+                "apply"
+              ]
             }
           },
           "additionalProperties": false

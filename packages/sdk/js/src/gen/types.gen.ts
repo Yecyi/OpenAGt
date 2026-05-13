@@ -125,6 +125,86 @@ export type EventMessagePartDelta = {
   }
 }
 
+export type EventBehaviorToolInvoked = {
+  type: "behavior.tool.invoked"
+  properties: {
+    tool_id: string
+    tool_call_id: string
+    session_id: string
+    message_id: string
+    args_hash: string
+    started_at: number
+    agent?: string
+  }
+}
+
+export type EventBehaviorToolCompleted = {
+  type: "behavior.tool.completed"
+  properties: {
+    tool_id: string
+    tool_call_id: string
+    session_id: string
+    message_id: string
+    success: boolean
+    output_size: number
+    duration_ms: number
+    error_kind?: string
+  }
+}
+
+export type EventBehaviorPermissionDecided = {
+  type: "behavior.permission.decided"
+  properties: {
+    request_id: string
+    session_id: string
+    action: "once" | "always" | "reject"
+    pattern?: string
+    risk_level?: string
+    cascade?: boolean
+  }
+}
+
+export type EventBehaviorMemoryInjected = {
+  type: "behavior.memory.injected"
+  properties: {
+    session_id?: string
+    plan_id?: string
+    goal_hash: string
+    note_ids: Array<string>
+    kind_breakdown: {
+      fact?: number
+      preference?: number
+      belief?: number
+    }
+    source?: "plan_enrichment" | "search_tool" | "manual"
+  }
+}
+
+export type EventBehaviorSubagentDispatched = {
+  type: "behavior.subagent.dispatched"
+  properties: {
+    parent_session_id: string
+    child_session_id: string
+    node_id: string
+    agent: string
+    role?: string
+    isolation_level?: "full" | "facts_only" | "blind"
+    goal_hash: string
+    started_at: number
+  }
+}
+
+export type EventBehaviorFileTouched = {
+  type: "behavior.file.touched"
+  properties: {
+    path: string
+    kind: "read" | "write" | "edit" | "patch"
+    session_id: string
+    tool_call_id?: string
+    bytes?: number
+  }
+}
+
 export type PermissionRequest = {
   id: string
   sessionID: string
@@ -575,6 +655,7 @@ export type EventMemoryUpdated = {
   properties: {
     id: string
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    kind?: "fact" | "preference" | "belief"
     projectID?: string
     sessionID?: string
     title: string
@@ -608,7 +689,7 @@ export type EventInboxCreated = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -632,7 +713,7 @@ export type EventInboxUpdated = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -699,7 +780,7 @@ export type EventSchedulerFired = {
       id: string
       projectID: string
       sessionID?: string
-      source: "session" | "scheduled" | "webhook"
+      source: "session" | "scheduled" | "webhook" | "agent"
       scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
       goal: string
       context_refs: Array<string>
@@ -800,6 +881,7 @@ export type EventCoordinatorCreated = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -958,6 +1040,11 @@ export type EventCoordinatorCreated = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -1268,6 +1355,23 @@ export type EventCoordinatorCreated = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -1275,6 +1379,15 @@ export type EventCoordinatorCreated = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -1408,6 +1521,7 @@ export type EventCoordinatorUpdated = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -1566,6 +1680,11 @@ export type EventCoordinatorUpdated = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -1876,6 +1995,23 @@ export type EventCoordinatorUpdated = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -1883,6 +2019,15 @@ export type EventCoordinatorUpdated = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -2016,6 +2161,7 @@ export type EventCoordinatorCompleted = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -2174,6 +2320,11 @@ export type EventCoordinatorCompleted = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -2484,6 +2635,23 @@ export type EventCoordinatorCompleted = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -2491,6 +2659,15 @@ export type EventCoordinatorCompleted = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -2996,6 +3173,7 @@ export type PermissionRule = {
   permission: string
   pattern: string
   action: PermissionAction
+  requires_fresh_context?: boolean
 }
 
 export type PermissionRuleset = Array<PermissionRule>
@@ -3185,6 +3363,12 @@ export type GlobalEvent = {
     | EventInstallationUpdated
     | EventInstallationUpdateAvailable
     | EventMessagePartDelta
+    | EventBehaviorToolInvoked
+    | EventBehaviorToolCompleted
+    | EventBehaviorPermissionDecided
+    | EventBehaviorMemoryInjected
+    | EventBehaviorSubagentDispatched
+    | EventBehaviorFileTouched
     | EventPermissionAsked
     | EventPermissionReplied
     | EventSessionDiff
@@ -3843,6 +4027,10 @@ export type Config = {
       failure_policy?: "closed" | "confirm_downgrade" | "fallback"
       report_only?: boolean
       broker_idle_ttl_ms?: number
+      /**
+       * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
+       */
+      windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
     }
     /**
      * Session memory configuration
@@ -4297,6 +4485,12 @@ export type EventEnvelope = {
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
   | EventMessagePartDelta
+  | EventBehaviorToolInvoked
+  | EventBehaviorToolCompleted
+  | EventBehaviorPermissionDecided
+  | EventBehaviorMemoryInjected
+  | EventBehaviorSubagentDispatched
+  | EventBehaviorFileTouched
   | EventPermissionAsked
   | EventPermissionReplied
   | EventSessionDiff
@@ -5448,6 +5642,10 @@ export type ConfigGlobalUpdateData = {
         failure_policy?: "closed" | "confirm_downgrade" | "fallback"
         report_only?: boolean
         broker_idle_ttl_ms?: number
+        /**
+         * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
+         */
+        windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
       }
       /**
        * Session memory configuration
@@ -7160,6 +7358,7 @@ export type CoordinatorIntentSettleResponses = {
     >
     expected_output: string
     permission_expectations: Array<string>
+    domain?: string
   }
 }
 
@@ -7281,6 +7480,11 @@ export type CoordinatorPlanGenerateData = {
       mpacr_per_critic_timeout_ms?: number
       mpacr_degraded?: boolean
       memory_namespace?: string
+      personal_memory_access?: "full" | "facts_only" | "blind"
+      acceptable_failure?: {
+        conditions: Array<string>
+        on_match?: "give_up" | "escalate"
+      }
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
     }>
@@ -7336,6 +7540,7 @@ export type CoordinatorPlanGenerateData = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     effort?: "low" | "medium" | "high" | "deep"
     workflow?:
@@ -7505,6 +7710,11 @@ export type CoordinatorPlanGenerateResponses = {
       mpacr_per_critic_timeout_ms?: number
       mpacr_degraded?: boolean
       memory_namespace?: string
+      personal_memory_access?: "full" | "facts_only" | "blind"
+      acceptable_failure?: {
+        conditions: Array<string>
+        on_match?: "give_up" | "escalate"
+      }
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
     }>
@@ -7815,6 +8025,23 @@ export type CoordinatorPlanGenerateResponses = {
         min_new_evidence_items?: number
         min_quality_delta?: number
       }
+      continuation_state?: {
+        approved_count?: number
+        last_approved_usage?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        last_approved_progress_score?: number
+        last_approved_completed_todo_weight?: number
+        last_approved_evidence_count?: number
+        last_approved_verifier_quality?: number
+        last_approved_failure_penalty?: number
+        last_denied_reason?: string
+      }
     }
     budget_state?: {
       soft_budget_used?: number
@@ -7822,6 +8049,15 @@ export type CoordinatorPlanGenerateResponses = {
       checkpoint_count?: number
       budget_limited?: boolean
       ceiling_hit?: boolean
+      limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+      limited_resource?:
+        | "max_rounds"
+        | "max_model_calls"
+        | "max_tool_calls"
+        | "max_subagents"
+        | "max_wallclock_ms"
+        | "max_estimated_tokens"
+      limited_todo_id?: string
     }
     progress_snapshot?: {
       done?: number
@@ -8007,6 +8243,11 @@ export type CoordinatorPlanData = {
       mpacr_per_critic_timeout_ms?: number
       mpacr_degraded?: boolean
       memory_namespace?: string
+      personal_memory_access?: "full" | "facts_only" | "blind"
+      acceptable_failure?: {
+        conditions: Array<string>
+        on_match?: "give_up" | "escalate"
+      }
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
     }>
@@ -8062,6 +8303,7 @@ export type CoordinatorPlanData = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     effort?: "low" | "medium" | "high" | "deep"
     workflow?:
@@ -8231,6 +8473,11 @@ export type CoordinatorPlanResponses = {
       mpacr_per_critic_timeout_ms?: number
       mpacr_degraded?: boolean
       memory_namespace?: string
+      personal_memory_access?: "full" | "facts_only" | "blind"
+      acceptable_failure?: {
+        conditions: Array<string>
+        on_match?: "give_up" | "escalate"
+      }
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
     }>
@@ -8541,6 +8788,23 @@ export type CoordinatorPlanResponses = {
         min_new_evidence_items?: number
         min_quality_delta?: number
       }
+      continuation_state?: {
+        approved_count?: number
+        last_approved_usage?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        last_approved_progress_score?: number
+        last_approved_completed_todo_weight?: number
+        last_approved_evidence_count?: number
+        last_approved_verifier_quality?: number
+        last_approved_failure_penalty?: number
+        last_denied_reason?: string
+      }
     }
     budget_state?: {
       soft_budget_used?: number
@@ -8548,6 +8812,15 @@ export type CoordinatorPlanResponses = {
       checkpoint_count?: number
       budget_limited?: boolean
       ceiling_hit?: boolean
+      limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+      limited_resource?:
+        | "max_rounds"
+        | "max_model_calls"
+        | "max_tool_calls"
+        | "max_subagents"
+        | "max_wallclock_ms"
+        | "max_estimated_tokens"
+      limited_todo_id?: string
     }
     progress_snapshot?: {
       done?: number
@@ -8733,6 +9006,11 @@ export type CoordinatorRunData = {
       mpacr_per_critic_timeout_ms?: number
       mpacr_degraded?: boolean
       memory_namespace?: string
+      personal_memory_access?: "full" | "facts_only" | "blind"
+      acceptable_failure?: {
+        conditions: Array<string>
+        on_match?: "give_up" | "escalate"
+      }
       confidence?: "low" | "medium" | "high"
       revise_policy?: "none" | "critical_only" | "all_artifacts"
     }>
@@ -8788,6 +9066,7 @@ export type CoordinatorRunData = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     effort?: "low" | "medium" | "high" | "deep"
     workflow?:
@@ -8900,6 +9179,7 @@ export type CoordinatorRunResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -9058,6 +9338,11 @@ export type CoordinatorRunResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -9368,6 +9653,23 @@ export type CoordinatorRunResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -9375,6 +9677,15 @@ export type CoordinatorRunResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -9524,6 +9835,7 @@ export type CoordinatorGetResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -9682,6 +9994,11 @@ export type CoordinatorGetResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -9992,6 +10309,23 @@ export type CoordinatorGetResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -9999,6 +10333,15 @@ export type CoordinatorGetResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -10148,6 +10491,7 @@ export type CoordinatorListResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -10306,6 +10650,11 @@ export type CoordinatorListResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -10616,6 +10965,23 @@ export type CoordinatorListResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -10623,6 +10989,15 @@ export type CoordinatorListResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -10772,6 +11147,7 @@ export type CoordinatorApproveResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -10930,6 +11306,11 @@ export type CoordinatorApproveResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -11240,6 +11621,23 @@ export type CoordinatorApproveResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -11247,6 +11645,15 @@ export type CoordinatorApproveResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -11396,6 +11803,7 @@ export type CoordinatorCancelResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -11554,6 +11962,11 @@ export type CoordinatorCancelResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -11864,6 +12277,23 @@ export type CoordinatorCancelResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -11871,6 +12301,15 @@ export type CoordinatorCancelResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -12032,6 +12471,7 @@ export type CoordinatorRetryResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -12190,6 +12630,11 @@ export type CoordinatorRetryResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -12500,6 +12945,23 @@ export type CoordinatorRetryResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -12507,6 +12969,15 @@ export type CoordinatorRetryResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -12675,6 +13146,7 @@ export type CoordinatorContinueResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -12833,6 +13305,11 @@ export type CoordinatorContinueResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -13143,6 +13620,23 @@ export type CoordinatorContinueResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -13150,6 +13644,15 @@ export type CoordinatorContinueResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -13323,6 +13826,7 @@ export type CoordinatorDispatchResponses = {
         >
         expected_output: string
         permission_expectations: Array<string>
+        domain?: string
       }
       mode: "manual" | "assisted" | "autonomous"
       workflow:
@@ -13481,6 +13985,11 @@ export type CoordinatorDispatchResponses = {
           mpacr_per_critic_timeout_ms?: number
           mpacr_degraded?: boolean
           memory_namespace?: string
+          personal_memory_access?: "full" | "facts_only" | "blind"
+          acceptable_failure?: {
+            conditions: Array<string>
+            on_match?: "give_up" | "escalate"
+          }
           confidence?: "low" | "medium" | "high"
           revise_policy?: "none" | "critical_only" | "all_artifacts"
         }>
@@ -13791,6 +14300,23 @@ export type CoordinatorDispatchResponses = {
             min_new_evidence_items?: number
             min_quality_delta?: number
           }
+          continuation_state?: {
+            approved_count?: number
+            last_approved_usage?: {
+              max_rounds: number
+              max_model_calls: number
+              max_tool_calls: number
+              max_subagents: number
+              max_wallclock_ms: number
+              max_estimated_tokens: number
+            }
+            last_approved_progress_score?: number
+            last_approved_completed_todo_weight?: number
+            last_approved_evidence_count?: number
+            last_approved_verifier_quality?: number
+            last_approved_failure_penalty?: number
+            last_denied_reason?: string
+          }
         }
         budget_state?: {
           soft_budget_used?: number
@@ -13798,6 +14324,15 @@ export type CoordinatorDispatchResponses = {
           checkpoint_count?: number
           budget_limited?: boolean
           ceiling_hit?: boolean
+          limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+          limited_resource?:
+            | "max_rounds"
+            | "max_model_calls"
+            | "max_tool_calls"
+            | "max_subagents"
+            | "max_wallclock_ms"
+            | "max_estimated_tokens"
+          limited_todo_id?: string
         }
         progress_snapshot?: {
           done?: number
@@ -13950,6 +14485,7 @@ export type CoordinatorProjectionResponses = {
         >
         expected_output: string
         permission_expectations: Array<string>
+        domain?: string
       }
       mode: "manual" | "assisted" | "autonomous"
       workflow:
@@ -14108,6 +14644,11 @@ export type CoordinatorProjectionResponses = {
           mpacr_per_critic_timeout_ms?: number
           mpacr_degraded?: boolean
           memory_namespace?: string
+          personal_memory_access?: "full" | "facts_only" | "blind"
+          acceptable_failure?: {
+            conditions: Array<string>
+            on_match?: "give_up" | "escalate"
+          }
           confidence?: "low" | "medium" | "high"
           revise_policy?: "none" | "critical_only" | "all_artifacts"
         }>
@@ -14418,6 +14959,23 @@ export type CoordinatorProjectionResponses = {
             min_new_evidence_items?: number
             min_quality_delta?: number
           }
+          continuation_state?: {
+            approved_count?: number
+            last_approved_usage?: {
+              max_rounds: number
+              max_model_calls: number
+              max_tool_calls: number
+              max_subagents: number
+              max_wallclock_ms: number
+              max_estimated_tokens: number
+            }
+            last_approved_progress_score?: number
+            last_approved_completed_todo_weight?: number
+            last_approved_evidence_count?: number
+            last_approved_verifier_quality?: number
+            last_approved_failure_penalty?: number
+            last_denied_reason?: string
+          }
         }
         budget_state?: {
           soft_budget_used?: number
@@ -14425,6 +14983,15 @@ export type CoordinatorProjectionResponses = {
           checkpoint_count?: number
           budget_limited?: boolean
           ceiling_hit?: boolean
+          limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+          limited_resource?:
+            | "max_rounds"
+            | "max_model_calls"
+            | "max_tool_calls"
+            | "max_subagents"
+            | "max_wallclock_ms"
+            | "max_estimated_tokens"
+          limited_todo_id?: string
         }
         progress_snapshot?: {
           done?: number
@@ -14834,6 +15401,23 @@ export type CoordinatorProjectionResponses = {
         min_new_evidence_items?: number
         min_quality_delta?: number
       }
+      continuation_state?: {
+        approved_count?: number
+        last_approved_usage?: {
+          max_rounds: number
+          max_model_calls: number
+          max_tool_calls: number
+          max_subagents: number
+          max_wallclock_ms: number
+          max_estimated_tokens: number
+        }
+        last_approved_progress_score?: number
+        last_approved_completed_todo_weight?: number
+        last_approved_evidence_count?: number
+        last_approved_verifier_quality?: number
+        last_approved_failure_penalty?: number
+        last_denied_reason?: string
+      }
     }
     budget_state: {
       soft_budget_used?: number
@@ -14841,6 +15425,15 @@ export type CoordinatorProjectionResponses = {
       checkpoint_count?: number
       budget_limited?: boolean
       ceiling_hit?: boolean
+      limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+      limited_resource?:
+        | "max_rounds"
+        | "max_model_calls"
+        | "max_tool_calls"
+        | "max_subagents"
+        | "max_wallclock_ms"
+        | "max_estimated_tokens"
+      limited_todo_id?: string
     }
     progress_snapshot: {
       done?: number
@@ -14982,6 +15575,7 @@ export type CoordinatorResumeResponses = {
       >
       expected_output: string
       permission_expectations: Array<string>
+      domain?: string
     }
     mode: "manual" | "assisted" | "autonomous"
     workflow:
@@ -15140,6 +15734,11 @@ export type CoordinatorResumeResponses = {
         mpacr_per_critic_timeout_ms?: number
         mpacr_degraded?: boolean
         memory_namespace?: string
+        personal_memory_access?: "full" | "facts_only" | "blind"
+        acceptable_failure?: {
+          conditions: Array<string>
+          on_match?: "give_up" | "escalate"
+        }
         confidence?: "low" | "medium" | "high"
         revise_policy?: "none" | "critical_only" | "all_artifacts"
       }>
@@ -15450,6 +16049,23 @@ export type CoordinatorResumeResponses = {
           min_new_evidence_items?: number
           min_quality_delta?: number
         }
+        continuation_state?: {
+          approved_count?: number
+          last_approved_usage?: {
+            max_rounds: number
+            max_model_calls: number
+            max_tool_calls: number
+            max_subagents: number
+            max_wallclock_ms: number
+            max_estimated_tokens: number
+          }
+          last_approved_progress_score?: number
+          last_approved_completed_todo_weight?: number
+          last_approved_evidence_count?: number
+          last_approved_verifier_quality?: number
+          last_approved_failure_penalty?: number
+          last_denied_reason?: string
+        }
       }
       budget_state?: {
         soft_budget_used?: number
@@ -15457,6 +16073,15 @@ export type CoordinatorResumeResponses = {
         checkpoint_count?: number
         budget_limited?: boolean
         ceiling_hit?: boolean
+        limit_reason?: "none" | "mission" | "absolute" | "phase" | "todo" | "checkpoint_reserve"
+        limited_resource?:
+          | "max_rounds"
+          | "max_model_calls"
+          | "max_tool_calls"
+          | "max_subagents"
+          | "max_wallclock_ms"
+          | "max_estimated_tokens"
+        limited_todo_id?: string
       }
       progress_snapshot?: {
         done?: number
@@ -15570,6 +16195,7 @@ export type PersonalOverviewResponses = {
       recent: Array<{
         id: string
         scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+        kind?: "fact" | "preference" | "belief"
         projectID?: string
         sessionID?: string
         title: string
@@ -15620,6 +16246,7 @@ export type PersonalMemoryListResponses = {
   200: Array<{
     id: string
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    kind?: "fact" | "preference" | "belief"
     projectID?: string
     sessionID?: string
     title: string
@@ -15696,6 +16323,7 @@ export type PersonalMemoryRememberResponses = {
   200: {
     id: string
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    kind?: "fact" | "preference" | "belief"
     projectID?: string
     sessionID?: string
     title: string
@@ -15751,6 +16379,7 @@ export type PersonalMemorySearchResponses = {
   200: Array<{
     id: string
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    kind?: "fact" | "preference" | "belief"
     projectID?: string
     sessionID?: string
     title: string
@@ -15817,6 +16446,7 @@ export type PersonalMemorySynthesizeResponses = {
   200: {
     id: string
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
+    kind?: "fact" | "preference" | "belief"
     projectID?: string
     sessionID?: string
     title: string
@@ -15866,7 +16496,7 @@ export type PersonalInboxListResponses = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -15915,7 +16545,7 @@ export type PersonalInboxCreateResponses = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -15957,7 +16587,7 @@ export type PersonalInboxUpdateResponses = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -16083,7 +16713,7 @@ export type PersonalSchedulerDispatchResponses = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>
@@ -16171,7 +16801,7 @@ export type PersonalGatewayWebhookResponses = {
     id: string
     projectID: string
     sessionID?: string
-    source: "session" | "scheduled" | "webhook"
+    source: "session" | "scheduled" | "webhook" | "agent"
     scope: "profile" | "workspace" | "session" | "semantic" | "procedural"
     goal: string
     context_refs: Array<string>

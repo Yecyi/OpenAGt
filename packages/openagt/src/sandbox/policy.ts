@@ -86,6 +86,7 @@ export const layer = Layer.effect(
         failure_policy: sandbox?.failure_policy ?? (process.platform === "win32" ? "fallback" : "closed"),
         report_only: sandbox?.report_only ?? false,
         broker_idle_ttl_ms: sandbox?.broker_idle_ttl_ms ?? 300_000,
+        windows_acl_apply_mode: sandbox?.windows_acl_apply_mode ?? "preflight",
       } satisfies SandboxConfig
     })
 

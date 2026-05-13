@@ -15,7 +15,7 @@ import { ConfigPlugin } from "./plugin"
 import { ConfigProvider } from "./provider"
 import { ConfigServer } from "./server"
 import { ConfigSkills } from "./skills"
-import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
+import type { SandboxBackendPreference, SandboxFailurePolicy, SandboxWindowsAclApplyMode } from "@/sandbox/types"
 
 // Schemas that still live at the zod layer (have .transform / .preprocess /
 // .meta not expressible in current Effect Schema) get referenced via a
@@ -182,6 +182,12 @@ export const InfoSchema = Schema.Struct({
           ),
           report_only: Schema.optional(Schema.Boolean),
           broker_idle_ttl_ms: Schema.optional(PositiveInt),
+          windows_acl_apply_mode: Schema.optional(
+            Schema.Literals(["preflight", "dry_run", "apply"] satisfies SandboxWindowsAclApplyMode[]),
+          ).annotate({
+            description:
+              "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
+          }),
         }),
       ),
       memory: Schema.optional(

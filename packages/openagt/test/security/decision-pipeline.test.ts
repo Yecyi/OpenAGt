@@ -28,6 +28,7 @@ const policy = (
       failure_policy: failurePolicy,
       report_only: false,
       broker_idle_ttl_ms: 300_000,
+      windows_acl_apply_mode: "preflight" as const,
     },
     backend_preference: backend,
     network_policy: networkPolicy,
