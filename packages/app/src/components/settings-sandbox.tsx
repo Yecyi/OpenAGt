@@ -1,8 +1,10 @@
-import { createMemo, type Component, type JSX } from "solid-js"
+import { createMemo, createResource, For, Show, type Component, type JSX } from "solid-js"
+import { Button } from "@openagt/ui/button"
 import { Select } from "@openagt/ui/select"
 import { Switch } from "@openagt/ui/switch"
 import { showToast } from "@openagt/ui/toast"
-import type { Config } from "@openagt/sdk/v2/client"
+import type { Config, SandboxStatus } from "@openagt/sdk/v2/client"
+import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
 import { SettingsList } from "./settings-list"
@@ -34,8 +36,14 @@ const aclModeOptions: Array<{ value: SandboxAclMode; label: string }> = [
 
 export const SettingsSandbox: Component = () => {
   const language = useLanguage()
+  const globalSDK = useGlobalSDK()
   const globalSync = useGlobalSync()
   const sandbox = createMemo(() => globalSync.data.config.experimental?.sandbox ?? {})
+  const sandboxStatusKey = createMemo(() => JSON.stringify(sandbox()))
+  const [sandboxStatus, sandboxStatusActions] = createResource(sandboxStatusKey, async () => {
+    const response = await globalSDK.client.global.sandbox.status()
+    return response.data
+  })
 
   const updateSandbox = (patch: SandboxConfig) => {
     const before = globalSync.data.config
@@ -83,6 +91,23 @@ export const SettingsSandbox: Component = () => {
       </div>
 
       <div class="flex flex-col gap-8 max-w-[720px]">
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between gap-3 pb-2">
+            <h3 class="text-14-medium text-text-strong">Status</h3>
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={sandboxStatus.loading}
+              onClick={() => sandboxStatusActions.refetch()}
+            >
+              Refresh status
+            </Button>
+          </div>
+          <SettingsList>
+            <SandboxStatusPanel status={sandboxStatus()} loading={sandboxStatus.loading} />
+          </SettingsList>
+        </div>
+
         <div class="flex flex-col gap-1">
           <h3 class="text-14-medium text-text-strong pb-2">{language.t("settings.sandbox.section.runtime")}</h3>
           <SettingsList>
@@ -170,6 +195,135 @@ export const SettingsSandbox: Component = () => {
       </div>
     </div>
   )
+}
+
+const SandboxStatusPanel: Component<{
+  status: SandboxStatus | undefined
+  loading: boolean
+}> = (props) => {
+  const details = createMemo(() => {
+    const status = props.status
+    if (!status) return [] as Array<{ label: string; value: string }>
+    return [
+      {
+        label: "Backend",
+        value: `${status.preferred_backend} (${status.backend_run_loop_enabled ? "enabled" : "not ready"})`,
+      },
+      { label: "Helper", value: status.helper_path ?? "not found" },
+      { label: "Version", value: status.windows_native.helper_version ?? "unknown" },
+      {
+        label: "Protocol",
+        value: `${status.windows_native.helper_protocol_version ?? "unknown"} / required ${status.helper_protocol_required}`,
+      },
+      { label: "SHA256", value: status.windows_native.helper_sha256 ?? "unknown" },
+      {
+        label: "Setup",
+        value:
+          status.windows_native.setup_installed === undefined
+            ? "unknown"
+            : status.windows_native.setup_installed
+              ? "installed"
+              : "missing",
+      },
+      { label: "Admin gate", value: status.windows_native.admin_verification_required ? "required" : "not required" },
+      {
+        label: "Filesystem",
+        value: `${flag(status.windows_native.filesystem_ready)} ready / ${flag(status.windows_native.filesystem_enforced)} enforced`,
+      },
+      { label: "ACL mode", value: status.config.windows_acl_apply_mode },
+      {
+        label: "Network",
+        value: `${flag(status.windows_native.network_ready)} ready / ${flag(status.windows_native.network_enforced)} enforced`,
+      },
+      {
+        label: "Policies",
+        value: status.windows_native.network_policies_enforced?.length
+          ? status.windows_native.network_policies_enforced.join(", ")
+          : "none",
+      },
+    ]
+  })
+
+  return (
+    <div class="py-3">
+      <Show
+        when={props.status}
+        fallback={
+          <span class="text-12-regular text-text-weak">
+            {props.loading ? "Loading sandbox status..." : "Sandbox status unavailable."}
+          </span>
+        }
+      >
+        {(status) => (
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex min-w-0 flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <StatusBadge status={status().windows_native.readiness ?? "backend_unavailable"} />
+                  <span class="text-12-regular text-text-weak">
+                    {status().windows_native.reason ?? status().next_action.label}
+                  </span>
+                </div>
+                <Show when={status().windows_native.admin_gate_report_path}>
+                  <span class="text-11-regular text-text-weak break-all">
+                    Admin report: {status().windows_native.admin_gate_report_path}
+                  </span>
+                </Show>
+                <Show when={status().windows_native.admin_gate_verified_at}>
+                  <span class="text-11-regular text-text-weak">
+                    Verified at: {status().windows_native.admin_gate_verified_at}
+                  </span>
+                </Show>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <For each={details()}>
+                {(item) => (
+                  <div class="min-w-0 rounded-md bg-surface-panel px-3 py-2">
+                    <div class="text-11-medium text-text-weak">{item.label}</div>
+                    <div class="truncate text-12-regular text-text-strong" title={item.value}>
+                      {item.value}
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+
+            <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">
+              <div class="text-11-medium text-text-weak">Next action</div>
+              <div class="text-12-regular text-text-strong">{status().next_action.label}</div>
+              <Show when={status().next_action.command}>
+                <code class="mt-1 block overflow-x-auto whitespace-nowrap text-11-regular text-text-weak">
+                  {status().next_action.command}
+                </code>
+              </Show>
+            </div>
+          </div>
+        )}
+      </Show>
+    </div>
+  )
+}
+
+const StatusBadge: Component<{ status: string }> = (props) => {
+  const ready = createMemo(() => props.status === "ready")
+  return (
+    <span
+      classList={{
+        "rounded-full px-2 py-0.5 text-11-medium": true,
+        "bg-surface-success-weak text-text-on-success-strong": ready(),
+        "bg-surface-warning-weak text-text-on-warning-strong": !ready(),
+      }}
+    >
+      {props.status}
+    </span>
+  )
+}
+
+function flag(value: boolean | undefined) {
+  if (value === undefined) return "unknown"
+  return value ? "yes" : "no"
 }
 
 const SettingsRow: Component<{

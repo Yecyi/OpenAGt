@@ -78,6 +78,7 @@ import type {
   GlobalDisposeResponses,
   GlobalEventResponses,
   GlobalHealthResponses,
+  GlobalSandboxStatusResponses,
   GlobalUpgradeErrors,
   GlobalUpgradeResponses,
   InstanceDisposeResponses,
@@ -324,6 +325,20 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Sandbox extends HeyApiClient {
+  /**
+   * Get sandbox status
+   *
+   * Retrieve sandbox configuration and Windows native sandbox readiness diagnostics.
+   */
+  public status<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalSandboxStatusResponses, unknown, ThrowOnError>({
+      url: "/global/sandbox/status",
+      ...options,
+    })
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -388,6 +403,11 @@ export class Global extends HeyApiClient {
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _sandbox?: Sandbox
+  get sandbox(): Sandbox {
+    return (this._sandbox ??= new Sandbox({ client: this.client }))
   }
 }
 

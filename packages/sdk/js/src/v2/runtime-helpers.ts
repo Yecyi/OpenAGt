@@ -1,3 +1,5 @@
+import type { OpenagtClient, SandboxStatus } from "./client.js"
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -431,6 +433,12 @@ export function getCheckpointMemorySummary(value: unknown) {
   if (projection?.checkpoint_memory) return projection.checkpoint_memory
   const candidate = isRecord(value) && isRecord(value.properties) ? value.properties : value
   if (isRecord(candidate) && isCheckpointMemorySummary(candidate.checkpoint_memory)) return candidate.checkpoint_memory
+}
+
+export async function getSandboxStatus(client: Pick<OpenagtClient, "global">): Promise<SandboxStatus> {
+  const response = await client.global.sandbox.status()
+  if (response.data) return response.data
+  throw new Error("Sandbox status response did not include data")
 }
 
 export function getInboxOverview(value: unknown) {

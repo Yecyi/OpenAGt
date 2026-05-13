@@ -133,6 +133,31 @@
         ]
       }
     },
+    "/global/sandbox/status": {
+      "get": {
+        "operationId": "global.sandbox.status",
+        "summary": "Get sandbox status",
+        "description": "Retrieve sandbox configuration and Windows native sandbox readiness diagnostics.",
+        "responses": {
+          "200": {
+            "description": "Sandbox status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxStatus"
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@openagt/sdk\n\nconst client = createOpencodeClient()\nawait client.global.sandbox.status({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/global/dispose": {
       "post": {
         "operationId": "global.dispose",
@@ -54643,6 +54668,221 @@
           }
         },
         "additionalProperties": false
+      },
+      "SandboxBackendStatus": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["process", "seatbelt", "windows_native", "landlock"]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "helper": {
+            "type": "string"
+          },
+          "helper_path": {
+            "type": "string"
+          },
+          "helper_version": {
+            "type": "string"
+          },
+          "helper_sha256": {
+            "type": "string"
+          },
+          "readiness": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "helper_missing",
+              "helper_version_mismatch",
+              "setup_required",
+              "admin_verification_required",
+              "acl_apply_required",
+              "network_policy_unsupported",
+              "backend_unavailable"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "setup_required": {
+            "type": "boolean"
+          },
+          "setup_reason": {
+            "type": "string"
+          },
+          "setup_installed": {
+            "type": "boolean"
+          },
+          "setup_version": {
+            "type": "string"
+          },
+          "helper_protocol_version": {
+            "type": "number"
+          },
+          "acl_apply_mode": {
+            "type": "string",
+            "enum": ["preflight", "dry_run", "apply"]
+          },
+          "admin_verification_required": {
+            "type": "boolean"
+          },
+          "admin_gate_report_path": {
+            "type": "string"
+          },
+          "admin_gate_verified_at": {
+            "type": "string"
+          },
+          "job_object_supported": {
+            "type": "boolean"
+          },
+          "filesystem_ready": {
+            "type": "boolean"
+          },
+          "filesystem_enforced": {
+            "type": "boolean"
+          },
+          "filesystem_reason": {
+            "type": "string"
+          },
+          "network_ready": {
+            "type": "boolean"
+          },
+          "network_enforced": {
+            "type": "boolean"
+          },
+          "network_reason": {
+            "type": "string"
+          },
+          "network_policies_enforced": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["none", "loopback", "full"]
+            }
+          }
+        },
+        "required": ["name", "available"]
+      },
+      "SandboxNextAction": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "enable_sandbox",
+              "choose_native_backend",
+              "install_helper",
+              "update_helper",
+              "install_setup",
+              "run_admin_gate",
+              "enable_acl_apply",
+              "use_supported_network_policy",
+              "inspect_status"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          }
+        },
+        "required": ["kind", "label"]
+      },
+      "SandboxStatus": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "helper_protocol_required": {
+            "type": "number"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "backend": {
+                "type": "string",
+                "enum": ["auto", "process", "seatbelt", "windows_native", "landlock"]
+              },
+              "failure_policy": {
+                "type": "string",
+                "enum": ["closed", "confirm_downgrade", "fallback"]
+              },
+              "report_only": {
+                "type": "boolean"
+              },
+              "broker_idle_ttl_ms": {
+                "type": "number"
+              },
+              "windows_acl_apply_mode": {
+                "type": "string",
+                "enum": ["preflight", "dry_run", "apply"]
+              }
+            },
+            "required": [
+              "enabled",
+              "backend",
+              "failure_policy",
+              "report_only",
+              "broker_idle_ttl_ms",
+              "windows_acl_apply_mode"
+            ]
+          },
+          "auto_backend": {
+            "type": "string",
+            "enum": ["process", "seatbelt", "windows_native", "landlock"]
+          },
+          "preferred_backend": {
+            "type": "string",
+            "enum": ["process", "seatbelt", "windows_native", "landlock"]
+          },
+          "backend_run_loop_enabled": {
+            "type": "boolean"
+          },
+          "helper_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "helper_override_used": {
+            "type": "boolean"
+          },
+          "windows_native": {
+            "$ref": "#/components/schemas/SandboxBackendStatus"
+          },
+          "process": {
+            "$ref": "#/components/schemas/SandboxBackendStatus"
+          },
+          "next_action": {
+            "$ref": "#/components/schemas/SandboxNextAction"
+          }
+        },
+        "required": [
+          "platform",
+          "helper_protocol_required",
+          "config",
+          "auto_backend",
+          "preferred_backend",
+          "backend_run_loop_enabled",
+          "helper_path",
+          "helper_override_used",
+          "windows_native",
+          "process",
+          "next_action"
+        ]
       },
       "BadRequestError": {
         "type": "object",

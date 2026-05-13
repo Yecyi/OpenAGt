@@ -4104,6 +4104,79 @@ export type Config = {
   }
 }
 
+export type SandboxBackendStatus = {
+  name: "process" | "seatbelt" | "windows_native" | "landlock"
+  available: boolean
+  helper?: string
+  helper_path?: string
+  helper_version?: string
+  helper_sha256?: string
+  readiness?:
+    | "ready"
+    | "helper_missing"
+    | "helper_version_mismatch"
+    | "setup_required"
+    | "admin_verification_required"
+    | "acl_apply_required"
+    | "network_policy_unsupported"
+    | "backend_unavailable"
+  reason?: string
+  setup_required?: boolean
+  setup_reason?: string
+  setup_installed?: boolean
+  setup_version?: string
+  helper_protocol_version?: number
+  acl_apply_mode?: "preflight" | "dry_run" | "apply"
+  admin_verification_required?: boolean
+  admin_gate_report_path?: string
+  admin_gate_verified_at?: string
+  job_object_supported?: boolean
+  filesystem_ready?: boolean
+  filesystem_enforced?: boolean
+  filesystem_reason?: string
+  network_ready?: boolean
+  network_enforced?: boolean
+  network_reason?: string
+  network_policies_enforced?: Array<"none" | "loopback" | "full">
+}
+
+export type SandboxNextAction = {
+  kind:
+    | "none"
+    | "enable_sandbox"
+    | "choose_native_backend"
+    | "install_helper"
+    | "update_helper"
+    | "install_setup"
+    | "run_admin_gate"
+    | "enable_acl_apply"
+    | "use_supported_network_policy"
+    | "inspect_status"
+  label: string
+  command?: string
+}
+
+export type SandboxStatus = {
+  platform: string
+  helper_protocol_required: number
+  config: {
+    enabled: boolean
+    backend: "auto" | "process" | "seatbelt" | "windows_native" | "landlock"
+    failure_policy: "closed" | "confirm_downgrade" | "fallback"
+    report_only: boolean
+    broker_idle_ttl_ms: number
+    windows_acl_apply_mode: "preflight" | "dry_run" | "apply"
+  }
+  auto_backend: "process" | "seatbelt" | "windows_native" | "landlock"
+  preferred_backend: "process" | "seatbelt" | "windows_native" | "landlock"
+  backend_run_loop_enabled: boolean
+  helper_path: string | null
+  helper_override_used: boolean
+  windows_native: SandboxBackendStatus
+  process: SandboxBackendStatus
+  next_action: SandboxNextAction
+}
+
 export type BadRequestError = {
   data: unknown
   errors: Array<{
@@ -4711,6 +4784,22 @@ export type GlobalConfigUpdateResponses = {
 }
 
 export type GlobalConfigUpdateResponse = GlobalConfigUpdateResponses[keyof GlobalConfigUpdateResponses]
+
+export type GlobalSandboxStatusData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/sandbox/status"
+}
+
+export type GlobalSandboxStatusResponses = {
+  /**
+   * Sandbox status
+   */
+  200: SandboxStatus
+}
+
+export type GlobalSandboxStatusResponse = GlobalSandboxStatusResponses[keyof GlobalSandboxStatusResponses]
 
 export type GlobalDisposeData = {
   body?: never

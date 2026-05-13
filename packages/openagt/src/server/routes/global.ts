@@ -15,6 +15,7 @@ import { Log } from "../../util"
 import { lazy } from "../../util/lazy"
 import { Config } from "../../config"
 import { errors } from "../error"
+import { getSandboxStatus, SandboxStatusSchema } from "@/sandbox/status"
 
 const log = Log.create({ service: "server" })
 
@@ -155,6 +156,31 @@ export const GlobalRoutes = lazy(() =>
       }),
       async (c) => {
         return c.json(await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal())))
+      },
+    )
+    .get(
+      "/sandbox/status",
+      describeRoute({
+        summary: "Get sandbox status",
+        description: "Retrieve sandbox configuration and Windows native sandbox readiness diagnostics.",
+        operationId: "global.sandbox.status",
+        responses: {
+          200: {
+            description: "Sandbox status",
+            content: {
+              "application/json": {
+                schema: resolver(SandboxStatusSchema),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        return c.json(
+          getSandboxStatus({
+            config: await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal())),
+          }),
+        )
       },
     )
     .patch(
