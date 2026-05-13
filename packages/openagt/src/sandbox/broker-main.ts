@@ -23,7 +23,10 @@ async function send(frame: unknown) {
   Bun.stdout.write(encodeFrame(frame as never))
 }
 
-function policyAdvisory(frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"], reportOnly: boolean) {
+function policyAdvisory(
+  frame: Extract<SandboxBrokerRequestFrame, { type: "exec.start" }>["request"],
+  reportOnly: boolean,
+) {
   return {
     enforcement: frame.enforcement,
     backendPreference: frame.backend_preference,

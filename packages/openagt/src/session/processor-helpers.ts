@@ -32,9 +32,7 @@ export function isShellRunnerBash(
   )
 }
 
-export function completeInterruptedBashFor(session: {
-  updatePart: SessionUpdatePart
-}) {
+export function completeInterruptedBashFor(session: { updatePart: SessionUpdatePart }) {
   return Effect.fn("SessionProcessor.completeInterruptedBash")(function* (
     part: MessageV2.ToolPart,
     metadata: Record<string, unknown>,

@@ -62,7 +62,10 @@ export const listTaskOutcomes = Effect.fn("TaskOutcome.list")(function* (input: 
         .from(TaskOutcomeTable)
         .where(
           input.taskID
-            ? and(eq(TaskOutcomeTable.parent_session_id, input.parentSessionID), eq(TaskOutcomeTable.task_id, input.taskID))
+            ? and(
+                eq(TaskOutcomeTable.parent_session_id, input.parentSessionID),
+                eq(TaskOutcomeTable.task_id, input.taskID),
+              )
             : eq(TaskOutcomeTable.parent_session_id, input.parentSessionID),
         )
         .orderBy(desc(TaskOutcomeTable.time_recorded), desc(TaskOutcomeTable.id))

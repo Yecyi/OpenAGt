@@ -156,9 +156,10 @@ export function listSchemaVersions(): { migration_name: string; applied_at: numb
     .all()
   if (exists.length === 0) return []
   return sqlite
-    .query<{ migration_name: string; applied_at: number; checksum: string }, []>(
-      `SELECT migration_name, applied_at, checksum FROM _schema_version ORDER BY migration_name ASC`,
-    )
+    .query<
+      { migration_name: string; applied_at: number; checksum: string },
+      []
+    >(`SELECT migration_name, applied_at, checksum FROM _schema_version ORDER BY migration_name ASC`)
     .all()
 }
 

@@ -6,10 +6,7 @@ import {
   type ExpertEntry,
 } from "../../src/coordinator/expert-registry"
 import { Effect, Layer } from "effect"
-import {
-  enrichMemoryContext,
-  taskSignatureFor,
-} from "../../src/personal/three-layer"
+import { enrichMemoryContext, taskSignatureFor } from "../../src/personal/three-layer"
 import { settleIntentProfile, basePlanForIntent } from "../../src/coordinator/coordinator"
 
 // Sanity check the v1.21 plan-creation pipeline post-processors work as a

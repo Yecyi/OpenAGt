@@ -1,13 +1,15 @@
 export function normalizeFailureText(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/`{3}[\s\S]*?`{3}/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/\b[0-9a-f]{7,40}\b/g, " ")
-    .replace(/\b\d+\b/g, " ")
-    .match(/[\p{L}\p{N}_-]{3,}/gu)
-    ?.slice(0, 256)
-    .join(" ") ?? ""
+  return (
+    text
+      .toLowerCase()
+      .replace(/`{3}[\s\S]*?`{3}/g, " ")
+      .replace(/https?:\/\/\S+/g, " ")
+      .replace(/\b[0-9a-f]{7,40}\b/g, " ")
+      .replace(/\b\d+\b/g, " ")
+      .match(/[\p{L}\p{N}_-]{3,}/gu)
+      ?.slice(0, 256)
+      .join(" ") ?? ""
+  )
 }
 
 function fnv1a32(text: string, seed: number) {
@@ -31,10 +33,7 @@ export function simHash64(text: string) {
       weights[bit]! += (hash & (1n << BigInt(bit))) === 0n ? -1 : 1
     }
   }
-  const signature = weights.reduce(
-    (acc, weight, bit) => (weight >= 0 ? acc | (1n << BigInt(bit)) : acc),
-    0n,
-  )
+  const signature = weights.reduce((acc, weight, bit) => (weight >= 0 ? acc | (1n << BigInt(bit)) : acc), 0n)
   return signature.toString(16).padStart(16, "0").slice(-16)
 }
 

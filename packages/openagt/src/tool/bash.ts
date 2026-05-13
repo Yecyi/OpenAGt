@@ -27,11 +27,7 @@ import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner
 
 import { ShellSecurity } from "../security/shell-security"
 import { ExecPolicy } from "@/security/exec-policy"
-import {
-  addShellReviewMetadata,
-  buildBlockedCommandResult,
-  type BashMetadata,
-} from "./bash-metadata"
+import { addShellReviewMetadata, buildBlockedCommandResult, type BashMetadata } from "./bash-metadata"
 import { BashExecutionPlanner } from "./bash-execution-plan"
 import { chooseShell, DEFAULT_TIMEOUT, isPowerShellName } from "./bash-shell"
 import {

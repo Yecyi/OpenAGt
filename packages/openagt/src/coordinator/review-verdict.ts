@@ -172,7 +172,9 @@ export function isMpacrReviewTask(metadata: Record<string, unknown> | undefined)
 }
 
 export function isMpacrCriticTask(metadata: Record<string, unknown> | undefined) {
-  return metadata?.output_schema === "revise" && (metadata?.mpacr_role === "critic" || metadata?.role === "red-team-critic")
+  return (
+    metadata?.output_schema === "revise" && (metadata?.mpacr_role === "critic" || metadata?.role === "red-team-critic")
+  )
 }
 
 export function reviewVerdictForMessage(

@@ -26,12 +26,8 @@ describe("CriticalReviewVerdict — MPACR fields", () => {
   })
 
   test("posterior must be in [0,1]", () => {
-    expect(() =>
-      CriticalReviewVerdict.parse({ verdict: "pass", posterior: 1.5 }),
-    ).toThrow()
-    expect(() =>
-      CriticalReviewVerdict.parse({ verdict: "pass", posterior: -0.1 }),
-    ).toThrow()
+    expect(() => CriticalReviewVerdict.parse({ verdict: "pass", posterior: 1.5 })).toThrow()
+    expect(() => CriticalReviewVerdict.parse({ verdict: "pass", posterior: -0.1 })).toThrow()
     const ok = CriticalReviewVerdict.parse({ verdict: "pass", posterior: 0.7 })
     expect(ok.posterior).toBe(0.7)
   })
@@ -39,9 +35,7 @@ describe("CriticalReviewVerdict — MPACR fields", () => {
   test("brier_score must be in [0,1]", () => {
     const ok = CriticalReviewVerdict.parse({ verdict: "pass", brier_score: 0.04 })
     expect(ok.brier_score).toBe(0.04)
-    expect(() =>
-      CriticalReviewVerdict.parse({ verdict: "pass", brier_score: 1.5 }),
-    ).toThrow()
+    expect(() => CriticalReviewVerdict.parse({ verdict: "pass", brier_score: 1.5 })).toThrow()
   })
 
   test("priors map values are clamped to [0,1] by validation", () => {
@@ -51,9 +45,7 @@ describe("CriticalReviewVerdict — MPACR fields", () => {
     })
     expect(ok.priors).toEqual({ factuality: 0.6, risk: 0.3 })
 
-    expect(() =>
-      CriticalReviewVerdict.parse({ verdict: "revise", priors: { x: 1.2 } }),
-    ).toThrow()
+    expect(() => CriticalReviewVerdict.parse({ verdict: "revise", priors: { x: 1.2 } })).toThrow()
   })
 
   test("verdict accepts the new 'skipped' state for partial-failure handling", () => {
@@ -64,9 +56,7 @@ describe("CriticalReviewVerdict — MPACR fields", () => {
 
 describe("QualityGate — MPACR pending quorum", () => {
   test("accepts pending_quorum as a first-class gate status", () => {
-    expect(QualityGate.parse({ id: "gate", kind: "synthesis", status: "pending_quorum" }).status).toBe(
-      "pending_quorum",
-    )
+    expect(QualityGate.parse({ id: "gate", kind: "synthesis", status: "pending_quorum" }).status).toBe("pending_quorum")
   })
 })
 

@@ -503,4 +503,3 @@ export function basePlanForIntent(intent: IntentProfileType): CoordinatorPlanTyp
                               ],
   })
 }
-

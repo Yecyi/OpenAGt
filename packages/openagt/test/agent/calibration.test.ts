@@ -45,10 +45,10 @@ describe("gradeBrier", () => {
 
   test("classifies bands by Brier score once sample size is sufficient", () => {
     expect(gradeBrier(0.05, MIN_CALIBRATION_SAMPLES)).toBe("well-calibrated")
-    expect(gradeBrier(0.10, MIN_CALIBRATION_SAMPLES)).toBe("well-calibrated")
+    expect(gradeBrier(0.1, MIN_CALIBRATION_SAMPLES)).toBe("well-calibrated")
     expect(gradeBrier(0.15, MIN_CALIBRATION_SAMPLES)).toBe("acceptable")
     expect(gradeBrier(0.25, MIN_CALIBRATION_SAMPLES)).toBe("acceptable")
-    expect(gradeBrier(0.40, MIN_CALIBRATION_SAMPLES)).toBe("poor")
+    expect(gradeBrier(0.4, MIN_CALIBRATION_SAMPLES)).toBe("poor")
   })
 })
 

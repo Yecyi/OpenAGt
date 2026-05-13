@@ -123,10 +123,7 @@ export class PromptPartResolver {
     })
   }
 
-  private resolveFileUrl(
-    part: Extract<PromptPart, { type: "file" }>,
-    url: URL,
-  ): Effect.Effect<PromptPartDraft[]> {
+  private resolveFileUrl(part: Extract<PromptPart, { type: "file" }>, url: URL): Effect.Effect<PromptPartDraft[]> {
     const deps = this.deps
     const context = this.context
     const scope = this.scope()

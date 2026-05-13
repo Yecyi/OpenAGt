@@ -61,7 +61,9 @@ if (process.platform === "win32") {
     throw new Error(`Packaged Windows sandbox helper checksum not found: ${helperSha}`)
   }
   const expectedHash = (await Bun.file(helperSha).text()).trim().split(/\s+/)[0]
-  const actualHash = createHash("sha256").update(await Bun.file(helper).bytes()).digest("hex")
+  const actualHash = createHash("sha256")
+    .update(await Bun.file(helper).bytes())
+    .digest("hex")
   if (expectedHash !== actualHash) {
     throw new Error(`Packaged Windows sandbox helper checksum mismatch for ${helper}`)
   }

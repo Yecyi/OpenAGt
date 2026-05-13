@@ -16,4 +16,3 @@ export function sanitizeTerminalOutput(input: string) {
     })
     .join("")
 }
-

@@ -139,7 +139,9 @@ function sandboxDecision(input: {
   if (input.preliminaryDecision === "block") return
   if (nativeUnavailable({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {
     const backendLabel =
-      input.policy.backend_preference === "auto" ? "sandbox backend" : `sandbox backend ${input.policy.backend_preference}`
+      input.policy.backend_preference === "auto"
+        ? "sandbox backend"
+        : `sandbox backend ${input.policy.backend_preference}`
     if (input.policy.sandbox.failure_policy === "closed") {
       return {
         decision: "block" as const,
@@ -174,7 +176,10 @@ function sandboxDecision(input: {
       reason: `Sandbox backend cannot enforce ${input.policy.network_policy} network policy; confirmation required before downgrade.`,
     }
   }
-  if (isRisky(input.riskLevel) && processOnly({ preference: input.policy.backend_preference, capabilities: input.capabilities })) {
+  if (
+    isRisky(input.riskLevel) &&
+    processOnly({ preference: input.policy.backend_preference, capabilities: input.capabilities })
+  ) {
     if (input.policy.sandbox.failure_policy === "closed") {
       return {
         decision: "block" as const,
@@ -183,7 +188,8 @@ function sandboxDecision(input: {
     }
     return {
       decision: "confirm" as const,
-      reason: "Only process-level sandbox is available; confirmation required before running without OS-native isolation.",
+      reason:
+        "Only process-level sandbox is available; confirmation required before running without OS-native isolation.",
     }
   }
   if (

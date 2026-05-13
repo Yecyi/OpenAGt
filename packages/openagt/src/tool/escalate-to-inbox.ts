@@ -12,18 +12,13 @@ import DESCRIPTION from "./escalate-to-inbox.txt"
 
 const parameters = z.object({
   question: z.string().min(1).describe("The question or blocker the user needs to address."),
-  context: z
-    .string()
-    .describe("1-3 sentences of relevant state. What were you trying to do and why is this blocking?"),
+  context: z.string().describe("1-3 sentences of relevant state. What were you trying to do and why is this blocking?"),
   priority: z.enum(["high", "normal", "low"]).default("normal").describe("Priority of the inbox item."),
   blocking: z
     .boolean()
     .default(false)
     .describe("If true, mark the inbox item state as 'blocked' so it surfaces as awaiting user response."),
-  resume_with: z
-    .string()
-    .optional()
-    .describe("Optional goal string the user can attach when resolving the item."),
+  resume_with: z.string().optional().describe("Optional goal string the user can attach when resolving the item."),
 })
 
 type Metadata = {

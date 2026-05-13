@@ -67,13 +67,15 @@ export function packagedHelperPath(execPath = process.execPath) {
   return path.join(path.dirname(execPath), WINDOWS_SANDBOX_HELPER_NAME)
 }
 
-export function resolveWindowsHelperPath(input: {
-  platform?: NodeJS.Platform
-  execPath?: string
-  override?: string
-  env?: NodeJS.ProcessEnv
-  exists?: (candidate: string) => boolean
-} = {}) {
+export function resolveWindowsHelperPath(
+  input: {
+    platform?: NodeJS.Platform
+    execPath?: string
+    override?: string
+    env?: NodeJS.ProcessEnv
+    exists?: (candidate: string) => boolean
+  } = {},
+) {
   if ((input.platform ?? process.platform) !== "win32") {
     return { path: undefined, reason: "Windows native helper is only supported on Windows", source: undefined }
   }
@@ -87,7 +89,8 @@ export function resolveWindowsHelperPath(input: {
       source: undefined,
     }
   }
-  if (input.override && exists(input.override)) return { path: input.override, reason: undefined, source: "override" as const }
+  if (input.override && exists(input.override))
+    return { path: input.override, reason: undefined, source: "override" as const }
   return {
     path: undefined,
     reason: input.override ? `Windows helper not found: ${input.override}` : "Windows native helper unavailable",
@@ -227,7 +230,10 @@ export function probeWindowsHelper(helper: string): SandboxBackendStatus {
   }
 }
 
-export function runWindowsHelperSetup(helper: string, mode: WindowsSandboxSetupResult["mode"]): WindowsSandboxSetupResult {
+export function runWindowsHelperSetup(
+  helper: string,
+  mode: WindowsSandboxSetupResult["mode"],
+): WindowsSandboxSetupResult {
   const result = Bun.spawnSync({
     cmd: [helper, "setup", `--${mode}`, "--json"],
     stdout: "pipe",
@@ -241,7 +247,8 @@ export function runWindowsHelperSetup(helper: string, mode: WindowsSandboxSetupR
       mode,
       setup_installed: false,
       setup_required: true,
-      setup_reason: new TextDecoder().decode(result.stderr).trim() || `Windows helper setup failed with ${result.exitCode}`,
+      setup_reason:
+        new TextDecoder().decode(result.stderr).trim() || `Windows helper setup failed with ${result.exitCode}`,
     }
   }
   try {

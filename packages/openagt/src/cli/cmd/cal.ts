@@ -39,9 +39,7 @@ const CalShowCommand = cmd({
           // Discover the set of experts with calibration history. Direct SQL
           // because the Calibration service exposes per-expert reads, not a
           // bulk listing.
-          const expertIDs: string[] = args.expert_id
-            ? [args.expert_id]
-            : await listExpertIdsWithRecords()
+          const expertIDs: string[] = args.expert_id ? [args.expert_id] : await listExpertIdsWithRecords()
           if (expertIDs.length === 0) {
             if (args.format === "json") console.log("[]")
             else UI.println("(no calibration records yet)")

@@ -29,7 +29,11 @@ export function normalizedUsage(info: Extract<MessageV2.Info, { role: "assistant
     info.tokens.total ??
     (provider.includes("anthropic")
       ? info.tokens.input + info.tokens.output + info.tokens.reasoning
-      : info.tokens.input + info.tokens.output + info.tokens.reasoning + info.tokens.cache.read + info.tokens.cache.write)
+      : info.tokens.input +
+        info.tokens.output +
+        info.tokens.reasoning +
+        info.tokens.cache.read +
+        info.tokens.cache.write)
   return {
     totalTokens,
     inputTokens: info.tokens.input,

@@ -77,9 +77,17 @@ function promptInputText(input: Parameters<SessionPrompt.Interface["prompt"]>[0]
 }
 
 const promptFailureIt = testEffect(
-  Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.die(new Error("critic exploded")))),
+  Layer.mergeAll(
+    coordinatorLayer,
+    sessionPromptLayer(() => Effect.die(new Error("critic exploded"))),
+  ),
 )
-const promptTimeoutIt = testEffect(Layer.mergeAll(coordinatorLayer, sessionPromptLayer(() => Effect.never)))
+const promptTimeoutIt = testEffect(
+  Layer.mergeAll(
+    coordinatorLayer,
+    sessionPromptLayer(() => Effect.never),
+  ),
+)
 const quorumPromptCalls: string[] = []
 const promptQuorumIt = testEffect(
   Layer.mergeAll(
@@ -174,8 +182,9 @@ function waitForNodeStatus(input: {
       yield* Effect.sleep("20 millis")
     }
     const final = (yield* input.tasks.list(input.parentSessionID))
-      .map((item) =>
-        `${String(item.metadata?.coordinator_node_id ?? item.task_id)}:${item.status}:${item.error_summary ?? ""}`,
+      .map(
+        (item) =>
+          `${String(item.metadata?.coordinator_node_id ?? item.task_id)}:${item.status}:${item.error_summary ?? ""}`,
       )
       .join(", ")
     throw new Error(`Timed out waiting for ${input.nodeID} to become ${input.status}; tasks=${final}`)
@@ -266,7 +275,7 @@ describe("MPACR debate carries quorum metadata", () => {
     })
     expect(out.quorum).toBe(2)
     expect(out.synthesis.prompt).toContain("Quorum required: 2")
-    expect(out.synthesis.prompt).toContain("verdict: \"skipped\"")
+    expect(out.synthesis.prompt).toContain('verdict: "skipped"')
   })
 
   test("buildDegraded fixes quorum at 1 (lone critic must produce)", () => {

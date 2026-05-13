@@ -43,7 +43,8 @@ export type TraceExportLine = {
   }
 }
 
-const sensitiveKey = /(^|_|\b)(api[_-]?key|auth|authorization|bearer|client[_-]?secret|cookie|credential|password|refresh[_-]?token|secret|token)(_|$|\b)/i
+const sensitiveKey =
+  /(^|_|\b)(api[_-]?key|auth|authorization|bearer|client[_-]?secret|cookie|credential|password|refresh[_-]?token|secret|token)(_|$|\b)/i
 const bearerPattern = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g
 const authContentPattern = /\b(?:OPENAGT_AUTH_CONTENT|OPENCODE_AUTH_CONTENT)\b\s*[:=]\s*("[^"]*"|'[^']*'|\S+)/g
 const keyPattern = /\b(?:sk|pk|ghp|github_pat|glpat|xox[baprs])_[A-Za-z0-9_=-]{8,}\b/g
@@ -61,7 +62,9 @@ export function redactTraceValue(value: unknown, key = "", depth = 0): unknown {
   if (typeof value === "string") return redactString(value)
   if (Array.isArray(value)) return value.map((item) => redactTraceValue(item, key, depth + 1))
   if (typeof value !== "object" || value === null) return value
-  return Object.fromEntries(Object.entries(value).map(([entryKey, item]) => [entryKey, redactTraceValue(item, entryKey, depth + 1)]))
+  return Object.fromEntries(
+    Object.entries(value).map(([entryKey, item]) => [entryKey, redactTraceValue(item, entryKey, depth + 1)]),
+  )
 }
 
 function rows(input: TraceExportInput) {

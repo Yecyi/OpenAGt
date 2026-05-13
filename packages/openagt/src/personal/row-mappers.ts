@@ -1,11 +1,5 @@
 import { InboxItemTable, PersonalMemoryNoteTable, ScheduledWakeupTable } from "./personal.sql"
-import {
-  InboxItem,
-  InboxState,
-  MemoryNote,
-  ScheduledWakeup,
-  type InboxState as InboxStateType,
-} from "./schema"
+import { InboxItem, InboxState, MemoryNote, ScheduledWakeup, type InboxState as InboxStateType } from "./schema"
 
 export function normalizeInboxState(state: string): InboxStateType {
   if (state === "pending") return "queued"

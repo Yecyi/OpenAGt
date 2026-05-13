@@ -32,16 +32,16 @@ OpenAGt 当前围绕四个核心方向构建：
 
 下表基于 OpenCode 官方开源仓库和文档做技术对比，而不是只看命名。
 
-| 主题 | OpenCode | OpenAGt |
-| --- | --- | --- |
-| 运行时中心 | Client/server coding agent，强调 TUI 体验 | 后端优先的 session runtime，可被 CLI、TUI、server、SDK 复用 |
-| Agent loop | 通用编码 agent，内置 agent mode 和 subagent 能力 | 持久 session 工具循环，扩展 task runtime、coordinator graph、personal-agent primitives |
-| Provider 策略 | Provider-agnostic，支持 Claude、OpenAI、Google、本地模型等 | 多 provider runtime，支持 provider fallback、server 暴露和生成式 JavaScript SDK |
-| LSP 集成 | 官方文档强调开箱即用 LSP | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop |
-| 安全模型 | Agent mode 和 permission prompt 是 CLI 体验核心 | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
-| 编排重点 | Terminal-first 编码流，保留 client/server 远程控制潜力 | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆 |
-| 前端形态 | TUI-first，官方项目也提供 desktop beta | 当前稳定版聚焦 CLI/TUI/headless server/SDK，Flutter 延后 |
-| 迁移兼容 | 原生 OpenCode 项目 | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容 |
+| 主题          | OpenCode                                                   | OpenAGt                                                                                               |
+| ------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 运行时中心    | Client/server coding agent，强调 TUI 体验                  | 后端优先的 session runtime，可被 CLI、TUI、server、SDK 复用                                           |
+| Agent loop    | 通用编码 agent，内置 agent mode 和 subagent 能力           | 持久 session 工具循环，扩展 task runtime、coordinator graph、personal-agent primitives                |
+| Provider 策略 | Provider-agnostic，支持 Claude、OpenAI、Google、本地模型等 | 多 provider runtime，支持 provider fallback、server 暴露和生成式 JavaScript SDK                       |
+| LSP 集成      | 官方文档强调开箱即用 LSP                                   | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop                          |
+| 安全模型      | Agent mode 和 permission prompt 是 CLI 体验核心            | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
+| 编排重点      | Terminal-first 编码流，保留 client/server 远程控制潜力     | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆                        |
+| 前端形态      | TUI-first，官方项目也提供 desktop beta                     | 当前稳定版聚焦 CLI/TUI/headless server/SDK，Flutter 延后                                              |
+| 迁移兼容      | 原生 OpenCode 项目                                         | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容                                                     |
 
 ## 发布
 
@@ -79,15 +79,15 @@ OpenAGt 当前后端能力包括：
 
 ## Verification Matrix
 
-| 能力 | 状态 |
-| --- | --- |
-| Session runtime 与工具循环 | v1.16 稳定；v1.17 RC 加强 task/subagent 结果可见性 |
-| Approval and Safety Envelope | v1.16 稳定，带版本化 `shell_safety` |
-| Coordinator Runtime | v1.16 稳定；v1.17 RC 加强 sidebar planning visibility |
-| Personal Agent Core | 已实现，v1.16 稳定后端契约 |
-| Debug doctor / repro bundle | v1.16 稳定诊断面 |
-| Release verification automation | `bun run verify:v1.17` |
-| Flutter 前端 | 路线图；先稳定后端契约 |
+| 能力                            | 状态                                                  |
+| ------------------------------- | ----------------------------------------------------- |
+| Session runtime 与工具循环      | v1.16 稳定；v1.17 RC 加强 task/subagent 结果可见性    |
+| Approval and Safety Envelope    | v1.16 稳定，带版本化 `shell_safety`                   |
+| Coordinator Runtime             | v1.16 稳定；v1.17 RC 加强 sidebar planning visibility |
+| Personal Agent Core             | 已实现，v1.16 稳定后端契约                            |
+| Debug doctor / repro bundle     | v1.16 稳定诊断面                                      |
+| Release verification automation | `bun run verify:v1.17`                                |
+| Flutter 前端                    | 路线图；先稳定后端契约                                |
 
 ## 启动
 

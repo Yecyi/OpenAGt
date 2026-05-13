@@ -255,29 +255,18 @@ describe("tool.bash", () => {
     })
   })
 
-  test.skipIf(process.platform !== "win32")("auto sandbox with closed policy blocks unavailable Windows native backend", async () => {
-    await Instance.provide({
-      directory: projectRoot,
-      fn: async () => {
-        const bash = await initBash(
-          Layer.succeed(
-            Config.Service,
-            Config.Service.of({
-              get: () =>
-                Effect.succeed({
-                  experimental: {
-                    sandbox: {
-                      enabled: true,
-                      backend: "auto",
-                      failure_policy: "closed",
-                      report_only: false,
-                      broker_idle_ttl_ms: 300_000,
-                    },
-                  },
-                }),
-              effective: () =>
-                Effect.succeed({
-                  config: {
+  test.skipIf(process.platform !== "win32")(
+    "auto sandbox with closed policy blocks unavailable Windows native backend",
+    async () => {
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
+          const bash = await initBash(
+            Layer.succeed(
+              Config.Service,
+              Config.Service.of({
+                get: () =>
+                  Effect.succeed({
                     experimental: {
                       sandbox: {
                         enabled: true,
@@ -287,41 +276,55 @@ describe("tool.bash", () => {
                         broker_idle_ttl_ms: 300_000,
                       },
                     },
-                  },
-                  sources: [],
-                  field_sources: {} as any,
-                }),
-              getGlobal: () => Effect.succeed({}),
-              getConsoleState: () =>
-                Effect.succeed({
-                  consoleManagedProviders: [],
-                  activeOrgName: undefined,
-                  switchableOrgCount: 0,
-                }),
-              update: () => Effect.void,
-              updateGlobal: () => Effect.succeed({}),
-              invalidate: () => Effect.void,
-              invalidateDirectory: () => Effect.void,
-              directories: () => Effect.succeed([]),
-              waitForDependencies: () => Effect.void,
-            }),
-          ),
-        )
-        const result = await Effect.runPromise(
-          bash.execute(
-            {
-              command: "echo sandbox-auto",
-              description: "Echo auto sandbox",
-            },
-            ctx,
-          ),
-        )
-        expect(result.metadata.exit).toBeNull()
-        expect(result.metadata.decision).toBe("block")
-        expect(result.output).toContain("Blocked: Required sandbox backend is unavailable")
-      },
-    })
-  })
+                  }),
+                effective: () =>
+                  Effect.succeed({
+                    config: {
+                      experimental: {
+                        sandbox: {
+                          enabled: true,
+                          backend: "auto",
+                          failure_policy: "closed",
+                          report_only: false,
+                          broker_idle_ttl_ms: 300_000,
+                        },
+                      },
+                    },
+                    sources: [],
+                    field_sources: {} as any,
+                  }),
+                getGlobal: () => Effect.succeed({}),
+                getConsoleState: () =>
+                  Effect.succeed({
+                    consoleManagedProviders: [],
+                    activeOrgName: undefined,
+                    switchableOrgCount: 0,
+                  }),
+                update: () => Effect.void,
+                updateGlobal: () => Effect.succeed({}),
+                invalidate: () => Effect.void,
+                invalidateDirectory: () => Effect.void,
+                directories: () => Effect.succeed([]),
+                waitForDependencies: () => Effect.void,
+              }),
+            ),
+          )
+          const result = await Effect.runPromise(
+            bash.execute(
+              {
+                command: "echo sandbox-auto",
+                description: "Echo auto sandbox",
+              },
+              ctx,
+            ),
+          )
+          expect(result.metadata.exit).toBeNull()
+          expect(result.metadata.decision).toBe("block")
+          expect(result.output).toContain("Blocked: Required sandbox backend is unavailable")
+        },
+      })
+    },
+  )
 })
 
 describe("tool.bash permissions", () => {

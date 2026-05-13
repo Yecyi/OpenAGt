@@ -46,13 +46,9 @@ const MemConsolidateCommand = cmd({
           const overrides: Partial<ConsolidatorConfig> = {
             ...(args["min-occurrences"] !== undefined ? { min_pattern_occurrences: args["min-occurrences"] } : {}),
             ...(args["max-facts"] !== undefined ? { max_facts_per_run: args["max-facts"] } : {}),
-            ...(args["replay-window-hours"] !== undefined
-              ? { replay_window_hours: args["replay-window-hours"] }
-              : {}),
+            ...(args["replay-window-hours"] !== undefined ? { replay_window_hours: args["replay-window-hours"] } : {}),
           }
-          const report = await AppRuntime.runPromise(
-            MemoryConsolidator.Service.use((svc) => svc.runOnce(overrides)),
-          )
+          const report = await AppRuntime.runPromise(MemoryConsolidator.Service.use((svc) => svc.runOnce(overrides)))
           if (args.format === "json") {
             console.log(JSON.stringify(report, null, 2))
             return

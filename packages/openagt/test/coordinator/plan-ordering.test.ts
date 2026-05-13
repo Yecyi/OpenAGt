@@ -27,11 +27,7 @@ function planWith(nodes: Array<{ id: string; depends_on?: string[] }>) {
 }
 
 test("validatePlanResult — ok for an acyclic plan", () => {
-  const plan = planWith([
-    { id: "a" },
-    { id: "b", depends_on: ["a"] },
-    { id: "c", depends_on: ["a", "b"] },
-  ])
+  const plan = planWith([{ id: "a" }, { id: "b", depends_on: ["a"] }, { id: "c", depends_on: ["a", "b"] }])
   expect(validatePlanResult(plan)).toEqual({ ok: true })
 })
 
@@ -73,20 +69,14 @@ test("validatePlanResult — surfaces cycle path", () => {
 
 test("planValidationErrorMessage — produces human-readable strings", () => {
   expect(planValidationErrorMessage({ ok: false, kind: "duplicate", node_id: "x" })).toContain("duplicate node id: x")
-  expect(
-    planValidationErrorMessage({ ok: false, kind: "missing_dep", node_id: "x", missing: "y" }),
-  ).toContain("x depends on unknown node y")
-  expect(planValidationErrorMessage({ ok: false, kind: "cycle", cycle_path: ["a", "b", "a"] })).toContain(
-    "a -> b -> a",
+  expect(planValidationErrorMessage({ ok: false, kind: "missing_dep", node_id: "x", missing: "y" })).toContain(
+    "x depends on unknown node y",
   )
+  expect(planValidationErrorMessage({ ok: false, kind: "cycle", cycle_path: ["a", "b", "a"] })).toContain("a -> b -> a")
 })
 
 test("repairMissingDeps — drops bogus dep refs and reports them", () => {
-  const plan = planWith([
-    { id: "a" },
-    { id: "b", depends_on: ["a", "ghost"] },
-    { id: "c", depends_on: ["phantom"] },
-  ])
+  const plan = planWith([{ id: "a" }, { id: "b", depends_on: ["a", "ghost"] }, { id: "c", depends_on: ["phantom"] }])
   const { plan: repaired, dropped } = repairMissingDeps(plan)
   expect(dropped).toEqual([
     { node_id: "b", missing: "ghost" },

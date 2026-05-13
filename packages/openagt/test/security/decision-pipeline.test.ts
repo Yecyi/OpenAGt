@@ -15,11 +15,7 @@ const evalResult = (decision: EvaluationResult["decision"], matched = false): Ev
   matchedRules: matched ? [{ index: 0, pattern: ["cmd"], decision, justification: "Matched policy rule." }] : [],
 })
 
-const policy = (
-  backend: SandboxBackendPreference,
-  failurePolicy: SandboxFailurePolicy,
-  network = false,
-) => {
+const policy = (backend: SandboxBackendPreference, failurePolicy: SandboxFailurePolicy, network = false) => {
   const networkPolicy: SandboxNetworkPolicy = network ? "full" : "none"
   return {
     sandbox: {

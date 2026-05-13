@@ -6,4 +6,3 @@ describe("sanitizeTerminalOutput", () => {
     expect(sanitizeTerminalOutput("ok\x1b]52;c;SGVsbG8=\x07\x1b[2Jdone")).toBe("okdone")
   })
 })
-

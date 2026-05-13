@@ -24,7 +24,9 @@ export function selectOverflowReplay(input: {
   })()
   if (!candidate) return { messages: input.messages }
 
-  const hasContent = candidate.messages.some((m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"))
+  const hasContent = candidate.messages.some(
+    (m) => m.info.role === "user" && !m.parts.some((p) => p.type === "compaction"),
+  )
   if (!hasContent) return { messages: input.messages }
   return candidate
 }

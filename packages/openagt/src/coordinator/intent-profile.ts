@@ -34,7 +34,8 @@ function successCriteria(taskType: TaskTypeType) {
     return ["Sources and local context are synthesized", "Actionable conclusions are written", "Claims are reviewed"]
   if (taskType === "writing")
     return ["Audience and purpose are identified", "Draft is produced", "Style and factuality are reviewed"]
-  if (taskType === "data-analysis") return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
+  if (taskType === "data-analysis")
+    return ["Data shape is profiled", "Analysis is performed", "Statistics and anomalies are verified"]
   if (taskType === "planning")
     return ["Goal is decomposed", "Constraints and alternatives are checked", "Risks are reviewed"]
   if (taskType === "personal-admin")
@@ -49,7 +50,8 @@ function successCriteria(taskType: TaskTypeType) {
       "Automation plan is generated",
       "Risk and trigger conditions are verified",
     ]
-  if (taskType === "file-data-organization") return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
+  if (taskType === "file-data-organization")
+    return ["Files or data are inventoried", "Changes are scoped", "Result is verified"]
   return ["Goal is clarified enough to execute", "Work is completed", "Result is summarized"]
 }
 

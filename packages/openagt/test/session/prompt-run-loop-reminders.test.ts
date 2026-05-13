@@ -48,7 +48,5 @@ test("wrapUserMessagesAfterFinish wraps only user text after finished assistant"
   })
 
   expect(before.parts[0]?.type === "text" ? before.parts[0].text : "").toBe("before")
-  expect(after.parts[0]?.type === "text" ? after.parts[0].text : "").toContain(
-    "The user sent the following message:",
-  )
+  expect(after.parts[0]?.type === "text" ? after.parts[0].text : "").toContain("The user sent the following message:")
 })

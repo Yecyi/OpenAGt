@@ -10,11 +10,7 @@ export type PromptReferenceFilePart = {
   mime: "application/x-directory" | "text/plain"
 }
 
-export function promptReferencePath(input: {
-  name: string
-  worktree: string
-  homeDir: () => string
-}): string {
+export function promptReferencePath(input: { name: string; worktree: string; homeDir: () => string }): string {
   if (input.name.startsWith("~/")) return path.join(input.homeDir(), input.name.slice(2))
   return path.resolve(input.worktree, input.name)
 }

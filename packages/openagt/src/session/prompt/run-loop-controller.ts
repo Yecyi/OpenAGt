@@ -236,10 +236,7 @@ export class PromptRunLoopController {
                 sessionID,
                 parentSessionID: session.parentID,
                 system,
-                messages: [
-                  ...modelMsgs,
-                  ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : []),
-                ],
+                messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
                 tools: isLastStep ? {} : tools,
                 model: activeModel,
                 toolChoice: isLastStep ? undefined : format.type === "json_schema" ? "required" : undefined,

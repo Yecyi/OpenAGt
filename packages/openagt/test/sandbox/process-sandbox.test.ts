@@ -118,7 +118,7 @@ describe("combined output cap (apr.4.6 regression)", () => {
     // can fire here. Without the SharedBudget plumbing this would silently
     // succeed with `outputBytesTruncated: false` (the dead-code state).
     const command = isWindows
-      ? "cmd /c \"echo aaaaaaaaaaaaaaaaaaaaaaaa & echo bbbbbbbbbbbbbbbbbbbbbbbb 1>&2\""
+      ? 'cmd /c "echo aaaaaaaaaaaaaaaaaaaaaaaa & echo bbbbbbbbbbbbbbbbbbbbbbbb 1>&2"'
       : "printf 'aaaaaaaaaaaaaaaaaaaaaaaa' && printf 'bbbbbbbbbbbbbbbbbbbbbbbb' 1>&2"
     const result = await spawnWithSandbox(command, {
       timeoutMs: 5000,

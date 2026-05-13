@@ -5,9 +5,7 @@ import type * as Scope from "effect/Scope"
 import type { ChildProcessHandle } from "effect/unstable/process/ChildProcessSpawner"
 
 type McpProcessSpawner = {
-  spawn: (
-    command: ChildProcess.Command,
-  ) => Effect.Effect<ChildProcessHandle, PlatformError.PlatformError, Scope.Scope>
+  spawn: (command: ChildProcess.Command) => Effect.Effect<ChildProcessHandle, PlatformError.PlatformError, Scope.Scope>
 }
 
 export const mcpProcessDescendants = Effect.fnUntraced(

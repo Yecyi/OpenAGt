@@ -41,7 +41,8 @@ export function selectBackend(input: {
       ? `${preferred.name} does not enforce ${networkPolicy} network policy`
       : undefined
   if (preferred?.available && !readinessReason && !networkReason) return { type: "run", backend: preferred }
-  const reason = readinessReason ?? networkReason ?? preferred?.reason ?? `Sandbox backend unavailable: ${preferredName}`
+  const reason =
+    readinessReason ?? networkReason ?? preferred?.reason ?? `Sandbox backend unavailable: ${preferredName}`
   if (input.failurePolicy === "closed") {
     return {
       type: "deny",

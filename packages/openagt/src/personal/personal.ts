@@ -94,7 +94,9 @@ function reviewPatternContent(input: {
     input.verdict.required_changes.length
       ? `Required changes: ${input.verdict.required_changes.join("; ")}`
       : undefined,
-    input.verdict.missing_evidence.length ? `Missing evidence: ${input.verdict.missing_evidence.join("; ")}` : undefined,
+    input.verdict.missing_evidence.length
+      ? `Missing evidence: ${input.verdict.missing_evidence.join("; ")}`
+      : undefined,
     input.verdict.unsupported_claims.length
       ? `Unsupported claims: ${input.verdict.unsupported_claims.join("; ")}`
       : undefined,
@@ -219,12 +221,7 @@ export const layer = Layer.effect(
                     status: event.properties.result.status,
                     verdict,
                   }),
-                  tags: [
-                    ...tags,
-                    "failure-pattern",
-                    `failure_signature:${signature}`,
-                    `verdict:${verdict.verdict}`,
-                  ],
+                  tags: [...tags, "failure-pattern", `failure_signature:${signature}`, `verdict:${verdict.verdict}`],
                   metadata: {
                     ...metadata,
                     failure_signature: signature,

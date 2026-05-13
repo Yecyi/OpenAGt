@@ -17,9 +17,7 @@ describe("session.prompt command template helpers", () => {
   })
 
   test("replaces numeric placeholders and gives the last placeholder remaining args", () => {
-    expect(renderCommandTemplate({ template: "$1 :: $2", arguments: "alpha beta gamma" })).toBe(
-      "alpha :: beta gamma",
-    )
+    expect(renderCommandTemplate({ template: "$1 :: $2", arguments: "alpha beta gamma" })).toBe("alpha :: beta gamma")
   })
 
   test("appends arguments when no placeholder is present", () => {

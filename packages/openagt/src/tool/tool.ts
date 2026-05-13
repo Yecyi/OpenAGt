@@ -119,13 +119,7 @@ export interface ExecuteResult<M extends Metadata = Metadata> {
 //   - timeout: the tool exceeded its time budget
 //   - missing_precondition: required state (file, env var, dependency) absent
 //   - runtime: catch-all for unexpected failures
-export type ToolErrorKind =
-  | "validation"
-  | "io"
-  | "permission"
-  | "timeout"
-  | "missing_precondition"
-  | "runtime"
+export type ToolErrorKind = "validation" | "io" | "permission" | "timeout" | "missing_precondition" | "runtime"
 
 export interface ToolErrorInput {
   readonly kind: ToolErrorKind
@@ -144,7 +138,8 @@ export class ToolError extends Error {
   readonly of?: number
 
   constructor(input: ToolErrorInput) {
-    const attemptSuffix = input.attempt !== undefined && input.of !== undefined ? `attempt ${input.attempt}/${input.of}: ` : ""
+    const attemptSuffix =
+      input.attempt !== undefined && input.of !== undefined ? `attempt ${input.attempt}/${input.of}: ` : ""
     super(`${attemptSuffix}${input.fact}`, input.cause !== undefined ? { cause: input.cause } : undefined)
     this.name = "ToolError"
     this.kind = input.kind

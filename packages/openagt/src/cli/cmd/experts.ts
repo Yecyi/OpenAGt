@@ -49,7 +49,9 @@ const ExpertsListCommand = cmd({
             console.log(JSON.stringify(filtered, null, 2))
             return
           }
-          UI.println(`Registered experts: ${filtered.length} (filter: source=${args.source}${args.domain ? `, domain=${args.domain}` : ""})`)
+          UI.println(
+            `Registered experts: ${filtered.length} (filter: source=${args.source}${args.domain ? `, domain=${args.domain}` : ""})`,
+          )
           UI.println("")
           for (const e of filtered) {
             const tags: string[] = [e.source]

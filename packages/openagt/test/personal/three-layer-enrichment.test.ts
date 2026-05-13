@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  enrichMemoryContext,
-  extractKeywords,
-  taskSignatureFor,
-} from "../../src/personal/three-layer"
+import { enrichMemoryContext, extractKeywords, taskSignatureFor } from "../../src/personal/three-layer"
 import { CoordinatorPlan } from "../../src/coordinator/schema"
 
 describe("extractKeywords — stable signature inputs", () => {

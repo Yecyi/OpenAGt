@@ -23,7 +23,10 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   if (options?.bypass) return
 
   const ins = yield* InstanceState.context
-  const full = process.platform === "win32" ? AppFileSystem.normalizePath(canonicalSandboxPath(target)) : canonicalSandboxPath(target)
+  const full =
+    process.platform === "win32"
+      ? AppFileSystem.normalizePath(canonicalSandboxPath(target))
+      : canonicalSandboxPath(target)
   if (containsCanonicalPath(ins.directory, full)) return
   if (ins.worktree !== "/" && containsCanonicalPath(ins.worktree, full)) return
 

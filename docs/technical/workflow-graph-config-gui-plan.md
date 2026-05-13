@@ -19,6 +19,7 @@
 ## 1. 设计目标与张力
 
 四个互相牵扯的目标:
+
 - **表达力**:能描述足够复杂的 agent workflow (branching、loop、subagent fan-out、permission gate、feedback)
 - **可读性**:打开图就能看懂"这个 agent 怎么思考"
 - **稳定性**:graph 改动不能让 runtime 行为不可预期
@@ -32,13 +33,13 @@
 
 ### 2.1 五种候选范式
 
-| 范式 | 代表 | 表达力 | 可读性 | 心智成本 |
-| --- | --- | --- | --- | --- |
-| 纯 block (vertical snap) | Scratch, Blockly | 弱 (branching/parallel 不天然) | 高 | 低 |
-| 纯 dataflow (typed pins) | ComfyUI, Houdini | 中 (无控制流) | 中 | 中 |
-| 控制流 + dataflow 混合 | UE Blueprints | 高 | 中 | 中-高 |
-| 约束式 (declarative) | Datalog, GraphQL schema | 高但抽象 | 低 | 高 |
-| 命令式脚本 | Python, JS | 极高 | 低 | 高 |
+| 范式                     | 代表                    | 表达力                         | 可读性 | 心智成本 |
+| ------------------------ | ----------------------- | ------------------------------ | ------ | -------- |
+| 纯 block (vertical snap) | Scratch, Blockly        | 弱 (branching/parallel 不天然) | 高     | 低       |
+| 纯 dataflow (typed pins) | ComfyUI, Houdini        | 中 (无控制流)                  | 中     | 中       |
+| 控制流 + dataflow 混合   | UE Blueprints           | 高                             | 中     | 中-高    |
+| 约束式 (declarative)     | Datalog, GraphQL schema | 高但抽象                       | 低     | 高       |
+| 命令式脚本               | Python, JS              | 极高                           | 低     | 高       |
 
 ### 2.2 为什么不是纯 dataflow
 
@@ -73,12 +74,15 @@ Figma 是**生产工具**(精确对齐、grid、像 CAD);FigJam 是**思考工�
 ### 3.2 类型系统的取舍
 
 太简单(只有原始类型)失去校验价值,太丰富(structural)UX 灾难。折中:**nominal + 可选 + 数组 + literal union**。
+
 ```
 Type ::= Name | Name? | Name[] | "low" | "medium" | "high"
 ```
+
 不支持泛型、structural subtyping、function types。**够用**——节点边界类型几乎都是 nominal。
 
 **算法 — 连接合法性 `canConnect(out, in)`**:
+
 1. 类型完全相等 → 合法
 2. `out: T` 接 `in: T?` → 合法
 3. `out: T` 接 `in: T[]` → 合法 (单值合并入数组)
@@ -88,6 +92,7 @@ Type ::= Name | Name? | Name[] | "low" | "medium" | "high"
 ### 3.3 节点 schema 模型
 
 节点类型由 schema 描述,**不由代码**:
+
 ```
 NodeSchema {
   type: "BashTool", category: "Tool", shape: "diamond"
@@ -126,15 +131,15 @@ NodeSchema {
 
 只在以下三类 param 上提供 block 编辑:
 
-| Block 类型 | 输出类型 | 适用 param |
-| --- | --- | --- |
-| `PromptBlock` | `Prompt` (有序段+变量) | system prompt、agent prompt、template |
-| `RuleBlock` | `Predicate` (布尔表达式) | permission rule、condition |
-| `ConditionBlock` | `Branch` (多路 boolean → exec) | Decision 节点的判定逻辑 |
+| Block 类型       | 输出类型                       | 适用 param                            |
+| ---------------- | ------------------------------ | ------------------------------------- |
+| `PromptBlock`    | `Prompt` (有序段+变量)         | system prompt、agent prompt、template |
+| `RuleBlock`      | `Predicate` (布尔表达式)       | permission rule、condition            |
+| `ConditionBlock` | `Branch` (多路 boolean → exec) | Decision 节点的判定逻辑               |
 
 **不在以下场景提供 block**:数值/字符串简单输入、多选/枚举、文件路径、任何"集中编辑某字段"的需求(这些用 form)。
 
-判定原则:**block 表达 *结构*, form 表达 *值***。如果 param 本质是结构化逻辑/条件/拼接,block 胜;否则 form 胜。
+判定原则:**block 表达 _结构_, form 表达 _值_**。如果 param 本质是结构化逻辑/条件/拼接,block 胜;否则 form 胜。
 
 ### 4.3 进入/退出 block 的视觉语言
 
@@ -145,17 +150,17 @@ NodeSchema {
 - block 编辑区独立 chrome:左侧 block palette、顶部 block 类型 badge、左上 `[← Back to graph]`
 - 退出:Esc 或点 Back,反向 zoom-out 回到 graph
 
-视觉 metaphor:**"潜入"节点内部**。这个 metaphor 自然解释了"block 是 *节点内部* 的事,不是 *graph 上* 的事"。
+视觉 metaphor:**"潜入"节点内部**。这个 metaphor 自然解释了"block 是 _节点内部_ 的事,不是 _graph 上_ 的事"。
 
 ### 4.4 类型与校验责任划分
 
-| 校验对象 | 责任方 | 时机 |
-| --- | --- | --- |
-| Pin 之间的连接 | Graph validator | 拖动连线 |
-| Param 的简单值 | JSON Schema validator | param 改动 |
-| Block 内部的 DSL | Block validator (per type) | block 改动 |
-| Block 输出 vs param 期望类型 | Graph validator | block 保存 |
-| Drift | Runtime drift detector | 运行时回填 |
+| 校验对象                     | 责任方                     | 时机       |
+| ---------------------------- | -------------------------- | ---------- |
+| Pin 之间的连接               | Graph validator            | 拖动连线   |
+| Param 的简单值               | JSON Schema validator      | param 改动 |
+| Block 内部的 DSL             | Block validator (per type) | block 改动 |
+| Block 输出 vs param 期望类型 | Graph validator            | block 保存 |
+| Drift                        | Runtime drift detector     | 运行时回填 |
 
 **关键:block 内错不污染 graph 校验器。** block 自检通过后产出 typed value,graph 只关心这个 value 的类型对不对。这种**关注点分离**让两个系统都简单。
 
@@ -211,17 +216,18 @@ def resolve(target, run_context):
 
 ### 6.1 三个核心算法
 
-| 算法 | 输入 | 输出 | 难点 |
-| --- | --- | --- | --- |
-| Compiler | Graph | runtime config | 表达力 mismatch |
-| Validator | Graph | error list | 静态 + 运行时归因 |
-| Drift detector | Graph + runtime SSE | per-node 状态/告警 | 节点归因 |
+| 算法           | 输入                | 输出               | 难点              |
+| -------------- | ------------------- | ------------------ | ----------------- |
+| Compiler       | Graph               | runtime config     | 表达力 mismatch   |
+| Validator      | Graph               | error list         | 静态 + 运行时归因 |
+| Drift detector | Graph + runtime SSE | per-node 状态/告警 | 节点归因          |
 
 ### 6.2 Compiler:graph 表达力 ⊋ static config
 
 **两种策略**:
 
 **A — 双轨编译**(倾向):
+
 ```
 compile(graph):
     static_subgraph, dynamic_subgraph = partition(graph)
@@ -229,6 +235,7 @@ compile(graph):
     runtime_desc  = to_runtime(dynamic_subgraph)
     return (json_config, runtime_desc)
 ```
+
 partition 规则:节点带 "static-only" 标记 (Decision、Branch、Loop) → dynamic;其他 → static。跨 boundary 的连线生成 interop pin。静态部分编译到现有 JSON config;动态部分编译到 graph runtime descriptor,由 graph interpreter 在执行时解释。
 
 **B — 限制 graph 表达力**:禁 cycle、Decision 退化为 select-one。简单,但 graph 的表达力 = 现有 config,**graph 退化成花式表单**。
@@ -237,14 +244,15 @@ partition 规则:节点带 "static-only" 标记 (Decision、Branch、Loop) → d
 
 ### 6.3 Validator:四级错误模型
 
-| 级别 | 例子 | 行为 |
-| --- | --- | --- |
-| Error | 类型不匹配、必填缺失、unreachable exec、含 exec 的 cycle | 阻止保存 |
-| Warning | data pin 未连(取 default)、孤立子图 | 红黄角标,允许保存 |
-| Info | 节点参数处于非常用值 | 蓝色提示 |
-| Drift | runtime 实际行为与 graph 预期不符 | 节点上飘红圈(运行后回填) |
+| 级别    | 例子                                                     | 行为                     |
+| ------- | -------------------------------------------------------- | ------------------------ |
+| Error   | 类型不匹配、必填缺失、unreachable exec、含 exec 的 cycle | 阻止保存                 |
+| Warning | data pin 未连(取 default)、孤立子图                      | 红黄角标,允许保存        |
+| Info    | 节点参数处于非常用值                                     | 蓝色提示                 |
+| Drift   | runtime 实际行为与 graph 预期不符                        | 节点上飘红圈(运行后回填) |
 
 **静态部分的算法集合**:
+
 1. **类型校验**:遍历每条边跑 `canConnect(out, in)`
 2. **必填检查**:必填 pin 必须接入或 param 填了 default
 3. **可达性**:Source 节点 BFS,标记可达 exec 节点;不可达 → Warning
@@ -275,6 +283,7 @@ drift 不一定是 bug——可能是 graph 没考虑到的合理行为。UI 让
 ### 6.5 自动布局算法
 
 倾向 **Sugiyama 主、force 微调**:
+
 1. exec 边构建 DAG → Sugiyama 分层得主框架
 2. data 边作为 soft constraint 用 force 微调横向位置
 3. 子图当 super-node 先布局,展开时局部重排
@@ -292,6 +301,7 @@ graph 编辑时不知道 runtime 支持什么(旧版本?缺 MCP server?)。
 ```
 NodeSchema { type, version: 3, migrations: [{from:1,to:2,migrate}, {from:2,to:3,migrate}] }
 ```
+
 加载旧 graph 时,对每个低版本节点跑 migration chain。失败则节点显示 "incompatible, manual fix required"——graph 仍可打开,只是该节点不能 compile。**永远不丢用户的图,只标记不可用部分**。
 
 ---
@@ -300,13 +310,13 @@ NodeSchema { type, version: 3, migrations: [{from:1,to:2,migrate}, {from:2,to:3,
 
 ### 7.1 Customization Gradient
 
-| 层级 | 用户做什么 | 机制 | 默认可见? |
-| --- | --- | --- | --- |
-| L0 — 选 | 顶栏切换 active workflow | binding 切换 | ✅ |
-| L1 — 调 | 改节点参数 | 节点正面 inline form | 进画布后默认 |
-| L2 — 接 | 改连线、加/删节点 | typed pin connect | 需点 "Edit" |
-| L3 — 块 | 编辑 prompt blocks / rule expressions | Block 容器节点 | 节点右键 |
-| L4 — 扩 | 注册新 NodeSchema | 配置文件 / 开发者面板 | 仅开发者菜单 |
+| 层级    | 用户做什么                            | 机制                  | 默认可见?    |
+| ------- | ------------------------------------- | --------------------- | ------------ |
+| L0 — 选 | 顶栏切换 active workflow              | binding 切换          | ✅           |
+| L1 — 调 | 改节点参数                            | 节点正面 inline form  | 进画布后默认 |
+| L2 — 接 | 改连线、加/删节点                     | typed pin connect     | 需点 "Edit"  |
+| L3 — 块 | 编辑 prompt blocks / rule expressions | Block 容器节点        | 节点右键     |
+| L4 — 扩 | 注册新 NodeSchema                     | 配置文件 / 开发者面板 | 仅开发者菜单 |
 
 **每一层往上提门槛,但门始终可达**。绝大多数用户停在 L0/L1。
 
@@ -327,15 +337,15 @@ NodeSchema { type, version: 3, migrations: [{from:1,to:2,migrate}, {from:2,to:3,
 
 ### 7.4 自定义 vs 难度的判断框架
 
-| 维度 | 自定义价值 | 难度成本 | 决定 |
-| --- | --- | --- | --- |
-| 节点参数表单 | 极高 | 低 (schema → form) | 完全开放 |
-| 添加内置节点 | 高 | 低 | 完全开放 |
-| 改连线拓扑 | 高 | 中 | 开放 + 强校验 + 拖动时即拒 |
-| 子图组合与分享 | 高 | 低 | 完全开放 |
-| 注册新 NodeSchema | 中 | 高 | 限开发者 + 文档化 |
-| Block 内 DSL | 中 | 高 | 限定 DSL,不允许任意代码 |
-| 任意 plugin runtime | 低 | 极高 | 不在范围 |
+| 维度                | 自定义价值 | 难度成本           | 决定                       |
+| ------------------- | ---------- | ------------------ | -------------------------- |
+| 节点参数表单        | 极高       | 低 (schema → form) | 完全开放                   |
+| 添加内置节点        | 高         | 低                 | 完全开放                   |
+| 改连线拓扑          | 高         | 中                 | 开放 + 强校验 + 拖动时即拒 |
+| 子图组合与分享      | 高         | 低                 | 完全开放                   |
+| 注册新 NodeSchema   | 中         | 高                 | 限开发者 + 文档化          |
+| Block 内 DSL        | 中         | 高                 | 限定 DSL,不允许任意代码    |
+| 任意 plugin runtime | 低         | 极高               | 不在范围                   |
 
 **总原则**:**视觉松散,语义严格**。看起来什么都能拖,但每个连接处的语义校验即时跑,错的根本连不上。
 
@@ -347,33 +357,33 @@ NodeSchema { type, version: 3, migrations: [{from:1,to:2,migrate}, {from:2,to:3,
 
 ### 8.1 平移、缩放、聚焦
 
-| 操作 | 鼠标 | 触控板 | 键盘 |
-| --- | --- | --- | --- |
-| 平移 | 中键拖 / Space+左键拖 | 双指拖 | 方向键(慢) |
-| 缩放 | Ctrl+滚轮 | 双指捏 | Ctrl+`+/-` |
-| 重置缩放 | — | — | Ctrl+0 |
-| 缩放到全图 | — | — | Ctrl+1 |
-| 缩放到选区 | — | — | Ctrl+2 |
-| Mini-map | 始终右下角,可拖拽视口 | 同 | M 切换 |
+| 操作       | 鼠标                  | 触控板 | 键盘       |
+| ---------- | --------------------- | ------ | ---------- |
+| 平移       | 中键拖 / Space+左键拖 | 双指拖 | 方向键(慢) |
+| 缩放       | Ctrl+滚轮             | 双指捏 | Ctrl+`+/-` |
+| 重置缩放   | —                     | —      | Ctrl+0     |
+| 缩放到全图 | —                     | —      | Ctrl+1     |
+| 缩放到选区 | —                     | —      | Ctrl+2     |
+| Mini-map   | 始终右下角,可拖拽视口 | 同     | M 切换     |
 
 **默认体验**:开图时自动 fit-to-view;长时间不操作不漂移;**缩放围绕鼠标位置**,不是中心(关键体验细节,Figma/FigJam 都这样)。
 
 ### 8.2 选择模型
 
-| 操作 | 行为 |
-| --- | --- |
-| 单击节点 | 选中,清空之前选择 |
-| Shift+单击 | 加入选择 |
-| Cmd+单击 | 反选 |
-| 空地拖动 | Marquee 矩形框选 |
-| Alt+空地拖动 | Lasso 自由形选 |
-| 双击节点 | 进入节点参数编辑 |
+| 操作                | 行为                      |
+| ------------------- | ------------------------- |
+| 单击节点            | 选中,清空之前选择         |
+| Shift+单击          | 加入选择                  |
+| Cmd+单击            | 反选                      |
+| 空地拖动            | Marquee 矩形框选          |
+| Alt+空地拖动        | Lasso 自由形选            |
+| 双击节点            | 进入节点参数编辑          |
 | 双击 Block 容器节点 | 进入 block 编辑 (zoom-in) |
-| 双击 Subgraph 节点 | 进入子图 (dive in) |
-| 双击连线 | 选中连线 + 弹 inspector |
-| Ctrl+A | 全选 |
-| Esc | 清空选择 / 退出当前模式 |
-| Tab / Shift+Tab | 在连通分量内 cycle |
+| 双击 Subgraph 节点  | 进入子图 (dive in)        |
+| 双击连线            | 选中连线 + 弹 inspector   |
+| Ctrl+A              | 全选                      |
+| Esc                 | 清空选择 / 退出当前模式   |
+| Tab / Shift+Tab     | 在连通分量内 cycle        |
 
 **多选时的批量操作**:右键浮出菜单(对齐、分布、组合为子图、改 scope、删除)。
 
@@ -391,38 +401,44 @@ palette 搜索支持:别名 (`bash` → BashTool)、按 capability 过滤 (`need
 ### 8.4 连接的拖拽机制 (用户体验最敏感)
 
 **起手**:
+
 - 鼠标 hover 进入 pin 半径 12px → pin 高亮 + 出现 "+" 提示
 - 按下左键开始拖 → 一根橡皮筋 (rubber band) 跟随鼠标,颜色 = pin type 颜色
 
 **拖动中的智能反馈** (这部分决定整个画布的"手感"):
+
 - 画布上**所有兼容 pin** 在 200ms 后开始柔和呼吸发光(开拖瞬间不闪,避免视觉爆炸)
 - **不兼容 pin 不变化**(不主动变灰,降低视觉噪音)
 - 鼠标进入兼容 pin 半径 → 该 pin 强高亮 + **磁力吸附**(snap radius 16px)
-- 鼠标进入节点 *body* (不是某个具体 pin) → 自动**建议**该节点上最兼容的 pin 高亮预览
+- 鼠标进入节点 _body_ (不是某个具体 pin) → 自动**建议**该节点上最兼容的 pin 高亮预览
 - 鼠标进入不兼容节点 → 显示禁止图标 + tooltip 解释 (`"expected Tool[], this node only outputs string"`)
 
 **释放**:
+
 - 释放在兼容 pin 上 → 连接成功,pin 短暂闪烁确认
 - 释放在节点 body 上(无具体 pin) → 自动连到上面的"建议 pin"
 - 释放在空地 → **弹出过滤后的 palette**,只显示有兼容 pin 的节点类型;选择即创建并自动连线
 - 释放在不兼容 pin 上 → 拒绝,**短暂红色闪烁 + 橡皮筋弹回**(snap-back),pin 处显示 1.5 秒 tooltip 解释为何拒绝
 
 **取消**:
+
 - 拖动中 Esc / 右键 → 取消连线
 
 **点击模式**(无障碍 / 键盘流):
+
 - Click pin → 进入"待连接"模式,pin 持续高亮
 - Click 第二个 pin → 完成连接;Esc 取消
 - 这条路径让键盘用户和触摸屏用户都能用
 
 **断开**:
+
 - 点连线选中 → Delete 删
 - 拖连线端点拖离 pin → 释放在空地 = 删
 - 拖连线端点到另一兼容 pin → **重接 (reroute)**,不是先删后连
 
 ### 8.5 连接路由与样式
 
-- **路由算法**:bezier 平滑曲线为主,起终点处水平/垂直进出(按 pin 朝向);中段不强制正交(避免 CAD 感);用 A* 在简化网格上搜索绕开沿途节点(阈值低,只避大块占位)
+- **路由算法**:bezier 平滑曲线为主,起终点处水平/垂直进出(按 pin 朝向);中段不强制正交(避免 CAD 感);用 A\* 在简化网格上搜索绕开沿途节点(阈值低,只避大块占位)
 - **样式编码**:颜色 = data type;粗细 = 默认细 / 选中加粗 / runtime 高亮加粗;exec 边略粗实线,data 边略细
 - **方向**:箭头小三角在中段或终点;hover 整条线时显示完整流向高亮
 - **重叠处理**:连线穿越节点时半透明,降低遮挡感
@@ -431,17 +447,20 @@ palette 搜索支持:别名 (`bash` → BashTool)、按 capability 过滤 (`need
 ### 8.6 注释、Section、子图导航
 
 **Sticky note**:
+
 - N 键在鼠标位置贴一个;颜色 palette 选(默认黄)
 - 拖到节点附近 → 自动"挂靠",显示一根细灰线指向节点
 - **不参与编译,不 export 到 effective config**
 - 双击编辑文本
 
 **Section / Frame** (FigJam 借鉴):
+
 - F 键画矩形 frame
 - 可命名 + 着色;Frame 移动时框内节点跟随
 - **Frame ≠ 子图**:Frame 是视觉分组,Subgraph 是语义封装
 
 **Subgraph 导航**:
+
 - Multi-select + Cmd+G:折叠为子图节点(自动提取 pin)
 - 双击子图节点:zoom-in 进入子图
 - 顶部**面包屑**显示当前层 (`Root > research-flow > rerank-stage`)
@@ -450,6 +469,7 @@ palette 搜索支持:别名 (`bash` → BashTool)、按 capability 过滤 (`need
 ### 8.7 校验与运行时反馈
 
 **静态校验反馈**(随手实时):
+
 - 拖连线不兼容:直接 snap-back,无错误状态遗留
 - 节点 param 错:节点角上**红圆点**,hover 显示详情
 - Unreachable / 必填缺失:节点边框**红色虚线**
@@ -457,6 +477,7 @@ palette 搜索支持:别名 (`bash` → BashTool)、按 capability 过滤 (`need
 - Info 级:**蓝色小圆点**(不染边框)
 
 **Runtime overlay**(已绑定 active session 时):
+
 - 执行中节点:蓝色发光脉冲(1Hz 呼吸)
 - 已完成:边框变浅绿 + 半透明充填(已完成不再脉冲)
 - 出错:红色边框 + 上飘 toast
@@ -467,22 +488,22 @@ palette 搜索支持:别名 (`bash` → BashTool)、按 capability 过滤 (`need
 
 ### 8.8 键盘流 (高频用户)
 
-| 快捷键 | 行为 |
-| --- | --- |
-| Cmd+K | 命令面板 |
-| Cmd+S | 保存 |
-| Cmd+Z / Cmd+Shift+Z | Undo / Redo |
-| Cmd+D | 复制选中 |
-| Cmd+C / Cmd+V | 复制 / 粘贴(含连线) |
-| Cmd+G | 选中节点组合为子图 |
-| Cmd+/ | 注释/取消注释选中(暂时禁用执行) |
-| F | 在鼠标处加 Frame |
-| N | 在鼠标处加 Sticky |
-| Delete | 删除选中 |
-| Tab / Shift+Tab | 连通分量内 cycle |
-| Space (按住) | 临时切换为平移工具 |
-| L | Auto-layout 当前选区(无选区则全图) |
-| `?` | 显示快捷键 cheatsheet |
+| 快捷键              | 行为                               |
+| ------------------- | ---------------------------------- |
+| Cmd+K               | 命令面板                           |
+| Cmd+S               | 保存                               |
+| Cmd+Z / Cmd+Shift+Z | Undo / Redo                        |
+| Cmd+D               | 复制选中                           |
+| Cmd+C / Cmd+V       | 复制 / 粘贴(含连线)                |
+| Cmd+G               | 选中节点组合为子图                 |
+| Cmd+/               | 注释/取消注释选中(暂时禁用执行)    |
+| F                   | 在鼠标处加 Frame                   |
+| N                   | 在鼠标处加 Sticky                  |
+| Delete              | 删除选中                           |
+| Tab / Shift+Tab     | 连通分量内 cycle                   |
+| Space (按住)        | 临时切换为平移工具                 |
+| L                   | Auto-layout 当前选区(无选区则全图) |
+| `?`                 | 显示快捷键 cheatsheet              |
 
 **核心理念**:每个常见操作都至少有一个键盘路径,高频用户**永不离开键盘**完成一次工作流编辑。这是 power user 留存的关键。
 
@@ -495,6 +516,7 @@ graph 编辑器与表单视图共享真理源,实时互通。
 ### 9.1 真理源选择
 
 三种:graph 是真理 / form 是真理 / **共同真理 = effective config**(倾向)。两个视图都不持有真理,都在 mutate 中央 model。
+
 - **好处**:不必决定谁优先
 - **代价**:中央 model 必须能容纳双方所有改动 — 这就是 §6.2 倾向"双轨编译策略 A"的根本原因
 
@@ -506,6 +528,7 @@ on user_edit(view, op):
     notify_other_views(op)
     # 每个 view 从 model 重投影
 ```
+
 关键:op 描述**意图** (`set BashTool.sandbox = process`) 而非**结果** (`config.tools.bash.sandbox = "process"`)。意图能被两个视图理解,结果只能被产生它的视图理解。
 
 ### 9.3 临时不一致是合法的
@@ -531,9 +554,9 @@ graph 的瞬态(拖到一半的连线、刚加还没接的节点)不应触发 fo
 
 ## 11. 与既有设计的关系
 
-| 已有文档 | 关系 |
-| --- | --- |
-| [`user-input-execution-feedback-flowchart.md`](./user-input-execution-feedback-flowchart.md) | 节点分类与 stage 划分继承自此;它定义了 "runtime 长什么样" |
-| [`advanced-developer-settings-scope.md`](./advanced-developer-settings-scope.md) | scope 6 层级与 effective config 概念直接复用;它定义了 "配置如何 cascade" |
+| 已有文档                                                                                     | 关系                                                                     |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`user-input-execution-feedback-flowchart.md`](./user-input-execution-feedback-flowchart.md) | 节点分类与 stage 划分继承自此;它定义了 "runtime 长什么样"                |
+| [`advanced-developer-settings-scope.md`](./advanced-developer-settings-scope.md)             | scope 6 层级与 effective config 概念直接复用;它定义了 "配置如何 cascade" |
 
 graph 视图与 stage 表单视图共享同一份 effective config (见 §9.1)。graph 提供拓扑表达力,表单提供密集字段编辑;两者各擅其场,不互相取代。

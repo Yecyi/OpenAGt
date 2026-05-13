@@ -148,7 +148,6 @@ export function deriveNewContentsFromChunks(filePath: string, chunks: UpdateFile
   }
 }
 
-
 // Apply hunks to filesystem
 export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
   if (hunks.length === 0) {

@@ -64,9 +64,7 @@ const PromptStatsCommand = cmd({
             .query<
               { variant: string; success: number; quality: number | null; duration_ms: number | null },
               [string, number]
-            >(
-              `SELECT variant, success, quality, duration_ms FROM prompt_outcome WHERE role = ? AND time_recorded >= ? ORDER BY time_recorded DESC`,
-            )
+            >(`SELECT variant, success, quality, duration_ms FROM prompt_outcome WHERE role = ? AND time_recorded >= ? ORDER BY time_recorded DESC`)
             .all(role, since)
           result[role] = PromptTemplates.summarizeVariantHistory(rows)
         }
@@ -82,8 +80,7 @@ const PromptStatsCommand = cmd({
           for (const s of stats) {
             const rate = (s.success_rate * 100).toFixed(1)
             const quality = s.mean_quality !== undefined ? s.mean_quality.toFixed(2) : "—"
-            const dur =
-              s.mean_duration_ms !== undefined ? `${Math.round(s.mean_duration_ms)}ms` : "—"
+            const dur = s.mean_duration_ms !== undefined ? `${Math.round(s.mean_duration_ms)}ms` : "—"
             process.stdout.write(
               `  ${s.variant.padEnd(24)} success=${s.success.toString().padStart(4)}/${s.total.toString().padEnd(4)} (${rate.padStart(5)}%)  quality=${quality}  dur=${dur}` +
                 EOL,

@@ -27,10 +27,7 @@ export function coordinatorSummaryText(input: { total: number; counts: SummaryCo
   return `${input.counts.completed}/${input.total} completed, ${input.counts.partial} partial, ${input.counts.running} running, ${input.counts.pending} pending, ${input.counts.failed} failed, ${input.counts.cancelled} cancelled`
 }
 
-export function coordinatorStateFromSummary(input: {
-  total: number
-  counts: SummaryCounts
-}): CoordinatorRunState {
+export function coordinatorStateFromSummary(input: { total: number; counts: SummaryCounts }): CoordinatorRunState {
   if (input.counts.failed > 0) return "failed"
   if (input.counts.cancelled > 0 && input.counts.completed + input.counts.cancelled === input.total) return "cancelled"
   if (input.counts.completed === input.total && input.total > 0) return "completed"

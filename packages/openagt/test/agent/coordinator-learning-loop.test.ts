@@ -4,17 +4,10 @@ import { Agent } from "../../src/agent/agent"
 import { Bus } from "../../src/bus"
 import { Config } from "../../src/config"
 import { Coordinator } from "../../src/coordinator/coordinator"
-import {
-  failureSignature,
-  hammingDistance64,
-  normalizeFailureText,
-} from "../../src/coordinator/failure-signature"
+import { failureSignature, hammingDistance64, normalizeFailureText } from "../../src/coordinator/failure-signature"
 import { ExpertRegistry } from "../../src/coordinator/expert-registry"
 import { historyForOutcomeRows } from "../../src/coordinator/prompt-templates"
-import {
-  deterministicChecksForNode,
-  missingDeterministicSignals,
-} from "../../src/coordinator/verifier-checks"
+import { deterministicChecksForNode, missingDeterministicSignals } from "../../src/coordinator/verifier-checks"
 import { aggregateVerifierSignals, verifierSignalsFromMessages } from "../../src/coordinator/verifier-aggregator"
 import { node } from "../../src/coordinator/plan-node-factory"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
@@ -287,8 +280,7 @@ describe("coordinator learning loop", () => {
           ],
         })
         const nextFinalRevise = (yield* tasks.list(parent.id)).find(
-          (item) =>
-            item.group_id === nextRun.id && item.metadata?.coordinator_node_id === "final_revise",
+          (item) => item.group_id === nextRun.id && item.metadata?.coordinator_node_id === "final_revise",
         )
         const patterns = nextFinalRevise?.metadata?.review_memory_patterns
 

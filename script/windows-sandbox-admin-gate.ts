@@ -181,19 +181,27 @@ if (preflightOnly || preflightFailures.length) {
 }
 
 const results = [
-  await run("Windows sandbox setup status before", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"], {
-    ...process.env,
-    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
-  }),
+  await run(
+    "Windows sandbox setup status before",
+    [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"],
+    {
+      ...process.env,
+      OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
+    },
+  ),
   await run("Windows sandbox WFP execution gate", [cargo, "test", "--manifest-path", manifest], {
     ...process.env,
     OPENAGT_RUN_WINDOWS_WFP_TESTS: "1",
     OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
   }),
-  await run("Windows sandbox setup status after", [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"], {
-    ...process.env,
-    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
-  }),
+  await run(
+    "Windows sandbox setup status after",
+    [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"],
+    {
+      ...process.env,
+      OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
+    },
+  ),
 ]
 
 const report = {

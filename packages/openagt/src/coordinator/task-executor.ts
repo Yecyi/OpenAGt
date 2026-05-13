@@ -267,9 +267,7 @@ export class CoordinatorTaskExecutor {
         const timeoutMs = mpacrCriticTimeoutMs(started.metadata)
         return effect.pipe(
           Effect.timeout(`${timeoutMs} millis`),
-          Effect.catchTag("TimeoutError", () =>
-            Effect.fail(new Error(`MPACR critic timed out after ${timeoutMs}ms`)),
-          ),
+          Effect.catchTag("TimeoutError", () => Effect.fail(new Error(`MPACR critic timed out after ${timeoutMs}ms`))),
         )
       }
       yield* promptOnce(basePrompt).pipe(
@@ -280,7 +278,8 @@ export class CoordinatorTaskExecutor {
               ? promptOnce(firstReview.retryPrompt).pipe(
                   Effect.map((retryMessage) => ({
                     message: retryMessage,
-                    verdict: reviewVerdictForMessage(started.metadata, messageText(retryMessage), basePrompt, 1).verdict,
+                    verdict: reviewVerdictForMessage(started.metadata, messageText(retryMessage), basePrompt, 1)
+                      .verdict,
                   })),
                 )
               : Effect.succeed({ message, verdict: firstReview.verdict })
@@ -379,7 +378,9 @@ export class CoordinatorTaskExecutor {
                 parentSessionID: started.parent_session_id,
                 error: reviewFailure,
                 metadata:
-                  final.verdict && isMpacrReviewTask(started.metadata) ? mpacrVerdictMetadata(final.verdict) : undefined,
+                  final.verdict && isMpacrReviewTask(started.metadata)
+                    ? mpacrVerdictMetadata(final.verdict)
+                    : undefined,
               })
               yield* emitTaskEvent(failed, "task_finished", {
                 status: failed.status,

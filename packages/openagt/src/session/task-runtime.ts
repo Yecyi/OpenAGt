@@ -6,11 +6,7 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { MessageV2 } from "./message-v2"
 import { BudgetTuning } from "@/agent/budget-tuning"
-import {
-  resultFromRecord,
-  scopeOverlap,
-  scopedReadOverlap,
-} from "./task-runtime-helpers"
+import { resultFromRecord, scopeOverlap, scopedReadOverlap } from "./task-runtime-helpers"
 import { latestTaskOutcome, listTaskOutcomes, type TaskOutcome } from "./task-outcomes"
 import { createTaskWriteOps } from "./task-runtime-write-ops"
 

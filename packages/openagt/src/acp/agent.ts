@@ -1484,5 +1484,4 @@ export class Agent implements ACPAgent {
   }
 }
 
-
 export * as ACP from "./agent"

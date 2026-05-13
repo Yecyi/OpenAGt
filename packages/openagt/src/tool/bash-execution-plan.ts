@@ -11,10 +11,7 @@ import { resolveExecutionDecision, strictestDecision } from "../security/decisio
 import type { ExecutionDecision } from "../security/decision-pipeline"
 import { formatShellSafety, isPrivilegeEscalationCommand, ShellSecurity } from "../security/shell-security"
 import type { ShellDecision, ShellSafety, ShellSecurityResult } from "../security/shell-security"
-import {
-  buildNetworkPermissionMetadata,
-  buildShellPermissionMetadata,
-} from "./bash-metadata"
+import { buildNetworkPermissionMetadata, buildShellPermissionMetadata } from "./bash-metadata"
 
 type BashExecutionPlanLog = {
   warn(message: string, data?: Record<string, unknown>): void

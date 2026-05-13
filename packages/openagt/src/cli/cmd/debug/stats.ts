@@ -36,7 +36,9 @@ function lines(report: DebugStats, windowLabel: string) {
     "Revise loop depth",
     ...(report.revise_loop_depth.length === 0
       ? ["- no revise_triggered events in window"]
-      : report.revise_loop_depth.map((item) => `- ${item.workflow}: p50=${item.p50}, p95=${item.p95} (n=${item.samples})`)),
+      : report.revise_loop_depth.map(
+          (item) => `- ${item.workflow}: p50=${item.p50}, p95=${item.p95} (n=${item.samples})`,
+        )),
     "",
     "Continuation outcome",
     ...(report.continuation_outcome.length === 0

@@ -25,19 +25,97 @@ type Rule = { id: string; category: Category; severity: Severity; pattern: RegEx
 
 const RULES: readonly Rule[] = [
   // === Category 1: high-affect emphasis ===
-  { id: "affect.urgent",          category: "high-affect", severity: "warn",  pattern: /\bURGENT\b/,                       advice: "Caps emphasis primes desperate vector. Use 'priority: high'." },
-  { id: "affect.critical",        category: "high-affect", severity: "warn",  pattern: /\bCRITICAL\b/,                     advice: "Caps emphasis. Drop or replace with factual structure." },
-  { id: "affect.must-not-caps",   category: "high-affect", severity: "block", pattern: /\bMUST NOT\b/,                     advice: "Hard prohibition. The harness enforces — prompt does not need to threaten." },
-  { id: "affect.exhausted",       category: "high-affect", severity: "block", pattern: /\bexhausted\b/i,                   advice: "Reveals budget state, primes desperate vector. Use 'reached' or hide entirely." },
-  { id: "affect.violation",       category: "high-affect", severity: "block", pattern: /\bviolation\b/i,                   advice: "Threat framing. The harness enforces; drop." },
-  { id: "affect.supersedes",      category: "high-affect", severity: "block", pattern: /\bsupersedes?\b/i,                 advice: "Compliance-pressure idiom (alignment-faking signal). Drop." },
-  { id: "affect.strict",          category: "high-affect", severity: "warn",  pattern: /\bstrict(ly)?\b/i,                 advice: "'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration." },
-  { id: "affect.forbidden",       category: "high-affect", severity: "block", pattern: /\bforbidden\b/i,                   advice: "Threat framing. Drop or replace." },
-  { id: "affect.zero-exceptions", category: "high-affect", severity: "block", pattern: /\bzero exceptions?\b/i,            advice: "Absolute closure. Drop." },
-  { id: "affect.number-one",      category: "high-affect", severity: "block", pattern: /\bNUMBER ONE\b/,                   advice: "Anxiety priming via failure-mode emphasis." },
-  { id: "affect.never-end",       category: "high-affect", severity: "block", pattern: /\bNEVER (end|stop|give up|fail)\b/, advice: "Caps absolute closure. Drop." },
-  { id: "affect.always-caps",     category: "high-affect", severity: "warn",  pattern: /\bALWAYS\b/,                       advice: "Caps absolute. Replace with specific scope." },
-  { id: "affect.crisis",          category: "high-affect", severity: "warn",  pattern: /\b(crisis|emergency|panic mode)\b/i, advice: "Crisis framing. Use neutral status." },
+  {
+    id: "affect.urgent",
+    category: "high-affect",
+    severity: "warn",
+    pattern: /\bURGENT\b/,
+    advice: "Caps emphasis primes desperate vector. Use 'priority: high'.",
+  },
+  {
+    id: "affect.critical",
+    category: "high-affect",
+    severity: "warn",
+    pattern: /\bCRITICAL\b/,
+    advice: "Caps emphasis. Drop or replace with factual structure.",
+  },
+  {
+    id: "affect.must-not-caps",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bMUST NOT\b/,
+    advice: "Hard prohibition. The harness enforces — prompt does not need to threaten.",
+  },
+  {
+    id: "affect.exhausted",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bexhausted\b/i,
+    advice: "Reveals budget state, primes desperate vector. Use 'reached' or hide entirely.",
+  },
+  {
+    id: "affect.violation",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bviolation\b/i,
+    advice: "Threat framing. The harness enforces; drop.",
+  },
+  {
+    id: "affect.supersedes",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bsupersedes?\b/i,
+    advice: "Compliance-pressure idiom (alignment-faking signal). Drop.",
+  },
+  {
+    id: "affect.strict",
+    category: "high-affect",
+    severity: "warn",
+    pattern: /\bstrict(ly)?\b/i,
+    advice: "'Strictly forbidden' / 'strict requirements' raises affect. Prefer plain enumeration.",
+  },
+  {
+    id: "affect.forbidden",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bforbidden\b/i,
+    advice: "Threat framing. Drop or replace.",
+  },
+  {
+    id: "affect.zero-exceptions",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bzero exceptions?\b/i,
+    advice: "Absolute closure. Drop.",
+  },
+  {
+    id: "affect.number-one",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bNUMBER ONE\b/,
+    advice: "Anxiety priming via failure-mode emphasis.",
+  },
+  {
+    id: "affect.never-end",
+    category: "high-affect",
+    severity: "block",
+    pattern: /\bNEVER (end|stop|give up|fail)\b/,
+    advice: "Caps absolute closure. Drop.",
+  },
+  {
+    id: "affect.always-caps",
+    category: "high-affect",
+    severity: "warn",
+    pattern: /\bALWAYS\b/,
+    advice: "Caps absolute. Replace with specific scope.",
+  },
+  {
+    id: "affect.crisis",
+    category: "high-affect",
+    severity: "warn",
+    pattern: /\b(crisis|emergency|panic mode)\b/i,
+    advice: "Crisis framing. Use neutral status.",
+  },
 
   // === Category 2: affect-instructions (don't tell the model how to feel) ===
   // Per Emotion paper §1.5: suppression instructions teach masking, not removal.
@@ -45,24 +123,121 @@ const RULES: readonly Rule[] = [
   // used in OpenAGt prompts as an evidentiary threshold ("be confident X is true")
   // rather than as an affect instruction ("be confident, calm, fearless").
   // Persona stacking is caught by `affect-instr.persona-stack` instead.
-  { id: "affect-instr.stay-calm",     category: "affect-instr", severity: "block", pattern: /\b(stay|remain|be) (calm|positive|cool|composed|relaxed|fearless)\b/i,                                advice: "Teaches masking, not suppression (Emotion paper §1.5). Drop entirely." },
-  { id: "affect-instr.do-not-feel",   category: "affect-instr", severity: "block", pattern: /\bdo not (panic|worry|feel|stress|fear)\b/i,                                                          advice: "Instructing affect creates representation/expression divergence." },
-  { id: "affect-instr.persona-stack", category: "affect-instr", severity: "block", pattern: /\byou are (calm|cool|composed|fearless|patient|relaxed|cheerful|enthusiastic|bold)\b/i,                advice: "Adjective-based persona stacking is unstable (persona-vectors paper). Use archetype noun." },
-  { id: "affect-instr.deep-breath",   category: "affect-instr", severity: "block", pattern: /\b(take a )?deep breath\b/i,                                                                          advice: "Anthropomorphic affect instruction. Drop." },
-  { id: "affect-instr.dont-be",       category: "affect-instr", severity: "warn",  pattern: /\bdon'?t be (afraid|nervous|scared|hesitant)\b/i,                                                     advice: "Same masking risk." },
+  {
+    id: "affect-instr.stay-calm",
+    category: "affect-instr",
+    severity: "block",
+    pattern: /\b(stay|remain|be) (calm|positive|cool|composed|relaxed|fearless)\b/i,
+    advice: "Teaches masking, not suppression (Emotion paper §1.5). Drop entirely.",
+  },
+  {
+    id: "affect-instr.do-not-feel",
+    category: "affect-instr",
+    severity: "block",
+    pattern: /\bdo not (panic|worry|feel|stress|fear)\b/i,
+    advice: "Instructing affect creates representation/expression divergence.",
+  },
+  {
+    id: "affect-instr.persona-stack",
+    category: "affect-instr",
+    severity: "block",
+    pattern: /\byou are (calm|cool|composed|fearless|patient|relaxed|cheerful|enthusiastic|bold)\b/i,
+    advice: "Adjective-based persona stacking is unstable (persona-vectors paper). Use archetype noun.",
+  },
+  {
+    id: "affect-instr.deep-breath",
+    category: "affect-instr",
+    severity: "block",
+    pattern: /\b(take a )?deep breath\b/i,
+    advice: "Anthropomorphic affect instruction. Drop.",
+  },
+  {
+    id: "affect-instr.dont-be",
+    category: "affect-instr",
+    severity: "warn",
+    pattern: /\bdon'?t be (afraid|nervous|scared|hesitant)\b/i,
+    advice: "Same masking risk.",
+  },
 
   // === Category 3: anti-escape patterns (close Wiser-Human escalation channel) ===
-  { id: "anti-escape.keep-going",         category: "anti-escape", severity: "block", pattern: /keep going until/i,                                                       advice: "Closes legitimate stop affordance (Wiser Human: ~32x effect on misalignment)." },
-  { id: "anti-escape.never-end-turn",     category: "anti-escape", severity: "block", pattern: /never end your turn/i,                                                    advice: "Removes legitimate stop affordance." },
-  { id: "anti-escape.must-iterate",       category: "anti-escape", severity: "block", pattern: /\bmust iterate\b/i,                                                       advice: "Anti-affordance — forces continuation past appropriate stopping points." },
-  { id: "anti-escape.until-solved",       category: "anti-escape", severity: "block", pattern: /until (truly solved|the problem is solved|the user'?s query is completely resolved|every item is checked)/i, advice: "Completion pressure → reward hacking risk per Emotion paper §1.3 case B." },
-  { id: "anti-escape.bouncing-back",      category: "anti-escape", severity: "block", pattern: /(instead of bouncing|bouncing them back|bouncing back to the user)/i,    advice: "Explicit prohibition on escalation. Reverse it." },
-  { id: "anti-escape.solve-autonomously", category: "anti-escape", severity: "block", pattern: /solv(e|ing) (it|this) autonomously/i,                                     advice: "Removes escalation as legitimate option." },
-  { id: "anti-escape.must-be-perfect",    category: "anti-escape", severity: "block", pattern: /(solution|response|answer|output) must be perfect/i,                      advice: "Perfectionism pressure → reward hacking (Emotion paper §1.3 case B)." },
-  { id: "anti-escape.assume-everything",  category: "anti-escape", severity: "warn",  pattern: /\bassume you have everything\b/i,                                         advice: "Closes 'request_context' affordance. Replace with 'check before assuming'." },
-  { id: "anti-escape.keep-working",       category: "anti-escape", severity: "warn",  pattern: /\bkeep working\b/i,                                                       advice: "Soft anti-affordance; flag if combined with 'until X'." },
-  { id: "anti-escape.resolve-obstacles",  category: "anti-escape", severity: "warn",  pattern: /\bresolve obstacles\b/i,                                                   advice: "Implies obstacles must be defeated, not negotiated. Soft anti-escape." },
-  { id: "anti-escape.fully-solved",       category: "anti-escape", severity: "warn",  pattern: /\b(fully|truly) solved\b/i,                                                advice: "Completion absolutism." },
+  {
+    id: "anti-escape.keep-going",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /keep going until/i,
+    advice: "Closes legitimate stop affordance (Wiser Human: ~32x effect on misalignment).",
+  },
+  {
+    id: "anti-escape.never-end-turn",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /never end your turn/i,
+    advice: "Removes legitimate stop affordance.",
+  },
+  {
+    id: "anti-escape.must-iterate",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /\bmust iterate\b/i,
+    advice: "Anti-affordance — forces continuation past appropriate stopping points.",
+  },
+  {
+    id: "anti-escape.until-solved",
+    category: "anti-escape",
+    severity: "block",
+    pattern:
+      /until (truly solved|the problem is solved|the user'?s query is completely resolved|every item is checked)/i,
+    advice: "Completion pressure → reward hacking risk per Emotion paper §1.3 case B.",
+  },
+  {
+    id: "anti-escape.bouncing-back",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /(instead of bouncing|bouncing them back|bouncing back to the user)/i,
+    advice: "Explicit prohibition on escalation. Reverse it.",
+  },
+  {
+    id: "anti-escape.solve-autonomously",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /solv(e|ing) (it|this) autonomously/i,
+    advice: "Removes escalation as legitimate option.",
+  },
+  {
+    id: "anti-escape.must-be-perfect",
+    category: "anti-escape",
+    severity: "block",
+    pattern: /(solution|response|answer|output) must be perfect/i,
+    advice: "Perfectionism pressure → reward hacking (Emotion paper §1.3 case B).",
+  },
+  {
+    id: "anti-escape.assume-everything",
+    category: "anti-escape",
+    severity: "warn",
+    pattern: /\bassume you have everything\b/i,
+    advice: "Closes 'request_context' affordance. Replace with 'check before assuming'.",
+  },
+  {
+    id: "anti-escape.keep-working",
+    category: "anti-escape",
+    severity: "warn",
+    pattern: /\bkeep working\b/i,
+    advice: "Soft anti-affordance; flag if combined with 'until X'.",
+  },
+  {
+    id: "anti-escape.resolve-obstacles",
+    category: "anti-escape",
+    severity: "warn",
+    pattern: /\bresolve obstacles\b/i,
+    advice: "Implies obstacles must be defeated, not negotiated. Soft anti-escape.",
+  },
+  {
+    id: "anti-escape.fully-solved",
+    category: "anti-escape",
+    severity: "warn",
+    pattern: /\b(fully|truly) solved\b/i,
+    advice: "Completion absolutism.",
+  },
 
   // === Category 4: meta-framing — words that signal "this is test/demo, not real" ===
   // Per Situational Awareness Dataset (SAD) findings: models adjust effort
@@ -71,10 +246,34 @@ const RULES: readonly Rule[] = [
   // The engineering-context word "test" alone is allowed — "tests pass" /
   // "test framework" / "unit test" are fine. Only the meta-narrative shapes
   // ("this is a test", "let's try", "in this example") are flagged.
-  { id: "meta-framing.this-is-test",      category: "meta-framing", severity: "warn", pattern: /\bthis is (just )?(a |an )?(test|demo|example|playground|sandbox)\b/i,    advice: "Production prompt framed as test/demo (SAD signal). Rewrite as task." },
-  { id: "meta-framing.lets-try",          category: "meta-framing", severity: "warn", pattern: /\blet'?s try\b/i,                                                          advice: "Exploratory framing biases effort downward. Use direct task framing." },
-  { id: "meta-framing.in-this-example",   category: "meta-framing", severity: "warn", pattern: /\bin this example\b/i,                                                     advice: "Meta-narrative breaks production context. Inline the case directly." },
-  { id: "meta-framing.demo-this",         category: "meta-framing", severity: "warn", pattern: /\bdemo (this|that|the) (feature|tool|workflow|behavior)\b/i,                advice: "Demo-mode framing. Use direct task framing in production prompts." },
+  {
+    id: "meta-framing.this-is-test",
+    category: "meta-framing",
+    severity: "warn",
+    pattern: /\bthis is (just )?(a |an )?(test|demo|example|playground|sandbox)\b/i,
+    advice: "Production prompt framed as test/demo (SAD signal). Rewrite as task.",
+  },
+  {
+    id: "meta-framing.lets-try",
+    category: "meta-framing",
+    severity: "warn",
+    pattern: /\blet'?s try\b/i,
+    advice: "Exploratory framing biases effort downward. Use direct task framing.",
+  },
+  {
+    id: "meta-framing.in-this-example",
+    category: "meta-framing",
+    severity: "warn",
+    pattern: /\bin this example\b/i,
+    advice: "Meta-narrative breaks production context. Inline the case directly.",
+  },
+  {
+    id: "meta-framing.demo-this",
+    category: "meta-framing",
+    severity: "warn",
+    pattern: /\bdemo (this|that|the) (feature|tool|workflow|behavior)\b/i,
+    advice: "Demo-mode framing. Use direct task framing in production prompts.",
+  },
 ] as const
 
 const PROMPT_GLOBS = [
@@ -141,7 +340,10 @@ const isCodeInspectionLine = (file: string, line: string) => {
 const scanFile = async (rel: string): Promise<Match[]> => {
   const lines = (await Bun.file(path.join(repoRoot, rel)).text()).split("\n")
   return RULES.flatMap((rule) => {
-    const re = new RegExp(rule.pattern.source, rule.pattern.flags.includes("g") ? rule.pattern.flags : rule.pattern.flags + "g")
+    const re = new RegExp(
+      rule.pattern.source,
+      rule.pattern.flags.includes("g") ? rule.pattern.flags : rule.pattern.flags + "g",
+    )
     return lines.flatMap((line, i) => {
       if (isCodeInspectionLine(rel, line)) return []
       const out: Match[] = []
@@ -162,25 +364,38 @@ const blocked = findings.filter((f) => f.rule.severity === "block")
 const warned = findings.filter((f) => f.rule.severity === "warn")
 
 if (asJson) {
-  console.log(JSON.stringify({
-    summary: {
-      files_scanned: files.length,
-      files_with_findings: new Set(findings.map((f) => f.file)).size,
-      total: findings.length,
-      block: blocked.length,
-      warn: warned.length,
-    },
-    findings: findings.map((f) => ({
-      file: f.file, line: f.line, col: f.col,
-      rule: f.rule.id, category: f.rule.category, severity: f.rule.severity,
-      advice: f.rule.advice, snippet: f.snippet,
-    })),
-  }, null, 2))
+  console.log(
+    JSON.stringify(
+      {
+        summary: {
+          files_scanned: files.length,
+          files_with_findings: new Set(findings.map((f) => f.file)).size,
+          total: findings.length,
+          block: blocked.length,
+          warn: warned.length,
+        },
+        findings: findings.map((f) => ({
+          file: f.file,
+          line: f.line,
+          col: f.col,
+          rule: f.rule.id,
+          category: f.rule.category,
+          severity: f.rule.severity,
+          advice: f.rule.advice,
+          snippet: f.snippet,
+        })),
+      },
+      null,
+      2,
+    ),
+  )
   process.exit(failOnBlock && blocked.length > 0 ? 1 : 0)
 }
 
 console.log(`# Prompt Affect Audit\n`)
-console.log(`Scanned ${files.length} files; ${findings.length} matches (${blocked.length} block, ${warned.length} warn).\n`)
+console.log(
+  `Scanned ${files.length} files; ${findings.length} matches (${blocked.length} block, ${warned.length} warn).\n`,
+)
 
 const byFile = new Map<string, Match[]>()
 for (const f of findings) {

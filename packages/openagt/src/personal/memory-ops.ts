@@ -115,8 +115,7 @@ export interface SynthesizeOnceInput {
 
 export function createMemoryOps(bus: Bus.Interface) {
   const remember = Effect.fn("PersonalAgent.remember")(function* (input: RememberInput) {
-    if (!privacySafeContent(input.content))
-      return yield* Effect.fail(new Error("Memory content failed privacy filter"))
+    if (!privacySafeContent(input.content)) return yield* Effect.fail(new Error("Memory content failed privacy filter"))
     const id = MemoryNoteID.ascending()
     const timestamp = now()
     yield* Effect.sync(() =>

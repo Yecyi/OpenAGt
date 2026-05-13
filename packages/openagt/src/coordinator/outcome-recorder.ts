@@ -47,8 +47,7 @@ export class CoordinatorOutcomeRecorder {
     const deps = this.deps
     return Effect.gen(function* () {
       if (!verdict || Option.isNone(deps.calibration)) return
-      const expertID =
-        typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : record.subagent_type
+      const expertID = typeof record.metadata?.expert_id === "string" ? record.metadata.expert_id : record.subagent_type
       const workflow = typeof record.metadata?.workflow === "string" ? record.metadata.workflow : "general-operations"
       yield* deps.calibration.value
         .record({

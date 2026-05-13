@@ -213,7 +213,10 @@ export function spawnWithSandboxSync(command: string, options: ProcessSandboxOpt
   if (timedOut) stats.totalKilled++
 
   const stdout = truncateOutput(result.stdout ?? "", limits?.maxFileSize)
-  const stderr = truncateOutput(result.stderr ?? (result.error ? String(result.error.message) : ""), limits?.maxFileSize)
+  const stderr = truncateOutput(
+    result.stderr ?? (result.error ? String(result.error.message) : ""),
+    limits?.maxFileSize,
+  )
 
   return {
     stdout: stdout.text,

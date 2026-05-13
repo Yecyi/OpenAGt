@@ -157,7 +157,9 @@ export class CoordinatorRunFactory {
         ),
       )
       return yield* Effect.sync(() =>
-        Database.use((db) => db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, params.runID)).get()),
+        Database.use((db) =>
+          db.select().from(CoordinatorRunTable).where(eq(CoordinatorRunTable.id, params.runID)).get(),
+        ),
       ).pipe(Effect.map((row) => runFromRow(row!)))
     })
   }

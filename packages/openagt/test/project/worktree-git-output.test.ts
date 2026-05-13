@@ -10,18 +10,20 @@ describe("worktree git-output helpers", () => {
 
   test("parseWorktreeList parses porcelain output entries", () => {
     expect(
-      parseWorktreeList([
-        "worktree C:/repo/main",
-        "HEAD 1111111111111111111111111111111111111111",
-        "branch refs/heads/main",
-        "",
-        "worktree C:/repo/worktree",
-        "HEAD 2222222222222222222222222222222222222222",
-        "branch refs/heads/opencode/demo",
-        "",
-        "worktree C:/repo/detached",
-        "HEAD 3333333333333333333333333333333333333333",
-      ].join("\n")),
+      parseWorktreeList(
+        [
+          "worktree C:/repo/main",
+          "HEAD 1111111111111111111111111111111111111111",
+          "branch refs/heads/main",
+          "",
+          "worktree C:/repo/worktree",
+          "HEAD 2222222222222222222222222222222222222222",
+          "branch refs/heads/opencode/demo",
+          "",
+          "worktree C:/repo/detached",
+          "HEAD 3333333333333333333333333333333333333333",
+        ].join("\n"),
+      ),
     ).toEqual([
       { path: "C:/repo/main", branch: "refs/heads/main" },
       { path: "C:/repo/worktree", branch: "refs/heads/opencode/demo" },

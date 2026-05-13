@@ -12,7 +12,8 @@ import {
 } from "./danger-patterns"
 import type { ClassifierAstNode, PatternCheckResult } from "./command-classifier-contracts"
 
-const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
+const DESTRUCTIVE_RM_PATTERN =
+  /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
 
 export function runPatternChecks(command: string): PatternCheckResult[] {
   return [

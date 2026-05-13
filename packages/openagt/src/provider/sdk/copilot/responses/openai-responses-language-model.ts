@@ -1285,4 +1285,3 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
     }
   }
 }
-

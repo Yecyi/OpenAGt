@@ -426,28 +426,31 @@ describe("coordinator intent planning", () => {
     const plan = defaultPlanForIntent(intent, { effort: "deep" })
     const nodeID = plan.nodes[0]?.id ?? "planner"
     const startedAt = Date.now()
-    const tasks = Array.from({ length: 120 }, (_, index): TaskRuntime.TaskRecord => ({
-      task_id: `ses_task_${index}` as TaskRuntime.TaskRecord["task_id"],
-      group_id: "coordinator_test",
-      parent_session_id: "ses_parent" as TaskRuntime.TaskRecord["parent_session_id"],
-      child_session_id: `ses_child_${index}` as TaskRuntime.TaskRecord["child_session_id"],
-      status: "completed",
-      task_kind: "research",
-      subagent_type: "general",
-      description: `task ${index}`,
-      prompt_hash: "hash",
-      depends_on: [],
-      write_scope: [],
-      read_scope: ["packages/openagt"],
-      acceptance_checks: [],
-      priority: "normal",
-      origin: "coordinator",
-      metadata: { coordinator_node_id: nodeID },
-      created_at: index,
-      started_at: index,
-      finished_at: index,
-      result_summary: `result ${index}`,
-    }))
+    const tasks = Array.from(
+      { length: 120 },
+      (_, index): TaskRuntime.TaskRecord => ({
+        task_id: `ses_task_${index}` as TaskRuntime.TaskRecord["task_id"],
+        group_id: "coordinator_test",
+        parent_session_id: "ses_parent" as TaskRuntime.TaskRecord["parent_session_id"],
+        child_session_id: `ses_child_${index}` as TaskRuntime.TaskRecord["child_session_id"],
+        status: "completed",
+        task_kind: "research",
+        subagent_type: "general",
+        description: `task ${index}`,
+        prompt_hash: "hash",
+        depends_on: [],
+        write_scope: [],
+        read_scope: ["packages/openagt"],
+        acceptance_checks: [],
+        priority: "normal",
+        origin: "coordinator",
+        metadata: { coordinator_node_id: nodeID },
+        created_at: index,
+        started_at: index,
+        finished_at: index,
+        result_summary: `result ${index}`,
+      }),
+    )
     const runtime = runtimeStateFor(
       {
         id: "coordinator_test" as CoordinatorRun["id"],

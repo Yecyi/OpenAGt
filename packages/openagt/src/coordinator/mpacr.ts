@@ -25,13 +25,7 @@ import {
 // Predefined adversarial perspectives. Each critic is dispatched with a
 // distinct lens so the debate covers complementary failure modes rather
 // than redundant copies of the same critique.
-export const CRITIC_PERSPECTIVES = [
-  "factuality",
-  "coherence",
-  "risk",
-  "domain_expertise",
-  "user_value",
-] as const
+export const CRITIC_PERSPECTIVES = ["factuality", "coherence", "risk", "domain_expertise", "user_value"] as const
 export type CriticPerspective = (typeof CRITIC_PERSPECTIVES)[number]
 
 export interface MpacrInput {
@@ -61,7 +55,9 @@ export interface MpacrOutput {
 
 const PARALLEL_GROUP = "mpacr-red-team"
 
-function makeNode(input: Omit<CoordinatorNodeInput, "priority" | "origin"> & Partial<Pick<CoordinatorNodeInput, "priority" | "origin">>) {
+function makeNode(
+  input: Omit<CoordinatorNodeInput, "priority" | "origin"> & Partial<Pick<CoordinatorNodeInput, "priority" | "origin">>,
+) {
   return CoordinatorNode.parse({
     priority: "normal",
     origin: "coordinator",
@@ -110,7 +106,12 @@ function steelManNode(input: MpacrInput): CoordinatorNodeType {
   })
 }
 
-function criticNode(input: MpacrInput, perspective: CriticPerspective, idx: number, steelManId: string): CoordinatorNodeType {
+function criticNode(
+  input: MpacrInput,
+  perspective: CriticPerspective,
+  idx: number,
+  steelManId: string,
+): CoordinatorNodeType {
   const id = `${input.idPrefix}:critic_${idx}_${perspective}`
   return makeNode({
     id,
@@ -139,10 +140,7 @@ function criticNode(input: MpacrInput, perspective: CriticPerspective, idx: numb
     write_scope: [],
     read_scope: input.target.read_scope,
     parallel_group: PARALLEL_GROUP,
-    acceptance_checks: [
-      `Attacks grounded in steel-manned claims`,
-      `Both evidence_for and evidence_against populated`,
-    ],
+    acceptance_checks: [`Attacks grounded in steel-manned claims`, `Both evidence_for and evidence_against populated`],
     output_schema: "revise",
     requires_user_input: false,
     expert_id: expertID(input.workflow, `red-team-${perspective}`),
@@ -333,8 +331,17 @@ export function buildDebate(input: MpacrInput): MpacrOutput {
   const perspectives = pickPerspectives(input.profile.mpacr_critic_count)
   const critics = perspectives.map((p, i) => criticNode(input, p, i, steelMan.id))
   const quorum = computeQuorum(critics.length)
-  const defender = defenderNode(input, critics.map((c) => c.id), steelMan.id)
-  const synthesis = synthesisNode(input, critics.map((c) => c.id), defender.id, quorum)
+  const defender = defenderNode(
+    input,
+    critics.map((c) => c.id),
+    steelMan.id,
+  )
+  const synthesis = synthesisNode(
+    input,
+    critics.map((c) => c.id),
+    defender.id,
+    quorum,
+  )
   const calibrator = calibratorNode(input, synthesis.id)
   return {
     steelMan,

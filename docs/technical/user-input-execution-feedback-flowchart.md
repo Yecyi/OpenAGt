@@ -233,32 +233,32 @@ flowchart LR
 
 ## 关键参数点
 
-| 参数区域 | 典型字段 | 进入流程的位置 | 影响 |
-| --- | --- | --- | --- |
-| Input payload | `message`、`parts`、`files`、`command`、`system`、`format`、`tools` | 客户端整理后进入 `SessionRoutes` / `SessionPrompt` | 决定用户消息内容、附件、结构化输出和工具启用/禁用。 |
-| Effort / variant | `effort`、`variant`、provider model variant | TUI prompt 本地选择，提交时写入 `variant` | 影响模型 reasoning/预算配置，也会透传到 user/assistant message。 |
-| Runtime budget | `stepBudget`、`timeoutMs`、`maxParallelSubagents` | `PromptInput.runtime` 或 subagent runtime metadata | 控制 run loop 最大步数、超时和 subagent 并行度。 |
-| Feedback | `once`、`always`、`reject`、corrected message、question answer、abort | `Permission.reply`、question prompt、`session.abort` | 决定继续执行、永久授权、拒绝并把修正反馈写回模型上下文，或取消当前 run。 |
-| Subagent | `subagent_type`、`task_id`、`group_id`、`depends_on`、`task_kind`、`write_scope`、`priority`、`metadata` | `task` tool / `SubtaskPart` / `TaskRuntime` | 创建或恢复 child session，记录任务依赖、范围、状态、partial/full result。 |
-| Sandbox | `backendPreference`、`enforcement`、`filesystemPolicy`、`allowedPaths`、`writablePaths`、`networkPolicy`、`reportOnly`、`failurePolicy`、`riskLevel` | Bash tool -> `SandboxPolicy` -> `ShellRunner` -> `SandboxBroker` | 决定命令是否 block、是否 ask、使用哪个 backend、文件/网络边界和失败降级策略。 |
+| 参数区域         | 典型字段                                                                                                                                             | 进入流程的位置                                                   | 影响                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Input payload    | `message`、`parts`、`files`、`command`、`system`、`format`、`tools`                                                                                  | 客户端整理后进入 `SessionRoutes` / `SessionPrompt`               | 决定用户消息内容、附件、结构化输出和工具启用/禁用。                           |
+| Effort / variant | `effort`、`variant`、provider model variant                                                                                                          | TUI prompt 本地选择，提交时写入 `variant`                        | 影响模型 reasoning/预算配置，也会透传到 user/assistant message。              |
+| Runtime budget   | `stepBudget`、`timeoutMs`、`maxParallelSubagents`                                                                                                    | `PromptInput.runtime` 或 subagent runtime metadata               | 控制 run loop 最大步数、超时和 subagent 并行度。                              |
+| Feedback         | `once`、`always`、`reject`、corrected message、question answer、abort                                                                                | `Permission.reply`、question prompt、`session.abort`             | 决定继续执行、永久授权、拒绝并把修正反馈写回模型上下文，或取消当前 run。      |
+| Subagent         | `subagent_type`、`task_id`、`group_id`、`depends_on`、`task_kind`、`write_scope`、`priority`、`metadata`                                             | `task` tool / `SubtaskPart` / `TaskRuntime`                      | 创建或恢复 child session，记录任务依赖、范围、状态、partial/full result。     |
+| Sandbox          | `backendPreference`、`enforcement`、`filesystemPolicy`、`allowedPaths`、`writablePaths`、`networkPolicy`、`reportOnly`、`failurePolicy`、`riskLevel` | Bash tool -> `SandboxPolicy` -> `ShellRunner` -> `SandboxBroker` | 决定命令是否 block、是否 ask、使用哪个 backend、文件/网络边界和失败降级策略。 |
 
 ## 源码对应关系
 
-| 流程区域 | 主要源码 |
-| --- | --- |
-| CLI 启动与命令分发 | `packages/openagt/src/index.ts` |
-| `openagt run` 输入、事件订阅、输出渲染 | `packages/openagt/src/cli/cmd/run.ts` |
-| TUI session 页面与 prompt 挂载 | `packages/openagt/src/cli/cmd/tui/routes/session/index.tsx` |
+| 流程区域                                        | 主要源码                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| CLI 启动与命令分发                              | `packages/openagt/src/index.ts`                               |
+| `openagt run` 输入、事件订阅、输出渲染          | `packages/openagt/src/cli/cmd/run.ts`                         |
+| TUI session 页面与 prompt 挂载                  | `packages/openagt/src/cli/cmd/tui/routes/session/index.tsx`   |
 | TUI prompt 提交、effort、附件、shell mode、中断 | `packages/openagt/src/cli/cmd/tui/component/prompt/index.tsx` |
-| HTTP session routes | `packages/openagt/src/server/routes/instance/session.ts` |
-| SSE event route | `packages/openagt/src/server/routes/instance/event.ts` |
-| Prompt 入库、runtime 参数与 run loop | `packages/openagt/src/session/prompt.ts` |
-| LLM 请求组装与 provider streaming | `packages/openagt/src/session/llm.ts` |
-| stream event 持久化与 tool state | `packages/openagt/src/session/processor.ts` |
-| session/message/part 事件发布 | `packages/openagt/src/session/session.ts` |
-| Permission ask/reply 与 corrected feedback | `packages/openagt/src/permission/index.ts` |
-| Task/subagent 参数与 child session | `packages/openagt/src/tool/task.ts` |
-| Task record、依赖、状态与结果 | `packages/openagt/src/session/task-runtime.ts` |
-| Bash 风险分析与 policy gate | `packages/openagt/src/tool/bash.ts` |
-| Shell 执行与 sandbox/output metadata | `packages/openagt/src/shell/runner.ts` |
-| Sandbox broker 执行边界 | `packages/openagt/src/sandbox/broker.ts` |
+| HTTP session routes                             | `packages/openagt/src/server/routes/instance/session.ts`      |
+| SSE event route                                 | `packages/openagt/src/server/routes/instance/event.ts`        |
+| Prompt 入库、runtime 参数与 run loop            | `packages/openagt/src/session/prompt.ts`                      |
+| LLM 请求组装与 provider streaming               | `packages/openagt/src/session/llm.ts`                         |
+| stream event 持久化与 tool state                | `packages/openagt/src/session/processor.ts`                   |
+| session/message/part 事件发布                   | `packages/openagt/src/session/session.ts`                     |
+| Permission ask/reply 与 corrected feedback      | `packages/openagt/src/permission/index.ts`                    |
+| Task/subagent 参数与 child session              | `packages/openagt/src/tool/task.ts`                           |
+| Task record、依赖、状态与结果                   | `packages/openagt/src/session/task-runtime.ts`                |
+| Bash 风险分析与 policy gate                     | `packages/openagt/src/tool/bash.ts`                           |
+| Shell 执行与 sandbox/output metadata            | `packages/openagt/src/shell/runner.ts`                        |
+| Sandbox broker 执行边界                         | `packages/openagt/src/sandbox/broker.ts`                      |

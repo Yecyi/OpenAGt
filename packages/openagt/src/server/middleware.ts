@@ -78,11 +78,9 @@ export function getLocalServerToken() {
 export function setLocalServerTokenCookie(c: Context) {
   const token = getLocalServerToken()
   if (!token) return
-  c.header(
-    "Set-Cookie",
-    `openagt_local_token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`,
-    { append: true },
-  )
+  c.header("Set-Cookie", `openagt_local_token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`, {
+    append: true,
+  })
 }
 
 function parseBasic(header: string | undefined) {

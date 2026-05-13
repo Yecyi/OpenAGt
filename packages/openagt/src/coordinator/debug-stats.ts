@@ -103,8 +103,14 @@ function reviseDepth(rows: ReviseRow[]) {
   }
   return Array.from(groups.entries(), ([workflow, depths]) => ({
     workflow,
-    p50: percentile(depths.filter((item) => Number.isFinite(item)), 0.5),
-    p95: percentile(depths.filter((item) => Number.isFinite(item)), 0.95),
+    p50: percentile(
+      depths.filter((item) => Number.isFinite(item)),
+      0.5,
+    ),
+    p95: percentile(
+      depths.filter((item) => Number.isFinite(item)),
+      0.95,
+    ),
     samples: depths.length,
   })).toSorted((a, b) => b.samples - a.samples)
 }

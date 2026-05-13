@@ -36,7 +36,8 @@ export function parseCatFileBatchOutput(refs: SnapshotCatFileRef[], out: Uint8Ar
     if (end >= out.length) {
       return {
         ok: false,
-        message: "git cat-file --batch returned a truncated header during snapshot diff, falling back to per-file git show",
+        message:
+          "git cat-file --batch returned a truncated header during snapshot diff, falling back to per-file git show",
       }
     }
 

@@ -263,9 +263,8 @@ function completedTodoWeightRatio(todoTimeline: TodoTimelineType) {
   const totalWeight = todoTimeline.todos.reduce((acc, item) => acc + item.budget_weight, 0)
   if (totalWeight <= 0) return 0
   return (
-    todoTimeline.todos
-      .filter((item) => item.status === "done")
-      .reduce((acc, item) => acc + item.budget_weight, 0) / totalWeight
+    todoTimeline.todos.filter((item) => item.status === "done").reduce((acc, item) => acc + item.budget_weight, 0) /
+    totalWeight
   )
 }
 
@@ -279,7 +278,10 @@ export function continuationVelocityFor(input: {
   const evidence_count = input.todoTimeline.evidence_ledger.length
   const completed_todo_weight_delta = Math.max(0, completed_todo_weight - state.last_approved_completed_todo_weight)
   const evidence_delta = Math.max(0, evidence_count - state.last_approved_evidence_count)
-  const verifier_quality_delta = Math.max(0, input.progressSnapshot.verifier_quality - state.last_approved_verifier_quality)
+  const verifier_quality_delta = Math.max(
+    0,
+    input.progressSnapshot.verifier_quality - state.last_approved_verifier_quality,
+  )
   const progress_score_delta = Math.max(0, input.progressSnapshot.progress_score - state.last_approved_progress_score)
   const failure_penalty_delta = input.progressSnapshot.failure_penalty - state.last_approved_failure_penalty
   const todo_improved =
@@ -367,13 +369,11 @@ function limitedResourceFor(usage: ResourceLimitType, limit: ResourceLimitType):
 export function subtractResourceLimit(left: ResourceLimitType, right: ResourceLimitType) {
   return ResourceLimit.parse({
     max_rounds: Math.max(0, left.max_rounds - right.max_rounds),
-    max_model_calls:
-      Math.max(0, left.max_model_calls - right.max_model_calls),
+    max_model_calls: Math.max(0, left.max_model_calls - right.max_model_calls),
     max_tool_calls: Math.max(0, left.max_tool_calls - right.max_tool_calls),
     max_subagents: Math.max(0, left.max_subagents - right.max_subagents),
     max_wallclock_ms: Math.max(0, left.max_wallclock_ms - right.max_wallclock_ms),
-    max_estimated_tokens:
-      Math.max(0, left.max_estimated_tokens - right.max_estimated_tokens),
+    max_estimated_tokens: Math.max(0, left.max_estimated_tokens - right.max_estimated_tokens),
   })
 }
 

@@ -53,4 +53,3 @@ describe("server security middleware", () => {
     expect(response.status).toBe(403)
   })
 })
-

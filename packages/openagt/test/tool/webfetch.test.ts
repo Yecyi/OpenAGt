@@ -50,7 +50,10 @@ describe("tool.webfetch", () => {
         await Instance.provide({
           directory: projectRoot,
           fn: async () => {
-            const result = await exec({ url: new URL("/image.png", url).toString(), format: "markdown" }, { allowPrivate: true })
+            const result = await exec(
+              { url: new URL("/image.png", url).toString(), format: "markdown" },
+              { allowPrivate: true },
+            )
             expect(result.output).toBe("Image fetched successfully")
             expect(result.attachments).toBeDefined()
             expect(result.attachments?.length).toBe(1)
@@ -78,7 +81,10 @@ describe("tool.webfetch", () => {
         await Instance.provide({
           directory: projectRoot,
           fn: async () => {
-            const result = await exec({ url: new URL("/image.svg", url).toString(), format: "html" }, { allowPrivate: true })
+            const result = await exec(
+              { url: new URL("/image.svg", url).toString(), format: "html" },
+              { allowPrivate: true },
+            )
             expect(result.output).toContain("<svg")
             expect(result.attachments).toBeUndefined()
           },
@@ -98,7 +104,10 @@ describe("tool.webfetch", () => {
         await Instance.provide({
           directory: projectRoot,
           fn: async () => {
-            const result = await exec({ url: new URL("/file.txt", url).toString(), format: "text" }, { allowPrivate: true })
+            const result = await exec(
+              { url: new URL("/file.txt", url).toString(), format: "text" },
+              { allowPrivate: true },
+            )
             expect(result.output).toBe("hello from webfetch")
             expect(result.attachments).toBeUndefined()
           },

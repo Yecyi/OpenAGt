@@ -39,7 +39,10 @@ import { CONFIG_SCHEMA_URL, ConfigFileLoader } from "./file-loader"
 import { ConfigGlobalLoader } from "./global-loader"
 import { ConfigInstanceMergePipeline } from "./instance-merge-pipeline"
 import { ConfigWriter } from "./writer"
-import { EffectiveConfigSnapshot, type EffectiveConfigSnapshot as EffectiveConfigSnapshotType } from "./effective-config"
+import {
+  EffectiveConfigSnapshot,
+  type EffectiveConfigSnapshot as EffectiveConfigSnapshotType,
+} from "./effective-config"
 import { Npm } from "@/npm"
 import { withProcessEnv } from "@/util/process-env"
 import type { SandboxBackendPreference, SandboxFailurePolicy } from "@/sandbox/types"
@@ -261,18 +264,17 @@ export const layer = Layer.effect(
           yield* pipeline.mergePluginOrigins(dir, list)
         }
 
-        const configContent =
-          process.env.OPENCODE_CONFIG_CONTENT
+        const configContent = process.env.OPENCODE_CONFIG_CONTENT
+          ? {
+              source: "OPENCODE_CONFIG_CONTENT",
+              text: process.env.OPENCODE_CONFIG_CONTENT,
+            }
+          : process.env.OPENCODE_CONFIG_CONTENT === undefined && process.env.OPENAGT_CONFIG_CONTENT
             ? {
-                source: "OPENCODE_CONFIG_CONTENT",
-                text: process.env.OPENCODE_CONFIG_CONTENT,
+                source: "OPENAGT_CONFIG_CONTENT",
+                text: process.env.OPENAGT_CONFIG_CONTENT,
               }
-            : process.env.OPENCODE_CONFIG_CONTENT === undefined && process.env.OPENAGT_CONFIG_CONTENT
-              ? {
-                  source: "OPENAGT_CONFIG_CONTENT",
-                  text: process.env.OPENAGT_CONFIG_CONTENT,
-                }
-              : undefined
+            : undefined
         if (configContent) {
           const next = yield* loadConfig(configContent.text, {
             dir: ctx.directory,

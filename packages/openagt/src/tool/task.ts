@@ -121,7 +121,9 @@ function taskTimeoutMs(
     broad || taskKind === "research"
       ? Math.max(
           effortFloor,
-          agentName === "explore" ? BudgetTuning.timeoutMs.broadExploreFloor : BudgetTuning.timeoutMs.broadResearchFloor,
+          agentName === "explore"
+            ? BudgetTuning.timeoutMs.broadExploreFloor
+            : BudgetTuning.timeoutMs.broadResearchFloor,
         )
       : effortFloor
   const stepFloor = stepBudget ? stepBudget * BudgetTuning.timeoutMs.perStepFloor : base
@@ -227,7 +229,8 @@ export const TaskTool = Tool.define(
 
       const messageID = MessageID.ascending()
       const taskKind = params.task_kind ?? "generic"
-      const readOnlyTask = next.name === "explore" || (taskKind === "research" && (params.write_scope ?? []).length === 0)
+      const readOnlyTask =
+        next.name === "explore" || (taskKind === "research" && (params.write_scope ?? []).length === 0)
       const stepBudget = taskStepBudget(params, next.name, taskKind)
       const dependsOn = (params.depends_on ?? []).map((item) => SessionID.make(item))
       const timeoutMs = taskTimeoutMs(params, next.name, taskKind, stepBudget?.value)
@@ -244,29 +247,28 @@ export const TaskTool = Tool.define(
         fallback_used: classification.fallback_used,
       }
 
-      const record =
-        Option.isSome(existingRecord)
-          ? existingRecord.value.status === "failed" ||
-            existingRecord.value.status === "cancelled" ||
-            existingRecord.value.status === "partial"
-            ? yield* tasks.retry({ taskID: nextSession.id, parentSessionID: ctx.sessionID })
-            : existingRecord.value
-          : yield* tasks.create({
-              parentSessionID: ctx.sessionID,
-              childSessionID: nextSession.id,
-              groupID: params.group_id,
-              taskKind,
-              subagentType: next.name,
-              description: params.description,
-              prompt: params.prompt,
-              dependsOn,
-              writeScope: params.write_scope,
-              readScope: params.read_scope,
-              acceptanceChecks: params.acceptance_checks,
-              priority: params.priority,
-              origin: params.origin,
-              metadata: runtimeMetadata,
-            })
+      const record = Option.isSome(existingRecord)
+        ? existingRecord.value.status === "failed" ||
+          existingRecord.value.status === "cancelled" ||
+          existingRecord.value.status === "partial"
+          ? yield* tasks.retry({ taskID: nextSession.id, parentSessionID: ctx.sessionID })
+          : existingRecord.value
+        : yield* tasks.create({
+            parentSessionID: ctx.sessionID,
+            childSessionID: nextSession.id,
+            groupID: params.group_id,
+            taskKind,
+            subagentType: next.name,
+            description: params.description,
+            prompt: params.prompt,
+            dependsOn,
+            writeScope: params.write_scope,
+            readScope: params.read_scope,
+            acceptanceChecks: params.acceptance_checks,
+            priority: params.priority,
+            origin: params.origin,
+            metadata: runtimeMetadata,
+          })
 
       const target = { sessionId: nextSession.id, model }
 
@@ -362,7 +364,9 @@ export const TaskTool = Tool.define(
                 output: summary,
                 reason: "timeout",
                 retryable: true,
-                remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
+                remainingScope: params.acceptance_checks ??
+                  params.read_scope ??
+                  params.write_scope ?? [params.description],
               })
 
               return formatTimeoutPartialOutput(params, target, summary, result.error)
@@ -391,10 +395,14 @@ export const TaskTool = Tool.define(
                 result: completedMessage,
                 reason: maxStepReason,
                 retryable: true,
-                remainingScope: params.acceptance_checks ?? params.read_scope ?? params.write_scope ?? [params.description],
+                remainingScope: params.acceptance_checks ??
+                  params.read_scope ??
+                  params.write_scope ?? [params.description],
               })
 
-              const summary = assistantText(completedMessage) || "Subagent reached its step budget before returning a detailed summary."
+              const summary =
+                assistantText(completedMessage) ||
+                "Subagent reached its step budget before returning a detailed summary."
 
               return formatStepBudgetPartialOutput(params, target, summary, maxStepReason)
             }

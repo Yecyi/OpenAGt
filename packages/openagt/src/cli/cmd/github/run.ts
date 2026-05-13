@@ -35,18 +35,8 @@ import {
   type RepoEvent,
   type UserEvent,
 } from "./constants"
-import {
-  extractResponseText,
-  formatPromptTooLargeError,
-  isIssueCommentEvent,
-  withRetry,
-} from "./helpers"
-import type {
-  GitHubIssue,
-  GitHubPullRequest,
-  IssueQueryResponse,
-  PullRequestQueryResponse,
-} from "./types"
+import { extractResponseText, formatPromptTooLargeError, isIssueCommentEvent, withRetry } from "./helpers"
+import type { GitHubIssue, GitHubPullRequest, IssueQueryResponse, PullRequestQueryResponse } from "./types"
 
 type Context = typeof github.context
 

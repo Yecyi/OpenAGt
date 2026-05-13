@@ -32,13 +32,7 @@ export interface ExpertEntry {
   readonly prompt: string | undefined
   readonly acceptance_checks: readonly string[] | undefined
   readonly memory_namespace: string | undefined
-  readonly mpacr_perspective:
-    | "factuality"
-    | "coherence"
-    | "risk"
-    | "domain_expertise"
-    | "user_value"
-    | undefined
+  readonly mpacr_perspective: "factuality" | "coherence" | "risk" | "domain_expertise" | "user_value" | undefined
 }
 
 export interface Interface {
@@ -278,8 +272,7 @@ export function applyExpertOverride(input: ExpertOverrideInput): CoordinatorNode
     return node
   }
   const workflow = input.workflow ?? node.workflow
-  const memoryNamespace =
-    entry.memory_namespace ?? (workflow ? `${workflow}:${entry.role}` : `${entry.role}`)
+  const memoryNamespace = entry.memory_namespace ?? (workflow ? `${workflow}:${entry.role}` : `${entry.role}`)
   return CoordinatorNode.parse({
     ...node,
     prompt: entry.prompt ?? node.prompt,
@@ -315,7 +308,8 @@ function goalMatchesDomain(goal: string | undefined, domain: string) {
   if (!goal) return false
   const lower = goal.toLowerCase()
   if (lower.includes(domain)) return true
-  if (domain === "coding") return /\b(api|backend|frontend|code|implement|module|package|repo|test|typescript|javascript)\b/.test(lower)
+  if (domain === "coding")
+    return /\b(api|backend|frontend|code|implement|module|package|repo|test|typescript|javascript)\b/.test(lower)
   return false
 }
 
@@ -352,9 +346,7 @@ function expertMatchesPlan(input: { expert: ExpertEntry; plan: PlanLikeForExpert
 //
 // Selection rule: if multiple user experts match the same builtin role and
 // scope, the first registered matching expert wins.
-export const applyUserExpertsToPlan = <P extends PlanLikeForExperts>(
-  plan: P,
-): Effect.Effect<P, Error, Service> =>
+export const applyUserExpertsToPlan = <P extends PlanLikeForExperts>(plan: P): Effect.Effect<P, Error, Service> =>
   Effect.gen(function* () {
     const registry = yield* Service
     const all = yield* registry.all()

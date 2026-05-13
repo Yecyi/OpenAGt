@@ -94,9 +94,7 @@ export const configHandlers = Layer.unwrap(
       }
     })
 
-    const updateGlobal = Effect.fn("ConfigHttpApi.updateGlobal")(function* (ctx: {
-      payload: Record<string, unknown>
-    }) {
+    const updateGlobal = Effect.fn("ConfigHttpApi.updateGlobal")(function* (ctx: { payload: Record<string, unknown> }) {
       const parsed = Config.AdvancedGlobalConfigPatch.safeParse(ctx.payload)
       if (!parsed.success) return yield* new HttpApiError.BadRequest({})
       return (yield* cfg.updateGlobal(parsed.data)) as Record<string, unknown>

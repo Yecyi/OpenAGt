@@ -172,7 +172,9 @@ const live: Layer.Layer<
       // calls but no tools param is present. When there are no active tools (e.g.
       // during compaction), inject a stub tool to satisfy the validation requirement.
       // The stub description explicitly tells the model not to call it.
-      if (shouldInjectNoopTool({ model: input.model, providerOptions: item.options, tools, messages: input.messages })) {
+      if (
+        shouldInjectNoopTool({ model: input.model, providerOptions: item.options, tools, messages: input.messages })
+      ) {
         tools["_noop"] = createNoopTool()
       }
 

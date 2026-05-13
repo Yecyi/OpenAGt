@@ -389,11 +389,7 @@ describe("coordinator runtime", () => {
           id: run.id,
           taskID: first.task_id,
         })
-        const retried = yield* waitForProjection(
-          coordinator,
-          run.id,
-          (projection) => projection.run.state === "failed",
-        )
+        const retried = yield* waitForProjection(coordinator, run.id, (projection) => projection.run.state === "failed")
         const retriedTask = retried.tasks.find((item) => item.task_id === first.task_id)
 
         expect(retried.run.state).toBe("failed")

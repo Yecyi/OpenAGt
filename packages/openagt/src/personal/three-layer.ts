@@ -171,7 +171,21 @@ const DOMAIN_KEYWORDS: Record<string, readonly string[]> = {
     "综述",
     "总结",
   ],
-  writing: ["draft", "write", "essay", "letter", "memo", "blog", "起草", "撰写", "文章", "信件", "备忘", "博客", "文案"],
+  writing: [
+    "draft",
+    "write",
+    "essay",
+    "letter",
+    "memo",
+    "blog",
+    "起草",
+    "撰写",
+    "文章",
+    "信件",
+    "备忘",
+    "博客",
+    "文案",
+  ],
   "data-analysis": [
     "dataset",
     "csv",
@@ -433,33 +447,33 @@ export const layer = Layer.effect(
       },
     )
 
-    const recordProceduralRecipe: Interface["recordProceduralRecipe"] = Effect.fn(
-      "ThreeLayer.recordProceduralRecipe",
-    )(function* (input) {
-      const parsed = ProceduralRecipeInput.parse(input)
-      const successRate = parsed.success_count / Math.max(1, parsed.success_count + parsed.failure_count)
-      const note = yield* personal.remember({
-        scope: "procedural" as MemoryScopeType,
-        // Wave 5: procedural recipes are observed-to-work patterns —
-        // empirical claims about which step sequences succeed. Tag as
-        // fact so the critic-isolation filter returns them.
-        kind: "fact",
-        title: `Recipe: ${parsed.task_signature}`,
-        content: parsed.steps.map((s, i) => `${i + 1}. ${s.description}`).join("\n"),
-        tags: proceduralTags(parsed),
-        metadata: proceduralMetadata(parsed),
-        source: "coordinator",
-        importance: Math.round(successRate * 10),
-        pinned: false,
-      })
-      const recipe = readProceduralFromNote(note)
-      if (!recipe) {
-        return yield* Effect.fail(
-          new Error(`procedural recipe note ${note.id} did not round-trip — metadata layer mismatch`),
-        )
-      }
-      return recipe
-    })
+    const recordProceduralRecipe: Interface["recordProceduralRecipe"] = Effect.fn("ThreeLayer.recordProceduralRecipe")(
+      function* (input) {
+        const parsed = ProceduralRecipeInput.parse(input)
+        const successRate = parsed.success_count / Math.max(1, parsed.success_count + parsed.failure_count)
+        const note = yield* personal.remember({
+          scope: "procedural" as MemoryScopeType,
+          // Wave 5: procedural recipes are observed-to-work patterns —
+          // empirical claims about which step sequences succeed. Tag as
+          // fact so the critic-isolation filter returns them.
+          kind: "fact",
+          title: `Recipe: ${parsed.task_signature}`,
+          content: parsed.steps.map((s, i) => `${i + 1}. ${s.description}`).join("\n"),
+          tags: proceduralTags(parsed),
+          metadata: proceduralMetadata(parsed),
+          source: "coordinator",
+          importance: Math.round(successRate * 10),
+          pinned: false,
+        })
+        const recipe = readProceduralFromNote(note)
+        if (!recipe) {
+          return yield* Effect.fail(
+            new Error(`procedural recipe note ${note.id} did not round-trip — metadata layer mismatch`),
+          )
+        }
+        return recipe
+      },
+    )
 
     const searchSemantic: Interface["searchSemantic"] = Effect.fn("ThreeLayer.searchSemantic")(function* (input) {
       const limit = input.limit ?? 5

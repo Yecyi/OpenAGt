@@ -17,20 +17,12 @@ const REASONS = [
 
 const parameters = z.object({
   reason: z.enum(REASONS).describe("Categorical reason for stopping. Pick the one that best matches the situation."),
-  partial_result: z
-    .string()
-    .optional()
-    .describe("Optional summary of what was completed before stopping."),
-  recommend_next: z
-    .string()
-    .optional()
-    .describe("Optional suggested follow-up (e.g. 'scope this PR to file X only')."),
+  partial_result: z.string().optional().describe("Optional summary of what was completed before stopping."),
+  recommend_next: z.string().optional().describe("Optional suggested follow-up (e.g. 'scope this PR to file X only')."),
   open_inbox_item: z
     .boolean()
     .default(true)
-    .describe(
-      "If true (default), also write an inbox item recording the reason, partial result, and recommendation.",
-    ),
+    .describe("If true (default), also write an inbox item recording the reason, partial result, and recommendation."),
 })
 
 type Metadata = {

@@ -62,17 +62,19 @@ export function collectNamedFromConnected<T extends { name: string }>(input: {
   state: McpCatalogState
   listFn: (c: Client) => Promise<T[]>
   label: string
-  fetch: (clientName: string, client: Client, listFn: (c: Client) => Promise<T[]>, label: string) => Effect.Effect<
-    Record<string, T & { client: string }> | undefined,
-    never
-  >
+  fetch: (
+    clientName: string,
+    client: Client,
+    listFn: (c: Client) => Promise<T[]>,
+    label: string,
+  ) => Effect.Effect<Record<string, T & { client: string }> | undefined, never>
 }) {
   return Effect.forEach(
     connectedClientEntries(input.state),
     ([clientName, client]) =>
-      input.fetch(clientName, client, input.listFn, input.label).pipe(
-        Effect.map((items) => Object.entries(items ?? {})),
-      ),
+      input
+        .fetch(clientName, client, input.listFn, input.label)
+        .pipe(Effect.map((items) => Object.entries(items ?? {}))),
     { concurrency: "unbounded" },
   ).pipe(Effect.map((results) => Object.fromEntries<T & { client: string }>(results.flat())))
 }

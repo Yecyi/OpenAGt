@@ -20,17 +20,8 @@ import type {
   UpdateInboxStateInput,
 } from "./inbox-ops"
 import type { IngestSessionInput, IngestWebhookInput } from "./ingestion-ops"
-import type {
-  ListMemoryInput,
-  RememberInput,
-  SearchMemoryInput,
-  SynthesizeInput,
-} from "./memory-ops"
-import type {
-  DispatchDueWakeupsInput,
-  ListDueWakeupsInput,
-  ScheduleWakeupInput,
-} from "./wakeup-ops"
+import type { ListMemoryInput, RememberInput, SearchMemoryInput, SynthesizeInput } from "./memory-ops"
+import type { DispatchDueWakeupsInput, ListDueWakeupsInput, ScheduleWakeupInput } from "./wakeup-ops"
 import type {
   InboxItem as InboxItemType,
   MemoryNote as MemoryNoteType,

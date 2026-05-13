@@ -114,7 +114,12 @@ describe("extractCandidateTriples — heuristic fallback over title", () => {
   test("recognises Chinese verbs (C1: multilingual heuristic)", () => {
     const cases: Array<{ title: string; subject: string; predicate: string; object: string }> = [
       { title: "Drizzle 依赖 bun-sqlite", subject: "Drizzle", predicate: "依赖", object: "bun-sqlite" },
-      { title: "TypeScript 用于 编写类型安全的代码", subject: "TypeScript", predicate: "用于", object: "编写类型安全的代码" },
+      {
+        title: "TypeScript 用于 编写类型安全的代码",
+        subject: "TypeScript",
+        predicate: "用于",
+        object: "编写类型安全的代码",
+      },
       { title: "PostgreSQL 是 关系型数据库", subject: "PostgreSQL", predicate: "是", object: "关系型数据库" },
       { title: "Effect 实现 类型化错误通道", subject: "Effect", predicate: "实现", object: "类型化错误通道" },
     ]
@@ -258,9 +263,7 @@ describe("scoreDecay — exponential decay with rehearsal boost", () => {
   })
 
   test("output is clamped to [0, 10]", () => {
-    expect(
-      scoreDecay({ currentImportance: 100, ageMs: 0, rehearsalCount: 100, half_life_days: 30 }),
-    ).toBe(10)
+    expect(scoreDecay({ currentImportance: 100, ageMs: 0, rehearsalCount: 100, half_life_days: 30 })).toBe(10)
     expect(
       scoreDecay({
         currentImportance: 0,
@@ -285,21 +288,19 @@ describe("scoreDecay — exponential decay with rehearsal boost", () => {
 
 describe("classifyDecayAction", () => {
   test("returns 'keep' when importance >= demote threshold", () => {
-    expect(
-      classifyDecayAction(2, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 }),
-    ).toBe("keep")
+    expect(classifyDecayAction(2, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 })).toBe("keep")
   })
 
   test("returns 'demote' between delete and demote thresholds", () => {
-    expect(
-      classifyDecayAction(0.5, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 }),
-    ).toBe("demote")
+    expect(classifyDecayAction(0.5, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 })).toBe(
+      "demote",
+    )
   })
 
   test("returns 'delete' under delete threshold", () => {
-    expect(
-      classifyDecayAction(0.05, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 }),
-    ).toBe("delete")
+    expect(classifyDecayAction(0.05, { importance_demote_threshold: 1, importance_delete_threshold: 0.1 })).toBe(
+      "delete",
+    )
   })
 })
 

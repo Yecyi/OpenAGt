@@ -6,7 +6,9 @@ import { Permission } from "@/permission"
 import type { Provider } from "@/provider"
 import type { StreamInput } from "./llm"
 
-export function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">): Record<string, Tool> {
+export function resolveTools(
+  input: Pick<StreamInput, "tools" | "agent" | "permission" | "user">,
+): Record<string, Tool> {
   const disabled = Permission.disabled(
     Object.keys(input.tools),
     Permission.merge(input.agent.permission, input.permission ?? []),
@@ -14,10 +16,7 @@ export function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "permi
   return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
 }
 
-export function isLiteLLMProxy(input: {
-  model: Provider.Model
-  providerOptions?: Record<string, unknown>
-}): boolean {
+export function isLiteLLMProxy(input: { model: Provider.Model; providerOptions?: Record<string, unknown> }): boolean {
   return (
     input.providerOptions?.["litellmProxy"] === true ||
     input.model.providerID.toLowerCase().includes("litellm") ||

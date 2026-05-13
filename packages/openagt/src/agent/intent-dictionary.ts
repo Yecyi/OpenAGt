@@ -6,16 +6,7 @@ export const IntentDictionary = {
     zh: ["深入", "深度", "完整", "全面", "彻底", "全部", "全量", "详细", "仔细"],
   },
   projectTargets: {
-    en: [
-      "project",
-      "repo",
-      "repository",
-      "codebase",
-      "workspace",
-      "source tree",
-      "src directory",
-      "package structure",
-    ],
+    en: ["project", "repo", "repository", "codebase", "workspace", "source tree", "src directory", "package structure"],
     zh: ["项目", "仓库", "代码库", "工作区", "源码", "工程", "目录结构", "包结构"],
   },
   technicalTargets: {

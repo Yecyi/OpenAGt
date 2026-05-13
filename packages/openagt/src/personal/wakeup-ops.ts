@@ -133,7 +133,9 @@ export function createWakeupOps(deps: {
     )
   })
 
-  const completeWakeup = Effect.fn("PersonalAgent.completeWakeup")(function* (id: z.infer<typeof ScheduledWakeupID.zod>) {
+  const completeWakeup = Effect.fn("PersonalAgent.completeWakeup")(function* (
+    id: z.infer<typeof ScheduledWakeupID.zod>,
+  ) {
     yield* Effect.sync(() =>
       Database.use((db) =>
         db

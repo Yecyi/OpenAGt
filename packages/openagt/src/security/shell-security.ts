@@ -154,7 +154,8 @@ export type ShellSafetyInput = {
 }
 export { classifyApprovalKind, formatShellSafety, isPrivilegeEscalationCommand } from "./shell-safety"
 
-const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
+const DESTRUCTIVE_RM_PATTERN =
+  /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
 
 function shellName(shell: string) {
   return (shell.replace(/\\/g, "/").split("/").pop() || shell).toLowerCase().replace(/\.(exe|cmd|bat|com|ps1)$/i, "")

@@ -1,9 +1,9 @@
 /* Mission Control — full-screen takeover with plan-preview, DAG, expert lanes */
 
 function MissionControl({ open, onClose }) {
-  const M = window.AGT.MISSION;
-  if (!open) return null;
-  const [tab, setTab] = React.useState("execution"); // preview | execution | quality
+  const M = window.AGT.MISSION
+  if (!open) return null
+  const [tab, setTab] = React.useState("execution") // preview | execution | quality
 
   return (
     <div className="mission-scrim">
@@ -16,7 +16,8 @@ function MissionControl({ open, onClose }) {
           </div>
           <button className="mc-close" onClick={onClose} title="Close (Esc)">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <line x1="3" y1="3" x2="13" y2="13" /><line x1="13" y1="3" x2="3" y2="13" />
+              <line x1="3" y1="3" x2="13" y2="13" />
+              <line x1="13" y1="3" x2="3" y2="13" />
             </svg>
           </button>
         </header>
@@ -25,16 +26,22 @@ function MissionControl({ open, onClose }) {
           <div className="mc-goal">
             <h1>{M.goal}</h1>
             <div className="mc-goal-meta">
-              <span><b>Workflow</b> {M.workflow}</span>
+              <span>
+                <b>Workflow</b> {M.workflow}
+              </span>
               <span className="sep">·</span>
-              <span><b>Effort</b> {M.effort}</span>
+              <span>
+                <b>Effort</b> {M.effort}
+              </span>
               <span className="sep">·</span>
-              <span><b>Status</b> <span className={`mc-state ${M.status}`}>{M.status}</span></span>
+              <span>
+                <b>Status</b> <span className={`mc-state ${M.status}`}>{M.status}</span>
+              </span>
             </div>
           </div>
           <div className="mc-tabs">
-            {["preview","execution","quality"].map(t => (
-              <button key={t} className={`mc-tab ${tab===t?"on":""}`} onClick={()=>setTab(t)}>
+            {["preview", "execution", "quality"].map((t) => (
+              <button key={t} className={`mc-tab ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>
                 {t === "preview" ? "Plan Preview" : t === "execution" ? "Execution" : "Quality"}
               </button>
             ))}
@@ -42,21 +49,23 @@ function MissionControl({ open, onClose }) {
         </div>
 
         <div className="mc-body">
-          {tab === "preview"   && <PlanPreview M={M} />}
+          {tab === "preview" && <PlanPreview M={M} />}
           {tab === "execution" && <Execution M={M} />}
-          {tab === "quality"   && <Quality M={M} />}
+          {tab === "quality" && <Quality M={M} />}
         </div>
 
         <footer className="mc-foot">
           <BudgetMeters b={M.budget} />
           <div className="mc-foot-acts">
-            <button className="mc-btn ghost" onClick={onClose}>Close</button>
+            <button className="mc-btn ghost" onClick={onClose}>
+              Close
+            </button>
             <button className="mc-btn">Pause Mission</button>
           </div>
         </footer>
       </div>
     </div>
-  );
+  )
 }
 
 /* ---------- Plan Preview tab ---------- */
@@ -68,7 +77,7 @@ function PlanPreview({ M }) {
         <ol className="mc-stages">
           {M.stages.map((s, i) => (
             <li key={s.id} className={`mc-stage ${s.state}`}>
-              <span className="num">{String(i+1).padStart(2,"0")}</span>
+              <span className="num">{String(i + 1).padStart(2, "0")}</span>
               <span className="title">{s.title}</span>
               <span className="state">{s.state}</span>
             </li>
@@ -78,7 +87,7 @@ function PlanPreview({ M }) {
       <section className="mc-pane">
         <h3 className="mc-h">Todo Timeline (planned)</h3>
         <ul className="mc-todos">
-          {M.todos.map(t => (
+          {M.todos.map((t) => (
             <li key={t.id} className={`mc-todo ${t.state}`}>
               <span className="check">{t.state === "done" ? "✓" : t.state === "active" ? "▶" : "○"}</span>
               <span className="title">{t.title}</span>
@@ -98,10 +107,12 @@ function PlanPreview({ M }) {
               </li>
             ))}
           </ul>
-        ) : <p className="mc-empty">No revise points planned.</p>}
+        ) : (
+          <p className="mc-empty">No revise points planned.</p>
+        )}
       </section>
     </div>
-  );
+  )
 }
 
 /* ---------- Execution tab ---------- */
@@ -113,50 +124,63 @@ function Execution({ M }) {
         <DAG dag={M.dag} />
       </section>
       <section className="mc-pane">
-        <h3 className="mc-h">Expert Lanes <span className="ct">{M.experts.length}</span></h3>
+        <h3 className="mc-h">
+          Expert Lanes <span className="ct">{M.experts.length}</span>
+        </h3>
         <div className="mc-lanes">
-          {M.experts.map(e => <ExpertLane key={e.id} e={e} />)}
+          {M.experts.map((e) => (
+            <ExpertLane key={e.id} e={e} />
+          ))}
         </div>
       </section>
     </div>
-  );
+  )
 }
 
 function DAG({ dag }) {
   // grid: laneCount × xCount
-  const laneCount = Math.max(...dag.nodes.map(n => n.lane)) + 1;
-  const xCount    = Math.max(...dag.nodes.map(n => n.x))    + 1;
-  const W = 760, H = laneCount * 70 + 30;
-  const colW = W / xCount;
+  const laneCount = Math.max(...dag.nodes.map((n) => n.lane)) + 1
+  const xCount = Math.max(...dag.nodes.map((n) => n.x)) + 1
+  const W = 760,
+    H = laneCount * 70 + 30
+  const colW = W / xCount
   const pos = (id) => {
-    const n = dag.nodes.find(n => n.id === id);
-    return { cx: n.x * colW + colW/2, cy: n.lane * 70 + 35 };
-  };
+    const n = dag.nodes.find((n) => n.id === id)
+    return { cx: n.x * colW + colW / 2, cy: n.lane * 70 + 35 }
+  }
   return (
     <svg className="mc-dag" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
       {/* edges */}
-      {dag.edges.map(([a,b], i) => {
-        const A = pos(a), B = pos(b);
-        const mx = (A.cx + B.cx) / 2;
+      {dag.edges.map(([a, b], i) => {
+        const A = pos(a),
+          B = pos(b)
+        const mx = (A.cx + B.cx) / 2
         return (
-          <path key={i}
+          <path
+            key={i}
             d={`M ${A.cx + 50} ${A.cy} C ${mx} ${A.cy}, ${mx} ${B.cy}, ${B.cx - 50} ${B.cy}`}
-            fill="none" stroke="currentColor" strokeWidth="0.75" opacity="0.45" />
-        );
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="0.75"
+            opacity="0.45"
+          />
+        )
       })}
       {/* nodes */}
-      {dag.nodes.map(n => {
-        const p = pos(n.id);
+      {dag.nodes.map((n) => {
+        const p = pos(n.id)
         return (
           <g key={n.id} transform={`translate(${p.cx - 50}, ${p.cy - 18})`}>
             <rect width="100" height="36" className={`dag-node ${n.state}`} />
-            <text x="50" y="22" textAnchor="middle" className="dag-label">{n.label}</text>
+            <text x="50" y="22" textAnchor="middle" className="dag-label">
+              {n.label}
+            </text>
             <circle cx="6" cy="6" r="2.6" className={`dag-dot ${n.state}`} />
           </g>
-        );
+        )
       })}
     </svg>
-  );
+  )
 }
 
 function ExpertLane({ e }) {
@@ -184,10 +208,26 @@ function ExpertLane({ e }) {
         <span className="k">Confidence</span>
         <span className={`v conf ${e.conf}`}>{e.conf}</span>
       </div>
-      {e.ev.length > 0 && <div className="mce-tags">{e.ev.map((x,i) => <span key={i} className="tag ev">{x}</span>)}</div>}
-      {e.risks.length > 0 && <div className="mce-tags">{e.risks.map((x,i) => <span key={i} className="tag risk">⚠ {x}</span>)}</div>}
+      {e.ev.length > 0 && (
+        <div className="mce-tags">
+          {e.ev.map((x, i) => (
+            <span key={i} className="tag ev">
+              {x}
+            </span>
+          ))}
+        </div>
+      )}
+      {e.risks.length > 0 && (
+        <div className="mce-tags">
+          {e.risks.map((x, i) => (
+            <span key={i} className="tag risk">
+              ⚠ {x}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
-  );
+  )
 }
 
 /* ---------- Quality tab ---------- */
@@ -197,7 +237,7 @@ function Quality({ M }) {
       <section className="mc-pane">
         <h3 className="mc-h">Quality Gates</h3>
         <ul className="mc-gates">
-          {M.qualityGates.map(g => (
+          {M.qualityGates.map((g) => (
             <li key={g.id} className={g.state}>
               <span className="check">{g.state === "passed" ? "✓" : g.state === "failed" ? "✗" : "○"}</span>
               <span className="title">{g.name}</span>
@@ -208,40 +248,55 @@ function Quality({ M }) {
       </section>
       <section className="mc-pane">
         <h3 className="mc-h">Evidence</h3>
-        <div className="env-row"><span className="k">Coverage</span><span className="v">{M.evidence.coverage}</span></div>
-        <div className="env-row"><span className="k">Confidence</span><span className="v">{M.evidence.confidence}</span></div>
-        <div className="env-row"><span className="k">Review</span><span className="v">{M.evidence.review}</span></div>
+        <div className="env-row">
+          <span className="k">Coverage</span>
+          <span className="v">{M.evidence.coverage}</span>
+        </div>
+        <div className="env-row">
+          <span className="k">Confidence</span>
+          <span className="v">{M.evidence.confidence}</span>
+        </div>
+        <div className="env-row">
+          <span className="k">Review</span>
+          <span className="v">{M.evidence.review}</span>
+        </div>
       </section>
       <section className="mc-pane mc-pane-wide">
         <h3 className="mc-h">Critical Review · Pending</h3>
         <p className="mc-empty">Reviewer will run after Verifier passes the quality gates.</p>
       </section>
     </div>
-  );
+  )
 }
 
 /* ---------- Budget meters ---------- */
 function BudgetMeters({ b }) {
   const items = [
-    { k: "Tool calls",   ...b.tools  },
-    { k: "Model calls",  ...b.calls  },
-    { k: "Wallclock",    ...b.wall, unit: "m" },
-    { k: "Tokens",       ...b.tokens },
-  ];
+    { k: "Tool calls", ...b.tools },
+    { k: "Model calls", ...b.calls },
+    { k: "Wallclock", ...b.wall, unit: "m" },
+    { k: "Tokens", ...b.tokens },
+  ]
   return (
     <div className="mc-budget">
-      {items.map(it => {
-        const pct = Math.min(100, (it.used / it.max) * 100);
+      {items.map((it) => {
+        const pct = Math.min(100, (it.used / it.max) * 100)
         return (
           <div className="mcb-item" key={it.k}>
             <div className="mcb-lab">{it.k}</div>
-            <div className="mcb-bar"><div className="mcb-fill" style={{ width: pct + "%" }} /></div>
-            <div className="mcb-val">{it.used.toLocaleString()}{it.unit||""} / {it.max.toLocaleString()}{it.unit||""}</div>
+            <div className="mcb-bar">
+              <div className="mcb-fill" style={{ width: pct + "%" }} />
+            </div>
+            <div className="mcb-val">
+              {it.used.toLocaleString()}
+              {it.unit || ""} / {it.max.toLocaleString()}
+              {it.unit || ""}
+            </div>
           </div>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
-window.MissionControl = MissionControl;
+window.MissionControl = MissionControl

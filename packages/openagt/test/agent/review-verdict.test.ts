@@ -3,17 +3,19 @@ import { reviewVerdictFromText } from "../../src/coordinator/review-verdict"
 
 describe("reviewVerdictFromText", () => {
   test("parses a fenced JSON verdict surrounded by prose", () => {
-    const verdict = reviewVerdictFromText([
-      "Reviewer summary:",
-      "```json",
-      JSON.stringify({
-        verdict: "revise",
-        required_changes: ["Add bounds check"],
-        evidence_against: ["The empty input path is uncovered"],
-      }),
-      "```",
-      "End.",
-    ].join("\n"))
+    const verdict = reviewVerdictFromText(
+      [
+        "Reviewer summary:",
+        "```json",
+        JSON.stringify({
+          verdict: "revise",
+          required_changes: ["Add bounds check"],
+          evidence_against: ["The empty input path is uncovered"],
+        }),
+        "```",
+        "End.",
+      ].join("\n"),
+    )
 
     expect(verdict?.verdict).toBe("revise")
     expect(verdict?.required_changes).toContain("Add bounds check")

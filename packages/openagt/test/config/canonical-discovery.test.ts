@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import {
-  _resetWarnedForTest,
-  _warnedKeysForTest,
-  warnDeprecatedConfigDir,
-} from "../../src/config/canonical-discovery"
+import { _resetWarnedForTest, _warnedKeysForTest, warnDeprecatedConfigDir } from "../../src/config/canonical-discovery"
 
 // A7: collapses .opencode/ singular/plural discovery onto a canonical name
 // while still discovering the deprecated form. The warning fires once per

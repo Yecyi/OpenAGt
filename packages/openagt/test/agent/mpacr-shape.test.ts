@@ -134,11 +134,7 @@ describe("MPACR debate graph shape", () => {
     })
 
     const roles = out.critics.map((c) => c.expert_role)
-    expect(roles).toEqual([
-      "red-team-critic-factuality",
-      "red-team-critic-coherence",
-      "red-team-critic-risk",
-    ])
+    expect(roles).toEqual(["red-team-critic-factuality", "red-team-critic-coherence", "red-team-critic-risk"])
   })
 
   test("Memory namespaces are scoped per perspective so critic memories do not pollute each other", () => {
@@ -153,11 +149,7 @@ describe("MPACR debate graph shape", () => {
     })
 
     const namespaces = out.critics.map((c) => c.memory_namespace)
-    expect(namespaces).toEqual([
-      "coding:red-team:factuality",
-      "coding:red-team:coherence",
-      "coding:red-team:risk",
-    ])
+    expect(namespaces).toEqual(["coding:red-team:factuality", "coding:red-team:coherence", "coding:red-team:risk"])
   })
 
   test("Synthesis node carries the artifact_id chain (revision_of points to target)", () => {

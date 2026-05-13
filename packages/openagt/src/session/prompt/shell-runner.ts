@@ -71,7 +71,10 @@ function shellInvocationArgs(shell: string, command: string): string[] {
   return (invocations[shellName] ?? invocations[""]).args
 }
 
-function shellUserMessage(input: PromptShellRunnerInput, model: { providerID: ProviderID; modelID: ModelID }): MessageV2.User {
+function shellUserMessage(
+  input: PromptShellRunnerInput,
+  model: { providerID: ProviderID; modelID: ModelID },
+): MessageV2.User {
   return {
     id: input.messageID ?? MessageID.ascending(),
     sessionID: input.sessionID,

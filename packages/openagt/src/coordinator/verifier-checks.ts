@@ -15,10 +15,13 @@ export type DeterministicVerifierCheck = {
 }
 
 const codeFile = /\.(cjs|cts|js|jsx|mjs|mts|ts|tsx)$/i
-const testFile = /(^|[\\/])(?:test|tests|spec|__tests__)([\\/]|$)|(?:\.|_)(?:spec|test)\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/i
+const testFile =
+  /(^|[\\/])(?:test|tests|spec|__tests__)([\\/]|$)|(?:\.|_)(?:spec|test)\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/i
 
 function stringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim() !== "") : []
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+    : []
 }
 
 function normalized(value: string) {

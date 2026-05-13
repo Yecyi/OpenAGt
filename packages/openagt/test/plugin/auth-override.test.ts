@@ -135,7 +135,7 @@ describe("plugin.auth-override", () => {
             "      methods: [],",
             "      refresh: async (auth) => ({",
             '        type: "success",',
-            '        refresh: `${auth.refresh}-new`,',
+            "        refresh: `${auth.refresh}-new`,",
             '        access: "new-access",',
             "        expires: 123456789,",
             '        accountId: auth.accountId || "existing-account",',

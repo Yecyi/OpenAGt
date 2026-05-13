@@ -1,10 +1,7 @@
 import { TaskRuntime } from "@/session/task-runtime"
 import { scopeOverlap } from "@/session/task-runtime-helpers"
 import { resourceLimitSlots, todoForNode, todoUsageFor } from "./runtime-state"
-import type {
-  CoordinatorRun as CoordinatorRunType,
-  ResourceLimit as ResourceLimitType,
-} from "./schema"
+import type { CoordinatorRun as CoordinatorRunType, ResourceLimit as ResourceLimitType } from "./schema"
 import { nodeIDForTask } from "./task-record"
 
 // Pure dispatch selection for ready coordinator tasks.
@@ -23,10 +20,7 @@ function nodeFor(item: TaskRuntime.TaskRecord) {
 // dependency edges, but a hallucinated parallel_group on overlapping write_scopes would
 // otherwise slip through. We only block when *both* sides have non-empty write_scope —
 // read-only tasks (empty write_scope) are never blocked here.
-function hasWriteScopeConflict(
-  candidate: TaskRuntime.TaskRecord,
-  others: readonly TaskRuntime.TaskRecord[],
-): boolean {
+function hasWriteScopeConflict(candidate: TaskRuntime.TaskRecord, others: readonly TaskRuntime.TaskRecord[]): boolean {
   if (candidate.write_scope.length === 0) return false
   return others.some((other) => other.write_scope.length > 0 && scopeOverlap(candidate.write_scope, other.write_scope))
 }
@@ -82,8 +76,7 @@ export function dispatchSelectionFor(input: {
       : targetGroup
         ? orderedReady.filter((item) => groupFor(item) === targetGroup).slice(0, slots)
         : orderedReady.slice(0, Math.min(slots, 1))
-  )
-    .slice(0, budgetSlots)
+  ).slice(0, budgetSlots)
   const todoBudgetBlocked = candidates.some((item) => !todoBudgetFor(item))
   const preselected = candidates.filter(todoBudgetFor)
 

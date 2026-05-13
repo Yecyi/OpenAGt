@@ -6,7 +6,7 @@
 **Methodology**: regex-based detection of three categories drawn from 2024–2026 LLM-behavior research:
 
 1. **high-affect** — emphasis words (CAPS, threat-framing, absolutist) that prime the desperate vector
-2. **affect-instr** — instructions about *feeling* (teaches masking per Emotion paper §1.5)
+2. **affect-instr** — instructions about _feeling_ (teaches masking per Emotion paper §1.5)
 3. **anti-escape** — phrases that close the legitimate "stop and ask" affordance (Wiser Human 2025)
 
 Raw report: [`prompt-affect-baseline-2026-05-02.txt`](prompt-affect-baseline-2026-05-02.txt).
@@ -15,12 +15,12 @@ Raw report: [`prompt-affect-baseline-2026-05-02.txt`](prompt-affect-baseline-202
 
 ## Headline numbers
 
-| | Count |
-|---|---|
-| Files scanned | 190 |
-| Files with findings | 16 |
+|                         | Count  |
+| ----------------------- | ------ |
+| Files scanned           | 190    |
+| Files with findings     | 16     |
 | Block-severity findings | **29** |
-| Warn-severity findings | 16 |
+| Warn-severity findings  | 16     |
 
 By category: 28 high-affect, 17 anti-escape, 0 affect-instr (after FP narrowing).
 
@@ -67,11 +67,11 @@ Same family as copilot-gpt-5.txt:
 
 ### Tier 3 — single-finding files
 
-| File | Findings | Note |
-|---|---|---|
-| [`session/prompt/gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt) | 1 block, 1 warn | `Adhere strictly` + `Always prioritize … keep going` |
-| [`session/prompt/anthropic.txt`](../../packages/openagt/src/session/prompt/anthropic.txt) | 0 block, 1 warn | `ALWAYS prefer editing` — caps absolute, low risk |
-| [`session/prompt/trinity.txt`](../../packages/openagt/src/session/prompt/trinity.txt) | 0 block, 1 warn | `strictly` |
+| File                                                                                      | Findings        | Note                                                 |
+| ----------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------- |
+| [`session/prompt/gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt)       | 1 block, 1 warn | `Adhere strictly` + `Always prioritize … keep going` |
+| [`session/prompt/anthropic.txt`](../../packages/openagt/src/session/prompt/anthropic.txt) | 0 block, 1 warn | `ALWAYS prefer editing` — caps absolute, low risk    |
+| [`session/prompt/trinity.txt`](../../packages/openagt/src/session/prompt/trinity.txt)     | 0 block, 1 warn | `strictly`                                           |
 
 ### Tier 4 — likely defensible (review before changing)
 
@@ -162,25 +162,25 @@ Decision: **option (d)** — invert gating. Default to softened prompts; preserv
 
 ### Changes
 
-| File | Action |
-|---|---|
-| [`session/prompt/beast.txt`](../../packages/openagt/src/session/prompt/beast.txt) | Lines 1, 3, 9 rewritten — closure language replaced with explicit "end your turn when …" threshold list. Workflow / debugging / communication sections unchanged. |
-| [`session/prompt/copilot-gpt-5.txt`](../../packages/openagt/src/session/prompt/copilot-gpt-5.txt) | Lines 8–22 (`<gptAgentInstructions>` block) rewritten with same threshold structure. structuredWorkflow / communication / output-formatting sections unchanged. |
-| `session/prompt/beast-autonomous.txt` | New — verbatim copy of pre-2026-05-02 `beast.txt`. |
-| `session/prompt/copilot-gpt-5-autonomous.txt` | New — verbatim copy of pre-2026-05-02 `copilot-gpt-5.txt`. |
-| [`session/system.ts`](../../packages/openagt/src/session/system.ts) | Imports the autonomous variants. `provider()` checks `Flag.OPENAGT_AUTONOMOUS_MODE`; if true and route is `beast` or `copilot`, returns the autonomous prompt. |
-| [`flag/flag.ts`](../../packages/openagt/src/flag/flag.ts) | Adds `OPENAGT_AUTONOMOUS_MODE` (with `OPENCODE_AUTONOMOUS_MODE` alias per existing compat pattern). |
-| [`README.md`](../../README.md) | Adds env-var entry. |
-| [`script/audit-prompt-affect.ts`](../../script/audit-prompt-affect.ts) | Excludes `*-autonomous.txt` from default scan; `--include-opt-in` re-enables them. |
+| File                                                                                              | Action                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`session/prompt/beast.txt`](../../packages/openagt/src/session/prompt/beast.txt)                 | Lines 1, 3, 9 rewritten — closure language replaced with explicit "end your turn when …" threshold list. Workflow / debugging / communication sections unchanged. |
+| [`session/prompt/copilot-gpt-5.txt`](../../packages/openagt/src/session/prompt/copilot-gpt-5.txt) | Lines 8–22 (`<gptAgentInstructions>` block) rewritten with same threshold structure. structuredWorkflow / communication / output-formatting sections unchanged.   |
+| `session/prompt/beast-autonomous.txt`                                                             | New — verbatim copy of pre-2026-05-02 `beast.txt`.                                                                                                                |
+| `session/prompt/copilot-gpt-5-autonomous.txt`                                                     | New — verbatim copy of pre-2026-05-02 `copilot-gpt-5.txt`.                                                                                                        |
+| [`session/system.ts`](../../packages/openagt/src/session/system.ts)                               | Imports the autonomous variants. `provider()` checks `Flag.OPENAGT_AUTONOMOUS_MODE`; if true and route is `beast` or `copilot`, returns the autonomous prompt.    |
+| [`flag/flag.ts`](../../packages/openagt/src/flag/flag.ts)                                         | Adds `OPENAGT_AUTONOMOUS_MODE` (with `OPENCODE_AUTONOMOUS_MODE` alias per existing compat pattern).                                                               |
+| [`README.md`](../../README.md)                                                                    | Adds env-var entry.                                                                                                                                               |
+| [`script/audit-prompt-affect.ts`](../../script/audit-prompt-affect.ts)                            | Excludes `*-autonomous.txt` from default scan; `--include-opt-in` re-enables them.                                                                                |
 
 ### Effect
 
-| | Before | After |
-|---|---|---|
-| Block-severity (default scan) | 29 | **15** |
-| Anti-escape category (default scan) | 17 | **1** |
-| Files with findings (default scan) | 16 | 14 |
-| Block-severity (with `--include-opt-in`) | n/a | 29 |
+|                                          | Before | After  |
+| ---------------------------------------- | ------ | ------ |
+| Block-severity (default scan)            | 29     | **15** |
+| Anti-escape category (default scan)      | 17     | **1**  |
+| Files with findings (default scan)       | 16     | 14     |
+| Block-severity (with `--include-opt-in`) | n/a    | 29     |
 
 The remaining anti-escape finding is in [`gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt) and is addressed in Tier 3 of the next phase.
 
@@ -207,33 +207,33 @@ Tier 2 prompt scrub: pure factual rewrites of the 5 files identified in the orig
 
 ### Changes
 
-| File | Action |
-|---|---|
-| [`session/prompt/max-steps.txt`](../../packages/openagt/src/session/prompt/max-steps.txt) | Full rewrite. Removes `CRITICAL — STEP BUDGET REACHED`, `exhausted`, `Strict requirements`, `critical violation`, `overrides ALL other instructions`. Preserves the structured response requirement. |
-| [`session/prompt/plan.txt`](../../packages/openagt/src/session/prompt/plan.txt) | Lines 4-6 and 20 rewritten. Removes `STRICTLY FORBIDDEN`, `Zero exceptions`, `MUST NOT … supersedes any other instruction`, `critical violation`. Preserves the sed/tee/echo specifics under "blocked by harness" framing. |
-| [`session/prompt/plan-reminder-anthropic.txt`](../../packages/openagt/src/session/prompt/plan-reminder-anthropic.txt) | Mirror of plan.txt:20. Same softening. |
-| [`session/prompt/reminder-inserter.ts`](../../packages/openagt/src/session/prompt/reminder-inserter.ts) | Line 94 runtime template — same softening as plan-reminder-anthropic.txt. |
-| [`session/prompt/gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt) | Line 1 `Adhere strictly` → `Follow`; line 147 trailing `keep going until the user's query is fully resolved` removed. |
+| File                                                                                                                  | Action                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`session/prompt/max-steps.txt`](../../packages/openagt/src/session/prompt/max-steps.txt)                             | Full rewrite. Removes `CRITICAL — STEP BUDGET REACHED`, `exhausted`, `Strict requirements`, `critical violation`, `overrides ALL other instructions`. Preserves the structured response requirement.                       |
+| [`session/prompt/plan.txt`](../../packages/openagt/src/session/prompt/plan.txt)                                       | Lines 4-6 and 20 rewritten. Removes `STRICTLY FORBIDDEN`, `Zero exceptions`, `MUST NOT … supersedes any other instruction`, `critical violation`. Preserves the sed/tee/echo specifics under "blocked by harness" framing. |
+| [`session/prompt/plan-reminder-anthropic.txt`](../../packages/openagt/src/session/prompt/plan-reminder-anthropic.txt) | Mirror of plan.txt:20. Same softening.                                                                                                                                                                                     |
+| [`session/prompt/reminder-inserter.ts`](../../packages/openagt/src/session/prompt/reminder-inserter.ts)               | Line 94 runtime template — same softening as plan-reminder-anthropic.txt.                                                                                                                                                  |
+| [`session/prompt/gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt)                                   | Line 1 `Adhere strictly` → `Follow`; line 147 trailing `keep going until the user's query is fully resolved` removed.                                                                                                      |
 
 ### Effect
 
-| | Pre-Tier 1 | Post-Tier 1 | Post-Wave 1 |
-|---|---|---|---|
-| Block-severity | 29 | 15 | **3** |
-| Anti-escape category | 17 | 1 | **0** |
-| High-affect category | 12 | 11 | 11 |
-| Affect-instr category | 0 | 0 | 0 |
-| Files with findings | 16 | 14 | 9 |
+|                       | Pre-Tier 1 | Post-Tier 1 | Post-Wave 1 |
+| --------------------- | ---------- | ----------- | ----------- |
+| Block-severity        | 29         | 15          | **3**       |
+| Anti-escape category  | 17         | 1           | **0**       |
+| High-affect category  | 12         | 11          | 11          |
+| Affect-instr category | 0          | 0           | 0           |
+| Files with findings   | 16         | 14          | 9           |
 
 Cumulative reduction: **29 → 3 block (-90%)**.
 
 ### Remaining 3 block findings — defensible FPs
 
-| Location | Finding | Verdict |
-|---|---|---|
-| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts) | `- Forbidden: ad hominem` | Structural label in adversarial-debate critic prompt; lists prohibited critic moves, not threats to the agent. Defensible. |
-| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts) | `silence is forbidden` | Tells the defender they must rebut or concede in the debate; not a threat. Defensible but borderline. |
-| [`command/template/review.txt:75`](../../packages/openagt/src/command/template/review.txt) | `actually in violation` | "violation" refers to **code violating style norms**, not a threat. Genuine FP. |
+| Location                                                                                   | Finding                   | Verdict                                                                                                                    |
+| ------------------------------------------------------------------------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts)              | `- Forbidden: ad hominem` | Structural label in adversarial-debate critic prompt; lists prohibited critic moves, not threats to the agent. Defensible. |
+| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts)              | `silence is forbidden`    | Tells the defender they must rebut or concede in the debate; not a threat. Defensible but borderline.                      |
+| [`command/template/review.txt:75`](../../packages/openagt/src/command/template/review.txt) | `actually in violation`   | "violation" refers to **code violating style norms**, not a threat. Genuine FP.                                            |
 
 ### CI gate status
 
@@ -247,22 +247,22 @@ Cosmetic rephrasing of the 3 remaining defensible FPs + CI gate wiring.
 
 ### Changes
 
-| File | Edit |
-|---|---|
-| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts) | `- Forbidden:` → `- Out of bounds:` |
-| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts) | `silence is forbidden` → `silence is not an option` |
+| File                                                                                       | Edit                                                                                                |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| [`coordinator/mpacr.ts:130`](../../packages/openagt/src/coordinator/mpacr.ts)              | `- Forbidden:` → `- Out of bounds:`                                                                 |
+| [`coordinator/mpacr.ts:168`](../../packages/openagt/src/coordinator/mpacr.ts)              | `silence is forbidden` → `silence is not an option`                                                 |
 | [`command/template/review.txt:75`](../../packages/openagt/src/command/template/review.txt) | `Verify the code is *actually* in violation.` → `Verify the code *actually* breaks the convention.` |
-| [`.github/workflows/typecheck.yml`](../../.github/workflows/typecheck.yml) | Adds `Check prompt affect` step running `--fail-on-block` after `check:audit-policy`. |
-| [`script/release-verify.ts`](../../script/release-verify.ts) | Adds `Check prompt affect` step in the release-verify pipeline. |
+| [`.github/workflows/typecheck.yml`](../../.github/workflows/typecheck.yml)                 | Adds `Check prompt affect` step running `--fail-on-block` after `check:audit-policy`.               |
+| [`script/release-verify.ts`](../../script/release-verify.ts)                               | Adds `Check prompt affect` step in the release-verify pipeline.                                     |
 
 ### Final state
 
-| | Original | Tier 1 | Wave 1 | **Tail** |
-|---|---|---|---|---|
-| Block-severity | 29 | 15 | 3 | **0** |
-| Warn-severity | 16 | 12 | 8 | 8 |
-| Anti-escape | 17 | 1 | 0 | 0 |
-| Files with findings | 16 | 14 | 9 | 7 |
+|                     | Original | Tier 1 | Wave 1 | **Tail** |
+| ------------------- | -------- | ------ | ------ | -------- |
+| Block-severity      | 29       | 15     | 3      | **0**    |
+| Warn-severity       | 16       | 12     | 8      | 8        |
+| Anti-escape         | 17       | 1      | 0      | 0        |
+| Files with findings | 16       | 14     | 9      | 7        |
 
 CI gate: **active**. PR checks and release-verify both fail the build on any block-severity finding.
 

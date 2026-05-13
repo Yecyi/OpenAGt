@@ -55,7 +55,9 @@ function canonical(value: unknown): unknown {
 }
 
 function hash(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex")
+  return createHash("sha256")
+    .update(JSON.stringify(canonical(value)))
+    .digest("hex")
 }
 
 function row(input: EmitInput): PendingEvent {
@@ -90,7 +92,9 @@ function scheduleFlush() {
   timer = setTimeout(() => {
     timer = undefined
     Effect.runFork(
-      flush().pipe(Effect.catchCause((cause) => Effect.sync(() => log.warn("flush failed", { cause: Cause.pretty(cause) })))),
+      flush().pipe(
+        Effect.catchCause((cause) => Effect.sync(() => log.warn("flush failed", { cause: Cause.pretty(cause) }))),
+      ),
     )
   }, flushDelayMs)
   timer.unref?.()

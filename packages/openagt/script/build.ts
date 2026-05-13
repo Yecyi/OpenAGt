@@ -148,7 +148,9 @@ async function copyWindowsSandboxHelper(binDir: string) {
   await fs.promises.copyFile(helper, target)
   await Bun.write(
     path.join(binDir, "openagt-sandbox-win.exe.sha256"),
-    `${createHash("sha256").update(await Bun.file(target).bytes()).digest("hex")}  openagt-sandbox-win.exe\n`,
+    `${createHash("sha256")
+      .update(await Bun.file(target).bytes())
+      .digest("hex")}  openagt-sandbox-win.exe\n`,
   )
 }
 
@@ -195,9 +197,7 @@ async function createReleasePackage(input: { name: string; os: string; arch: "ar
   await fs.promises.copyFile(sourceBinary, path.join(binDir, binaryName))
   const windowsSandboxHelper =
     input.os === "win32" ? path.join(path.dirname(sourceBinary), "openagt-sandbox-win.exe") : undefined
-  const windowsSandboxHelperIncluded = windowsSandboxHelper
-    ? await Bun.file(windowsSandboxHelper).exists()
-    : false
+  const windowsSandboxHelperIncluded = windowsSandboxHelper ? await Bun.file(windowsSandboxHelper).exists() : false
   if (input.os === "win32") {
     const helperSha = `${windowsSandboxHelper}.sha256`
     if (!windowsSandboxHelperIncluded && !skipWindowsSandboxHelper) {

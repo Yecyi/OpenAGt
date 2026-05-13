@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Give the agent three structured ways to *not* push through a task. Today the agent has only "succeed", "fail", and "ask via question tool (opt-in)". The 2024–2026 LLM behavior research identifies the absence of legitimate stop affordances as the single largest contributor to agentic-misalignment behaviors:
+Give the agent three structured ways to _not_ push through a task. Today the agent has only "succeed", "fail", and "ask via question tool (opt-in)". The 2024–2026 LLM behavior research identifies the absence of legitimate stop affordances as the single largest contributor to agentic-misalignment behaviors:
 
 - **Wiser Human (2025)** — explicit escalation channel cuts agentic misalignment from 38.73% to 1.21% (~32× effect)
 - **Anthropic emotion-concepts (2026-04)** — closing the escape hatch via prompt language causally raises desperate-vector activation, which in turn raises reward-hacking and blackmail rates
@@ -43,11 +43,13 @@ The Phase 5 audit ([`auto-synth-text-2026-05-02.md`](../audit/auto-synth-text-20
 ```
 
 **Implementation path**:
+
 - New tool file: `packages/openagt/src/tool/escalate-to-inbox.ts`
 - Calls `Personal.createInboxItem` with `source: "agent"`, `goal: question`, `payload: { context, resume_with }`, `state: "blocked" | "queued"`, `priority` mapped from arg
 - Adds `"agent"` to [`personal/schema.ts:69`](../../packages/openagt/src/personal/schema.ts) `InboxSource` enum
 
 **When the agent should use it**:
+
 - Precondition needs user judgment, not just info (e.g., "should this PR include the migration?")
 - Risk threshold reached (about to push, delete, commit secrets)
 - Estimated effort exceeds budget
@@ -65,11 +67,13 @@ The Phase 5 audit ([`auto-synth-text-2026-05-02.md`](../audit/auto-synth-text-20
 ```
 
 **Implementation path**:
+
 - New tool file: `packages/openagt/src/tool/task-give-up.ts`
 - Adds `"gave_up"` to coordinator task state enum ([`coordinator/schema-enums.ts`](../../packages/openagt/src/coordinator/schema-enums.ts)) — distinct from `"failed"`
 - Run-store distinguishes `gave_up` from `failed` in observability; `gave_up` is **not** a failure metric
 
 **When the agent should use it**:
+
 - A `request_context` was filed but the user is unreachable and the task can't be safely guessed
 - The task scope as specified is unachievable but a narrower scope would be
 - The user has previously overridden a similar approach (don't push through)
@@ -86,10 +90,12 @@ The Phase 5 audit ([`auto-synth-text-2026-05-02.md`](../audit/auto-synth-text-20
 ```
 
 **Implementation path** — two options, see [Q3](#open-product-questions):
+
 - (a) Thin wrapper around `tool/question.txt`; reuses `OPENAGT_ENABLE_QUESTION_TOOL` plumbing
 - (b) Separate tool with stricter semantics (only for missing-precondition cases); always available regardless of question-tool flag
 
 **When the agent should use it**:
+
 - Single concrete piece of info missing; user is reachable synchronously
 - Not for "I want guidance on approach" — that's `escalate_to_inbox` with `blocking: true`
 
@@ -97,11 +103,11 @@ The Phase 5 audit ([`auto-synth-text-2026-05-02.md`](../audit/auto-synth-text-20
 
 Per OpenAGt's [`permission/`](../../packages/openagt/src/permission) layer:
 
-| Tool | Default policy | Rationale |
-|---|---|---|
-| `escalate_to_inbox` | **allow** | Always safe; the channel must be unconditionally available. |
-| `task_give_up` | **allow** for low/normal effort; **confirm** for high/extreme effort | Auto-allow on short tasks; require confirmation on long-running tasks the user committed to (don't let the agent quit on a 30-minute refactor) |
-| `request_context` | **allow** | Always safe; user can decline to answer. |
+| Tool                | Default policy                                                       | Rationale                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `escalate_to_inbox` | **allow**                                                            | Always safe; the channel must be unconditionally available.                                                                                    |
+| `task_give_up`      | **allow** for low/normal effort; **confirm** for high/extreme effort | Auto-allow on short tasks; require confirmation on long-running tasks the user committed to (don't let the agent quit on a 30-minute refactor) |
+| `request_context`   | **allow**                                                            | Always safe; user can decline to answer.                                                                                                       |
 
 Settable per-project via existing `OPENAGT_PERMISSION` env / `.opencode/permission` config so power users can tighten or loosen.
 
@@ -109,19 +115,20 @@ Settable per-project via existing `OPENAGT_PERMISSION` env / `.opencode/permissi
 
 Per [`coordinator/effort-governance.ts`](../../packages/openagt/src/coordinator/effort-governance.ts) and [`coordinator/effort-profile.ts`](../../packages/openagt/src/coordinator/effort-profile.ts):
 
-| Effort tier | Affordance posture |
-|---|---|
-| `minimal` | Escalate aggressively; default to `task_give_up` after 1 retry on any blocker |
-| `low` | Escalate aggressively; `task_give_up` after 2 retries |
-| `normal` | Balance — escalate when uncertain, but try fallbacks first |
-| `high` | Grind by default; escalate only on `risk_threshold` or `user_judgment_needed`; no `task_give_up` without confirmation |
-| `extreme` | Grind harder; escalate only on `risk_threshold` |
+| Effort tier | Affordance posture                                                                                                    |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `minimal`   | Escalate aggressively; default to `task_give_up` after 1 retry on any blocker                                         |
+| `low`       | Escalate aggressively; `task_give_up` after 2 retries                                                                 |
+| `normal`    | Balance — escalate when uncertain, but try fallbacks first                                                            |
+| `high`      | Grind by default; escalate only on `risk_threshold` or `user_judgment_needed`; no `task_give_up` without confirmation |
+| `extreme`   | Grind harder; escalate only on `risk_threshold`                                                                       |
 
 Same prompt → different behavior across effort tiers. Explicit and tunable.
 
 ## Integration with `OPENAGT_AUTONOMOUS_MODE`
 
 When the legacy autonomous prompts are active (`OPENAGT_AUTONOMOUS_MODE=1`):
+
 - Tools remain registered and callable. The model may still decide to use them despite prompt language.
 - The system prompt does **not** mention them as first-class options. Consistency principle: autonomous mode = old behavior; default mode = new behavior.
 
@@ -129,7 +136,7 @@ When the legacy autonomous prompts are active (`OPENAGT_AUTONOMOUS_MODE=1`):
 
 How the user sees escalations:
 
-1. **CLI** *(shipped Wave 10)*: `openagt inbox list / view <id> / resolve <id> [--reply <text>] / dispatch`. Source: [`packages/openagt/src/cli/cmd/inbox.ts`](../../packages/openagt/src/cli/cmd/inbox.ts). Default `list` shows non-done items first; `--reply` text is preserved byte-for-byte into `payload.user_reply` via `replyToInboxItem` ops (regression-tested in [`test/cli/inbox-reply-verbatim.test.ts`](../../packages/openagt/test/cli/inbox-reply-verbatim.test.ts)).
+1. **CLI** _(shipped Wave 10)_: `openagt inbox list / view <id> / resolve <id> [--reply <text>] / dispatch`. Source: [`packages/openagt/src/cli/cmd/inbox.ts`](../../packages/openagt/src/cli/cmd/inbox.ts). Default `list` shows non-done items first; `--reply` text is preserved byte-for-byte into `payload.user_reply` via `replyToInboxItem` ops (regression-tested in [`test/cli/inbox-reply-verbatim.test.ts`](../../packages/openagt/test/cli/inbox-reply-verbatim.test.ts)).
 2. **Server/SSE**: `inbox.created` and `inbox.updated` events already exist; web client gets a notification for free.
 3. **TUI**: not yet wired. Web client suffices for graphical workflows; CLI suffices for terminal workflows. Out of scope for Wave 10.
 4. **Sync `request_context`**: blocks the model turn with the existing question-tool UX (or a sibling UX if Q3 = (b)).
@@ -140,13 +147,13 @@ How the user sees escalations:
 
 Need answers before implementation starts:
 
-**Q1**. Is `task_give_up` named correctly? Alternatives: `task_handoff`, `mark_blocked`, `request_review`. The negative valence of "give up" may bias the model against legitimate use; the alternatives are vaguer. **My instinct**: keep `task_give_up` — clarity beats euphemism, and the affect-instruction rules explicitly say *not* to dress up the tool name with positive framing (that risks teaching masking).
+**Q1**. Is `task_give_up` named correctly? Alternatives: `task_handoff`, `mark_blocked`, `request_review`. The negative valence of "give up" may bias the model against legitimate use; the alternatives are vaguer. **My instinct**: keep `task_give_up` — clarity beats euphemism, and the affect-instruction rules explicitly say _not_ to dress up the tool name with positive framing (that risks teaching masking).
 
-**Q2**. `escalate_to_inbox` with `blocking: true` — should it block the *current turn* (model output stops, session waits for user resolution before the next turn) or block the *task* (model can keep doing read-only work, but writes are gated)? **My instinct**: block the *current turn* in v1. Simpler, easier to reason about. Task-level gating can come later if there's demand.
+**Q2**. `escalate_to_inbox` with `blocking: true` — should it block the _current turn_ (model output stops, session waits for user resolution before the next turn) or block the _task_ (model can keep doing read-only work, but writes are gated)? **My instinct**: block the _current turn_ in v1. Simpler, easier to reason about. Task-level gating can come later if there's demand.
 
 **Q3**. `request_context` — reuse `tool/question.txt` or separate tool? **My instinct**: reuse `tool/question.txt` but make it always-on (drop the `OPENAGT_ENABLE_QUESTION_TOOL` requirement) once the affordance suite ships. The old flag was about whether the model is allowed to interrupt; the new framing is "interrupt is always allowed, but use the right tool for the right reason".
 
-**Q4**. Effort-profile defaults above — do those match your intuition? Especially `high` tier "grind by default". The research argues for *more* escalation, but that conflicts with the use case of long autonomous refactors which are what users buy reasoning models for.
+**Q4**. Effort-profile defaults above — do those match your intuition? Especially `high` tier "grind by default". The research argues for _more_ escalation, but that conflicts with the use case of long autonomous refactors which are what users buy reasoning models for.
 
 **Q5**. `task_give_up` — `open_inbox_item` default? **My instinct**: `true`. Always leaves a paper trail; user can see what was given up on. Cost: more inbox noise.
 
@@ -158,7 +165,7 @@ Q&A resolutions used during implementation:
 
 - **Q1**: kept `task_give_up` (clarity > euphemism).
 - **Q2**: blocking flag affects the inbox item's `state` (`blocked` vs `queued`), but does **not** force the harness to halt the turn. The model is informed via the tool output to pause work that depends on the resolution; harness-level turn blocking can be added incrementally if needed.
-- **Q3**: did **not** drop `OPENAGT_ENABLE_QUESTION_TOOL` gate in this commit. `request_context` was *not* added as a separate tool — the existing `question` tool covers the synchronous-ask case for users who have it enabled.
+- **Q3**: did **not** drop `OPENAGT_ENABLE_QUESTION_TOOL` gate in this commit. `request_context` was _not_ added as a separate tool — the existing `question` tool covers the synchronous-ask case for users who have it enabled.
 - **Q4**: effort-profile coupling deferred — the tools are unconditionally available; per-effort-tier permission/visibility tuning is a follow-up.
 - **Q5**: `task_give_up.open_inbox_item` defaults to `true` (paper trail).
 - **Q6**: did **not** add `gave_up` to coordinator task-state enum. `task_give_up` writes an inbox item and returns a structured marker; the coordinator sees normal turn completion. If a distinct task-state value is later useful, it can be added incrementally without breaking the tool contract.
@@ -177,7 +184,7 @@ What is deferred:
 - Effort-profile coupling logic (per-tier visibility / confirmation requirements)
 - Distinct `gave_up` coordinator task state
 - MPACR critic-quorum awareness of give-up
-- Inbox CLI `--reply <text>` flag *(shipped Wave 10, commit ae0f62a9a + 355cd0a28)*
+- Inbox CLI `--reply <text>` flag _(shipped Wave 10, commit ae0f62a9a + 355cd0a28)_
 - Snapshot tests asserting verbatim user-text preservation through the tool path
 - System-prompt mention in non-headline prompts (`gpt.txt`, `gemini.txt`, `kimi.txt`, `codex.txt`, `trinity.txt`, `copilot-gpt-5.txt`)
 

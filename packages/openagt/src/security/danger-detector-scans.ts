@@ -17,7 +17,8 @@ import { parsePowerShellAst } from "./powershell-ast"
 import { ENCODED_COMMAND_PATTERNS, REMOTE_EXECUTION_PATTERNS, validatePowerShellCommand } from "./powershell"
 
 const SEVERITY_ORDER: Record<DangerSeverity, number> = { safe: 0, low: 1, medium: 2, high: 3 }
-const DESTRUCTIVE_RM_PATTERN = /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
+const DESTRUCTIVE_RM_PATTERN =
+  /\brm\b(?=[^;&|]*\s-[^\s;&|]*r)(?=[^;&|]*\s-[^\s;&|]*f)[^;&|]*(?:^|\s)(?:\/|\*|~)(?:\s|$)/i
 
 function mergeSeverity(current: DangerSeverity, next: DangerSeverity): DangerSeverity {
   return SEVERITY_ORDER[next] > SEVERITY_ORDER[current] ? next : current

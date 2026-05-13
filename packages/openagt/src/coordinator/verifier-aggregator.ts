@@ -27,10 +27,12 @@ export function aggregateVerifierSignals(input: readonly VerifierSignalInput[]) 
   const hardFails = signals.filter((item) => item.status === "hard_fail")
   const warnings = signals.filter((item) => item.status === "warning")
   const unavailable = signals.filter((item) => item.status === "timeout" || item.status === "unavailable")
-  const evidence = signals.flatMap((item) => [
-    item.summary ? `${item.source}: ${item.summary}` : undefined,
-    ...item.evidence.map((entry) => `${item.source}: ${entry}`),
-  ]).filter((item): item is string => Boolean(item))
+  const evidence = signals
+    .flatMap((item) => [
+      item.summary ? `${item.source}: ${item.summary}` : undefined,
+      ...item.evidence.map((entry) => `${item.source}: ${entry}`),
+    ])
+    .filter((item): item is string => Boolean(item))
 
   if (hardFails.length > 0) {
     return AggregatedVerifierVerdict.parse({
@@ -89,14 +91,16 @@ function commandSource(command: string): "typecheck" | "test_subset" | undefined
 function diagnosticsFrom(value: unknown, depth = 0): { total: number; errors: number; warnings: number } {
   if (depth > 8) return { total: 0, errors: 0, warnings: 0 }
   if (Array.isArray(value)) {
-    return value.map((item) => diagnosticsFrom(item, depth + 1)).reduce(
-      (acc, item) => ({
-        total: acc.total + item.total,
-        errors: acc.errors + item.errors,
-        warnings: acc.warnings + item.warnings,
-      }),
-      { total: 0, errors: 0, warnings: 0 },
-    )
+    return value
+      .map((item) => diagnosticsFrom(item, depth + 1))
+      .reduce(
+        (acc, item) => ({
+          total: acc.total + item.total,
+          errors: acc.errors + item.errors,
+          warnings: acc.warnings + item.warnings,
+        }),
+        { total: 0, errors: 0, warnings: 0 },
+      )
   }
   const current = record(value)
   if (!current) return { total: 0, errors: 0, warnings: 0 }
@@ -148,9 +152,10 @@ function bashSignal(part: MessageV2.ToolPart): VerifierSignalInput[] {
 
 function diagnosticSignal(part: MessageV2.ToolPart): VerifierSignalInput[] {
   const state = part.state
-  const metadata = state.status === "completed" || state.status === "running" || state.status === "error"
-    ? record(state.metadata)
-    : undefined
+  const metadata =
+    state.status === "completed" || state.status === "running" || state.status === "error"
+      ? record(state.metadata)
+      : undefined
   const counts = diagnosticsFrom(metadata?.diagnostics ?? metadata?.result)
   if (counts.total === 0) return []
   return [

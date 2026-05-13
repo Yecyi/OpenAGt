@@ -64,10 +64,7 @@ describe("script/audit-tool-imports", () => {
 
       // Block-severity violations must include both personal and coordinator.
       const blocked = findings.filter((f) => f.rule.severity === "block").map((f) => f.rule.id)
-      expect(blocked.toSorted()).toEqual([
-        "tool-import.coordinator-coordinator",
-        "tool-import.personal-personal",
-      ])
+      expect(blocked.toSorted()).toEqual(["tool-import.coordinator-coordinator", "tool-import.personal-personal"])
 
       // The type-only import line must NOT appear in any finding.
       const flaggedSpecs = findings.map((f) => f.importPath)

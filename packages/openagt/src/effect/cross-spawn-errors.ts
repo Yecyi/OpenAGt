@@ -2,7 +2,8 @@ import type * as Arr from "effect/Array"
 import * as PlatformError from "effect/PlatformError"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
 
-export const toError = (err: unknown): Error => (err instanceof globalThis.Error ? err : new globalThis.Error(String(err)))
+export const toError = (err: unknown): Error =>
+  err instanceof globalThis.Error ? err : new globalThis.Error(String(err))
 
 const toTag = (err: NodeJS.ErrnoException): PlatformError.SystemErrorTag => {
   switch (err.code) {

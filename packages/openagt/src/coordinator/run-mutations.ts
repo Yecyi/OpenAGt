@@ -302,9 +302,7 @@ export class CoordinatorRunMutations {
       )
       const updated = yield* this.deps.runStore.readAfterUpdate(input.id)
       yield* this.deps.publishUpdated(updated)
-      return yield* Effect.fail(
-        new Error(`Coordinator continue denied: ${deniedReason}`),
-      )
+      return yield* Effect.fail(new Error(`Coordinator continue denied: ${deniedReason}`))
     }
     const delta = requested
     const fullDelta = ResourceLimit.parse({

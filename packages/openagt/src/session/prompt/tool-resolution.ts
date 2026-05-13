@@ -139,7 +139,11 @@ export function createToolScheduler(options?: { maxParallelSafeTasks?: number })
     running.push(entry)
 
     const start = () => Promise.all(blockers).then(() => execute())
-    const pending = safe ? (call.toolName === "task" ? withSafeTaskSlot(start) : start()) : unsafeTail.then(start, start)
+    const pending = safe
+      ? call.toolName === "task"
+        ? withSafeTaskSlot(start)
+        : start()
+      : unsafeTail.then(start, start)
     if (!safe)
       unsafeTail = pending.then(
         () => undefined,

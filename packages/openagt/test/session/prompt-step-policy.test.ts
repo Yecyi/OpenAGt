@@ -62,8 +62,6 @@ describe("prompt step policy", () => {
   test("selects runtime and effort timeouts without loop state", () => {
     expect(promptStepTimeoutMs(agent(), user({ runtime: { timeoutMs: 1_000 } }))).toBe(1_000)
     expect(promptStepTimeoutMs(agent(), user({ runtime: { effort: "deep" } }))).toBe(20 * 60 * 1000)
-    expect(promptStepTimeoutMs(agent({ mode: "subagent" }), user({ runtime: { effort: "deep" } }))).toBe(
-      10 * 60 * 1000,
-    )
+    expect(promptStepTimeoutMs(agent({ mode: "subagent" }), user({ runtime: { effort: "deep" } }))).toBe(10 * 60 * 1000)
   })
 })

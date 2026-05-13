@@ -125,9 +125,9 @@ describe("coordinator telemetry", () => {
         ts,
         event_kind: "tool_call",
         payload: {
-          command: "curl -H \"Authorization: Bearer secret-token\" https://example.test",
+          command: 'curl -H "Authorization: Bearer secret-token" https://example.test',
           nested: {
-            OPENAGT_AUTH_CONTENT: "{\"openai\":{\"key\":\"sk-test-secret\"}}",
+            OPENAGT_AUTH_CONTENT: '{"openai":{"key":"sk-test-secret"}}',
             safe: "keep this",
           },
         },

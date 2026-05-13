@@ -27,10 +27,7 @@ interface AuthResult {
 }
 
 interface BrowserFailureBus {
-  publish: (
-    event: typeof BrowserOpenFailed,
-    payload: { mcpName: string; url: string },
-  ) => Effect.Effect<unknown>
+  publish: (event: typeof BrowserOpenFailed, payload: { mcpName: string; url: string }) => Effect.Effect<unknown>
 }
 
 interface CreateAuthFlowControllerInput<State> {

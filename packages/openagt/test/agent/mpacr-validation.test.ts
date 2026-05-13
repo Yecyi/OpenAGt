@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  MPACR_RETRY_PROMPT_SUFFIX,
-  skippedVerdict,
-  validateCritique,
-} from "../../src/coordinator/mpacr-validation"
+import { MPACR_RETRY_PROMPT_SUFFIX, skippedVerdict, validateCritique } from "../../src/coordinator/mpacr-validation"
 
 const ORIGINAL_PROMPT = "Critique this artifact from the factuality perspective."
 

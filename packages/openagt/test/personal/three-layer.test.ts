@@ -110,9 +110,7 @@ describe("Procedural recipe metadata layout", () => {
   })
 
   test("ProceduralRecipeInput requires at least one step", () => {
-    expect(() =>
-      ProceduralRecipeInput.parse({ task_signature: "t", domain: "d", steps: [] }),
-    ).toThrow()
+    expect(() => ProceduralRecipeInput.parse({ task_signature: "t", domain: "d", steps: [] })).toThrow()
   })
 })
 

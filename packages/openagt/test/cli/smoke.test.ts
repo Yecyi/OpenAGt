@@ -75,10 +75,12 @@ describe("CLI Smoke Tests", () => {
 
   describe("db", () => {
     test("status runs integrity check by default", async () => {
-      const result = await $`bun run ${CLI_ENTRY} db status --format json`.env({
-        ...process.env,
-        OPENCODE_DB: ":memory:",
-      }).quiet()
+      const result = await $`bun run ${CLI_ENTRY} db status --format json`
+        .env({
+          ...process.env,
+          OPENCODE_DB: ":memory:",
+        })
+        .quiet()
       const payload = JSON.parse(result.stdout.toString()) as { integrity: string }
 
       expect(result.exitCode).toBe(0)

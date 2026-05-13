@@ -25,12 +25,7 @@ export * as MemoryConsolidator from "./consolidator"
 
 import { Context, Effect, Layer } from "effect"
 import { Bus } from "@/bus"
-import {
-  cleanExpiredAdvisoryLocks,
-  releaseAdvisoryLock,
-  tryAdvisoryLock,
-  walCheckpointTruncate,
-} from "@/storage/db"
+import { cleanExpiredAdvisoryLocks, releaseAdvisoryLock, tryAdvisoryLock, walCheckpointTruncate } from "@/storage/db"
 import { Database, eq } from "@/storage"
 import { Log } from "../util"
 import { PersonalAgent } from "./personal"
@@ -91,9 +86,7 @@ export function extractCandidateTriples(notes: readonly MemoryNoteType[]): Candi
   for (const note of notes) {
     const meta = note.metadata as Record<string, unknown> | undefined
     const domain =
-      (typeof meta?.domain === "string" ? meta.domain : undefined) ??
-      domainFromTags(note.tags) ??
-      "general"
+      (typeof meta?.domain === "string" ? meta.domain : undefined) ?? domainFromTags(note.tags) ?? "general"
 
     // Fast path: note already carries a structured triple in metadata.
     if (
@@ -335,9 +328,7 @@ export const layer = Layer.effect(
         const workspace = yield* personal.listMemory({ scope: "workspace" })
         const session = yield* personal.listMemory({ scope: "session" })
         const recentEpisodic = [...profile, ...workspace, ...session].filter(
-          (n) =>
-            n.time.updated >= since &&
-            (n.metadata as Record<string, unknown> | undefined)?.consolidated !== true,
+          (n) => n.time.updated >= since && (n.metadata as Record<string, unknown> | undefined)?.consolidated !== true,
         )
         const candidates = extractCandidateTriples(recentEpisodic)
 
@@ -411,9 +402,7 @@ export const layer = Layer.effect(
           if (writes % config.wal_checkpoint_every_n_writes === 0) walCheckpointTruncate()
         }
 
-        const sourceIDs = new Set(
-          [...replayGroups, ...patterns].flatMap((pattern) => pattern.source_note_ids),
-        )
+        const sourceIDs = new Set([...replayGroups, ...patterns].flatMap((pattern) => pattern.source_note_ids))
         if (sourceIDs.size > 0) {
           const timestamp = Date.now()
           for (const note of recentEpisodic.filter((item) => sourceIDs.has(item.id))) {

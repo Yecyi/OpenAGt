@@ -51,7 +51,10 @@ export function classifyGoal(goal: string): GoalClassification {
   const risk_level =
     riskMatches.length > 0
       ? "high"
-      : workflow === "coding" || workflow === "debugging" || workflow === "automation" || workflow === "environment-audit"
+      : workflow === "coding" ||
+          workflow === "debugging" ||
+          workflow === "automation" ||
+          workflow === "environment-audit"
         ? "medium"
         : "low"
   const matched_terms = [...(workflowMatch?.terms ?? []), ...riskMatches]

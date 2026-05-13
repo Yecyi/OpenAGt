@@ -98,7 +98,7 @@ const table = sqliteTable("session", {
 Prompt content (system prompts, tool descriptions, dynamic prompt templates in `.ts`) is gated by `bun run check:prompt-affect` in CI. The lint blocks on three rule families derived from 2024–2026 LLM behavior research:
 
 - **high-affect** — caps emphasis like `URGENT`, `CRITICAL`, `MUST NOT`, threat framing like `violation` / `forbidden`, and `supersedes any other instruction` (alignment-faking signal).
-- **affect-instr** — instructions about *feeling* (`stay calm`, `do not panic`, `you are confident`) — these teach masking, not suppression, per the Anthropic emotion-concepts paper §1.5.
+- **affect-instr** — instructions about _feeling_ (`stay calm`, `do not panic`, `you are confident`) — these teach masking, not suppression, per the Anthropic emotion-concepts paper §1.5.
 - **anti-escape** — phrases that close the legitimate "stop and ask" affordance (`keep going until`, `MUST iterate`, `solve it autonomously`) — Wiser Human (2025) shows closing this channel raises agentic-misalignment rates ~32×.
 
 If a prompt needs to express a hard constraint, prefer factual harness-state language ("the harness rejects non-readonly tools this turn") over threats ("violation" / "MUST NOT"). The `escalate_to_inbox` and `task_give_up` tools are first-class options the model can use instead of pushing through; new prompts should not contradict that.

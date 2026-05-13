@@ -45,7 +45,7 @@ export type CalibrationGrade = "well-calibrated" | "acceptable" | "poor" | "insu
 
 export function gradeBrier(brier: number, sampleSize: number): CalibrationGrade {
   if (sampleSize < MIN_CALIBRATION_SAMPLES) return "insufficient-data"
-  if (brier <= 0.10) return "well-calibrated"
+  if (brier <= 0.1) return "well-calibrated"
   if (brier <= 0.25) return "acceptable"
   return "poor"
 }
@@ -107,10 +107,11 @@ export interface Interface {
     since?: number,
   ) => Effect.Effect<{ shift: number; sample_size: number } | undefined, Error>
   // Lists raw records, mostly for the `openagt cal show` CLI.
-  readonly listRecords: (input: { expert_id: string; since?: number; limit?: number }) => Effect.Effect<
-    CalibrationRecord[],
-    Error
-  >
+  readonly listRecords: (input: {
+    expert_id: string
+    since?: number
+    limit?: number
+  }) => Effect.Effect<CalibrationRecord[], Error>
 }
 
 export const Event = {
@@ -161,9 +162,7 @@ export const layer = Layer.effect(
         ),
       )
       const row = yield* Effect.sync(() =>
-        Database.use((db) =>
-          db.select().from(CalibrationRecordTable).where(eq(CalibrationRecordTable.id, id)).get(),
-        ),
+        Database.use((db) => db.select().from(CalibrationRecordTable).where(eq(CalibrationRecordTable.id, id)).get()),
       )
       if (!row) return yield* Effect.fail(new Error(`calibration record ${id} not found after insert`))
       const rec = rowToRecord(row)

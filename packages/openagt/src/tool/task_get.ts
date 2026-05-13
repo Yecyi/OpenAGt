@@ -89,9 +89,7 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
               `status: ${record.value.status}`,
               `kind: ${record.value.task_kind}`,
               `description: ${record.value.description}`,
-              ...(latestOutcome
-                ? [`outcome_id: ${latestOutcome.id}`, `attempt: ${latestOutcome.attempt_no}`]
-                : []),
+              ...(latestOutcome ? [`outcome_id: ${latestOutcome.id}`, `attempt: ${latestOutcome.attempt_no}`] : []),
               "",
               `<task_result status="${record.value.status}">`,
               result,

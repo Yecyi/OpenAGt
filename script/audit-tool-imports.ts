@@ -46,7 +46,8 @@ export const RULES: readonly Rule[] = [
     bannedPath: "personal/personal",
     rationale:
       "personal/personal.ts pulls coordinator/coordinator at module load; that chain hits TDZ on Agent.defaultLayer when a test loads tool/registry.",
-    allowedAlternative: 'import { Service } from "../personal/service" — the Service tag lives in service.ts to break this chain.',
+    allowedAlternative:
+      'import { Service } from "../personal/service" — the Service tag lives in service.ts to break this chain.',
   },
   {
     id: "tool-import.coordinator-coordinator",
@@ -55,7 +56,7 @@ export const RULES: readonly Rule[] = [
     rationale:
       "coordinator/coordinator.ts:505 invokes Layer.provide(Agent.defaultLayer) at module-init. Importing it from a tool file recreates the TDZ trap.",
     allowedAlternative:
-      'import type-only types from coordinator/schema-*.ts files, or move the value lookup into an Effect.gen body where the layer is already resolved.',
+      "import type-only types from coordinator/schema-*.ts files, or move the value lookup into an Effect.gen body where the layer is already resolved.",
   },
   {
     id: "tool-import.agent-agent",
@@ -162,78 +163,78 @@ if (!import.meta.main) {
   // Imported for testing — skip the CLI body below. Tests should call
   // scanText / scanFile / RULES directly.
 } else {
-const args = Bun.argv.slice(2)
-const failOnBlock = args.includes("--fail-on-block")
-const asJson = args.includes("--json")
+  const args = Bun.argv.slice(2)
+  const failOnBlock = args.includes("--fail-on-block")
+  const asJson = args.includes("--json")
 
-const files = await collectFiles()
-const findings = (await Promise.all(files.map(scanFile))).flat()
-const blocked = findings.filter((f) => f.rule.severity === "block")
-const warned = findings.filter((f) => f.rule.severity === "warn")
+  const files = await collectFiles()
+  const findings = (await Promise.all(files.map(scanFile))).flat()
+  const blocked = findings.filter((f) => f.rule.severity === "block")
+  const warned = findings.filter((f) => f.rule.severity === "warn")
 
-if (asJson) {
-  console.log(
-    JSON.stringify(
-      {
-        summary: {
-          files_scanned: files.length,
-          files_with_findings: new Set(findings.map((f) => f.file)).size,
-          total: findings.length,
-          block: blocked.length,
-          warn: warned.length,
+  if (asJson) {
+    console.log(
+      JSON.stringify(
+        {
+          summary: {
+            files_scanned: files.length,
+            files_with_findings: new Set(findings.map((f) => f.file)).size,
+            total: findings.length,
+            block: blocked.length,
+            warn: warned.length,
+          },
+          framework_exceptions: [...FRAMEWORK_EXCEPTIONS],
+          findings: findings.map((f) => ({
+            file: f.file,
+            line: f.line,
+            col: f.col,
+            rule: f.rule.id,
+            severity: f.rule.severity,
+            import_path: f.importPath,
+            snippet: f.snippet,
+            rationale: f.rule.rationale,
+            allowed_alternative: f.rule.allowedAlternative,
+          })),
         },
-        framework_exceptions: [...FRAMEWORK_EXCEPTIONS],
-        findings: findings.map((f) => ({
-          file: f.file,
-          line: f.line,
-          col: f.col,
-          rule: f.rule.id,
-          severity: f.rule.severity,
-          import_path: f.importPath,
-          snippet: f.snippet,
-          rationale: f.rule.rationale,
-          allowed_alternative: f.rule.allowedAlternative,
-        })),
-      },
-      null,
-      2,
-    ),
-  )
-  process.exit(failOnBlock && blocked.length > 0 ? 1 : 0)
-}
-
-console.log(`# Tool-Registry Import Audit\n`)
-console.log(
-  `Scanned ${files.length} files in ${SCAN_GLOB} (${FRAMEWORK_EXCEPTIONS.size} framework exceptions excluded); ` +
-    `${findings.length} findings (${blocked.length} block, ${warned.length} warn).\n`,
-)
-
-if (findings.length === 0) {
-  console.log("OK — no banned imports detected.\n")
-  process.exit(0)
-}
-
-const byFile = new Map<string, Finding[]>()
-for (const f of findings) {
-  const list = byFile.get(f.file) ?? []
-  list.push(f)
-  byFile.set(f.file, list)
-}
-
-for (const [file, ms] of byFile) {
-  console.log(`## ${file}`)
-  for (const m of ms) {
-    console.log(`  - line ${m.line}: [${m.rule.severity.toUpperCase()}] ${m.rule.id}`)
-    console.log(`      import: ${m.snippet}`)
-    console.log(`      why:    ${m.rule.rationale}`)
-    console.log(`      fix:    ${m.rule.allowedAlternative}`)
+        null,
+        2,
+      ),
+    )
+    process.exit(failOnBlock && blocked.length > 0 ? 1 : 0)
   }
-  console.log("")
-}
 
-if (failOnBlock && blocked.length > 0) {
-  console.error(`FAIL: ${blocked.length} block-severity violation(s).`)
-  process.exit(1)
-}
-process.exit(0)
+  console.log(`# Tool-Registry Import Audit\n`)
+  console.log(
+    `Scanned ${files.length} files in ${SCAN_GLOB} (${FRAMEWORK_EXCEPTIONS.size} framework exceptions excluded); ` +
+      `${findings.length} findings (${blocked.length} block, ${warned.length} warn).\n`,
+  )
+
+  if (findings.length === 0) {
+    console.log("OK — no banned imports detected.\n")
+    process.exit(0)
+  }
+
+  const byFile = new Map<string, Finding[]>()
+  for (const f of findings) {
+    const list = byFile.get(f.file) ?? []
+    list.push(f)
+    byFile.set(f.file, list)
+  }
+
+  for (const [file, ms] of byFile) {
+    console.log(`## ${file}`)
+    for (const m of ms) {
+      console.log(`  - line ${m.line}: [${m.rule.severity.toUpperCase()}] ${m.rule.id}`)
+      console.log(`      import: ${m.snippet}`)
+      console.log(`      why:    ${m.rule.rationale}`)
+      console.log(`      fix:    ${m.rule.allowedAlternative}`)
+    }
+    console.log("")
+  }
+
+  if (failOnBlock && blocked.length > 0) {
+    console.error(`FAIL: ${blocked.length} block-severity violation(s).`)
+    process.exit(1)
+  }
+  process.exit(0)
 }

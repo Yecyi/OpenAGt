@@ -19,7 +19,9 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
     if (this.queue.length > 0) return this.queue.shift()!
     if (this.closed) return Promise.reject(new Error("AsyncQueue is closed"))
     return new Promise((resolve, reject) =>
-      this.resolvers.push((value) => (value === undefined ? reject(new Error("AsyncQueue is closed")) : resolve(value))),
+      this.resolvers.push((value) =>
+        value === undefined ? reject(new Error("AsyncQueue is closed")) : resolve(value),
+      ),
     )
   }
 

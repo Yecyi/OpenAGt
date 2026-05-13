@@ -17,12 +17,7 @@ import {
   type SystemPromptResult,
 } from "./system-prompt-contracts"
 import { getCache, setCache } from "./system-prompt-cache"
-import {
-  estimatePromptTokens,
-  isDynamicSegment,
-  isStaticSegment,
-  parsePromptSegments,
-} from "./system-prompt-parser"
+import { estimatePromptTokens, isDynamicSegment, isStaticSegment, parsePromptSegments } from "./system-prompt-parser"
 
 const log = Log.create({ service: "system-prompt-loader" })
 

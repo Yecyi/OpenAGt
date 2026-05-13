@@ -7,18 +7,10 @@
  */
 
 import { Effect, Layer, Context } from "effect"
-import {
-  expandAliases,
-  PATTERN_DANGERS,
-  STRUCTURED_DANGEROUS_CMDLETS,
-} from "./powershell-ast-patterns"
+import { expandAliases, PATTERN_DANGERS, STRUCTURED_DANGEROUS_CMDLETS } from "./powershell-ast-patterns"
 import { analyzeObfuscation } from "./powershell-obfuscation"
 import { parsePowerShellStructure } from "./powershell-ast-parser"
-import type {
-  CommandInfo,
-  DangerousNode,
-  PowerShellAstResult,
-} from "./powershell-ast-contracts"
+import type { CommandInfo, DangerousNode, PowerShellAstResult } from "./powershell-ast-contracts"
 
 export type {
   AstNode,

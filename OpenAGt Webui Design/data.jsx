@@ -101,13 +101,13 @@ const SESSIONS = [
     files: [],
     env: [],
   },
-];
+]
 
 const PROVIDERS = [
   { name: "Anthropic", status: "live", lat: "182 ms" },
   { name: "OpenAI", status: "live", lat: "234 ms" },
   { name: "Local · ollama", status: "idle", lat: "—" },
-];
+]
 
 const TRANSCRIPTS = {
   "react-auth": [
@@ -179,41 +179,79 @@ const TRANSCRIPTS = {
       sub: "Researcher → Implementer",
       ts: "13:01:09",
       blocks: [
-        { type: "p", text: "Three hot paths dominate the run: (1) sequential file enumeration, (2) per-row type coercion, and (3) a single-threaded concat. Of these, the concat is the cheapest to keep and the coercion is the most expensive to remove." },
+        {
+          type: "p",
+          text: "Three hot paths dominate the run: (1) sequential file enumeration, (2) per-row type coercion, and (3) a single-threaded concat. Of these, the concat is the cheapest to keep and the coercion is the most expensive to remove.",
+        },
         { type: "h3", text: "Plan" },
-        { type: "ul", items: [
-          ["Parallel reads", "Bounded thread-pool, 8 workers, with a 2 GB watermark."],
-          ["Vectorized coerce", "Replace per-row casts with column-wise PyArrow."],
-          ["Streaming concat", "Use DuckDB to stitch shards without materializing."],
-        ]},
+        {
+          type: "ul",
+          items: [
+            ["Parallel reads", "Bounded thread-pool, 8 workers, with a 2 GB watermark."],
+            ["Vectorized coerce", "Replace per-row casts with column-wise PyArrow."],
+            ["Streaming concat", "Use DuckDB to stitch shards without materializing."],
+          ],
+        },
       ],
     },
   ],
   "deploy-ci": [
     {
-      kind: "user", who: "User", sub: "S. Cyi", ts: "Yesterday 17:40",
+      kind: "user",
+      who: "User",
+      sub: "S. Cyi",
+      ts: "Yesterday 17:40",
       text: "Sketch a release pipeline that signs the Windows MSI, attests the macOS archive, and pushes a SHA256SUMS file.",
     },
     {
-      kind: "agent", who: "OpenAGt · Sonnet 4.5", sub: "Planner", ts: "17:40:12",
+      kind: "agent",
+      who: "OpenAGt · Sonnet 4.5",
+      sub: "Planner",
+      ts: "17:40:12",
       blocks: [
-        { type: "p", text: "I'll draft a single workflow with three matrix legs: windows-2022 for signtool, macos-14 for codesign + notary, and ubuntu-24.04 for the Linux tarball and final SHA roll-up." },
+        {
+          type: "p",
+          text: "I'll draft a single workflow with three matrix legs: windows-2022 for signtool, macos-14 for codesign + notary, and ubuntu-24.04 for the Linux tarball and final SHA roll-up.",
+        },
       ],
     },
   ],
   "legacy-api": [
-    { kind: "user", who: "User", sub: "S. Cyi", ts: "Mar 14", text: "Close out the v0 → v1 migration; archive everything." },
-    { kind: "agent", who: "OpenAGt · Haiku", sub: "Closer", ts: "Mar 14",
-      blocks: [{ type: "p", text: "All routes migrated. 18 endpoints retired, 4 deprecated with sunset headers. Closing session and archiving artifacts." }] },
+    {
+      kind: "user",
+      who: "User",
+      sub: "S. Cyi",
+      ts: "Mar 14",
+      text: "Close out the v0 → v1 migration; archive everything.",
+    },
+    {
+      kind: "agent",
+      who: "OpenAGt · Haiku",
+      sub: "Closer",
+      ts: "Mar 14",
+      blocks: [
+        {
+          type: "p",
+          text: "All routes migrated. 18 endpoints retired, 4 deprecated with sunset headers. Closing session and archiving artifacts.",
+        },
+      ],
+    },
   ],
   "obs-skills": [
     { kind: "user", who: "User", sub: "S. Cyi", ts: "Mar 02", text: "Bring over the Obsidian skill files." },
-    { kind: "agent", who: "OpenAGt · Sonnet", sub: "Importer", ts: "Mar 02",
-      blocks: [{ type: "p", text: "Imported 14 skills into .opencode/skills. No conflicts; vault remains source-of-truth." }] },
+    {
+      kind: "agent",
+      who: "OpenAGt · Sonnet",
+      sub: "Importer",
+      ts: "Mar 02",
+      blocks: [
+        { type: "p", text: "Imported 14 skills into .opencode/skills. No conflicts; vault remains source-of-truth." },
+      ],
+    },
   ],
-};
+}
 
-window.AGT = { SESSIONS, PROVIDERS, TRANSCRIPTS };
+window.AGT = { SESSIONS, PROVIDERS, TRANSCRIPTS }
 
 /* ---------- Mission Control mock ---------- */
 const MISSION = {
@@ -222,68 +260,169 @@ const MISSION = {
   workflow: "coding",
   effort: "High",
   status: "executing", // planning | preview | executing | reviewing | done
-  budget: { tools: { used: 18, max: 240 }, calls: { used: 4, max: 40 }, wall: { used: 3, max: 45 }, tokens: { used: 8243, max: 60000 } },
+  budget: {
+    tools: { used: 18, max: 240 },
+    calls: { used: 4, max: 40 },
+    wall: { used: 3, max: 45 },
+    tokens: { used: 8243, max: 60000 },
+  },
   evidence: { coverage: "medium", confidence: "medium", review: "pending" },
   stages: [
-    { id: "explore",   title: "Discovery",         state: "done",     ts: "00:42" },
-    { id: "plan",      title: "Coordinator Plan",  state: "done",     ts: "01:14" },
-    { id: "execute",   title: "Expert Execution",  state: "active",   ts: "—"    },
-    { id: "reduce",    title: "Reducer",           state: "pending",  ts: "—"    },
-    { id: "verify",    title: "Verifier",          state: "pending",  ts: "—"    },
-    { id: "review",    title: "Critical Review",   state: "pending",  ts: "—"    },
-    { id: "checkpoint",title: "Checkpoint Memory", state: "pending",  ts: "—"    },
+    { id: "explore", title: "Discovery", state: "done", ts: "00:42" },
+    { id: "plan", title: "Coordinator Plan", state: "done", ts: "01:14" },
+    { id: "execute", title: "Expert Execution", state: "active", ts: "—" },
+    { id: "reduce", title: "Reducer", state: "pending", ts: "—" },
+    { id: "verify", title: "Verifier", state: "pending", ts: "—" },
+    { id: "review", title: "Critical Review", state: "pending", ts: "—" },
+    { id: "checkpoint", title: "Checkpoint Memory", state: "pending", ts: "—" },
   ],
   todos: [
-    { id: "t1", state: "done",     title: "Inspect repo structure",            owner: "explorer",  ts: "00:18" },
-    { id: "t2", state: "done",     title: "Read existing auth scaffolding",    owner: "explorer",  ts: "00:34" },
-    { id: "t3", state: "done",     title: "Draft architecture sketch",         owner: "planner",   ts: "01:02" },
-    { id: "t4", state: "active",   title: "Implement AuthContext + provider",  owner: "implementer", ts: "01:20" },
-    { id: "t5", state: "active",   title: "Wire interceptor + refresh token",  owner: "implementer", ts: "01:24" },
-    { id: "t6", state: "pending",  title: "Add unit tests for token lifecycle",owner: "tester",    ts: "—"    },
-    { id: "t7", state: "pending",  title: "Reduce + verify behavior",          owner: "reducer",   ts: "—"    },
-    { id: "t8", state: "pending",  title: "Critical review pass",              owner: "reviewer",  ts: "—"    },
+    { id: "t1", state: "done", title: "Inspect repo structure", owner: "explorer", ts: "00:18" },
+    { id: "t2", state: "done", title: "Read existing auth scaffolding", owner: "explorer", ts: "00:34" },
+    { id: "t3", state: "done", title: "Draft architecture sketch", owner: "planner", ts: "01:02" },
+    { id: "t4", state: "active", title: "Implement AuthContext + provider", owner: "implementer", ts: "01:20" },
+    { id: "t5", state: "active", title: "Wire interceptor + refresh token", owner: "implementer", ts: "01:24" },
+    { id: "t6", state: "pending", title: "Add unit tests for token lifecycle", owner: "tester", ts: "—" },
+    { id: "t7", state: "pending", title: "Reduce + verify behavior", owner: "reducer", ts: "—" },
+    { id: "t8", state: "pending", title: "Critical review pass", owner: "reviewer", ts: "—" },
   ],
   // DAG: nodes + edges
   dag: {
     nodes: [
-      { id: "explore",     label: "Explore",       lane: 0, x: 0,   state: "done"     },
-      { id: "plan",        label: "Plan",          lane: 0, x: 1,   state: "done"     },
-      { id: "ctx",         label: "Context",       lane: 1, x: 2,   state: "done"     },
-      { id: "auth-impl",   label: "Auth Provider", lane: 2, x: 2,   state: "active"   },
-      { id: "interceptor", label: "Interceptor",   lane: 3, x: 2,   state: "active"   },
-      { id: "tests",       label: "Tests",         lane: 4, x: 3,   state: "pending"  },
-      { id: "reduce",      label: "Reduce",        lane: 2, x: 4,   state: "pending"  },
-      { id: "verify",      label: "Verify",        lane: 2, x: 5,   state: "pending"  },
-      { id: "review",      label: "Review",        lane: 2, x: 6,   state: "pending"  },
+      { id: "explore", label: "Explore", lane: 0, x: 0, state: "done" },
+      { id: "plan", label: "Plan", lane: 0, x: 1, state: "done" },
+      { id: "ctx", label: "Context", lane: 1, x: 2, state: "done" },
+      { id: "auth-impl", label: "Auth Provider", lane: 2, x: 2, state: "active" },
+      { id: "interceptor", label: "Interceptor", lane: 3, x: 2, state: "active" },
+      { id: "tests", label: "Tests", lane: 4, x: 3, state: "pending" },
+      { id: "reduce", label: "Reduce", lane: 2, x: 4, state: "pending" },
+      { id: "verify", label: "Verify", lane: 2, x: 5, state: "pending" },
+      { id: "review", label: "Review", lane: 2, x: 6, state: "pending" },
     ],
     edges: [
-      ["explore","plan"], ["plan","ctx"], ["plan","auth-impl"], ["plan","interceptor"],
-      ["auth-impl","tests"], ["interceptor","tests"], ["ctx","auth-impl"],
-      ["tests","reduce"], ["auth-impl","reduce"], ["interceptor","reduce"],
-      ["reduce","verify"], ["verify","review"],
+      ["explore", "plan"],
+      ["plan", "ctx"],
+      ["plan", "auth-impl"],
+      ["plan", "interceptor"],
+      ["auth-impl", "tests"],
+      ["interceptor", "tests"],
+      ["ctx", "auth-impl"],
+      ["tests", "reduce"],
+      ["auth-impl", "reduce"],
+      ["interceptor", "reduce"],
+      ["reduce", "verify"],
+      ["verify", "review"],
     ],
   },
   experts: [
-    { id: "explorer",    role: "Explorer",     state: "done",    tool: "—",            scope: ["src/", "package.json"], elapsed: "1:14", steps: "8 / 12",  conf: "high",   ev: ["repo layout", "vite config", "deps map"], risks: [] },
-    { id: "planner",     role: "Planner",      state: "done",    tool: "—",            scope: ["architecture"],          elapsed: "0:48", steps: "5 / 10",  conf: "high",   ev: ["arch sketch", "module boundaries"], risks: [] },
-    { id: "implementer", role: "Implementer",  state: "running", tool: "edit_file",    scope: ["src/context", "src/hooks"], elapsed: "2:03", steps: "11 / 30", conf: "medium", ev: ["AuthContext draft"], risks: ["token storage location"] },
-    { id: "interceptor", role: "Implementer",  state: "running", tool: "edit_file",    scope: ["src/lib/http"],          elapsed: "1:42", steps: "7 / 30",  conf: "medium", ev: ["axios baseline"], risks: ["refresh race condition"] },
-    { id: "tester",      role: "Tester",       state: "idle",    tool: "—",            scope: ["src/__tests__"],         elapsed: "—",    steps: "0 / 20",  conf: "—",      ev: [], risks: [] },
-    { id: "reducer",     role: "Reducer",      state: "pending", tool: "—",            scope: ["all expert outputs"],    elapsed: "—",    steps: "0 / 8",   conf: "—",      ev: [], risks: [] },
-    { id: "verifier",    role: "Verifier",     state: "pending", tool: "—",            scope: ["acceptance criteria"],   elapsed: "—",    steps: "0 / 6",   conf: "—",      ev: [], risks: [] },
-    { id: "reviewer",    role: "Reviewer",     state: "pending", tool: "—",            scope: ["security · UX · perf"],  elapsed: "—",    steps: "0 / 4",   conf: "—",      ev: [], risks: [] },
+    {
+      id: "explorer",
+      role: "Explorer",
+      state: "done",
+      tool: "—",
+      scope: ["src/", "package.json"],
+      elapsed: "1:14",
+      steps: "8 / 12",
+      conf: "high",
+      ev: ["repo layout", "vite config", "deps map"],
+      risks: [],
+    },
+    {
+      id: "planner",
+      role: "Planner",
+      state: "done",
+      tool: "—",
+      scope: ["architecture"],
+      elapsed: "0:48",
+      steps: "5 / 10",
+      conf: "high",
+      ev: ["arch sketch", "module boundaries"],
+      risks: [],
+    },
+    {
+      id: "implementer",
+      role: "Implementer",
+      state: "running",
+      tool: "edit_file",
+      scope: ["src/context", "src/hooks"],
+      elapsed: "2:03",
+      steps: "11 / 30",
+      conf: "medium",
+      ev: ["AuthContext draft"],
+      risks: ["token storage location"],
+    },
+    {
+      id: "interceptor",
+      role: "Implementer",
+      state: "running",
+      tool: "edit_file",
+      scope: ["src/lib/http"],
+      elapsed: "1:42",
+      steps: "7 / 30",
+      conf: "medium",
+      ev: ["axios baseline"],
+      risks: ["refresh race condition"],
+    },
+    {
+      id: "tester",
+      role: "Tester",
+      state: "idle",
+      tool: "—",
+      scope: ["src/__tests__"],
+      elapsed: "—",
+      steps: "0 / 20",
+      conf: "—",
+      ev: [],
+      risks: [],
+    },
+    {
+      id: "reducer",
+      role: "Reducer",
+      state: "pending",
+      tool: "—",
+      scope: ["all expert outputs"],
+      elapsed: "—",
+      steps: "0 / 8",
+      conf: "—",
+      ev: [],
+      risks: [],
+    },
+    {
+      id: "verifier",
+      role: "Verifier",
+      state: "pending",
+      tool: "—",
+      scope: ["acceptance criteria"],
+      elapsed: "—",
+      steps: "0 / 6",
+      conf: "—",
+      ev: [],
+      risks: [],
+    },
+    {
+      id: "reviewer",
+      role: "Reviewer",
+      state: "pending",
+      tool: "—",
+      scope: ["security · UX · perf"],
+      elapsed: "—",
+      steps: "0 / 4",
+      conf: "—",
+      ev: [],
+      risks: [],
+    },
   ],
   qualityGates: [
-    { id: "g1", name: "All tests pass",            state: "pending" },
+    { id: "g1", name: "All tests pass", state: "pending" },
     { id: "g2", name: "Reducer reaches consensus", state: "pending" },
     { id: "g3", name: "Verifier confidence ≥ med", state: "pending" },
-    { id: "g4", name: "Review approves diff",      state: "pending" },
+    { id: "g4", name: "Review approves diff", state: "pending" },
   ],
   revisePoints: [
     { at: "Reducer", reason: "Conflicting token-storage strategies between experts" },
     { at: "Verifier", reason: "Refresh-token race condition unresolved" },
   ],
-};
+}
 
 /* ---------- Permissions queue ---------- */
 const PERMISSIONS = [
@@ -296,7 +435,11 @@ const PERMISSIONS = [
     decision: "confirm",
     why: "Network access required to fetch packages, then writes to dist/.",
     policy: "exec_policy_rule · matched: shell-network-write",
-    boundary: { sandbox: "workspace", filesystem: "rw within /workspace", network: "allow registry.npmjs.org · jsr.io" },
+    boundary: {
+      sandbox: "workspace",
+      filesystem: "rw within /workspace",
+      network: "allow registry.npmjs.org · jsr.io",
+    },
     matched: ["shell-network-write", "package-manager-allowed"],
     retryable: true,
     requestedBy: "implementer",
@@ -351,7 +494,7 @@ const PERMISSIONS = [
     sessionId: "react-auth",
     at: "14:03:01",
   },
-];
+]
 
-window.AGT.MISSION = MISSION;
-window.AGT.PERMISSIONS = PERMISSIONS;
+window.AGT.MISSION = MISSION
+window.AGT.PERMISSIONS = PERMISSIONS

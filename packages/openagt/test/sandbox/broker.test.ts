@@ -221,7 +221,8 @@ describe("Windows helper discovery", () => {
       execPath: "C:\\OpenAGt\\bin\\openagt.exe",
       override: "C:\\tmp\\override.exe",
       env: { OPENAGT_SANDBOX_ALLOW_HELPER_OVERRIDE: "1" },
-      exists: (candidate) => candidate === "C:\\OpenAGt\\bin\\openagt-sandbox-win.exe" || candidate === "C:\\tmp\\override.exe",
+      exists: (candidate) =>
+        candidate === "C:\\OpenAGt\\bin\\openagt-sandbox-win.exe" || candidate === "C:\\tmp\\override.exe",
     })
 
     expect(result.path).toBe("C:\\OpenAGt\\bin\\openagt-sandbox-win.exe")

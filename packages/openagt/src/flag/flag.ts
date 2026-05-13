@@ -62,8 +62,7 @@ export const Flag = {
   OPENAGT_FAKE_VCS: process.env["OPENAGT_FAKE_VCS"] ?? process.env["OPENCODE_FAKE_VCS"],
   OPENAGT_SERVER_PASSWORD: process.env["OPENAGT_SERVER_PASSWORD"] ?? process.env["OPENCODE_SERVER_PASSWORD"],
   OPENAGT_SERVER_USERNAME: process.env["OPENAGT_SERVER_USERNAME"] ?? process.env["OPENCODE_SERVER_USERNAME"],
-  OPENAGT_SERVER_LOCAL_TOKEN:
-    process.env["OPENAGT_SERVER_LOCAL_TOKEN"] ?? process.env["OPENCODE_SERVER_LOCAL_TOKEN"],
+  OPENAGT_SERVER_LOCAL_TOKEN: process.env["OPENAGT_SERVER_LOCAL_TOKEN"] ?? process.env["OPENCODE_SERVER_LOCAL_TOKEN"],
   OPENAGT_ENABLE_QUESTION_TOOL: truthy("OPENAGT_ENABLE_QUESTION_TOOL"),
   // When set, GPT/O-series and Copilot model routes use the legacy autonomous
   // prompts (beast-autonomous.txt / copilot-gpt-5-autonomous.txt) instead of
@@ -84,8 +83,7 @@ export const Flag = {
   // handoff brief is the Context Rot-aware alternative to aggressive
   // in-session compaction. Schema-only today — the consuming code that
   // performs the fork + handoff brief is deferred.
-  OPENAGT_EXPERIMENTAL_AUTO_FORK:
-    truthy("OPENAGT_EXPERIMENTAL_AUTO_FORK") || truthy("OPENCODE_EXPERIMENTAL_AUTO_FORK"),
+  OPENAGT_EXPERIMENTAL_AUTO_FORK: truthy("OPENAGT_EXPERIMENTAL_AUTO_FORK") || truthy("OPENCODE_EXPERIMENTAL_AUTO_FORK"),
 
   OPENCODE_AUTO_HEAP_SNAPSHOT: truthy("OPENCODE_AUTO_HEAP_SNAPSHOT"),
   OPENCODE_GIT_BASH_PATH: process.env["OPENCODE_GIT_BASH_PATH"] ?? process.env["OPENAGT_GIT_BASH_PATH"],
@@ -110,8 +108,7 @@ export const Flag = {
   OPENCODE_FAKE_VCS: process.env["OPENCODE_FAKE_VCS"],
   OPENCODE_SERVER_PASSWORD: process.env["OPENCODE_SERVER_PASSWORD"] ?? process.env["OPENAGT_SERVER_PASSWORD"],
   OPENCODE_SERVER_USERNAME: process.env["OPENCODE_SERVER_USERNAME"] ?? process.env["OPENAGT_SERVER_USERNAME"],
-  OPENCODE_SERVER_LOCAL_TOKEN:
-    process.env["OPENCODE_SERVER_LOCAL_TOKEN"] ?? process.env["OPENAGT_SERVER_LOCAL_TOKEN"],
+  OPENCODE_SERVER_LOCAL_TOKEN: process.env["OPENCODE_SERVER_LOCAL_TOKEN"] ?? process.env["OPENAGT_SERVER_LOCAL_TOKEN"],
   OPENCODE_ENABLE_QUESTION_TOOL: truthy("OPENCODE_ENABLE_QUESTION_TOOL"),
 
   // Experimental

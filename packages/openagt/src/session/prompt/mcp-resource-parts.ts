@@ -28,10 +28,6 @@ export function mcpResourceBinaryPart(scope: PartScope, mime: string | undefined
   return textPart(scope, `[Binary content: ${mime}]`)
 }
 
-export function mcpResourceFailurePart(
-  scope: PartScope,
-  filename: string | undefined,
-  message: string,
-): DraftTextPart {
+export function mcpResourceFailurePart(scope: PartScope, filename: string | undefined, message: string): DraftTextPart {
   return textPart(scope, `Failed to read MCP resource ${filename}: ${message}`)
 }
