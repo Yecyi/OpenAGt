@@ -2,9 +2,9 @@
 // This file does not select default models, mutate provider catalogs, or handle auth discovery.
 
 import { type Provider as SDK } from "ai"
-import { Hash } from "@openagt/shared/util/hash"
 import { Npm } from "../npm"
 import { iife } from "@/util/iife"
+import { providerSDKCacheKey } from "./cache-scope"
 import type { BundledProviderRegistry, BundledSDK } from "./bundled-provider-registry"
 import type { CustomVarsLoader } from "./custom-loader-types"
 import type { Info, Model } from "./provider"
@@ -123,13 +123,11 @@ export async function resolveProviderSDK(input: ResolveProviderSDKInput): Promis
         ...input.model.headers,
       }
 
-    const key = Hash.fast(
-      JSON.stringify({
-        providerID: input.model.providerID,
-        npm: input.model.api.npm,
-        options,
-      }),
-    )
+    const key = providerSDKCacheKey({
+      providerID: input.model.providerID,
+      npm: input.model.api.npm,
+      options,
+    })
     const existing = input.state.sdk.get(key)
     if (existing) return existing as SDK
 

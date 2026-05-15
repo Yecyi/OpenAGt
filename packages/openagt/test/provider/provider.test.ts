@@ -1,8 +1,10 @@
 import { test, expect } from "bun:test"
 import { mkdir, unlink } from "fs/promises"
 import path from "path"
+import { pathToFileURL } from "url"
 
 import { tmpdir } from "../fixture/fixture"
+import { Auth } from "../../src/auth"
 import { Global } from "../../src/global"
 import { Instance } from "../../src/project/instance"
 import { Plugin } from "../../src/plugin/index"
@@ -363,6 +365,88 @@ test("getModel returns model for valid provider/model", async () => {
       expect(language).toBeDefined()
     },
   })
+})
+
+test("getLanguage scopes cached model by active auth account", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "fake-provider.ts"),
+        [
+          "export function createFakeProvider(options) {",
+          "  return {",
+          "    languageModel(modelID) {",
+          "      return { modelID, providerOptions: options }",
+          "    },",
+          "  }",
+          "}",
+          "",
+        ].join("\n"),
+      )
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          provider: {
+            "cache-scope-test": {
+              name: "Cache Scope Test",
+              npm: pathToFileURL(path.join(dir, "fake-provider.ts")).href,
+              api: "https://cache-scope.example/v1",
+              env: [],
+              models: {
+                model: {
+                  name: "Model",
+                  tool_call: true,
+                  limit: { context: 8000, output: 1000 },
+                },
+              },
+            },
+          },
+        }),
+      )
+    },
+  })
+
+  const authPath = path.join(Global.Path.data, "auth.json")
+  const previous = await Filesystem.readText(authPath).catch(() => undefined)
+  try {
+    const [first, second] = await Instance.provide({
+      directory: tmp.path,
+      fn: async () =>
+        AppRuntime.runPromise(
+          Effect.gen(function* () {
+            const auth = yield* Auth.Service
+            const providerID = ProviderID.make("cache-scope-test")
+            yield* auth.set(providerID, {
+              type: "api",
+              key: "first-key",
+              metadata: { accountId: "account-a" },
+            })
+            const provider = yield* Provider.Service
+            const model = yield* provider.getModel(providerID, ModelID.make("model"))
+            const first = yield* provider.getLanguage(model)
+            yield* auth.set(providerID, {
+              type: "api",
+              key: "second-key",
+              metadata: { accountId: "account-b" },
+            })
+            const second = yield* provider.getLanguage(model)
+            return [first, second] as const
+          }),
+        ),
+    })
+
+    expect(first).not.toBe(second)
+    expect((first as unknown as { providerOptions: { apiKey: string } }).providerOptions.apiKey).toBe("first-key")
+    expect((second as unknown as { providerOptions: { apiKey: string } }).providerOptions.apiKey).toBe("second-key")
+  } finally {
+    if (previous !== undefined) {
+      await Filesystem.write(authPath, previous)
+    }
+    if (previous === undefined) {
+      await unlink(authPath).catch(() => {})
+    }
+  }
 })
 
 test("getModel throws ModelNotFoundError for invalid model", async () => {

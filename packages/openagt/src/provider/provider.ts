@@ -23,6 +23,7 @@ import { BundledProviderRegistry } from "./bundled-provider-registry"
 import { resolveProviderSDK } from "./sdk-runtime"
 import { ProviderStateBuilder, type ProviderState } from "./state-builder"
 import * as ProviderAuth from "./auth"
+import { providerModelCacheKey } from "./cache-scope"
 
 export { defaultModelIDs, parseModel, sort } from "./model-selection"
 export { fromModelsDevProvider } from "./models-dev-conversion"
@@ -192,16 +193,11 @@ const layer: Layer.Layer<
     const getLanguage = Effect.fn("Provider.getLanguage")(function* (model: Model) {
       const s = yield* InstanceState.get(state)
       const envs = yield* env.all()
-      // Cache key includes the merged provider+model options so dynamic
-      // patches (custom headers, reasoningEffort, thinking config) actually
-      // take effect on the next call instead of being shadowed by a stale
-      // LanguageModelV3 keyed only on providerID/modelID.
       const provider = s.providers[model.providerID]
-      const mergedOptions = { ...provider?.options, ...model.options }
-      const optionsKey = Object.keys(mergedOptions).length === 0 ? "" : `:${JSON.stringify(mergedOptions)}`
-      const key = `${model.providerID}/${model.id}${optionsKey}`
-      const refreshExpiredOAuth = Effect.fn("Provider.refreshExpiredOAuth")(function* () {
-        const current = yield* auth.get(model.providerID).pipe(Effect.orElseSucceed(() => undefined))
+      const loadAuth = () => auth.get(model.providerID).pipe(Effect.orElseSucceed(() => undefined))
+      const refreshExpiredOAuth = Effect.fn("Provider.refreshExpiredOAuth")(function* (
+        current: Extract<Auth.Info, { type: "oauth" }>,
+      ) {
         if (current?.type !== "oauth") return false
         if (current.expires > Date.now()) return false
         return yield* providerAuth.refresh(model.providerID).pipe(
@@ -217,11 +213,29 @@ const layer: Layer.Layer<
           ),
         )
       })
-      // Cache hit + not expired = return immediately (the hot path; no
-      // file I/O). The OAuth expiry is recorded alongside the cache entry
-      // when it was built, so we don't need to read auth.json on every
-      // LLM call. Non-OAuth entries have no expiry and never invalidate
-      // here; they survive until process restart or a fallback failure.
+
+      const initialAuth = yield* loadAuth()
+      const storedAuth =
+        initialAuth?.type === "oauth" && initialAuth.expires <= Date.now() && (yield* refreshExpiredOAuth(initialAuth))
+          ? yield* loadAuth()
+          : initialAuth
+
+      if (provider && storedAuth?.type === "api") provider.key = storedAuth.key
+      if (provider && storedAuth?.type === "oauth") provider.key = storedAuth.access
+      if (provider && storedAuth?.type === "wellknown") provider.key = storedAuth.key
+      if (provider && !storedAuth && provider.source !== "env" && provider.options.apiKey === undefined) delete provider.key
+
+      // Cache key includes provider/model options and the active auth account
+      // scope. This prevents account switches from reusing a stale
+      // LanguageModelV3 or SDK client that was built with a previous token.
+      const mergedOptions = { ...provider?.options, ...model.options }
+      const key = providerModelCacheKey({
+        providerID: model.providerID,
+        modelID: model.id,
+        options: mergedOptions,
+        auth: storedAuth,
+      })
+
       if (s.models.has(key)) {
         const expiresAtMs = s.modelExpiry.get(key)
         if (expiresAtMs === undefined || expiresAtMs > Date.now()) return s.models.get(key)!
@@ -229,15 +243,10 @@ const layer: Layer.Layer<
           providerID: model.providerID,
           modelID: model.id,
           expiredAtMs: expiresAtMs,
-          refreshed: yield* refreshExpiredOAuth(),
+          refreshed: storedAuth?.type === "oauth" ? yield* refreshExpiredOAuth(storedAuth) : false,
         })
         s.models.delete(key)
         s.modelExpiry.delete(key)
-      } else if (yield* refreshExpiredOAuth()) {
-        log.info("refreshed expired oauth token before building language model", {
-          providerID: model.providerID,
-          modelID: model.id,
-        })
       }
 
       const language = yield* Effect.promise(async () => {
@@ -272,7 +281,6 @@ const layer: Layer.Layer<
       // detect stale OAuth tokens without re-reading auth.json. Done once
       // per cache miss, not once per call. Non-OAuth providers leave the
       // expiry slot empty and the cache entry never auto-invalidates.
-      const storedAuth = yield* auth.get(model.providerID).pipe(Effect.orElseSucceed(() => undefined))
       if (storedAuth?.type === "oauth") s.modelExpiry.set(key, storedAuth.expires)
       return language
     })
