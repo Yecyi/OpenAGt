@@ -55,4 +55,17 @@ describe("settings sandbox helpers", () => {
       command: "bun run verify:windows-sandbox-admin",
     })
   })
+
+  test("recommends active default-on when the config path is enabled", () => {
+    expect(
+      defaultOnRecommendation({
+        default_on_enabled: true,
+        ready_for_default_on: true,
+        default_on_blockers: [],
+        next_action: { kind: "none", label: "Backend ready" },
+      } as Pick<SandboxStatus, "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action">),
+    ).toEqual({
+      label: "Default-on native sandbox is active for new sandbox brokers.",
+    })
+  })
 })

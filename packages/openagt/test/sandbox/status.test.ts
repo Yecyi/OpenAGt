@@ -91,8 +91,12 @@ function writeAdminReport(file: string, patch: Record<string, unknown> = {}) {
 }
 
 function getWith(status: SandboxBackendStatus) {
+  return getWithConfig(status, { backend: "windows_native" })
+}
+
+function getWithConfig(status: SandboxBackendStatus, sandbox: Record<string, unknown>) {
   return getSandboxStatus({
-    config: { experimental: { sandbox: { backend: "windows_native" } } },
+    config: { experimental: { sandbox } },
     platform: "win32",
     execPath: "C:\\OpenAGt\\bin\\openagt.exe",
     exists: (candidate) => candidate === helper,
@@ -321,6 +325,29 @@ describe("sandbox status", () => {
     expect(result.acl_apply_verified).toBe(true)
     expect(result.ready_for_default_on).toBe(true)
     expect(result.default_on_blockers).toEqual([])
+  })
+
+  test("default-on enabled requires ready evidence plus auto closed apply config", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report)
+    const backend = status({
+      available: true,
+      readiness: "ready",
+      admin_gate_report_path: report,
+    })
+
+    const readyButOptInOnly = getWith(backend)
+    expect(readyButOptInOnly.ready_for_default_on).toBe(true)
+    expect(readyButOptInOnly.default_on_enabled).toBe(false)
+
+    const defaultOn = getWithConfig(backend, {
+      backend: "auto",
+      failure_policy: "closed",
+      windows_acl_apply_mode: "apply",
+    })
+    expect(defaultOn.ready_for_default_on).toBe(true)
+    expect(defaultOn.default_on_enabled).toBe(true)
   })
 
   test("returns parseable status contract", () => {
