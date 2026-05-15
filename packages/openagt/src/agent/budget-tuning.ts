@@ -26,6 +26,9 @@ export const BudgetTuning = {
     absoluteCap: 1_800_000,
   },
   resourceLimit: {
+    // Why: low/medium should finish quickly while still leaving enough room for
+    // a verifier/checkpoint pair; smaller caps make ordinary two-step plans look
+    // budget-broken instead of meaningfully constrained.
     low: {
       max_rounds: 8,
       max_model_calls: 16,
@@ -50,7 +53,9 @@ export const BudgetTuning = {
       max_wallclock_ms: 60 * 60 * 1000,
       max_estimated_tokens: 1_000_000,
     },
-    // Why: deep/huge tasks need enough ceiling for multi-expert research while checkpoint limits prevent silent runaway.
+    // Why: deep/huge tasks need enough ceiling for multi-expert research while
+    // checkpoint reserve, no-progress windows, and absolute gates prevent silent
+    // runaway. These are mission ceilings, not per-dispatch concurrency limits.
     deep: {
       max_rounds: 30,
       max_model_calls: 60,
@@ -61,6 +66,8 @@ export const BudgetTuning = {
     },
   },
   resourceLimitMinimum: {
+    // Why: scaled phase/todo budgets below this floor are not useful execution
+    // budgets; they immediately trip gates and masquerade as valid plans.
     max_rounds: 4,
     max_model_calls: 4,
     max_tool_calls: 12,
@@ -70,6 +77,8 @@ export const BudgetTuning = {
   },
   continuation: {
     minConsumedBeforeContinue: {
+      // Why: repeated continuations require observable work consumption between
+      // approvals, otherwise budget can grow faster than the run progresses.
       max_rounds: 1,
       max_model_calls: 1,
       max_tool_calls: 1,

@@ -1,12 +1,27 @@
 export type Eol = "\n" | "\r\n"
+export type EolStyle = "none" | "lf" | "crlf" | "mixed"
 
 export function normalizeEol(text: string) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
 }
 
+export function detectEolStyle(text: string): EolStyle {
+  const crlf = text.match(/\r\n/g)?.length ?? 0
+  const withoutCrlf = text.replace(/\r\n/g, "")
+  const bareLf = withoutCrlf.match(/\n/g)?.length ?? 0
+  const bareCr = withoutCrlf.match(/\r/g)?.length ?? 0
+  if (crlf > 0 && bareLf + bareCr > 0) return "mixed"
+  if (crlf > 0) return "crlf"
+  if (bareLf + bareCr > 0) return "lf"
+  return "none"
+}
+
+export function eolForStyle(style: EolStyle): Eol {
+  return style === "crlf" || style === "mixed" ? "\r\n" : "\n"
+}
+
 export function detectEol(text: string): Eol {
-  if (text.includes("\r\n")) return "\r\n"
-  return "\n"
+  return eolForStyle(detectEolStyle(text))
 }
 
 export function splitLinesForPatch(text: string) {

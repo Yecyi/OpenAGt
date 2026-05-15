@@ -150,6 +150,22 @@ describe("Truncate", () => {
       }),
     )
 
+    it.live("keeps tail truncation Unicode-safe and flags mixed EOL previews", () =>
+      Effect.gen(function* () {
+        const svc = yield* Truncate.Service
+        const content = `alpha\r\nbeta\n${"\u{1F642}".repeat(8)}tail\r\nomega`
+        const result = yield* svc.output(content, { maxLines: 2, direction: "tail" })
+
+        expect(result.truncated).toBe(true)
+        expect(result.content).toContain("\u{1F642}")
+        expect(result.content).not.toContain("\uFFFD")
+        expect(result.eol_style).toBe("mixed")
+        expect(result.unicode_safe_truncation).toBe(true)
+        expect(result.round_trip_partial).toBe(true)
+        expect(result.round_trip_reason).toBe("mixed_eol")
+      }),
+    )
+
     it.live("does not write file when not truncated", () =>
       Effect.gen(function* () {
         const svc = yield* Truncate.Service

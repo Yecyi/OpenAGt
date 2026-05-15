@@ -639,6 +639,37 @@ describe("tool.edit", () => {
       expectCrlf(output)
     })
 
+    test("reports mixed source EOL as partial round-trip metadata", async () => {
+      await using tmp = await tmpdir({
+        init: async (dir) => {
+          await Bun.write(path.join(dir, "test.txt"), "alpha\r\nbeta\ngamma\r\n")
+        },
+      })
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const edit = await resolve()
+          const filePath = path.join(tmp.path, "test.txt")
+          const result = await Effect.runPromise(
+            edit.execute(
+              {
+                filePath,
+                oldString: "beta",
+                newString: "BETA",
+              },
+              ctx,
+            ),
+          )
+
+          expect(result.metadata.eol_style).toBe("mixed")
+          expect(result.metadata.round_trip_partial).toBe(true)
+          expect(result.metadata.round_trip_reason).toBe("mixed_eol")
+          expect(result.metadata.unicode_safe_truncation).toBe(true)
+        },
+      })
+    })
+
     test("replaceAll preserves LF for multi-line blocks", async () => {
       const blockOld = "alpha\nbeta"
       const blockNew = "alpha\nbeta-updated"

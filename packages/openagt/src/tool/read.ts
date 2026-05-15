@@ -13,7 +13,7 @@ import { Instance } from "../project/instance"
 import { InstanceState } from "@/effect"
 import { Log } from "@/util"
 import { canonicalPath, containsCanonicalPath } from "@/util/path-canonical"
-import { truncateCodePoints } from "@/util/text"
+import { detectEolStyle, truncateCodePoints, type EolStyle } from "@/util/text"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isImageAttachment, isPdfAttachment, sniffAttachmentMime } from "@/util/media"
@@ -30,10 +30,13 @@ const MAX_ATTACHMENT_BYTES_LABEL = `${MAX_ATTACHMENT_BYTES / 1024 / 1024} MiB`
 const SAMPLE_BYTES = 4096
 const EXACT_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
-async function newlineBytes(filepath: string) {
+async function newlineProfile(filepath: string): Promise<{ bytes: number; style: EolStyle }> {
   const sample = Buffer.from(await Bun.file(filepath).slice(0, SAMPLE_BYTES).arrayBuffer())
-  if (sample.includes("\r\n")) return 2
-  return 1
+  const style = detectEolStyle(sample.toString("utf-8"))
+  return {
+    bytes: style === "crlf" || style === "mixed" ? 2 : 1,
+    style,
+  }
 }
 
 const parameters = z.object({
@@ -335,6 +338,10 @@ export const ReadTool = Tool.define(
         metadata: {
           preview: file.raw.slice(0, 20).join("\n"),
           truncated,
+          eol_style: file.eolStyle,
+          unicode_safe_truncation: true,
+          round_trip_partial: file.eolStyle === "mixed",
+          round_trip_reason: file.eolStyle === "mixed" ? "mixed_eol" : undefined,
           loaded: loaded.map((item) => item.filepath),
         },
       }
@@ -350,7 +357,7 @@ export const ReadTool = Tool.define(
 
 async function lines(filepath: string, opts: { limit: number; offset: number; exactTotal: boolean }) {
   const stream = createReadStream(filepath, { encoding: "utf8" })
-  const newline = await newlineBytes(filepath)
+  const newline = await newlineProfile(filepath)
   const rl = createInterface({
     input: stream,
     // Note: we use the crlfDelay option to recognize all instances of CR LF
@@ -380,7 +387,7 @@ async function lines(filepath: string, opts: { limit: number; offset: number; ex
       }
 
       const line = truncateCodePoints(text, MAX_LINE_LENGTH, MAX_LINE_SUFFIX)
-      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? newline : 0)
+      const size = Buffer.byteLength(line, "utf-8") + (raw.length > 0 ? newline.bytes : 0)
       if (bytes + size > MAX_BYTES) {
         cut = true
         more = true
@@ -395,5 +402,5 @@ async function lines(filepath: string, opts: { limit: number; offset: number; ex
     stream.destroy()
   }
 
-  return { raw, count, cut, more, offset: opts.offset, exact }
+  return { raw, count, cut, more, offset: opts.offset, exact, eolStyle: newline.style }
 }

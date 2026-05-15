@@ -2,6 +2,8 @@
 
 import { $ } from "bun"
 import { createHash } from "crypto"
+import fs from "fs/promises"
+import os from "os"
 import path from "path"
 
 const root = process.cwd()
@@ -30,7 +32,21 @@ if (!bin) {
   throw new Error(`Packaged binary not found. Tried:\n${candidates.join("\n")}`)
 }
 
-const help = await $`${bin} --help`.quiet()
+const smokeHome = await fs.mkdtemp(path.join(os.tmpdir(), "openagt-release-smoke-"))
+const smokeEnv = {
+  ...process.env,
+  HOME: smokeHome,
+  USERPROFILE: smokeHome,
+  XDG_DATA_HOME: path.join(smokeHome, "data"),
+  XDG_CACHE_HOME: path.join(smokeHome, "cache"),
+  XDG_CONFIG_HOME: path.join(smokeHome, "config"),
+  XDG_STATE_HOME: path.join(smokeHome, "state"),
+  OPENAGT_TEST_HOME: smokeHome,
+  OPENCODE_TEST_HOME: smokeHome,
+  OPENCODE_DISABLE_AUTOUPDATE: "1",
+}
+
+const help = await $`${bin} --help`.env(smokeEnv).quiet()
 if (help.exitCode !== 0 || !help.stdout.toString().toLowerCase().includes("openagt")) {
   throw new Error(`Packaged --help smoke failed for ${bin}`)
 }
@@ -40,12 +56,12 @@ const releaseVersionFile = path.join(releaseDir, "VERSION.txt")
 const expectedVersion = (await Bun.file(releaseVersionFile).exists())
   ? (await Bun.file(releaseVersionFile).text()).trim()
   : pkg.version
-const version = await $`${bin} --version`.quiet()
+const version = await $`${bin} --version`.env(smokeEnv).quiet()
 if (version.exitCode !== 0 || !version.stdout.toString().includes(expectedVersion)) {
   throw new Error(`Packaged --version smoke failed for ${bin}`)
 }
 
-const run = await $`${bin} run`.nothrow().quiet()
+const run = await $`${bin} run`.env(smokeEnv).nothrow().quiet()
 if (run.exitCode === 0 || !`${run.stdout}${run.stderr}`.toLowerCase().includes("message")) {
   throw new Error(`Packaged run argument smoke failed for ${bin}`)
 }
@@ -90,11 +106,11 @@ if (process.platform === "win32") {
   if (helperSetupStatusJson.mode !== "status") {
     throw new Error(`Packaged Windows sandbox helper setup status returned unexpected state for ${helper}`)
   }
-  const cliProbe = await $`${bin} sandbox windows probe --json`.quiet()
+  const cliProbe = await $`${bin} sandbox windows probe --json`.env(smokeEnv).quiet()
   if (cliProbe.exitCode !== 0 || !cliProbe.stdout.toString().includes("openagt-sandbox-win.exe")) {
     throw new Error(`Packaged Windows sandbox CLI probe failed for ${bin}`)
   }
-  const cliSetupStatus = await $`${bin} sandbox windows setup --status --json`.quiet()
+  const cliSetupStatus = await $`${bin} sandbox windows setup --status --json`.env(smokeEnv).quiet()
   if (
     cliSetupStatus.exitCode !== 0 ||
     !cliSetupStatus.stdout.toString().includes("openagt-sandbox-win.exe") ||
@@ -105,3 +121,4 @@ if (process.platform === "win32") {
 }
 
 console.log(`Packaged binary smoke passed: ${bin}`)
+await fs.rm(smokeHome, { recursive: true, force: true }).catch(() => {})

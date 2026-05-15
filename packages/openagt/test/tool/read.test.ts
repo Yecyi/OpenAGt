@@ -428,6 +428,19 @@ describe("tool.read truncation", () => {
     }),
   )
 
+  it.live("reports mixed EOL files as partial round-trip text", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped()
+      yield* put(path.join(dir, "mixed-eol.txt"), "alpha\r\nbeta\ngamma\r\n")
+
+      const result = yield* exec(dir, { filePath: path.join(dir, "mixed-eol.txt") })
+      expect(result.metadata.eol_style).toBe("mixed")
+      expect(result.metadata.unicode_safe_truncation).toBe(true)
+      expect(result.metadata.round_trip_partial).toBe(true)
+      expect(result.metadata.round_trip_reason).toBe("mixed_eol")
+    }),
+  )
+
   it.live("image files set truncated to false", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped()

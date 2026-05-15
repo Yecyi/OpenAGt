@@ -14,6 +14,7 @@ import { AppFileSystem } from "@openagt/shared/filesystem"
 import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
 import { Format } from "../format"
+import { detectEolStyle, eolForStyle, normalizeEol, type EolStyle } from "@/util/text"
 
 const PatchParams = z.object({
   patchText: z.string().describe("The full patch text that describes all changes to be made"),
@@ -34,6 +35,14 @@ export const ApplyPatchTool = Tool.define(
 
       // Parse the patch to get hunks
       let hunks: Patch.Hunk[]
+      const patchEolStyle = detectEolStyle(params.patchText)
+      const patchEol = eolForStyle(patchEolStyle)
+      const roundTripFor = (style: EolStyle) => ({
+        eol_style: style,
+        unicode_safe_truncation: true,
+        round_trip_partial: style === "mixed",
+        round_trip_reason: style === "mixed" ? "mixed_eol" : undefined,
+      })
       try {
         const parseResult = Patch.parsePatch(params.patchText)
         hunks = parseResult.hunks
@@ -55,6 +64,7 @@ export const ApplyPatchTool = Tool.define(
         oldContent: string
         newContent: string
         type: "add" | "update" | "delete" | "move"
+        eolStyle: EolStyle
         movePath?: string
         diff: string
         additions: number
@@ -70,8 +80,10 @@ export const ApplyPatchTool = Tool.define(
         switch (hunk.type) {
           case "add": {
             const oldContent = ""
-            const newContent =
+            const normalizedContent =
               hunk.contents.length === 0 || hunk.contents.endsWith("\n") ? hunk.contents : `${hunk.contents}\n`
+            const newContent =
+              patchEol === "\r\n" ? normalizeEol(normalizedContent).replaceAll("\n", "\r\n") : normalizedContent
             const diff = trimDiff(createTwoFilesPatch(filePath, filePath, oldContent, newContent))
 
             let additions = 0
@@ -86,6 +98,7 @@ export const ApplyPatchTool = Tool.define(
               oldContent,
               newContent,
               type: "add",
+              eolStyle: patchEolStyle === "none" ? "lf" : patchEolStyle,
               diff,
               additions,
               deletions,
@@ -105,6 +118,7 @@ export const ApplyPatchTool = Tool.define(
             }
 
             const oldContent = yield* afs.readFileString(filePath)
+            const eolStyle = detectEolStyle(oldContent)
             let newContent = oldContent
 
             // Apply the update chunks to get new content
@@ -132,6 +146,7 @@ export const ApplyPatchTool = Tool.define(
               oldContent,
               newContent,
               type: hunk.move_path ? "move" : "update",
+              eolStyle,
               movePath,
               diff,
               additions,
@@ -163,6 +178,7 @@ export const ApplyPatchTool = Tool.define(
               oldContent: contentToDelete,
               newContent: "",
               type: "delete",
+              eolStyle: detectEolStyle(contentToDelete),
               diff: deleteDiff,
               additions: 0,
               deletions,
@@ -183,6 +199,7 @@ export const ApplyPatchTool = Tool.define(
         additions: change.additions,
         deletions: change.deletions,
         movePath: change.movePath,
+        ...roundTripFor(change.eolStyle),
       }))
 
       // Check permissions if needed
@@ -195,6 +212,8 @@ export const ApplyPatchTool = Tool.define(
           filepath: relativePaths.join(", "),
           diff: totalDiff,
           files,
+          round_trip_partial: fileChanges.some((change) => change.eolStyle === "mixed"),
+          round_trip_reason: fileChanges.some((change) => change.eolStyle === "mixed") ? "mixed_eol" : undefined,
         },
       })
 
@@ -280,6 +299,8 @@ export const ApplyPatchTool = Tool.define(
           diff: totalDiff,
           files,
           diagnostics,
+          round_trip_partial: fileChanges.some((change) => change.eolStyle === "mixed"),
+          round_trip_reason: fileChanges.some((change) => change.eolStyle === "mixed") ? "mixed_eol" : undefined,
         },
         output,
       }

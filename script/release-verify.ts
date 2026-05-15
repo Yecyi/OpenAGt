@@ -155,6 +155,49 @@ async function verifyWindowsSandboxDefaultOnContract() {
   }
 }
 
+async function verifyRuntimeReliabilityContract() {
+  const dispatchSelectionTest = await Bun.file("packages/openagt/test/coordinator/dispatch-selection.test.ts").text()
+  for (const marker of [
+    "max_wallclock_ms",
+    "max_estimated_tokens",
+    "checkpoint synthesis can use reserved absolute budget",
+    "checkpoint synthesis is blocked at the absolute ceiling",
+  ]) {
+    if (!dispatchSelectionTest.includes(marker)) {
+      throw new Error(`dispatch-selection budget regression coverage is missing marker: ${marker}`)
+    }
+  }
+
+  const textMarkers = await Promise.all(
+    [
+      "packages/openagt/src/tool/read.ts",
+      "packages/openagt/src/tool/truncate.ts",
+      "packages/openagt/src/tool/apply_patch.ts",
+      "packages/openagt/src/tool/edit.ts",
+    ].map((file) => Bun.file(file).text()),
+  )
+  for (const marker of ["eol_style", "unicode_safe_truncation", "round_trip_partial", "mixed_eol"]) {
+    if (!textMarkers.every((source) => source.includes(marker))) {
+      throw new Error(`text round-trip metadata is missing marker: ${marker}`)
+    }
+  }
+
+  const systemPromptTest = await Bun.file("packages/openagt/test/session/system-prompt.test.ts").text()
+  if (!systemPromptTest.includes("estimates CJK and emoji text without length/4 undercounting")) {
+    throw new Error("system prompt token estimator must keep non-ASCII regression coverage")
+  }
+
+  const transformSource = await Bun.file("packages/openagt/src/provider/message-transform.ts").text()
+  if (!transformSource.includes("cacheZone") || !transformSource.includes("cacheControl")) {
+    throw new Error("provider message transform must keep cache-control zone markers")
+  }
+
+  const taskRuntimeTest = await Bun.file("packages/openagt/test/session/task-runtime-agentic.test.ts").text()
+  if (!taskRuntimeTest.includes("does not double-count Anthropic cache tokens in task usage")) {
+    throw new Error("task runtime must keep Anthropic cache token accounting regression coverage")
+  }
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -195,6 +238,10 @@ const steps = [
   {
     title: "Verify Windows sandbox default-on contract",
     run: verifyWindowsSandboxDefaultOnContract,
+  },
+  {
+    title: "Verify runtime reliability contract",
+    run: verifyRuntimeReliabilityContract,
   },
   {
     title: "Verify Windows sandbox helper",

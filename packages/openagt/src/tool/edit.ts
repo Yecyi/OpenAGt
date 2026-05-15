@@ -22,6 +22,7 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { replace, trimDiff } from "./edit-replace"
 import { buildDiagnosticFeedback } from "../lsp/feedback"
+import { detectEolStyle, type EolStyle } from "@/util/text"
 export * from "./edit-replace"
 
 const log = Log.create({ service: "tool.edit" })
@@ -37,6 +38,15 @@ function detectLineEnding(text: string): "\n" | "\r\n" {
 function convertToLineEnding(text: string, ending: "\n" | "\r\n"): string {
   if (ending === "\n") return text
   return text.replaceAll("\n", "\r\n")
+}
+
+function roundTripMetadata(style: EolStyle) {
+  return {
+    eol_style: style,
+    unicode_safe_truncation: true,
+    round_trip_partial: style === "mixed",
+    round_trip_reason: style === "mixed" ? "mixed_eol" : undefined,
+  }
 }
 
 const Parameters = z.object({
@@ -76,6 +86,7 @@ export const EditTool = Tool.define(
           let diff = ""
           let contentOld = ""
           let contentNew = ""
+          let eolStyle: EolStyle = "none"
           yield* Effect.gen(function* () {
             if (params.oldString === "") {
               const existed = yield* afs.existsSafe(filePath)
@@ -85,6 +96,7 @@ export const EditTool = Tool.define(
                 )
               }
               contentNew = params.newString
+              eolStyle = detectEolStyle(contentNew)
               diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
               yield* ctx.ask({
                 permission: "edit",
@@ -93,6 +105,7 @@ export const EditTool = Tool.define(
                 metadata: {
                   filepath: filePath,
                   diff,
+                  ...roundTripMetadata(eolStyle),
                 },
               })
               yield* afs.writeWithDirs(filePath, params.newString)
@@ -110,6 +123,7 @@ export const EditTool = Tool.define(
             if (info.type === "Directory") throw new Error(`Path is a directory, not a file: ${filePath}`)
             contentOld = yield* afs.readFileString(filePath)
 
+            eolStyle = detectEolStyle(contentOld)
             const ending = detectLineEnding(contentOld)
             const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
             const next = convertToLineEnding(normalizeLineEndings(params.newString), ending)
@@ -131,6 +145,7 @@ export const EditTool = Tool.define(
               metadata: {
                 filepath: filePath,
                 diff,
+                ...roundTripMetadata(eolStyle),
               },
             })
 
@@ -189,6 +204,7 @@ export const EditTool = Tool.define(
               diff,
               filediff,
               diagnostics: {},
+              ...roundTripMetadata(eolStyle),
             },
           })
 
@@ -209,6 +225,7 @@ export const EditTool = Tool.define(
               filediff,
               diagnostics,
               lsp_feedback: lspFeedback,
+              ...roundTripMetadata(eolStyle),
             },
           })
 
@@ -218,6 +235,7 @@ export const EditTool = Tool.define(
               lsp_feedback: lspFeedback,
               diff,
               filediff,
+              ...roundTripMetadata(eolStyle),
             },
             title: `${path.relative(Instance.worktree, filePath)}`,
             output,

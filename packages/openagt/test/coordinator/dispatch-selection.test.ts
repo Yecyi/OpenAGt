@@ -241,3 +241,91 @@ test("policy disabled: overlapping writes are dispatched anyway", () => {
   })
   expect(result.selected.map((item) => String(item.task_id))).toEqual(["t1", "t2"])
 })
+
+const resourceCases = [
+  "max_rounds",
+  "max_model_calls",
+  "max_tool_calls",
+  "max_subagents",
+  "max_wallclock_ms",
+  "max_estimated_tokens",
+] as const
+
+for (const resource of resourceCases) {
+  test(`normal dispatch is blocked when ${resource} reaches the normal absolute limit`, () => {
+    const run = makeRun({
+      nodes: [{ id: "n1", parallel_group: "g1", write_scope: [] }],
+      write_parallel_requires_disjoint_scope: true,
+    })
+    const task = makeTask({ id: "t1", status: "pending", nodeId: "n1", parallel_group: "g1" })
+    const usage = { ...zeroUsage, [resource]: 1 }
+    const normalAbsoluteLimit = { ...defaultResourceLimit, [resource]: 1 }
+    const result = dispatchSelectionFor({
+      run,
+      allTasks: [task],
+      ready: [task],
+      usage,
+      normalAbsoluteLimit,
+      checkpointSlots: 1,
+      ceilingHit: false,
+      softBudgetHit: false,
+    })
+
+    expect(result.budgetSlots).toBe(0)
+    expect(result.selected).toEqual([])
+  })
+}
+
+test("checkpoint synthesis can use reserved absolute budget when normal dispatch is exhausted", () => {
+  const run = makeRun({
+    nodes: [{ id: "budget_checkpoint_synthesis", parallel_group: "g1", write_scope: [] }],
+    write_parallel_requires_disjoint_scope: true,
+  })
+  const checkpoint = makeTask({
+    id: "checkpoint",
+    status: "pending",
+    nodeId: "budget_checkpoint_synthesis",
+    parallel_group: "g1",
+  })
+  const result = dispatchSelectionFor({
+    run,
+    allTasks: [checkpoint],
+    ready: [checkpoint],
+    checkpointReady: checkpoint,
+    usage: { ...zeroUsage, max_rounds: 10 },
+    normalAbsoluteLimit: { ...defaultResourceLimit, max_rounds: 10 },
+    checkpointSlots: 1,
+    ceilingHit: false,
+    softBudgetHit: true,
+  })
+
+  expect(result.budgetSlots).toBe(1)
+  expect(result.selected.map((item) => String(item.task_id))).toEqual(["checkpoint"])
+})
+
+test("checkpoint synthesis is blocked at the absolute ceiling", () => {
+  const run = makeRun({
+    nodes: [{ id: "budget_checkpoint_synthesis", parallel_group: "g1", write_scope: [] }],
+    write_parallel_requires_disjoint_scope: true,
+  })
+  const checkpoint = makeTask({
+    id: "checkpoint",
+    status: "pending",
+    nodeId: "budget_checkpoint_synthesis",
+    parallel_group: "g1",
+  })
+  const result = dispatchSelectionFor({
+    run,
+    allTasks: [checkpoint],
+    ready: [checkpoint],
+    checkpointReady: checkpoint,
+    usage: { ...zeroUsage, max_rounds: 10 },
+    normalAbsoluteLimit: { ...defaultResourceLimit, max_rounds: 9 },
+    checkpointSlots: 0,
+    ceilingHit: true,
+    softBudgetHit: true,
+  })
+
+  expect(result.budgetSlots).toBe(0)
+  expect(result.selected).toEqual([])
+})

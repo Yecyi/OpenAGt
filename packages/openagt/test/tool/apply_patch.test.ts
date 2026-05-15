@@ -195,6 +195,51 @@ describe("tool.apply_patch freeform", () => {
     })
   })
 
+  test("uses patch CRLF convention when adding new files", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await Instance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const patchText = [
+          "*** Begin Patch",
+          "*** Add File: added-crlf.txt",
+          "+first",
+          "+second",
+          "*** End Patch",
+        ].join("\r\n")
+
+        const result = await execute({ patchText }, ctx)
+        const files = result.metadata.files as Array<Record<string, unknown>>
+        expect(await fs.readFile(path.join(fixture.path, "added-crlf.txt"), "utf-8")).toBe("first\r\nsecond\r\n")
+        expect(files[0]?.eol_style).toBe("crlf")
+        expect(files[0]?.round_trip_partial).toBe(false)
+      },
+    })
+  })
+
+  test("marks mixed-EOL patch updates as partial round-trip metadata", async () => {
+    await using fixture = await tmpdir()
+    const { ctx } = makeCtx()
+
+    await Instance.provide({
+      directory: fixture.path,
+      fn: async () => {
+        const target = path.join(fixture.path, "mixed.txt")
+        await fs.writeFile(target, "alpha\r\nbeta\ngamma\r\n", "utf-8")
+        const patchText = "*** Begin Patch\n*** Update File: mixed.txt\n@@\n-beta\n+BETA\n*** End Patch"
+
+        const result = await execute({ patchText }, ctx)
+        const files = result.metadata.files as Array<Record<string, unknown>>
+        expect(files[0]?.eol_style).toBe("mixed")
+        expect(files[0]?.round_trip_partial).toBe(true)
+        expect(files[0]?.round_trip_reason).toBe("mixed_eol")
+        expect(result.metadata.round_trip_partial).toBe(true)
+      },
+    })
+  })
+
   test("inserts lines with insert-only hunk", async () => {
     await using fixture = await tmpdir()
     const { ctx } = makeCtx()

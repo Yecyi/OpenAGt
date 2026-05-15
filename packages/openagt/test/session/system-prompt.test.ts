@@ -82,6 +82,13 @@ describe("estimatePromptTokens", () => {
     const tokens = estimatePromptTokens(text)
     expect(tokens).toBe(Math.ceil(text.length / 4))
   })
+
+  test("estimates CJK and emoji text without length/4 undercounting", () => {
+    const text = "\u4f60\u597d\u4e16\u754c\u{1F642}"
+    const tokens = estimatePromptTokens(text)
+    expect(tokens).toBeGreaterThan(Math.ceil(text.length / 4))
+    expect(tokens).toBeGreaterThanOrEqual(5)
+  })
 })
 
 describe("estimateSavings", () => {

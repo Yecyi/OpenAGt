@@ -8,6 +8,7 @@ import { Identifier } from "../id/id"
 import { Log } from "../util"
 import { ToolID } from "./schema"
 import { TRUNCATION_DIR } from "./truncation-dir"
+import { detectEolStyle, eolForStyle, normalizeEol, type EolStyle } from "@/util/text"
 
 const log = Log.create({ service: "truncation" })
 const RETENTION = Duration.days(7)
@@ -17,7 +18,16 @@ export const MAX_BYTES = 50 * 1024
 export const DIR = TRUNCATION_DIR
 export const GLOB = path.join(TRUNCATION_DIR, "*")
 
-export type Result = { content: string; truncated: false } | { content: string; truncated: true; outputPath: string }
+type ResultMetadata = {
+  eol_style: EolStyle
+  unicode_safe_truncation: true
+  round_trip_partial: boolean
+  round_trip_reason?: "mixed_eol"
+}
+
+export type Result =
+  | ({ content: string; truncated: false } & ResultMetadata)
+  | ({ content: string; truncated: true; outputPath: string } & ResultMetadata)
 
 export interface Options {
   maxLines?: number
@@ -72,13 +82,20 @@ export const layer = Layer.effect(
       const maxLines = options.maxLines ?? MAX_LINES
       const maxBytes = options.maxBytes ?? MAX_BYTES
       const direction = options.direction ?? "head"
-      const newline = text.includes("\r\n") ? "\r\n" : "\n"
+      const eolStyle = detectEolStyle(text)
+      const newline = eolForStyle(eolStyle)
       const newlineBytes = Buffer.byteLength(newline, "utf-8")
-      const lines = text.split(newline)
+      const lines = normalizeEol(text).split("\n")
       const totalBytes = Buffer.byteLength(text, "utf-8")
+      const resultMetadata = {
+        eol_style: eolStyle,
+        unicode_safe_truncation: true as const,
+        round_trip_partial: eolStyle === "mixed",
+        round_trip_reason: eolStyle === "mixed" ? ("mixed_eol" as const) : undefined,
+      }
 
       if (lines.length <= maxLines && totalBytes <= maxBytes) {
-        return { content: text, truncated: false } as const
+        return { content: text, truncated: false, ...resultMetadata } as const
       }
 
       const out: string[] = []
@@ -124,6 +141,7 @@ export const layer = Layer.effect(
             : `...${removed} ${unit} truncated...\n\n${hint}\n\n${preview}`,
         truncated: true,
         outputPath: file,
+        ...resultMetadata,
       } as const
     })
 
