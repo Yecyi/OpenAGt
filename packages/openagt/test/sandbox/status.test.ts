@@ -10,6 +10,32 @@ import { tmpdir } from "../fixture/fixture"
 
 const helper = "C:\\OpenAGt\\bin\\openagt-sandbox-win.exe"
 
+function step(name: string, status: "passed" | "failed" = "passed") {
+  return {
+    name,
+    cmd: ["test"],
+    status,
+    exitCode: status === "passed" ? 0 : 1,
+    durationMs: 1,
+    stdout: "{}",
+    stderr: "",
+  }
+}
+
+function setupEvidence(patch: Record<string, unknown> = {}) {
+  return {
+    original_status: step("Windows sandbox setup status before admin gate"),
+    install: step("Windows sandbox setup install"),
+    installed_status: step("Windows sandbox setup status after install"),
+    network_policy_none_proof: step("Windows sandbox WFP network_policy=none execution proof"),
+    restore_action: "uninstall",
+    restore: step("Windows sandbox setup restore"),
+    restored_status: step("Windows sandbox setup status after restore"),
+    restored: true,
+    ...patch,
+  }
+}
+
 function status(patch: Partial<SandboxBackendStatus>) {
   return {
     name: "windows_native",
@@ -47,7 +73,15 @@ function writeAdminReport(file: string, patch: Record<string, unknown> = {}) {
           helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
           helper_sha256: "a".repeat(64),
         },
-        results: [{ name: "Windows sandbox WFP execution gate", status: "passed" }],
+        setup_evidence: setupEvidence(),
+        results: [
+          step("Windows sandbox setup status before admin gate"),
+          step("Windows sandbox setup install"),
+          step("Windows sandbox setup status after install"),
+          step("Windows sandbox WFP network_policy=none execution proof"),
+          step("Windows sandbox setup restore"),
+          step("Windows sandbox setup status after restore"),
+        ],
         ...patch,
       },
       null,
@@ -167,7 +201,73 @@ describe("sandbox status", () => {
     await using tmp = await tmpdir()
     const report = path.join(tmp.path, "admin-gate-report.json")
     writeAdminReport(report, {
-      results: [{ name: "Windows sandbox WFP execution gate", status: "failed" }],
+      results: [step("Windows sandbox WFP network_policy=none execution proof", "failed")],
+    })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("skipped admin gate report blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      gate: "windows_sandbox_admin_preflight",
+      status: "skipped",
+      setup_evidence: null,
+      results: [],
+    })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("admin report without setup evidence blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      setup_evidence: null,
+    })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("failed restore evidence blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      setup_evidence: setupEvidence({
+        restore: step("Windows sandbox setup restore", "failed"),
+        restored: false,
+      }),
     })
 
     const result = getWith(

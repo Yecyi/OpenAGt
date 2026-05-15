@@ -14,3 +14,49 @@ export function defaultOnBlockerLabels(status: Pick<SandboxStatus, "default_on_b
     return item
   })
 }
+
+export function defaultOnCandidateLabel(status: Pick<SandboxStatus, "default_on_blockers" | "ready_for_default_on">) {
+  if (status.ready_for_default_on) return "Eligible for default-on"
+  if (status.default_on_blockers.filter((item) => !item.startsWith("acl_apply_")).length === 0) {
+    return "Eligible for Apply mode"
+  }
+  return "Blocked"
+}
+
+export function defaultOnRecommendation(
+  status: Pick<
+    SandboxStatus,
+    "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action"
+  >,
+) {
+  if (status.default_on_enabled) {
+    return { label: "Default-on native sandbox is active for new sandbox brokers." }
+  }
+  if (status.ready_for_default_on) {
+    return {
+      label: "Ready for default-on candidate use. Select Auto backend, Closed failure policy, and Apply ACL mode.",
+    }
+  }
+  if (status.default_on_blockers.includes("wfp_setup_missing")) {
+    return {
+      label: "Install Windows sandbox WFP setup from an elevated terminal.",
+      command: "openagt sandbox windows setup --install --json",
+    }
+  }
+  if (status.default_on_blockers.includes("admin_gate_missing_or_stale")) {
+    return {
+      label: "Run the admin verification gate from an elevated repo terminal.",
+      command: "bun run verify:windows-sandbox-admin",
+    }
+  }
+  if (
+    status.default_on_blockers.includes("acl_apply_not_enabled") ||
+    status.default_on_blockers.includes("acl_apply_not_verified")
+  ) {
+    return { label: "Switch Filesystem ACL mode to Apply after admin and WFP evidence are valid." }
+  }
+  return {
+    label: status.next_action.label,
+    command: status.next_action.command,
+  }
+}

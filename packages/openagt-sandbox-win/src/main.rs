@@ -337,6 +337,13 @@ fn admin_gate_report_path() -> Option<String> {
     })
 }
 
+fn report_step_passed(value: Option<&serde_json::Value>) -> bool {
+    value
+        .and_then(|item| item.get("status"))
+        .and_then(|item| item.as_str())
+        == Some("passed")
+}
+
 fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
     let path = path?;
     let text = std::fs::read_to_string(path).ok()?;
@@ -353,6 +360,34 @@ fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
     match value.get("results").and_then(|item| item.as_array()) {
         Some(items) if !items.is_empty() => {}
         _ => return None,
+    }
+    if !value
+        .get("results")
+        .and_then(|item| item.as_array())
+        .map(|items| items.iter().all(|item| report_step_passed(Some(item))))
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    let setup_evidence = value.get("setup_evidence")?;
+    for field in [
+        "original_status",
+        "install",
+        "installed_status",
+        "network_policy_none_proof",
+        "restore",
+        "restored_status",
+    ] {
+        if !report_step_passed(setup_evidence.get(field)) {
+            return None;
+        }
+    }
+    if setup_evidence
+        .get("restored")
+        .and_then(|item| item.as_bool())
+        != Some(true)
+    {
+        return None;
     }
     let helper = value.get("helper")?;
     if helper.get("helper_version").and_then(|item| item.as_str())
@@ -2915,6 +2950,8 @@ mod tests {
         let dir = temp_case("admin-gate-report");
         let report = dir.join("admin-gate-report.json");
         let helper_sha256 = super::helper_sha256().unwrap();
+        let setup_evidence = r#""setup_evidence":{"original_status":{"status":"passed"},"install":{"status":"passed"},"installed_status":{"status":"passed"},"network_policy_none_proof":{"status":"passed"},"restore_action":"uninstall","restore":{"status":"passed"},"restored_status":{"status":"passed"},"restored":true}"#;
+        let failed_restore_evidence = r#""setup_evidence":{"original_status":{"status":"passed"},"install":{"status":"passed"},"installed_status":{"status":"passed"},"network_policy_none_proof":{"status":"passed"},"restore_action":"uninstall","restore":{"status":"failed"},"restored_status":{"status":"passed"},"restored":false}"#;
 
         fs::write(
             &report,
@@ -2955,9 +2992,10 @@ mod tests {
         fs::write(
             &report,
             format!(
-                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"stale","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}]}}"#,
+                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"stale","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}],{}}}"#,
                 super::HELPER_PROTOCOL_VERSION,
-                helper_sha256
+                helper_sha256,
+                setup_evidence
             ),
         )
         .unwrap();
@@ -2970,10 +3008,28 @@ mod tests {
         fs::write(
             &report,
             format!(
-                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"{}","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}]}}"#,
+                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"{}","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}],{}}}"#,
                 env!("CARGO_PKG_VERSION"),
                 super::HELPER_PROTOCOL_VERSION,
-                helper_sha256
+                helper_sha256,
+                failed_restore_evidence
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            super::admin_gate_verified_at(report.to_str()),
+            None,
+            "failed restore evidence must not satisfy the admin execution gate"
+        );
+
+        fs::write(
+            &report,
+            format!(
+                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"{}","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}],{}}}"#,
+                env!("CARGO_PKG_VERSION"),
+                super::HELPER_PROTOCOL_VERSION,
+                helper_sha256,
+                setup_evidence
             ),
         )
         .unwrap();

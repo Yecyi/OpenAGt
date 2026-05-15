@@ -111,6 +111,50 @@ async function verifyWindowsSandboxHelper() {
   await runCargo(["test", "--manifest-path", manifest])
 }
 
+function object(value: unknown, label: string) {
+  if (value && typeof value === "object") return value as Record<string, unknown>
+  throw new Error(`${label} is missing or not an object`)
+}
+
+function stringArray(value: unknown, label: string) {
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value
+  throw new Error(`${label} is missing or not a string array`)
+}
+
+async function verifyWindowsSandboxDefaultOnContract() {
+  const root = object(await Bun.file("packages/sdk/openapi.json").json(), "OpenAPI root")
+  const sandboxStatus = object(
+    object(object(root.components, "OpenAPI components").schemas, "OpenAPI schemas").SandboxStatus,
+    "SandboxStatus schema",
+  )
+  const sandboxStatusProperties = object(sandboxStatus.properties, "SandboxStatus properties")
+  const required = stringArray(sandboxStatus.required, "SandboxStatus required")
+  for (const field of [
+    "native_sandbox_ready",
+    "ready_for_default_on",
+    "default_on_enabled",
+    "default_on_blockers",
+    "admin_gate_report_valid",
+    "acl_apply_verified",
+  ]) {
+    if (!(field in sandboxStatusProperties)) throw new Error(`SandboxStatus is missing ${field}`)
+    if (!required.includes(field)) throw new Error(`SandboxStatus does not require ${field}`)
+  }
+
+  const statusSource = await Bun.file("packages/openagt/src/sandbox/status.ts").text()
+  if (!statusSource.includes("Process-level enforcement only; not an OS-native sandbox")) {
+    throw new Error("Sandbox process backend wording must remain advisory-only")
+  }
+
+  const docs = await Bun.file("docs/hardening-status.md").text()
+  if (!docs.includes("Default-on Windows OS-native sandbox enforcement remains blocked")) {
+    throw new Error("hardening-status must state that Windows native sandbox default-on remains blocked")
+  }
+  if (!docs.includes("network_policy=loopback` remains deferred")) {
+    throw new Error("hardening-status must state that network_policy=loopback remains deferred")
+  }
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -147,6 +191,10 @@ const steps = [
   {
     title: "Focused runtime and security tests",
     run: () => $`bun test ${runtimeTests} --timeout 30000`.cwd("packages/openagt"),
+  },
+  {
+    title: "Verify Windows sandbox default-on contract",
+    run: verifyWindowsSandboxDefaultOnContract,
   },
   {
     title: "Verify Windows sandbox helper",

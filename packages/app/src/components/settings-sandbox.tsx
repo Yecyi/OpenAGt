@@ -7,7 +7,11 @@ import type { Config, SandboxStatus } from "@openagt/sdk/v2/client"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
-import { defaultOnBlockerLabels } from "./settings-sandbox-helpers"
+import {
+  defaultOnBlockerLabels,
+  defaultOnCandidateLabel,
+  defaultOnRecommendation,
+} from "./settings-sandbox-helpers"
 import { SettingsList } from "./settings-list"
 
 type SandboxConfig = NonNullable<NonNullable<Config["experimental"]>["sandbox"]>
@@ -297,6 +301,17 @@ const SandboxStatusPanel: Component<{
             </div>
 
             <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">
+              <div class="text-11-medium text-text-weak">Default-on candidate</div>
+              <div class="text-12-regular text-text-strong">{defaultOnCandidateLabel(status())}</div>
+              <div class="mt-1 text-11-regular text-text-weak">{defaultOnRecommendation(status()).label}</div>
+              <Show when={defaultOnRecommendation(status()).command}>
+                <code class="mt-1 block overflow-x-auto whitespace-nowrap text-11-regular text-text-weak">
+                  {defaultOnRecommendation(status()).command}
+                </code>
+              </Show>
+            </div>
+
+            <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">
               <div class="text-11-medium text-text-weak">Default-on blockers</div>
               <Show
                 when={status().default_on_blockers.length > 0}
@@ -312,7 +327,7 @@ const SandboxStatusPanel: Component<{
             </div>
 
             <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">
-              <div class="text-11-medium text-text-weak">Next action</div>
+              <div class="text-11-medium text-text-weak">Backend next action</div>
               <div class="text-12-regular text-text-strong">{status().next_action.label}</div>
               <Show when={status().next_action.command}>
                 <code class="mt-1 block overflow-x-auto whitespace-nowrap text-11-regular text-text-weak">

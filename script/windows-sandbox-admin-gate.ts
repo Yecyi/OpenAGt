@@ -30,6 +30,17 @@ type HelperProof = {
   stderr: string
 }
 
+type SetupEvidence = {
+  original_status: StepResult
+  install: StepResult
+  installed_status: StepResult
+  network_policy_none_proof: StepResult
+  restore_action: "install" | "uninstall"
+  restore: StepResult
+  restored_status: StepResult
+  restored: boolean
+}
+
 type AdminGateReport = {
   schema_version: 1
   gate: "windows_sandbox_admin_preflight" | "windows_sandbox_admin_execution"
@@ -38,6 +49,7 @@ type AdminGateReport = {
   branch: string
   status: "passed" | "failed" | "skipped"
   helper: HelperProof
+  setup_evidence: SetupEvidence | null
   preflight: {
     platform: NodeJS.Platform
     elevated: boolean
@@ -175,6 +187,15 @@ function probeHelper(cargo: string | undefined, manifestExists: boolean): Helper
   }
 }
 
+function setupInstalled(step: StepResult) {
+  try {
+    const parsed = JSON.parse(step.stdout)
+    return Boolean(parsed && typeof parsed === "object" && "setup_installed" in parsed && parsed.setup_installed)
+  } catch {
+    return false
+  }
+}
+
 async function writeReport(report: AdminGateReport) {
   await Bun.write(reportPath, JSON.stringify(report, null, 2) + "\n")
   await Bun.write(
@@ -193,6 +214,13 @@ async function writeReport(report: AdminGateReport) {
       `- Helper SHA256: ${report.helper.helper_sha256 ?? "unknown"}`,
       `- Elevated: ${report.preflight.elevated ? "yes" : "no"}`,
       `- Cargo: ${report.preflight.cargo ?? "missing"}`,
+      ...(report.setup_evidence
+        ? [
+            `- Setup restore action: ${report.setup_evidence.restore_action}`,
+            `- Setup restored: ${report.setup_evidence.restored ? "yes" : "no"}`,
+            `- Network none proof: ${report.setup_evidence.network_policy_none_proof.status}`,
+          ]
+        : []),
       "",
       "| Step | Status | Exit | Duration |",
       "| --- | --- | ---: | ---: |",
@@ -238,6 +266,7 @@ if (preflightOnly || preflightFailures.length) {
     branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
     status: preflightFailures.length ? "skipped" : "passed",
     helper,
+    setup_evidence: null,
     preflight,
     results: [],
     notes: [
@@ -253,28 +282,71 @@ if (preflightOnly || preflightFailures.length) {
   process.exit(0)
 }
 
+const env = {
+  ...process.env,
+  OPENAGT_RUN_WINDOWS_WFP_TESTS: "1",
+  OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
+}
+if (!cargo) throw new Error("cargo is required after admin preflight")
+const helperCommand = (...args: string[]) => [
+  cargo,
+  "run",
+  "--quiet",
+  "--manifest-path",
+  manifest,
+  "--",
+  ...args,
+]
+const originalStatus = await run(
+  "Windows sandbox setup status before admin gate",
+  helperCommand("setup", "--status", "--json"),
+  env,
+)
+const install = await run("Windows sandbox setup install", helperCommand("setup", "--install", "--json"), env)
+const installedStatus = await run(
+  "Windows sandbox setup status after install",
+  helperCommand("setup", "--status", "--json"),
+  env,
+)
+const networkPolicyNoneProof = await run(
+  "Windows sandbox WFP network_policy=none execution proof",
+  [
+    cargo,
+    "test",
+    "--manifest-path",
+    manifest,
+    "wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect",
+  ],
+  env,
+)
+const restoreAction = setupInstalled(originalStatus) ? "install" : "uninstall"
+const restore = await run(
+  `Windows sandbox setup restore (${restoreAction})`,
+  helperCommand("setup", `--${restoreAction}`, "--json"),
+  env,
+)
+const restoredStatus = await run(
+  "Windows sandbox setup status after restore",
+  helperCommand("setup", "--status", "--json"),
+  env,
+)
+const setupEvidence: SetupEvidence = {
+  original_status: originalStatus,
+  install,
+  installed_status: installedStatus,
+  network_policy_none_proof: networkPolicyNoneProof,
+  restore_action: restoreAction,
+  restore,
+  restored_status: restoredStatus,
+  restored: setupInstalled(restoredStatus) === setupInstalled(originalStatus),
+}
 const results = [
-  await run(
-    "Windows sandbox setup status before",
-    [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"],
-    {
-      ...process.env,
-      OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
-    },
-  ),
-  await run("Windows sandbox WFP execution gate", [cargo, "test", "--manifest-path", manifest], {
-    ...process.env,
-    OPENAGT_RUN_WINDOWS_WFP_TESTS: "1",
-    OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
-  }),
-  await run(
-    "Windows sandbox setup status after",
-    [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "setup", "--status", "--json"],
-    {
-      ...process.env,
-      OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
-    },
-  ),
+  originalStatus,
+  install,
+  installedStatus,
+  networkPolicyNoneProof,
+  restore,
+  restoredStatus,
 ]
 
 const report = {
@@ -283,13 +355,17 @@ const report = {
   generated_at: new Date().toISOString(),
   commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
   branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
-  status: helper.status === "passed" && results.every((item) => item.status === "passed") ? "passed" : "failed",
+  status:
+    helper.status === "passed" && results.every((item) => item.status === "passed") && setupEvidence.restored
+      ? "passed"
+      : "failed",
   helper,
+  setup_evidence: setupEvidence,
   preflight,
   results,
   notes: [
     "This gate is intentionally manual/admin-only because it installs and removes OpenAGt WFP rules.",
-    "The helper tests restore the pre-existing WFP setup state after execution.",
+    "The gate restores the pre-existing WFP setup state after execution.",
   ],
 } satisfies AdminGateReport
 

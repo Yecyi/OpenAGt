@@ -158,17 +158,29 @@ function reportValue(value: unknown) {
   return value as Record<string, unknown>
 }
 
+function reportStepPassed(value: unknown) {
+  return reportValue(value)?.status === "passed"
+}
+
 function adminGateReportValid(windows: SandboxBackendStatus) {
   if (!windows.admin_gate_report_path) return false
   try {
     const report = reportValue(JSON.parse(readFileSync(windows.admin_gate_report_path, "utf8")))
     const helper = reportValue(report?.helper)
-    if (!report || !helper) return false
+    const setupEvidence = reportValue(report?.setup_evidence)
+    if (!report || !helper || !setupEvidence) return false
     if (report.schema_version !== 1) return false
     if (report.gate !== "windows_sandbox_admin_execution") return false
     if (report.status !== "passed") return false
     if (!Array.isArray(report.results) || report.results.length === 0) return false
-    if (!report.results.every((item) => reportValue(item)?.status === "passed")) return false
+    if (!report.results.every(reportStepPassed)) return false
+    if (!reportStepPassed(setupEvidence.original_status)) return false
+    if (!reportStepPassed(setupEvidence.install)) return false
+    if (!reportStepPassed(setupEvidence.installed_status)) return false
+    if (!reportStepPassed(setupEvidence.network_policy_none_proof)) return false
+    if (!reportStepPassed(setupEvidence.restore)) return false
+    if (!reportStepPassed(setupEvidence.restored_status)) return false
+    if (setupEvidence.restored !== true) return false
     if (helper.helper_protocol_version !== windows.helper_protocol_version) return false
     if (helper.helper_version !== windows.helper_version) return false
     if (windows.helper_sha256 && helper.helper_sha256 !== windows.helper_sha256) return false
