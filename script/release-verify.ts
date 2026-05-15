@@ -38,6 +38,7 @@ const runtimeTests = [
   "test/shell/runner.test.ts",
   "test/tool/webfetch.test.ts",
   "test/tool/lsp.test.ts",
+  "test/sync/index.test.ts",
   "test/util/process.test.ts",
   "test/util/path-canonical.test.ts",
   "test/util/sanitize-output.test.ts",
@@ -198,6 +199,25 @@ async function verifyRuntimeReliabilityContract() {
   }
 }
 
+async function verifyStorageScalabilityContract() {
+  const eventSchema = await Bun.file("packages/openagt/src/sync/event.sql.ts").text()
+  if (!eventSchema.includes("event_aggregate_seq_idx")) {
+    throw new Error("sync event schema must keep the aggregate replay index")
+  }
+
+  const eventMigration = await Bun.file(
+    "packages/openagt/migration/20260516120000_event_replay_indexes/migration.sql",
+  ).text()
+  if (!eventMigration.includes("event_aggregate_seq_idx")) {
+    throw new Error("sync event aggregate replay index migration is missing")
+  }
+
+  const syncTest = await Bun.file("packages/openagt/test/sync/index.test.ts").text()
+  if (!syncTest.includes("creates aggregate replay index for per-session event scans")) {
+    throw new Error("sync event aggregate replay index must keep focused regression coverage")
+  }
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -242,6 +262,10 @@ const steps = [
   {
     title: "Verify runtime reliability contract",
     run: verifyRuntimeReliabilityContract,
+  },
+  {
+    title: "Verify storage scalability contract",
+    run: verifyStorageScalabilityContract,
   },
   {
     title: "Verify Windows sandbox helper",

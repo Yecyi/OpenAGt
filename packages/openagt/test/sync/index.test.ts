@@ -66,6 +66,18 @@ describe("SyncEvent", () => {
 
   describe("run", () => {
     test(
+      "creates aggregate replay index for per-session event scans",
+      withInstance(() => {
+        const rows = Database.Client()
+          .$client.query<{ name: string }, []>(
+            `SELECT name FROM sqlite_master WHERE type='index' AND name='event_aggregate_seq_idx'`,
+          )
+          .all()
+        expect(rows).toHaveLength(1)
+      }),
+    )
+
+    test(
       "inserts event row",
       withInstance(() => {
         const { Created } = setup()
