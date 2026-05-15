@@ -4138,6 +4138,8 @@ export type SandboxBackendStatus = {
   network_enforced?: boolean
   network_reason?: string
   network_policies_enforced?: Array<"none" | "loopback" | "full">
+  admin_gate_report_valid?: boolean
+  acl_apply_verified?: boolean
 }
 
 export type SandboxNextAction = {
@@ -4172,6 +4174,12 @@ export type SandboxStatus = {
   backend_run_loop_enabled: boolean
   helper_path: string | null
   helper_override_used: boolean
+  native_sandbox_ready: boolean
+  ready_for_default_on: boolean
+  default_on_enabled: boolean
+  default_on_blockers: Array<string>
+  admin_gate_report_valid: boolean
+  acl_apply_verified: boolean
   windows_native: SandboxBackendStatus
   process: SandboxBackendStatus
   next_action: SandboxNextAction

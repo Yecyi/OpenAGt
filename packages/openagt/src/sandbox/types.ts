@@ -45,6 +45,8 @@ export type SandboxBackendStatus = {
   network_enforced?: boolean
   network_reason?: string
   network_policies_enforced?: SandboxNetworkPolicy[]
+  admin_gate_report_valid?: boolean
+  acl_apply_verified?: boolean
 }
 
 // Renamed from SandboxPolicySummary to make explicit that this is *advisory*

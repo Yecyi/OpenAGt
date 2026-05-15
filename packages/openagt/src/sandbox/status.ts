@@ -1,4 +1,5 @@
 import z from "zod"
+import { readFileSync } from "node:fs"
 import { Flag } from "@/flag/flag"
 import type { Config } from "@/config"
 import { autoBackendName } from "./backends"
@@ -57,6 +58,8 @@ export const SandboxBackendStatusSchema = z
     network_enforced: z.boolean().optional(),
     network_reason: z.string().optional(),
     network_policies_enforced: z.array(SandboxNetworkPolicySchema).optional(),
+    admin_gate_report_valid: z.boolean().optional(),
+    acl_apply_verified: z.boolean().optional(),
   })
   .meta({ ref: "SandboxBackendStatus" })
 
@@ -96,6 +99,12 @@ export const SandboxStatusSchema = z
     backend_run_loop_enabled: z.boolean(),
     helper_path: z.string().nullable(),
     helper_override_used: z.boolean(),
+    native_sandbox_ready: z.boolean(),
+    ready_for_default_on: z.boolean(),
+    default_on_enabled: z.boolean(),
+    default_on_blockers: z.array(z.string()),
+    admin_gate_report_valid: z.boolean(),
+    acl_apply_verified: z.boolean(),
     windows_native: SandboxBackendStatusSchema,
     process: SandboxBackendStatusSchema,
     next_action: SandboxNextActionSchema,
@@ -122,7 +131,7 @@ function backendFromPreference(preference: SandboxBackendPreference, platform: N
   return preference
 }
 
-function missingWindowsStatus(reason: string, readiness: SandboxNativeReadiness) {
+function missingWindowsStatus(reason: string, readiness: SandboxNativeReadiness): SandboxBackendStatus {
   return {
     name: "windows_native",
     available: false,
@@ -142,6 +151,51 @@ function processStatus() {
     helper: process.execPath,
     reason: "Process-level enforcement only; not an OS-native sandbox",
   } satisfies SandboxBackendStatus
+}
+
+function reportValue(value: unknown) {
+  if (!value || typeof value !== "object") return undefined
+  return value as Record<string, unknown>
+}
+
+function adminGateReportValid(windows: SandboxBackendStatus) {
+  if (!windows.admin_gate_report_path) return false
+  try {
+    const report = reportValue(JSON.parse(readFileSync(windows.admin_gate_report_path, "utf8")))
+    const helper = reportValue(report?.helper)
+    if (!report || !helper) return false
+    if (report.schema_version !== 1) return false
+    if (report.gate !== "windows_sandbox_admin_execution") return false
+    if (report.status !== "passed") return false
+    if (!Array.isArray(report.results) || report.results.length === 0) return false
+    if (!report.results.every((item) => reportValue(item)?.status === "passed")) return false
+    if (helper.helper_protocol_version !== windows.helper_protocol_version) return false
+    if (helper.helper_version !== windows.helper_version) return false
+    if (windows.helper_sha256 && helper.helper_sha256 !== windows.helper_sha256) return false
+    return typeof report.generated_at === "string" && report.generated_at.length > 0
+  } catch {
+    return false
+  }
+}
+
+function defaultOnBlockers(windows: SandboxBackendStatus, adminGateValid: boolean, aclApplyVerified: boolean) {
+  return [
+    !windows.helper_path ? "helper_missing" : undefined,
+    windows.helper_protocol_version !== undefined &&
+    windows.helper_protocol_version !== WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION
+      ? "helper_version_mismatch"
+      : undefined,
+    !windows.job_object_supported ? "job_object_unavailable" : undefined,
+    windows.setup_required || windows.setup_installed === false ? "wfp_setup_missing" : undefined,
+    !adminGateValid ? "admin_gate_missing_or_stale" : undefined,
+    !windows.filesystem_ready ? "filesystem_not_ready" : undefined,
+    !aclApplyVerified
+      ? windows.acl_apply_mode === "apply"
+        ? "acl_apply_not_verified"
+        : "acl_apply_not_enabled"
+      : undefined,
+    !windows.network_policies_enforced?.includes("none") ? "network_none_not_enforced" : undefined,
+  ].filter((item): item is string => item !== undefined)
 }
 
 function actionFor(input: {
@@ -247,6 +301,22 @@ export function getSandboxStatus(input: {
         platform === "win32" ? "helper_missing" : "backend_unavailable",
       )
   const preferred = backendFromPreference(sandbox.backend, platform)
+  const adminGateValid = adminGateReportValid(windows)
+  const aclApplyVerified = windows.acl_apply_mode === "apply" && windows.filesystem_enforced === true
+  const nativeSandboxReady = windows.available && windows.readiness === "ready"
+  const defaultOnBlockersList = platform === "win32" ? defaultOnBlockers(windows, adminGateValid, aclApplyVerified) : []
+  const readyForDefaultOn = platform === "win32" && nativeSandboxReady && defaultOnBlockersList.length === 0
+  const defaultOnEnabled =
+    readyForDefaultOn &&
+    sandbox.enabled &&
+    sandbox.backend === "auto" &&
+    sandbox.failure_policy === "closed" &&
+    sandbox.windows_acl_apply_mode === "apply"
+  const windowsWithDefaultOnEvidence = {
+    ...windows,
+    admin_gate_report_valid: adminGateValid,
+    acl_apply_verified: aclApplyVerified,
+  } satisfies SandboxBackendStatus
 
   return {
     platform,
@@ -257,7 +327,13 @@ export function getSandboxStatus(input: {
     backend_run_loop_enabled: sandbox.enabled && preferred === "windows_native" && windows.available,
     helper_path: resolved.path ?? null,
     helper_override_used: resolved.source === "override",
-    windows_native: windows,
+    native_sandbox_ready: nativeSandboxReady,
+    ready_for_default_on: readyForDefaultOn,
+    default_on_enabled: defaultOnEnabled,
+    default_on_blockers: defaultOnBlockersList,
+    admin_gate_report_valid: adminGateValid,
+    acl_apply_verified: aclApplyVerified,
+    windows_native: windowsWithDefaultOnEvidence,
     process: processStatus(),
     next_action: actionFor({
       sandbox,

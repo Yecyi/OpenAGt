@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { writeFileSync } from "node:fs"
+import path from "node:path"
 import { Instance } from "../../src/project/instance"
 import { Server } from "../../src/server/server"
 import { getSandboxStatus, SandboxStatusSchema } from "../../src/sandbox/status"
@@ -15,13 +17,43 @@ function status(patch: Partial<SandboxBackendStatus>) {
     helper,
     helper_path: helper,
     helper_version: "1.0.0",
+    helper_sha256: "a".repeat(64),
     helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+    acl_apply_mode: "apply",
+    setup_installed: true,
+    setup_required: false,
+    admin_verification_required: false,
     job_object_supported: true,
+    filesystem_ready: true,
     filesystem_enforced: true,
+    network_ready: true,
     network_enforced: true,
     network_policies_enforced: ["none"],
     ...patch,
   } satisfies SandboxBackendStatus
+}
+
+function writeAdminReport(file: string, patch: Record<string, unknown> = {}) {
+  writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        schema_version: 1,
+        gate: "windows_sandbox_admin_execution",
+        generated_at: "2026-05-15T00:00:00.000Z",
+        status: "passed",
+        helper: {
+          helper_version: "1.0.0",
+          helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+          helper_sha256: "a".repeat(64),
+        },
+        results: [{ name: "Windows sandbox WFP execution gate", status: "passed" }],
+        ...patch,
+      },
+      null,
+      2,
+    ),
+  )
 }
 
 function getWith(status: SandboxBackendStatus) {
@@ -86,8 +118,109 @@ describe("sandbox status", () => {
     )
 
     expect(result.backend_run_loop_enabled).toBe(true)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
     expect(result.next_action.kind).toBe("none")
     expect(result.next_action.command).toBeUndefined()
+  })
+
+  test("missing admin gate report blocks default-on readiness", () => {
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: "C:\\missing\\admin-gate-report.json",
+      }),
+    )
+
+    expect(result.native_sandbox_ready).toBe(true)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("stale helper proof blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      helper: {
+        helper_version: "0.0.0",
+        helper_protocol_version: WINDOWS_SANDBOX_HELPER_PROTOCOL_VERSION,
+        helper_sha256: "a".repeat(64),
+      },
+    })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("failed admin gate steps block default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      results: [{ name: "Windows sandbox WFP execution gate", status: "failed" }],
+    })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
+  test("ACL preflight blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report)
+
+    const result = getWith(
+      status({
+        available: false,
+        readiness: "acl_apply_required",
+        acl_apply_mode: "preflight",
+        filesystem_enforced: false,
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(true)
+    expect(result.acl_apply_verified).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("acl_apply_not_enabled")
+  })
+
+  test("valid admin report and ACL apply evidence allows default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report)
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(true)
+    expect(result.acl_apply_verified).toBe(true)
+    expect(result.ready_for_default_on).toBe(true)
+    expect(result.default_on_blockers).toEqual([])
   })
 
   test("returns parseable status contract", () => {

@@ -7,6 +7,7 @@ import type { Config, SandboxStatus } from "@openagt/sdk/v2/client"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
+import { defaultOnBlockerLabels } from "./settings-sandbox-helpers"
 import { SettingsList } from "./settings-list"
 
 type SandboxConfig = NonNullable<NonNullable<Config["experimental"]>["sandbox"]>
@@ -209,6 +210,9 @@ const SandboxStatusPanel: Component<{
         label: "Backend",
         value: `${status.preferred_backend} (${status.backend_run_loop_enabled ? "enabled" : "not ready"})`,
       },
+      { label: "Native ready", value: flag(status.native_sandbox_ready) },
+      { label: "Ready for default-on", value: flag(status.ready_for_default_on) },
+      { label: "Default-on enabled", value: flag(status.default_on_enabled) },
       { label: "Helper", value: status.helper_path ?? "not found" },
       { label: "Version", value: status.windows_native.helper_version ?? "unknown" },
       {
@@ -231,6 +235,8 @@ const SandboxStatusPanel: Component<{
         value: `${flag(status.windows_native.filesystem_ready)} ready / ${flag(status.windows_native.filesystem_enforced)} enforced`,
       },
       { label: "ACL mode", value: status.config.windows_acl_apply_mode },
+      { label: "ACL verified", value: flag(status.acl_apply_verified) },
+      { label: "Admin report valid", value: flag(status.admin_gate_report_valid) },
       {
         label: "Network",
         value: `${flag(status.windows_native.network_ready)} ready / ${flag(status.windows_native.network_enforced)} enforced`,
@@ -288,6 +294,21 @@ const SandboxStatusPanel: Component<{
                   </div>
                 )}
               </For>
+            </div>
+
+            <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">
+              <div class="text-11-medium text-text-weak">Default-on blockers</div>
+              <Show
+                when={status().default_on_blockers.length > 0}
+                fallback={<div class="text-12-regular text-text-strong">None</div>}
+              >
+                <ul class="mt-1 flex list-disc flex-col gap-1 pl-4 text-12-regular text-text-strong">
+                  <For each={defaultOnBlockerLabels(status())}>{(item) => <li>{item}</li>}</For>
+                </ul>
+              </Show>
+              <div class="mt-2 text-11-regular text-text-weak">
+                network_policy=loopback remains unsupported in this milestone.
+              </div>
             </div>
 
             <div class="rounded-md border border-border-weak-base bg-surface-panel px-3 py-2">

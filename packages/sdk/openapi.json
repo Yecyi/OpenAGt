@@ -54762,6 +54762,12 @@
               "type": "string",
               "enum": ["none", "loopback", "full"]
             }
+          },
+          "admin_gate_report_valid": {
+            "type": "boolean"
+          },
+          "acl_apply_verified": {
+            "type": "boolean"
           }
         },
         "required": ["name", "available"]
@@ -54860,6 +54866,27 @@
           "helper_override_used": {
             "type": "boolean"
           },
+          "native_sandbox_ready": {
+            "type": "boolean"
+          },
+          "ready_for_default_on": {
+            "type": "boolean"
+          },
+          "default_on_enabled": {
+            "type": "boolean"
+          },
+          "default_on_blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "admin_gate_report_valid": {
+            "type": "boolean"
+          },
+          "acl_apply_verified": {
+            "type": "boolean"
+          },
           "windows_native": {
             "$ref": "#/components/schemas/SandboxBackendStatus"
           },
@@ -54879,6 +54906,12 @@
           "backend_run_loop_enabled",
           "helper_path",
           "helper_override_used",
+          "native_sandbox_ready",
+          "ready_for_default_on",
+          "default_on_enabled",
+          "default_on_blockers",
+          "admin_gate_report_valid",
+          "acl_apply_verified",
           "windows_native",
           "process",
           "next_action"

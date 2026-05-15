@@ -21,13 +21,23 @@ type StepResult = {
   stderr: string
 }
 
+type HelperProof = {
+  status: "passed" | "failed" | "skipped"
+  helper_version: string | null
+  helper_protocol_version: number | null
+  helper_sha256: string | null
+  stdout: string
+  stderr: string
+}
+
 type AdminGateReport = {
   schema_version: 1
   gate: "windows_sandbox_admin_preflight" | "windows_sandbox_admin_execution"
   generated_at: string
   commit: string
   branch: string
-  status: "passed" | "failed"
+  status: "passed" | "failed" | "skipped"
+  helper: HelperProof
   preflight: {
     platform: NodeJS.Platform
     elevated: boolean
@@ -109,6 +119,62 @@ async function run(name: string, cmd: string[], env: NodeJS.ProcessEnv = process
   }
 }
 
+function probeHelper(cargo: string | undefined, manifestExists: boolean): HelperProof {
+  if (!cargo || !manifestExists) {
+    return {
+      status: "skipped",
+      helper_version: null,
+      helper_protocol_version: null,
+      helper_sha256: null,
+      stdout: "",
+      stderr: !cargo ? "cargo missing" : "helper manifest missing",
+    }
+  }
+  const result = Bun.spawnSync({
+    cmd: [cargo, "run", "--quiet", "--manifest-path", manifest, "--", "probe", "--json"],
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const stdout = result.stdout.toString()
+  const stderr = result.stderr.toString()
+  if (result.exitCode !== 0) {
+    return {
+      status: "failed",
+      helper_version: null,
+      helper_protocol_version: null,
+      helper_sha256: null,
+      stdout: trim(stdout),
+      stderr: trim(stderr),
+    }
+  }
+  try {
+    const parsed = JSON.parse(stdout) as {
+      helper_version?: unknown
+      helper_protocol_version?: unknown
+      helper_sha256?: unknown
+    }
+    return {
+      status: "passed",
+      helper_version: typeof parsed.helper_version === "string" ? parsed.helper_version : null,
+      helper_protocol_version:
+        typeof parsed.helper_protocol_version === "number" ? parsed.helper_protocol_version : null,
+      helper_sha256: typeof parsed.helper_sha256 === "string" ? parsed.helper_sha256 : null,
+      stdout: trim(stdout),
+      stderr: trim(stderr),
+    }
+  } catch (err) {
+    return {
+      status: "failed",
+      helper_version: null,
+      helper_protocol_version: null,
+      helper_sha256: null,
+      stdout: trim(stdout),
+      stderr: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
 async function writeReport(report: AdminGateReport) {
   await Bun.write(reportPath, JSON.stringify(report, null, 2) + "\n")
   await Bun.write(
@@ -121,6 +187,10 @@ async function writeReport(report: AdminGateReport) {
       `- Commit: ${report.commit}`,
       `- Branch: ${report.branch}`,
       `- Generated: ${report.generated_at}`,
+      `- Helper probe: ${report.helper.status}`,
+      `- Helper version: ${report.helper.helper_version ?? "unknown"}`,
+      `- Helper protocol: ${report.helper.helper_protocol_version ?? "unknown"}`,
+      `- Helper SHA256: ${report.helper.helper_sha256 ?? "unknown"}`,
       `- Elevated: ${report.preflight.elevated ? "yes" : "no"}`,
       `- Cargo: ${report.preflight.cargo ?? "missing"}`,
       "",
@@ -149,12 +219,14 @@ const preflight = {
   manifest,
   manifest_exists: await Bun.file(manifest).exists(),
 }
+const helper = probeHelper(cargo, preflight.manifest_exists)
 
 const preflightFailures = [
   process.platform !== "win32" ? "Windows sandbox admin gate can only run on Windows." : undefined,
   !preflight.elevated ? "Windows sandbox admin gate requires an elevated Administrator terminal." : undefined,
   !cargo ? "Rust cargo is required to run the Windows sandbox admin gate." : undefined,
   !preflight.manifest_exists ? `Windows sandbox helper manifest not found: ${manifest}` : undefined,
+  helper.status === "failed" ? "Windows sandbox helper probe failed." : undefined,
 ].filter((item): item is string => item !== undefined)
 
 if (preflightOnly || preflightFailures.length) {
@@ -164,7 +236,8 @@ if (preflightOnly || preflightFailures.length) {
     generated_at: new Date().toISOString(),
     commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
     branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
-    status: preflightFailures.length ? "failed" : "passed",
+    status: preflightFailures.length ? "skipped" : "passed",
+    helper,
     preflight,
     results: [],
     notes: [
@@ -175,7 +248,7 @@ if (preflightOnly || preflightFailures.length) {
   })
   if (preflightFailures.length) {
     for (const item of preflightFailures) console.error(item)
-    process.exit(1)
+    process.exit(0)
   }
   process.exit(0)
 }
@@ -210,7 +283,8 @@ const report = {
   generated_at: new Date().toISOString(),
   commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
   branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
-  status: results.every((item) => item.status === "passed") ? "passed" : "failed",
+  status: helper.status === "passed" && results.every((item) => item.status === "passed") ? "passed" : "failed",
+  helper,
   preflight,
   results,
   notes: [

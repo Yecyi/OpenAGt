@@ -354,6 +354,26 @@ fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
         Some(items) if !items.is_empty() => {}
         _ => return None,
     }
+    let helper = value.get("helper")?;
+    if helper.get("helper_version").and_then(|item| item.as_str())
+        != Some(env!("CARGO_PKG_VERSION"))
+    {
+        return None;
+    }
+    if helper
+        .get("helper_protocol_version")
+        .and_then(|item| item.as_u64())
+        != Some(HELPER_PROTOCOL_VERSION as u64)
+    {
+        return None;
+    }
+    if let Some(current_sha256) = helper_sha256() {
+        if helper.get("helper_sha256").and_then(|item| item.as_str())
+            != Some(current_sha256.as_str())
+        {
+            return None;
+        }
+    }
     value
         .get("generated_at")
         .and_then(|item| item.as_str())
@@ -2894,6 +2914,7 @@ mod tests {
     fn admin_gate_report_requires_execution_gate() {
         let dir = temp_case("admin-gate-report");
         let report = dir.join("admin-gate-report.json");
+        let helper_sha256 = super::helper_sha256().unwrap();
 
         fs::write(
             &report,
@@ -2923,6 +2944,37 @@ mod tests {
         fs::write(
             &report,
             r#"{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","results":[{"status":"passed"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            super::admin_gate_verified_at(report.to_str()),
+            None,
+            "reports without helper proof must not satisfy the admin execution gate"
+        );
+
+        fs::write(
+            &report,
+            format!(
+                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"stale","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}]}}"#,
+                super::HELPER_PROTOCOL_VERSION,
+                helper_sha256
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            super::admin_gate_verified_at(report.to_str()),
+            None,
+            "stale helper versions must not satisfy the admin execution gate"
+        );
+
+        fs::write(
+            &report,
+            format!(
+                r#"{{"schema_version":1,"gate":"windows_sandbox_admin_execution","status":"passed","generated_at":"2026-05-12T00:00:00.000Z","helper":{{"helper_version":"{}","helper_protocol_version":{},"helper_sha256":"{}"}},"results":[{{"status":"passed"}}]}}"#,
+                env!("CARGO_PKG_VERSION"),
+                super::HELPER_PROTOCOL_VERSION,
+                helper_sha256
+            ),
         )
         .unwrap();
         assert_eq!(
