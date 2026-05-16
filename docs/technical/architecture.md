@@ -14,7 +14,7 @@ The system is organized around five backend pillars:
 
 This document focuses on the current stable backend and release-facing architecture.
 
-For v1.16, the stable backend surface is CLI/TUI, headless server, SSE event envelopes, and the generated JavaScript SDK. Frontend expansion should preserve these backend contracts and target the Electron + React direction rather than a Flutter package.
+For v1.22, the stable backend surface is CLI/TUI, headless server, SSE event envelopes, the generated JavaScript SDK, Coordinator Runtime v1 with MPACR opt-in review, and the three-layer personal memory substrate. Frontend expansion should preserve these backend contracts and target the Electron + React direction rather than a Flutter package.
 
 ## OpenCode Comparison
 
@@ -345,25 +345,25 @@ sequenceDiagram
 
 | Capability                                                                                  | Status                                                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Session runtime and tool loop                                                               | stable in v1.16                                                                       |
-| Approval and Safety Envelope with `shell_safety.version`                                    | stable in v1.16                                                                       |
-| Windows signed-GA release policy                                                            | stable in v1.16 when signing secrets are configured                                   |
-| Packaged binary smoke tests                                                                 | stable in v1.16                                                                       |
-| `openagt debug doctor` and `debug bundle`                                                   | stable in v1.16                                                                       |
-| Coordinator Runtime projection and dispatch                                                 | stable in v1.16 for graph projection, duplicate-id rejection, retry, and cancellation |
+| Session runtime and tool loop                                                               | stable in v1.22 after runtime-foundation and task-outcome hardening                   |
+| Approval and Safety Envelope with `shell_safety.version`                                    | stable in v1.22; shell execution now uses the unified dangerous-command detector path |
+| Windows signed-GA release policy                                                            | stable when Azure Trusted Signing secrets are configured                              |
+| Packaged binary smoke tests                                                                 | stable in v1.22 and included in the GA verification path                              |
+| `openagt debug doctor` and `debug bundle`                                                   | stable diagnostics surface                                                            |
+| Coordinator Runtime projection and dispatch                                                 | stable for graph projection, duplicate-id rejection, retry, cancellation, and MPACR   |
 | Dynamic Expert Runtime `effort`, long-task timeline, adaptive budget, checkpoint projection | implemented for v1.2 backend contracts                                                |
-| Personal Agent inbox and memory primitives                                                  | implemented; backend contracts stabilized in v1.16                                    |
-| SSE EventEnvelope                                                                           | stable in v1.16                                                                       |
-| JavaScript SDK runtime helpers                                                              | stable in v1.16; extended for Dynamic Expert Runtime projection                       |
+| Personal Agent inbox and memory primitives                                                  | implemented; three-layer memory and manual consolidation are stable backend surfaces  |
+| SSE EventEnvelope                                                                           | stable                                                                                |
+| JavaScript SDK runtime helpers                                                              | stable; extended for Dynamic Expert Runtime projection                                |
 
 ## Repository Map
 
-| Path                       | Role                                        |
-| -------------------------- | ------------------------------------------- |
-| `packages/openagt`         | Core runtime, tools, providers, CLI, server |
-| `packages/app`             | Web client                                  |
-| `packages/sdk/js`          | Generated JavaScript SDK                    |
-| `packages/console/*`       | Control-plane packages                      |
+| Path                 | Role                                        |
+| -------------------- | ------------------------------------------- |
+| `packages/openagt`   | Core runtime, tools, providers, CLI, server |
+| `packages/app`       | Web client                                  |
+| `packages/sdk/js`    | Generated JavaScript SDK                    |
+| `packages/console/*` | Control-plane packages                      |
 
 ## Release Architecture
 

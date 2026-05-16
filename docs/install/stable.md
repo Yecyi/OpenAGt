@@ -1,6 +1,6 @@
 # OpenAGt Stable Install
 
-OpenAGt `v1.20.0` stable covers:
+OpenAGt `v1.22.0` stable covers:
 
 - CLI / TUI
 - headless server
@@ -8,7 +8,7 @@ OpenAGt `v1.20.0` stable covers:
 
 Native mobile clients are not part of this release line.
 
-The current stable line is `v1.20.0`, which contains the v1.17 task/subagent baseline plus v1.20 security and runtime hardening for the CLI/server/SDK runtime.
+The current stable line is `v1.22.0`, which contains the v1.20 runtime foundation, the v1.21 MPACR / memory / expert-runtime expansion, and the v1.22 GA readiness closure for shell safety, bus event persistence, release CI, and documentation consistency.
 
 ## Release Assets
 
@@ -88,5 +88,5 @@ openagt debug bundle --session <id>
 Release maintainers can run the current local release gate with:
 
 ```bash
-bun run verify:v1.20
+bun run verify:v1.22
 ```

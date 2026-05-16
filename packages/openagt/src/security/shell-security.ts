@@ -1,5 +1,7 @@
 import { Context, Effect, Layer } from "effect"
 import { commandClassifier } from "./command-classifier"
+import { detect as detectDangerousCommand } from "./dangerous-command-detector"
+import type { DangerResult } from "./danger-detector-contracts"
 import { WrapperStripper } from "./wrapper-stripper"
 import { classifyApprovalKind, formatShellSafety, isPrivilegeEscalationCommand } from "./shell-safety"
 import type {
@@ -234,6 +236,15 @@ function decisionFor(input: { risk: ShellRiskLevel; command: string; warnings: s
   return "allow"
 }
 
+function maxRisk(...items: ShellRiskLevel[]): ShellRiskLevel {
+  const riskLevels: Record<ShellRiskLevel, number> = { safe: 0, low: 1, medium: 2, high: 3 }
+  return items.reduce((max, item) => (riskLevels[item] > riskLevels[max] ? item : max), "safe" as ShellRiskLevel)
+}
+
+function dangerWarnings(result: DangerResult) {
+  return result.reasons.map((reason) => `DangerDetector: ${reason}`)
+}
+
 function reviewCandidates(result: { findings: ShellFinding[]; decision: ShellDecision }): ShellReviewCandidate[] {
   if (result.decision === "block") return []
   return result.findings
@@ -277,14 +288,26 @@ export const layer = Layer.effect(
       const stripped = wrapperStripper.stripAll(input.command)
       const strippedClassification = commandClassifier.classify(stripped)
 
-      // Take max risk level between original and stripped
-      const riskLevels: Record<string, number> = { safe: 0, low: 1, medium: 2, high: 3 }
-      const originalRisk = riskLevels[originalClassification.riskLevel] ?? 0
-      const strippedRisk = riskLevels[strippedClassification.riskLevel] ?? 0
-      const finalRisk =
-        originalRisk >= strippedRisk ? originalClassification.riskLevel : strippedClassification.riskLevel
-      const finalWarnings = [...originalClassification.warnings, ...strippedClassification.warnings]
-      const finalPatterns = [...originalClassification.matchedPatterns, ...strippedClassification.matchedPatterns]
+      const originalDanger = detectDangerousCommand(input.command, input.shell)
+      const strippedDanger = stripped === input.command ? originalDanger : detectDangerousCommand(stripped, input.shell)
+      const finalRisk = maxRisk(
+        originalClassification.riskLevel,
+        strippedClassification.riskLevel,
+        originalDanger.severity,
+        strippedDanger.severity,
+      )
+      const finalWarnings = [
+        ...originalClassification.warnings,
+        ...strippedClassification.warnings,
+        ...dangerWarnings(originalDanger),
+        ...dangerWarnings(strippedDanger),
+      ]
+      const finalPatterns = [
+        ...originalClassification.matchedPatterns,
+        ...strippedClassification.matchedPatterns,
+        ...originalDanger.matchedPatterns,
+        ...strippedDanger.matchedPatterns,
+      ]
 
       // Check if becomes dangerous after strip
       const becomesDangerous = wrapperStripper.becomesDangerousAfterStrip(input.command)

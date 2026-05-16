@@ -123,17 +123,22 @@ function computeTokenEstimate(value: string): number {
   return Token.estimate(value ?? "")
 }
 
-interface TokenValuedEntry {
-  value: string | undefined
+function tokenValue(entry: unknown): string {
+  if (typeof entry !== "object" || entry === null || !("value" in entry)) return ""
+  const value = entry.value
+  if (typeof value === "string") return value
+  if (typeof value !== "object" || value === null) return ""
+  if ("static" in value && "semiStatic" in value && Array.isArray(value.static) && Array.isArray(value.semiStatic)) {
+    return [...value.static, ...value.semiStatic].join("\n")
+  }
+  return ""
 }
 
 function evictIfOverTokenLimit(memo: LRUCache<string, unknown>, tokenLimit: number): void {
   let totalTokens = 0
-  const entries = Array.from((memo as LRUCache<string, TokenValuedEntry>).entries()) as Array<
-    [string, TokenValuedEntry]
-  >
+  const entries = Array.from(memo.entries())
   for (const [, entry] of entries) {
-    totalTokens += computeTokenEstimate(entry.value ?? "")
+    totalTokens += computeTokenEstimate(tokenValue(entry))
     while (totalTokens > tokenLimit && memo.size > 0) {
       memo.evictOldest()
       totalTokens = Math.max(0, totalTokens - 1000)

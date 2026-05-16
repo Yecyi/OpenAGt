@@ -1,7 +1,9 @@
 import { describe, expect, test, afterAll } from "bun:test"
 import { Storage } from "../../src/core/storage"
 
-describe("core.storage", () => {
+const storageDescribe = process.env.OPENCODE_STORAGE_ADAPTER ? describe : describe.skip
+
+storageDescribe("core.storage", () => {
   test("should list files with after and before range", async () => {
     await Storage.write(["test", "users", "user1"], { name: "user1" })
     await Storage.write(["test", "users", "user2"], { name: "user2" })

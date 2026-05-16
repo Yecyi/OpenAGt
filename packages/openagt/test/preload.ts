@@ -12,13 +12,16 @@ await fs.mkdir(dir, { recursive: true })
 afterAll(async () => {
   const { Database } = await import("../src/storage")
   Database.close()
-  const busy = (error: unknown) =>
-    typeof error === "object" && error !== null && "code" in error && error.code === "EBUSY"
+  const transientRemoveError = (error: unknown) =>
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    ["EBUSY", "EFAULT", "ENOTEMPTY", "EPERM"].includes(String(error.code))
   const rm = async (left: number): Promise<void> => {
     Bun.gc(true)
     await sleep(100)
     return fs.rm(dir, { recursive: true, force: true }).catch((error) => {
-      if (!busy(error)) throw error
+      if (!transientRemoveError(error)) throw error
       if (left <= 1) throw error
       return rm(left - 1)
     })

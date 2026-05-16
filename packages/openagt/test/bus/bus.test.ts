@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import z from "zod"
 import { Bus } from "../../src/bus"
 import { BusEvent } from "../../src/bus/bus-event"
+import { ToolsChanged } from "../../src/mcp/events"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 
@@ -191,6 +192,46 @@ describe("Bus", () => {
 
       expect(receivedA).toEqual([1])
       expect(receivedB).toEqual([2])
+    })
+
+    test("persisted critical events are partitioned by instance", async () => {
+      await using tmpState = await tmpdir()
+      await using tmpA = await tmpdir()
+      await using tmpB = await tmpdir()
+      const previousStateHome = process.env.XDG_STATE_HOME
+      process.env.XDG_STATE_HOME = tmpState.path
+      try {
+        await withInstance(tmpA.path, async () => {
+          await Bus.publish(ToolsChanged, { server: "server-a" })
+        })
+        await Instance.disposeAll()
+
+        await withInstance(tmpB.path, async () => {
+          await Bus.publish(ToolsChanged, { server: "server-b" })
+        })
+        await Instance.disposeAll()
+
+        const replayA: string[] = []
+        const replayB: string[] = []
+        await withInstance(tmpA.path, async () => {
+          await Bus.replayEvents((event) => {
+            const payload = event.payload as { properties?: { server?: string } }
+            if (payload.properties?.server) replayA.push(payload.properties.server)
+          })
+        })
+        await withInstance(tmpB.path, async () => {
+          await Bus.replayEvents((event) => {
+            const payload = event.payload as { properties?: { server?: string } }
+            if (payload.properties?.server) replayB.push(payload.properties.server)
+          })
+        })
+
+        expect(replayA).toEqual(["server-a"])
+        expect(replayB).toEqual(["server-b"])
+      } finally {
+        if (previousStateHome === undefined) delete process.env.XDG_STATE_HOME
+        else process.env.XDG_STATE_HOME = previousStateHome
+      }
     })
   })
 

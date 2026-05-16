@@ -5,11 +5,13 @@ import { Log } from "../util"
 import { BusEvent } from "./bus-event"
 import { GlobalBus } from "./global"
 import { InstanceState } from "@/effect"
+import { Instance, type InstanceContext } from "@/project/instance"
 import { makeRuntime } from "@/effect/run-service"
 import path from "path"
 import os from "os"
 import fs from "fs/promises"
 import fsSync from "node:fs"
+import { createHash } from "crypto"
 
 const log = Log.create({ service: "bus" })
 
@@ -92,12 +94,10 @@ class EventBuffer {
     this.maxBytes = maxBytes
   }
 
-  initialize(): void {
+  initialize(bufferPath: string): void {
     try {
-      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
-      const eventsDir = path.join(stateHome, "opencode", "events")
-      fsSync.mkdirSync(eventsDir, { recursive: true })
-      this.bufferPath = path.join(eventsDir, "events.jsonl")
+      fsSync.mkdirSync(path.dirname(bufferPath), { recursive: true })
+      this.bufferPath = bufferPath
     } catch (error) {
       log.warn("failed to initialize event buffer", { error })
     }
@@ -241,8 +241,21 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Bu
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const eventBuffer = new EventBuffer(getEventBufferSize(), getEventBufferBytes())
-    eventBuffer.initialize()
+    const eventBuffers = new Map<string, EventBuffer>()
+    const bufferPathFor = (ctx: InstanceContext) => {
+      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state")
+      const key = createHash("sha256").update(`${ctx.directory}\n${ctx.worktree}`).digest("hex").slice(0, 16)
+      return path.join(stateHome, "opencode", "events", key, "events.jsonl")
+    }
+    const eventBufferFor = (ctx: InstanceContext) => {
+      const bufferPath = bufferPathFor(ctx)
+      const current = eventBuffers.get(bufferPath)
+      if (current) return current
+      const next = new EventBuffer(getEventBufferSize(), getEventBufferBytes())
+      next.initialize(bufferPath)
+      eventBuffers.set(bufferPath, next)
+      return next
+    }
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Bus.state")(function* (ctx) {
@@ -260,7 +273,7 @@ export const layer = Layer.effect(
             for (const ps of typed.values()) {
               yield* PubSub.shutdown(ps)
             }
-            yield* Effect.promise(() => eventBuffer.persist())
+            yield* Effect.promise(() => eventBufferFor(ctx).persist())
           }),
         )
 
@@ -286,8 +299,9 @@ export const layer = Layer.effect(
         log.info("publishing", { type: def.type })
 
         // Persist critical events to buffer; log if dropped due to backpressure
-        if (CRITICAL_EVENT_TYPES.includes(def.type)) {
-          const pushed = eventBuffer.push({ timestamp: Date.now(), payload })
+        if (isCriticalEventType(def.type)) {
+          const context = yield* InstanceState.context
+          const pushed = eventBufferFor(context).push({ timestamp: Date.now(), payload })
           if (!pushed) {
             log.warn("event dropped due to backpressure", { type: def.type })
           }
@@ -373,9 +387,18 @@ export const layer = Layer.effect(
       return yield* on(s.wildcard, "*", callback)
     })
 
-    const getRecentEventsFn = (count?: number) => eventBuffer.getRecent(count)
+    const getRecentEventsFn = (count?: number) => {
+      try {
+        return eventBufferFor(Instance.current).getRecent(count)
+      } catch {
+        return []
+      }
+    }
     const replayEventsFn = (callback: (event: { timestamp: number; payload: unknown }) => void) =>
-      Effect.promise(() => eventBuffer.replay(callback))
+      Effect.gen(function* () {
+        const context = yield* InstanceState.context
+        yield* Effect.promise(() => eventBufferFor(context).replay(callback))
+      })
 
     return Service.of({
       publish,
@@ -408,6 +431,14 @@ export function subscribe<D extends BusEvent.Definition>(
 
 export function subscribeAll(callback: (event: any) => unknown) {
   return runSync((svc) => svc.subscribeAllCallback(callback))
+}
+
+export function getRecentEvents(count?: number) {
+  return runSync((svc) => Effect.sync(() => svc.getRecentEvents(count)))
+}
+
+export async function replayEvents(callback: (event: { timestamp: number; payload: unknown }) => void) {
+  return runPromise((svc) => svc.replayEvents(callback))
 }
 
 export * as Bus from "."

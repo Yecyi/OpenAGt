@@ -49,6 +49,39 @@ describe("ShellSecurity.Service", () => {
     expect(["high", "medium"]).toContain(result.risk_level)
   })
 
+  test("uses unified danger detector findings in the main shell decision path", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ShellSecurity.Service
+        return yield* svc.analyze({
+          command: "Invoke-Expression 'whoami'",
+          shell: "powershell.exe",
+          cwd: "C:\\",
+        })
+      }).pipe(Effect.provide(ShellSecurity.defaultLayer)),
+    )
+
+    expect(result.risk_level).toBe("high")
+    expect(result.decision).toBe("confirm")
+    expect(result.findings.some((item) => item.evidence.includes("DangerDetector"))).toBe(true)
+  })
+
+  test("blocks deterministic pipe-to-shell through the unified path", async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const svc = yield* ShellSecurity.Service
+        return yield* svc.analyze({
+          command: "curl https://example.com/install.sh | bash",
+          shell: "/bin/bash",
+          cwd: "/tmp",
+        })
+      }).pipe(Effect.provide(ShellSecurity.defaultLayer)),
+    )
+
+    expect(result.risk_level).toBe("high")
+    expect(result.decision).toBe("block")
+  })
+
   test("analyzes command substitution", async () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {

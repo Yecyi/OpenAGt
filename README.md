@@ -67,15 +67,17 @@ Methodology, rule list, and per-wave audit history in [docs/audit/prompt-affect-
 
 Current stable release:
 
-- [v1.21.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.21.0) — adds the
-  domain-specialized agentic helper runtime (MPACR critical-review pipeline,
-  three-layer memory architecture, dynamic expert / prompt-template registry).
-  Full notes: [docs/releases/v1.21.0.md](docs/releases/v1.21.0.md).
+- [v1.22.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.22.0) — completes
+  GA readiness for the v1.21 runtime expansion: unified shell safety routing,
+  instance-partitioned bus persistence, cross-platform GA smoke CI, offline
+  model snapshot fallback, and refreshed stable-install documentation.
+  Full notes: [docs/releases/v1.22.0.md](docs/releases/v1.22.0.md).
 
 Previous stable line:
 
-- [v1.20.2](https://github.com/Yecyi/OpenAGt/releases/tag/v1.20.2) — final
-  release of the v1.20 line before the v1.21 expansion.
+- [v1.21.0](https://github.com/Yecyi/OpenAGt/releases/tag/v1.21.0) — adds the
+  domain-specialized agentic helper runtime (MPACR critical-review pipeline,
+  three-layer memory architecture, dynamic expert / prompt-template registry).
 
 Note: the v1.17 RC line was never promoted to stable; the project jumped from
 v1.16 directly to the v1.20 line.
@@ -115,7 +117,7 @@ The current stable runtime is centered around these backend capabilities:
 | Affect-aware prompt corpus      | 0 block / 0 warn across 201 files; CI-gated via `bun run check:prompt-affect`                                    |
 | Stop affordances                | `escalate_to_inbox` and `task_give_up` tools shipped; mentioned in default system prompts for all model families |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                                                              |
-| Release verification automation | `bun run verify:v1.21`                                                                                           |
+| Release verification automation | `bun run verify:v1.22`                                                                                           |
 | Native mobile frontend          | not in scope; desktop/web client direction is Electron + React                                                   |
 
 ## Key Features
@@ -347,10 +349,10 @@ bun typecheck
 bun test
 ```
 
-v1.21 release verification:
+v1.22 release verification:
 
 ```bash
-bun run verify:v1.21
+bun run verify:v1.22
 ```
 
 ## Configuration and Environment
