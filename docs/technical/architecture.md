@@ -14,7 +14,7 @@ The system is organized around five backend pillars:
 
 This document focuses on the current stable backend and release-facing architecture.
 
-For v1.16, the stable backend surface is CLI/TUI, headless server, SSE event envelopes, and the generated JavaScript SDK. Flutter remains a future control panel over these backend contracts.
+For v1.16, the stable backend surface is CLI/TUI, headless server, SSE event envelopes, and the generated JavaScript SDK. Frontend expansion should preserve these backend contracts and target the Electron + React direction rather than a Flutter package.
 
 ## OpenCode Comparison
 
@@ -38,7 +38,7 @@ flowchart LR
 | Safety / approvals       | Permission prompts are part of the user-facing agent flow                         | Safety is modeled as a first-class backend layer with approval kinds, policy sources, and boundary metadata          |
 | Multi-step orchestration | Subagent support is part of the coding workflow                                   | Coordinator Runtime v1 turns work into task graphs with dependency checks, write scopes, verify stages, and dispatch |
 | Long-running agent state | README emphasis is remote-driving and terminal workflows                          | Personal Agent Core adds durable profile/workspace/session memory, inbox items, scheduled wakeups, and synthesis     |
-| Client surfaces          | TUI-first, client/server, desktop beta                                            | CLI/TUI, headless server, SSE, generated JS SDK, and deferred Flutter frontend                                       |
+| Client surfaces          | TUI-first, client/server, desktop beta                                            | CLI/TUI, headless server, SSE, generated JS SDK, and web/desktop frontend direction                                  |
 
 ## System Overview
 
@@ -217,7 +217,7 @@ Effort semantics:
 | `high`   | Multi-round planning, multi-expert lanes, reducer/reviewer, and critical-path revise gates                  |
 | `deep`   | Long-task mode with todo timeline, full artifact review, checkpoint synthesis, and larger adaptive ceilings |
 
-Long-task runs add these projection fields for UI, SDK, and future Flutter clients:
+Long-task runs add these projection fields for UI, SDK, and frontend clients:
 
 - `long_task`
 - `todo_timeline`
@@ -355,7 +355,6 @@ sequenceDiagram
 | Personal Agent inbox and memory primitives                                                  | implemented; backend contracts stabilized in v1.16                                    |
 | SSE EventEnvelope                                                                           | stable in v1.16                                                                       |
 | JavaScript SDK runtime helpers                                                              | stable in v1.16; extended for Dynamic Expert Runtime projection                       |
-| Flutter control panel                                                                       | roadmap; backend contracts only in v1.16                                              |
 
 ## Repository Map
 
@@ -364,7 +363,6 @@ sequenceDiagram
 | `packages/openagt`         | Core runtime, tools, providers, CLI, server |
 | `packages/app`             | Web client                                  |
 | `packages/sdk/js`          | Generated JavaScript SDK                    |
-| `packages/openagt_flutter` | Deferred Flutter client placeholder         |
 | `packages/console/*`       | Control-plane packages                      |
 
 ## Release Architecture
@@ -388,7 +386,7 @@ Windows signing details are documented separately in [Windows Signing](../releas
 ## Current Limitations
 
 - naming transition is still incomplete in parts of the repo
-- Flutter is not part of the stable release support matrix
+- native mobile clients are not part of the stable release support matrix
 - some compatibility paths still refer to historical `opencode` naming
 - Windows release signing requires Azure Trusted Signing configuration and is not yet always present on shipped assets
 

@@ -183,7 +183,7 @@ function releaseReadme(input: {
       : []),
     ``,
     `This stable release covers the CLI, TUI, and headless server runtime.`,
-    `Flutter is not included in this support matrix.`,
+    `Native mobile clients are not included in this support matrix.`,
   ].join("\n")
 }
 

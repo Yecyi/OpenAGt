@@ -21,7 +21,7 @@ OpenAGt 当前围绕四个核心方向构建：
 
 当前稳定版不包含：
 
-- Flutter 客户端发行版
+- 原生移动客户端发行版
 
 技术文档：
 
@@ -40,7 +40,7 @@ OpenAGt 当前围绕四个核心方向构建：
 | LSP 集成      | 官方文档强调开箱即用 LSP                                   | LSP 作为工具运行时的一部分，与 read/edit/bash/MCP/task 进入同一 session loop                          |
 | 安全模型      | Agent mode 和 permission prompt 是 CLI 体验核心            | 结构化 Approval & Safety Envelope：`allow/confirm/block`、`shell_safety`、exec policy、sandbox policy |
 | 编排重点      | Terminal-first 编码流，保留 client/server 远程控制潜力     | Coordinator Runtime、任务图调度、Inbox、Wakeup、Profile/Workspace/Session 记忆                        |
-| 前端形态      | TUI-first，官方项目也提供 desktop beta                     | 当前稳定版聚焦 CLI/TUI/headless server/SDK，Flutter 延后                                              |
+| 前端形态      | TUI-first，官方项目也提供 desktop beta                     | 当前稳定版聚焦 CLI/TUI/headless server/SDK；前端方向转向 Electron + React，原生移动端不在当前范围                                              |
 | 迁移兼容      | 原生 OpenCode 项目                                         | 保留 `opencode` CLI alias 和 `.opencode` 配置兼容                                                     |
 
 ## 发布
@@ -87,7 +87,7 @@ OpenAGt 当前后端能力包括：
 | Personal Agent Core             | 已实现，v1.16 稳定后端契约                            |
 | Debug doctor / repro bundle     | v1.16 稳定诊断面                                      |
 | Release verification automation | `bun run verify:v1.17`                                |
-| Flutter 前端                    | 路线图；先稳定后端契约                                |
+| 原生移动前端                    | 不在当前范围；桌面/网页前端方向为 Electron + React                                |
 
 ## 启动
 

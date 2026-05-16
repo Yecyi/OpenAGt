@@ -6,7 +6,7 @@ OpenAGt `v1.20.0` stable covers:
 - headless server
 - JavaScript SDK
 
-Flutter is not part of this release line.
+Native mobile clients are not part of this release line.
 
 The current stable line is `v1.20.0`, which contains the v1.17 task/subagent baseline plus v1.20 security and runtime hardening for the CLI/server/SDK runtime.
 

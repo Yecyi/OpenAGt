@@ -22,7 +22,7 @@ Current stable scope:
 
 Not in the current stable line:
 
-- Flutter client distribution
+- native mobile client distribution
 
 Technical documentation:
 
@@ -42,7 +42,7 @@ This comparison is based on the public OpenCode repository and README, not brand
 | Safety model              | Agent modes and permission prompts are central to the CLI experience                          | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy                                                                                                                                                               |
 | Affect-aware prompts      | Default prompts include strong persistence framing                                            | Prompt corpus is CI-gated against high-affect, affect-instruction, and anti-escape patterns derived from the Anthropic emotion-concepts paper, persona-vectors, and Wiser Human escalation-channel research; legacy autonomous prompts are opt-in via `OPENAGT_AUTONOMOUS_MODE=1` |
 | Orchestration focus       | Terminal-first coding flow with client/server remote-control potential                        | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory                                                                                                                                                                      |
-| Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, and JavaScript SDK; Flutter is deferred                                                                                                                                                                            |
+| Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, JavaScript SDK, and the web/desktop client direction; native mobile clients are not in this line                                                                                                                   |
 | Migration / compatibility | Native source project                                                                         | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration                                                                                                                                                                                                  |
 
 ## Affect-aware agent design
@@ -116,7 +116,7 @@ The current stable runtime is centered around these backend capabilities:
 | Stop affordances                | `escalate_to_inbox` and `task_give_up` tools shipped; mentioned in default system prompts for all model families |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                                                              |
 | Release verification automation | `bun run verify:v1.21`                                                                                           |
-| Flutter frontend                | roadmap; backend contracts first                                                                                 |
+| Native mobile frontend          | not in scope; desktop/web client direction is Electron + React                               |
 
 ## Key Features
 
@@ -291,7 +291,6 @@ Shell permission requests also expose structured `shell_safety` metadata.
 | `packages/openagt`         | Core runtime, CLI, server, tools, session engine                    |
 | `packages/app`             | Solid/Vite web client                                               |
 | `packages/sdk/js`          | Generated JavaScript SDK                                            |
-| `packages/openagt_flutter` | Deferred Flutter client placeholder                                 |
 | `packages/console/*`       | Console and control-plane packages                                  |
 | `packages/opencode`        | Compatibility leftovers, not the main runtime                       |
 | `.opencode/`               | Local examples for agents, commands, plugins, skills, tools, themes |
@@ -332,9 +331,9 @@ Web app:
 bun run --cwd packages/app dev
 ```
 
-Flutter client:
+Desktop/web client direction:
 
-The Flutter package is kept only as a deferred mobile control-panel placeholder. It is not part of the current stable runtime or release workflow.
+Flutter has been removed from the workspace. New frontend work should target the Electron + React direction while preserving the backend runtime, server, and SDK contracts.
 
 ### Testing
 
