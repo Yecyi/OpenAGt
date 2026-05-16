@@ -25,7 +25,10 @@ export function defaultOnCandidateLabel(status: Pick<SandboxStatus, "default_on_
 }
 
 export function defaultOnRecommendation(
-  status: Pick<SandboxStatus, "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action">,
+  status: Pick<
+    SandboxStatus,
+    "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action" | "config"
+  >,
 ) {
   if (status.default_on_enabled) {
     return { label: "Default-on native sandbox is active for new sandbox brokers." }
@@ -44,7 +47,9 @@ export function defaultOnRecommendation(
   if (status.default_on_blockers.includes("admin_gate_missing_or_stale")) {
     return {
       label: "Run the admin verification gate from an elevated repo terminal.",
-      command: "bun run verify:windows-sandbox-admin",
+      command: `bun run verify:windows-sandbox-admin -- --policy ${
+        status.config.network_policy === "loopback" ? "loopback" : "none"
+      }`,
     }
   }
   if (

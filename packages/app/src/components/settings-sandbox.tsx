@@ -350,7 +350,7 @@ const SandboxStatusPanel: Component<{
                 </ul>
               </Show>
               <div class="mt-2 text-11-regular text-text-weak">
-                network_policy=loopback remains unsupported in this milestone.
+                network_policy=loopback uses the Windows WFP helper and still requires the elevated loopback admin gate.
               </div>
             </div>
 

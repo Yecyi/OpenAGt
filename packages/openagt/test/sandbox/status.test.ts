@@ -133,7 +133,7 @@ describe("sandbox status", () => {
     )
 
     expect(result.next_action.kind).toBe("run_admin_gate")
-    expect(result.next_action.command).toBe("bun run verify:windows-sandbox-admin")
+    expect(result.next_action.command).toBe("bun run verify:windows-sandbox-admin -- --policy none")
   })
 
   test("distinguishes ACL apply next action", () => {

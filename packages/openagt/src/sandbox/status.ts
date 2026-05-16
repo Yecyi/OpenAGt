@@ -235,6 +235,7 @@ function actionFor(input: {
   helperPath?: string
   windows: SandboxBackendStatus
 }) {
+  const adminGatePolicy = input.sandbox.network_policy === "loopback" ? "loopback" : "none"
   if (!input.sandbox.enabled) {
     return {
       kind: "enable_sandbox",
@@ -278,7 +279,7 @@ function actionFor(input: {
     return {
       kind: "run_admin_gate",
       label: "Run the admin verification gate from an elevated repo terminal.",
-      command: "bun run verify:windows-sandbox-admin",
+      command: `bun run verify:windows-sandbox-admin -- --policy ${adminGatePolicy}`,
     } satisfies SandboxNextAction
   }
   if (input.windows.readiness === "acl_apply_required" || !input.windows.filesystem_enforced) {

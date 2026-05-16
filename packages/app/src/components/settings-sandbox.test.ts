@@ -2,6 +2,18 @@ import { describe, expect, test } from "bun:test"
 import { defaultOnBlockerLabels, defaultOnCandidateLabel, defaultOnRecommendation } from "./settings-sandbox-helpers"
 import type { SandboxStatus } from "@openagt/sdk/v2/client"
 
+function sandboxConfig(networkPolicy: SandboxStatus["config"]["network_policy"]) {
+  return {
+    enabled: true,
+    backend: "auto",
+    failure_policy: "closed",
+    report_only: false,
+    broker_idle_ttl_ms: 30_000,
+    windows_acl_apply_mode: "apply",
+    network_policy: networkPolicy,
+  } satisfies SandboxStatus["config"]
+}
+
 describe("settings sandbox helpers", () => {
   test("labels default-on blockers for the settings status panel", () => {
     expect(
@@ -49,11 +61,30 @@ describe("settings sandbox helpers", () => {
         default_on_enabled: false,
         ready_for_default_on: false,
         default_on_blockers: ["admin_gate_missing_or_stale"],
+        config: sandboxConfig("none"),
         next_action: { kind: "none", label: "Backend ready" },
-      } as Pick<SandboxStatus, "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action">),
+      } as Pick<
+        SandboxStatus,
+        "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action" | "config"
+      >),
     ).toEqual({
       label: "Run the admin verification gate from an elevated repo terminal.",
-      command: "bun run verify:windows-sandbox-admin",
+      command: "bun run verify:windows-sandbox-admin -- --policy none",
+    })
+    expect(
+      defaultOnRecommendation({
+        default_on_enabled: false,
+        ready_for_default_on: false,
+        default_on_blockers: ["admin_gate_missing_or_stale"],
+        config: sandboxConfig("loopback"),
+        next_action: { kind: "none", label: "Backend ready" },
+      } as Pick<
+        SandboxStatus,
+        "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action" | "config"
+      >),
+    ).toEqual({
+      label: "Run the admin verification gate from an elevated repo terminal.",
+      command: "bun run verify:windows-sandbox-admin -- --policy loopback",
     })
   })
 
@@ -63,8 +94,12 @@ describe("settings sandbox helpers", () => {
         default_on_enabled: true,
         ready_for_default_on: true,
         default_on_blockers: [],
+        config: sandboxConfig("none"),
         next_action: { kind: "none", label: "Backend ready" },
-      } as Pick<SandboxStatus, "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action">),
+      } as Pick<
+        SandboxStatus,
+        "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action" | "config"
+      >),
     ).toEqual({
       label: "Default-on native sandbox is active for new sandbox brokers.",
     })
