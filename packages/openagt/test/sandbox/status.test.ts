@@ -287,6 +287,24 @@ describe("sandbox status", () => {
     expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
   })
 
+  test("non-none admin gate policy report blocks default-on readiness", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, { policy: "loopback" })
+
+    const result = getWith(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+    )
+
+    expect(result.admin_gate_report_valid).toBe(false)
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
+  })
+
   test("ACL preflight blocks default-on readiness", async () => {
     await using tmp = await tmpdir()
     const report = path.join(tmp.path, "admin-gate-report.json")
@@ -348,6 +366,32 @@ describe("sandbox status", () => {
     })
     expect(defaultOn.ready_for_default_on).toBe(true)
     expect(defaultOn.default_on_enabled).toBe(true)
+  })
+
+  test("configured loopback policy stays visible and blocks default-on until enforced", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report)
+
+    const result = getWithConfig(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+      }),
+      {
+        backend: "auto",
+        failure_policy: "closed",
+        windows_acl_apply_mode: "apply",
+        network_policy: "loopback",
+      },
+    )
+
+    expect(result.config.network_policy).toBe("loopback")
+    expect(result.ready_for_default_on).toBe(false)
+    expect(result.default_on_enabled).toBe(false)
+    expect(result.default_on_blockers).toContain("network_loopback_not_enforced")
+    expect(result.next_action.kind).toBe("use_supported_network_policy")
   })
 
   test("returns parseable status contract", () => {

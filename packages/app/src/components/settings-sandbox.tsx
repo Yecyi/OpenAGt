@@ -7,17 +7,14 @@ import type { Config, SandboxStatus } from "@openagt/sdk/v2/client"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useGlobalSync } from "@/context/global-sync"
 import { useLanguage } from "@/context/language"
-import {
-  defaultOnBlockerLabels,
-  defaultOnCandidateLabel,
-  defaultOnRecommendation,
-} from "./settings-sandbox-helpers"
+import { defaultOnBlockerLabels, defaultOnCandidateLabel, defaultOnRecommendation } from "./settings-sandbox-helpers"
 import { SettingsList } from "./settings-list"
 
 type SandboxConfig = NonNullable<NonNullable<Config["experimental"]>["sandbox"]>
 type SandboxBackend = NonNullable<SandboxConfig["backend"]>
 type SandboxFailurePolicy = NonNullable<SandboxConfig["failure_policy"]>
 type SandboxAclMode = NonNullable<SandboxConfig["windows_acl_apply_mode"]>
+type SandboxNetworkPolicy = NonNullable<SandboxConfig["network_policy"]>
 
 const backendOptions: Array<{ value: SandboxBackend; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -37,6 +34,13 @@ const aclModeOptions: Array<{ value: SandboxAclMode; label: string }> = [
   { value: "preflight", label: "Preflight" },
   { value: "dry_run", label: "Dry run" },
   { value: "apply", label: "Apply" },
+]
+
+const networkPolicyOptions: Array<{ value: SandboxNetworkPolicy; label: string }> = [
+  { value: "auto", label: "Auto" },
+  { value: "none", label: "None" },
+  { value: "loopback", label: "Loopback" },
+  { value: "full", label: "Full" },
 ]
 
 export const SettingsSandbox: Component = () => {
@@ -84,6 +88,11 @@ export const SettingsSandbox: Component = () => {
     () =>
       aclModeOptions.find((item) => item.value === (sandbox().windows_acl_apply_mode ?? "preflight")) ??
       aclModeOptions[0],
+  )
+  const currentNetworkPolicy = createMemo(
+    () =>
+      networkPolicyOptions.find((item) => item.value === (sandbox().network_policy ?? "auto")) ??
+      networkPolicyOptions[0],
   )
 
   return (
@@ -195,6 +204,24 @@ export const SettingsSandbox: Component = () => {
                 triggerStyle={{ "min-width": "220px" }}
               />
             </SettingsRow>
+
+            <SettingsRow
+              title={language.t("settings.sandbox.row.networkPolicy.title")}
+              description={language.t("settings.sandbox.row.networkPolicy.description")}
+            >
+              <Select
+                data-action="settings-sandbox-network-policy"
+                options={networkPolicyOptions}
+                current={currentNetworkPolicy()}
+                value={(item) => item.value}
+                label={(item) => item.label}
+                onSelect={(item) => item && updateSandbox({ network_policy: item.value })}
+                variant="secondary"
+                size="small"
+                triggerVariant="settings"
+                triggerStyle={{ "min-width": "220px" }}
+              />
+            </SettingsRow>
           </SettingsList>
         </div>
       </div>
@@ -239,6 +266,7 @@ const SandboxStatusPanel: Component<{
         value: `${flag(status.windows_native.filesystem_ready)} ready / ${flag(status.windows_native.filesystem_enforced)} enforced`,
       },
       { label: "ACL mode", value: status.config.windows_acl_apply_mode },
+      { label: "Configured network policy", value: status.config.network_policy },
       { label: "ACL verified", value: flag(status.acl_apply_verified) },
       { label: "Admin report valid", value: flag(status.admin_gate_report_valid) },
       {

@@ -732,6 +732,9 @@ export const dict = {
   "settings.sandbox.row.aclMode.title": "Filesystem ACL mode",
   "settings.sandbox.row.aclMode.description":
     "Windows native filesystem enforcement mode. Changes apply to newly started sandbox brokers.",
+  "settings.sandbox.row.networkPolicy.title": "Network policy",
+  "settings.sandbox.row.networkPolicy.description":
+    "Default sandbox network policy. Auto keeps command-aware inference; loopback is visible for testing but remains unsupported until native enforcement lands.",
   "settings.sandbox.toast.updateFailed.title": "Sandbox settings were not saved",
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "WSL integration",

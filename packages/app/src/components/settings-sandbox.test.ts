@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  defaultOnBlockerLabels,
-  defaultOnCandidateLabel,
-  defaultOnRecommendation,
-} from "./settings-sandbox-helpers"
+import { defaultOnBlockerLabels, defaultOnCandidateLabel, defaultOnRecommendation } from "./settings-sandbox-helpers"
 import type { SandboxStatus } from "@openagt/sdk/v2/client"
 
 describe("settings sandbox helpers", () => {
@@ -17,6 +13,11 @@ describe("settings sandbox helpers", () => {
       "ACL apply mode is not enabled",
       "network_policy=none is not enforced",
     ])
+    expect(
+      defaultOnBlockerLabels({
+        default_on_blockers: ["network_loopback_not_enforced"],
+      } as Pick<SandboxStatus, "default_on_blockers">),
+    ).toEqual(["network_policy=loopback is not enforced"])
   })
 
   test("passes through unknown blocker ids so new server reasons stay visible", () => {

@@ -188,6 +188,10 @@ export const InfoSchema = Schema.Struct({
             description:
               "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
           }),
+          network_policy: Schema.optional(Schema.Literals(["auto", "none", "loopback", "full"] as const)).annotate({
+            description:
+              "Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.",
+          }),
         }),
       ),
       memory: Schema.optional(

@@ -4031,6 +4031,10 @@ export type Config = {
        * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
        */
       windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
+      /**
+       * Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.
+       */
+      network_policy?: "auto" | "none" | "loopback" | "full"
     }
     /**
      * Session memory configuration
@@ -4168,6 +4172,7 @@ export type SandboxStatus = {
     report_only: boolean
     broker_idle_ttl_ms: number
     windows_acl_apply_mode: "preflight" | "dry_run" | "apply"
+    network_policy: "auto" | "none" | "loopback" | "full"
   }
   auto_backend: "process" | "seatbelt" | "windows_native" | "landlock"
   preferred_backend: "process" | "seatbelt" | "windows_native" | "landlock"
@@ -5743,6 +5748,10 @@ export type ConfigGlobalUpdateData = {
          * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
          */
         windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
+        /**
+         * Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.
+         */
+        network_policy?: "auto" | "none" | "loopback" | "full"
       }
       /**
        * Session memory configuration

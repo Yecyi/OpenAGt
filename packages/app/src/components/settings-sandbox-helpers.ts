@@ -11,6 +11,7 @@ export function defaultOnBlockerLabels(status: Pick<SandboxStatus, "default_on_b
     if (item === "acl_apply_not_enabled") return "ACL apply mode is not enabled"
     if (item === "acl_apply_not_verified") return "ACL apply mode has not verified enforcement"
     if (item === "network_none_not_enforced") return "network_policy=none is not enforced"
+    if (item === "network_loopback_not_enforced") return "network_policy=loopback is not enforced"
     return item
   })
 }
@@ -24,10 +25,7 @@ export function defaultOnCandidateLabel(status: Pick<SandboxStatus, "default_on_
 }
 
 export function defaultOnRecommendation(
-  status: Pick<
-    SandboxStatus,
-    "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action"
-  >,
+  status: Pick<SandboxStatus, "default_on_enabled" | "ready_for_default_on" | "default_on_blockers" | "next_action">,
 ) {
   if (status.default_on_enabled) {
     return { label: "Default-on native sandbox is active for new sandbox brokers." }

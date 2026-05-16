@@ -87,6 +87,7 @@ export const layer = Layer.effect(
         report_only: sandbox?.report_only ?? false,
         broker_idle_ttl_ms: sandbox?.broker_idle_ttl_ms ?? 300_000,
         windows_acl_apply_mode: sandbox?.windows_acl_apply_mode ?? "preflight",
+        network_policy: sandbox?.network_policy ?? "auto",
       } satisfies SandboxConfig
     })
 
@@ -100,7 +101,7 @@ export const layer = Layer.effect(
         enforcement: enforcement(decision, input.result.risk_level),
         backend_preference: sandbox.backend,
         filesystem_policy: "workspace_write",
-        network_policy: needsNetwork ? "full" : "none",
+        network_policy: sandbox.network_policy === "auto" ? (needsNetwork ? "full" : "none") : sandbox.network_policy,
         allowed_paths: pathScopes.allowed,
         writable_paths: pathScopes.writable,
         needs_network_permission: needsNetwork,

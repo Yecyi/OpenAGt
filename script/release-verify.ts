@@ -141,6 +141,13 @@ async function verifyWindowsSandboxDefaultOnContract() {
     if (!(field in sandboxStatusProperties)) throw new Error(`SandboxStatus is missing ${field}`)
     if (!required.includes(field)) throw new Error(`SandboxStatus does not require ${field}`)
   }
+  const sandboxConfig = object(
+    object(sandboxStatusProperties.config, "SandboxStatus.config").properties,
+    "SandboxStatus.config properties",
+  )
+  if (!("network_policy" in sandboxConfig)) {
+    throw new Error("SandboxStatus.config is missing network_policy")
+  }
 
   const statusSource = await Bun.file("packages/openagt/src/sandbox/status.ts").text()
   if (!statusSource.includes("Process-level enforcement only; not an OS-native sandbox")) {

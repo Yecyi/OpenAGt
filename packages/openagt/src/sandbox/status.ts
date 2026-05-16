@@ -9,6 +9,7 @@ import type {
   SandboxBackendPreference,
   SandboxBackendStatus,
   SandboxConfig,
+  SandboxConfiguredNetworkPolicy,
   SandboxFailurePolicy,
   SandboxNativeReadiness,
   SandboxNetworkPolicy,
@@ -19,6 +20,7 @@ const SandboxBackendNameSchema = z.enum(["process", "seatbelt", "windows_native"
 const SandboxBackendPreferenceSchema = z.enum(["auto", "process", "seatbelt", "windows_native", "landlock"])
 const SandboxFailurePolicySchema = z.enum(["closed", "confirm_downgrade", "fallback"])
 const SandboxAclModeSchema = z.enum(["preflight", "dry_run", "apply"])
+const SandboxConfiguredNetworkPolicySchema = z.enum(["auto", "none", "loopback", "full"])
 const SandboxReadinessSchema = z.enum([
   "ready",
   "helper_missing",
@@ -93,6 +95,7 @@ export const SandboxStatusSchema = z
       report_only: z.boolean(),
       broker_idle_ttl_ms: z.number(),
       windows_acl_apply_mode: SandboxAclModeSchema,
+      network_policy: SandboxConfiguredNetworkPolicySchema,
     }),
     auto_backend: SandboxBackendNameSchema,
     preferred_backend: SandboxBackendNameSchema,
@@ -123,6 +126,7 @@ function sandboxConfig(config: Config.Info, platform = process.platform) {
     report_only: sandbox?.report_only ?? false,
     broker_idle_ttl_ms: sandbox?.broker_idle_ttl_ms ?? 300_000,
     windows_acl_apply_mode: sandbox?.windows_acl_apply_mode ?? "preflight",
+    network_policy: sandbox?.network_policy ?? "auto",
   } satisfies SandboxConfig
 }
 
@@ -172,6 +176,7 @@ function adminGateReportValid(windows: SandboxBackendStatus) {
     if (report.schema_version !== 1) return false
     if (report.gate !== "windows_sandbox_admin_execution") return false
     if (report.status !== "passed") return false
+    if (report.policy !== undefined && report.policy !== "none") return false
     if (!Array.isArray(report.results) || report.results.length === 0) return false
     if (!report.results.every(reportStepPassed)) return false
     if (!reportStepPassed(setupEvidence.original_status)) return false
@@ -190,7 +195,17 @@ function adminGateReportValid(windows: SandboxBackendStatus) {
   }
 }
 
-function defaultOnBlockers(windows: SandboxBackendStatus, adminGateValid: boolean, aclApplyVerified: boolean) {
+function networkPolicySupported(windows: SandboxBackendStatus, policy: SandboxNetworkPolicy) {
+  if (policy === "full") return true
+  return Boolean(windows.network_policies_enforced?.includes(policy))
+}
+
+function defaultOnBlockers(
+  windows: SandboxBackendStatus,
+  sandbox: { network_policy: SandboxConfiguredNetworkPolicy },
+  adminGateValid: boolean,
+  aclApplyVerified: boolean,
+) {
   return [
     !windows.helper_path ? "helper_missing" : undefined,
     windows.helper_protocol_version !== undefined &&
@@ -207,6 +222,9 @@ function defaultOnBlockers(windows: SandboxBackendStatus, adminGateValid: boolea
         : "acl_apply_not_enabled"
       : undefined,
     !windows.network_policies_enforced?.includes("none") ? "network_none_not_enforced" : undefined,
+    sandbox.network_policy !== "auto" && !networkPolicySupported(windows, sandbox.network_policy)
+      ? `network_${sandbox.network_policy}_not_enforced`
+      : undefined,
   ].filter((item): item is string => item !== undefined)
 }
 
@@ -275,6 +293,12 @@ function actionFor(input: {
       label: "Use network_policy=none or full; loopback remains deferred.",
     } satisfies SandboxNextAction
   }
+  if (input.sandbox.network_policy === "loopback" && !networkPolicySupported(input.windows, "loopback")) {
+    return {
+      kind: "use_supported_network_policy",
+      label: "Use network_policy=none or full; loopback remains deferred.",
+    } satisfies SandboxNextAction
+  }
   if (input.windows.available && input.windows.readiness === "ready") {
     return {
       kind: "none",
@@ -316,7 +340,8 @@ export function getSandboxStatus(input: {
   const adminGateValid = adminGateReportValid(windows)
   const aclApplyVerified = windows.acl_apply_mode === "apply" && windows.filesystem_enforced === true
   const nativeSandboxReady = windows.available && windows.readiness === "ready"
-  const defaultOnBlockersList = platform === "win32" ? defaultOnBlockers(windows, adminGateValid, aclApplyVerified) : []
+  const defaultOnBlockersList =
+    platform === "win32" ? defaultOnBlockers(windows, sandbox, adminGateValid, aclApplyVerified) : []
   const readyForDefaultOn = platform === "win32" && nativeSandboxReady && defaultOnBlockersList.length === 0
   const defaultOnEnabled =
     readyForDefaultOn &&

@@ -10,6 +10,18 @@ const artifactDir = path.join(root, ".artifacts", "windows-sandbox")
 const reportPath = path.join(artifactDir, "admin-gate-report.json")
 const markdownReportPath = path.join(artifactDir, "admin-gate-report.md")
 const preflightOnly = process.argv.includes("--preflight-only")
+type AdminGatePolicy = "none" | "full" | "loopback"
+
+function parsePolicy(): AdminGatePolicy {
+  const equals = process.argv.find((item) => item.startsWith("--policy="))
+  const index = process.argv.indexOf("--policy")
+  const raw = equals?.slice("--policy=".length) ?? (index >= 0 ? process.argv[index + 1] : undefined)
+  if (!raw || raw.startsWith("--")) return "none"
+  if (raw === "none" || raw === "full" || raw === "loopback") return raw
+  throw new Error(`Unsupported Windows sandbox admin gate policy: ${raw}`)
+}
+
+const policy = parsePolicy()
 
 type StepResult = {
   name: string
@@ -48,6 +60,7 @@ type AdminGateReport = {
   commit: string
   branch: string
   status: "passed" | "failed" | "skipped"
+  policy: AdminGatePolicy
   helper: HelperProof
   setup_evidence: SetupEvidence | null
   preflight: {
@@ -208,6 +221,7 @@ async function writeReport(report: AdminGateReport) {
       `- Commit: ${report.commit}`,
       `- Branch: ${report.branch}`,
       `- Generated: ${report.generated_at}`,
+      `- Policy: ${report.policy}`,
       `- Helper probe: ${report.helper.status}`,
       `- Helper version: ${report.helper.helper_version ?? "unknown"}`,
       `- Helper protocol: ${report.helper.helper_protocol_version ?? "unknown"}`,
@@ -255,6 +269,9 @@ const preflightFailures = [
   !cargo ? "Rust cargo is required to run the Windows sandbox admin gate." : undefined,
   !preflight.manifest_exists ? `Windows sandbox helper manifest not found: ${manifest}` : undefined,
   helper.status === "failed" ? "Windows sandbox helper probe failed." : undefined,
+  policy !== "none"
+    ? `Windows sandbox admin gate currently supports --policy none only; requested ${policy}.`
+    : undefined,
 ].filter((item): item is string => item !== undefined)
 
 if (preflightOnly || preflightFailures.length) {
@@ -265,6 +282,7 @@ if (preflightOnly || preflightFailures.length) {
     commit: (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim(),
     branch: (await Bun.$`git branch --show-current`.cwd(root).text()).trim(),
     status: preflightFailures.length ? "skipped" : "passed",
+    policy,
     helper,
     setup_evidence: null,
     preflight,
@@ -288,15 +306,7 @@ const env = {
   OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT: reportPath,
 }
 if (!cargo) throw new Error("cargo is required after admin preflight")
-const helperCommand = (...args: string[]) => [
-  cargo,
-  "run",
-  "--quiet",
-  "--manifest-path",
-  manifest,
-  "--",
-  ...args,
-]
+const helperCommand = (...args: string[]) => [cargo, "run", "--quiet", "--manifest-path", manifest, "--", ...args]
 const originalStatus = await run(
   "Windows sandbox setup status before admin gate",
   helperCommand("setup", "--status", "--json"),
@@ -310,13 +320,7 @@ const installedStatus = await run(
 )
 const networkPolicyNoneProof = await run(
   "Windows sandbox WFP network_policy=none execution proof",
-  [
-    cargo,
-    "test",
-    "--manifest-path",
-    manifest,
-    "wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect",
-  ],
+  [cargo, "test", "--manifest-path", manifest, "wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect"],
   env,
 )
 const restoreAction = setupInstalled(originalStatus) ? "install" : "uninstall"
@@ -340,14 +344,7 @@ const setupEvidence: SetupEvidence = {
   restored_status: restoredStatus,
   restored: setupInstalled(restoredStatus) === setupInstalled(originalStatus),
 }
-const results = [
-  originalStatus,
-  install,
-  installedStatus,
-  networkPolicyNoneProof,
-  restore,
-  restoredStatus,
-]
+const results = [originalStatus, install, installedStatus, networkPolicyNoneProof, restore, restoredStatus]
 
 const report = {
   schema_version: 1,
@@ -359,6 +356,7 @@ const report = {
     helper.status === "passed" && results.every((item) => item.status === "passed") && setupEvidence.restored
       ? "passed"
       : "failed",
+  policy,
   helper,
   setup_evidence: setupEvidence,
   preflight,

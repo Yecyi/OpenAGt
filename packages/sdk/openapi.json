@@ -2215,6 +2215,11 @@
                             "description": "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
                             "type": "string",
                             "enum": ["preflight", "dry_run", "apply"]
+                          },
+                          "network_policy": {
+                            "description": "Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.",
+                            "type": "string",
+                            "enum": ["auto", "none", "loopback", "full"]
                           }
                         }
                       },
@@ -54562,6 +54567,11 @@
                     "description": "Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.",
                     "type": "string",
                     "enum": ["preflight", "dry_run", "apply"]
+                  },
+                  "network_policy": {
+                    "description": "Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.",
+                    "type": "string",
+                    "enum": ["auto", "none", "loopback", "full"]
                   }
                 }
               },
@@ -54831,6 +54841,10 @@
               "windows_acl_apply_mode": {
                 "type": "string",
                 "enum": ["preflight", "dry_run", "apply"]
+              },
+              "network_policy": {
+                "type": "string",
+                "enum": ["auto", "none", "loopback", "full"]
               }
             },
             "required": [
@@ -54839,7 +54853,8 @@
               "failure_policy",
               "report_only",
               "broker_idle_ttl_ms",
-              "windows_acl_apply_mode"
+              "windows_acl_apply_mode",
+              "network_policy"
             ]
           },
           "auto_backend": {

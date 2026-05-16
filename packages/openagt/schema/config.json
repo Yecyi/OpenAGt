@@ -7681,6 +7681,16 @@
                 "dry_run",
                 "apply"
               ]
+            },
+            "network_policy": {
+              "description": "Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.",
+              "type": "string",
+              "enum": [
+                "auto",
+                "none",
+                "loopback",
+                "full"
+              ]
             }
           },
           "additionalProperties": false

@@ -1564,6 +1564,10 @@ export class Global2 extends HeyApiClient {
            * Windows native sandbox filesystem ACL mode. preflight only validates grants, dry_run builds ACL changes without applying them, and apply enables OS ACL enforcement.
            */
           windows_acl_apply_mode?: "preflight" | "dry_run" | "apply"
+          /**
+           * Sandbox network policy. auto keeps command-aware inference, none blocks network, full allows network, and loopback is reserved until native loopback enforcement is available.
+           */
+          network_policy?: "auto" | "none" | "loopback" | "full"
         }
         /**
          * Session memory configuration
