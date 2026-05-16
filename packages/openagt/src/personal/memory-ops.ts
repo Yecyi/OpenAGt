@@ -3,7 +3,8 @@ import { Bus } from "@/bus"
 import { ProjectID } from "@/project/schema"
 import { loadMemory } from "@/session/memory"
 import { SessionID } from "@/session/schema"
-import { Database, desc, eq, sql } from "@/storage"
+import { Database, and, desc, eq, inArray, sql } from "@/storage"
+import type { SQL } from "@/storage"
 import { Client as DatabaseClient } from "@/storage/db"
 import { Effect } from "effect"
 import { PersonalMemoryIdempotencyTable, PersonalMemoryNoteTable } from "./personal.sql"
@@ -150,20 +151,22 @@ export function createMemoryOps(bus: Bus.Interface) {
 
   const listMemory = Effect.fn("PersonalAgent.listMemory")(function* (input?: ListMemoryInput) {
     const rows = yield* Effect.sync(() =>
-      Database.use((db) =>
-        db
-          .select()
-          .from(PersonalMemoryNoteTable)
-          .orderBy(desc(PersonalMemoryNoteTable.time_updated))
-          .all()
-          .filter(
-            (row) =>
-              (!input?.scope || row.scope === input.scope) &&
-              (!input?.kinds || input.kinds.includes((row.kind ?? "belief") as MemoryKindType)) &&
-              (!input?.projectID || row.project_id === input.projectID) &&
-              (!input?.sessionID || row.session_id === input.sessionID),
-          ),
-      ),
+      Database.use((db) => {
+        const conditions = [
+          input?.scope ? eq(PersonalMemoryNoteTable.scope, input.scope) : undefined,
+          input?.kinds?.length ? inArray(PersonalMemoryNoteTable.kind, input.kinds) : undefined,
+          input?.projectID ? eq(PersonalMemoryNoteTable.project_id, input.projectID) : undefined,
+          input?.sessionID ? eq(PersonalMemoryNoteTable.session_id, input.sessionID) : undefined,
+        ].filter((item): item is SQL => Boolean(item))
+        const query =
+          conditions.length > 0
+            ? db
+                .select()
+                .from(PersonalMemoryNoteTable)
+                .where(and(...conditions))
+            : db.select().from(PersonalMemoryNoteTable)
+        return query.orderBy(desc(PersonalMemoryNoteTable.time_updated)).all()
+      }),
     )
     return rows.map(memoryFromRow)
   })
@@ -219,27 +222,35 @@ export function createMemoryOps(bus: Bus.Interface) {
               .map((item) => [item.id, Math.max(0, item.score * -1)]),
           ),
     )
-    const rows = yield* Effect.sync(() =>
-      Database.use((db) =>
-        db
-          .select()
-          .from(PersonalMemoryNoteTable)
+    const rows = yield* Effect.sync(() => {
+      if (ftsQuery && matches.size === 0) return []
+      return Database.use((db) => {
+        const conditions = [
+          scopes.length ? inArray(PersonalMemoryNoteTable.scope, scopes) : undefined,
+          input.kinds?.length ? inArray(PersonalMemoryNoteTable.kind, input.kinds) : undefined,
+          input.projectID ? eq(PersonalMemoryNoteTable.project_id, input.projectID) : undefined,
+          ftsQuery ? inArray(PersonalMemoryNoteTable.id, [...matches.keys()] as MemoryNoteID[]) : undefined,
+        ].filter((item): item is SQL => Boolean(item))
+        const query =
+          conditions.length > 0
+            ? db
+                .select()
+                .from(PersonalMemoryNoteTable)
+                .where(and(...conditions))
+            : db.select().from(PersonalMemoryNoteTable)
+        return query
           .orderBy(desc(PersonalMemoryNoteTable.time_updated))
           .all()
           .filter(
             (row) =>
-              scopes.includes(row.scope as MemoryScopeType) &&
-              (!input.kinds || input.kinds.includes((row.kind ?? "belief") as MemoryKindType)) &&
-              (!input.projectID || row.project_id === input.projectID) &&
               (!input.workflow || row.tags.includes(`workflow:${input.workflow}`)) &&
               (!input.expertID || row.tags.includes(`expert:${input.expertID}`)) &&
               (!input.role || row.tags.includes(`role:${input.role}`)) &&
               (!input.artifactType || row.tags.includes(`artifact:${input.artifactType}`)) &&
-              (input.includeFailurePatterns || !row.tags.includes("failure-pattern")) &&
-              (!ftsQuery || matches.has(row.id)),
-          ),
-      ),
-    )
+              (input.includeFailurePatterns || !row.tags.includes("failure-pattern")),
+          )
+      })
+    })
     const ranked = rows
       .map((row) => {
         const note = memoryFromRow(row)
@@ -297,10 +308,10 @@ export function createMemoryOps(bus: Bus.Interface) {
     return yield* Effect.sync(() =>
       Database.use((db) =>
         db
-          .select()
-          .from(PersonalMemoryNoteTable)
-          .all()
-          .some((row) => row.tags.includes(tag)),
+          .select({ tag: PersonalMemoryIdempotencyTable.tag })
+          .from(PersonalMemoryIdempotencyTable)
+          .where(eq(PersonalMemoryIdempotencyTable.tag, tag))
+          .get() !== undefined,
       ),
     )
   })

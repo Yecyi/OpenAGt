@@ -197,12 +197,22 @@ async function verifyRuntimeReliabilityContract() {
   if (!taskRuntimeTest.includes("does not double-count Anthropic cache tokens in task usage")) {
     throw new Error("task runtime must keep Anthropic cache token accounting regression coverage")
   }
+
+  const providerDiagnostics = await Bun.file("script/provider-cache-diagnostics.ts").text()
+  for (const marker of ["fallback_unicode_weighted", "cacheControl", "provider.includes"]) {
+    if (!providerDiagnostics.includes(marker)) {
+      throw new Error(`provider cache diagnostics is missing marker: ${marker}`)
+    }
+  }
 }
 
 async function verifyStorageScalabilityContract() {
   const eventSchema = await Bun.file("packages/openagt/src/sync/event.sql.ts").text()
   if (!eventSchema.includes("event_aggregate_seq_idx")) {
     throw new Error("sync event schema must keep the aggregate replay index")
+  }
+  if (!eventSchema.includes("EventSnapshotTable") || !eventSchema.includes("event_snapshot_aggregate_seq_idx")) {
+    throw new Error("sync event schema must keep the snapshot replay contract")
   }
 
   const eventMigration = await Bun.file(
@@ -211,10 +221,47 @@ async function verifyStorageScalabilityContract() {
   if (!eventMigration.includes("event_aggregate_seq_idx")) {
     throw new Error("sync event aggregate replay index migration is missing")
   }
+  const runtimeFoundationMigration = await Bun.file(
+    "packages/openagt/migration/20260516123000_runtime_foundation_indexes/migration.sql",
+  ).text()
+  for (const marker of [
+    "personal_memory_query_idx",
+    "inbox_project_state_time_idx",
+    "wakeup_project_state_due_idx",
+    "event_snapshot",
+    "event_snapshot_aggregate_seq_idx",
+  ]) {
+    if (!runtimeFoundationMigration.includes(marker)) {
+      throw new Error(`runtime foundation migration is missing marker: ${marker}`)
+    }
+  }
 
   const syncTest = await Bun.file("packages/openagt/test/sync/index.test.ts").text()
-  if (!syncTest.includes("creates aggregate replay index for per-session event scans")) {
-    throw new Error("sync event aggregate replay index must keep focused regression coverage")
+  for (const marker of [
+    "creates aggregate replay index for per-session event scans",
+    "creates snapshot table and indexes for bounded replay",
+    "replays from event snapshot plus tail events",
+  ]) {
+    if (!syncTest.includes(marker)) {
+      throw new Error(`sync event focused regression coverage is missing marker: ${marker}`)
+    }
+  }
+
+  const personalTest = await Bun.file("packages/openagt/test/agent/coordinator-personal.test.ts").text()
+  for (const marker of [
+    "uses database indexes for memory, inbox, and wakeup filters",
+    "dispatchDueWakeups atomically claims a due wakeup once under concurrent dispatch",
+  ]) {
+    if (!personalTest.includes(marker)) {
+      throw new Error(`personal memory/wakeup focused regression coverage is missing marker: ${marker}`)
+    }
+  }
+
+  const dbCommand = await Bun.file("packages/openagt/src/cli/cmd/db.ts").text()
+  for (const marker of ["storageDiagnostics", "event_snapshot_rows", "wal_bytes"]) {
+    if (!dbCommand.includes(marker)) {
+      throw new Error(`db status storage diagnostics is missing marker: ${marker}`)
+    }
   }
 }
 

@@ -24,6 +24,15 @@ export type DiagnosticFeedback = {
   report: string
 }
 
+export type DiagnosticRepairPlan = {
+  status: "not_needed" | "retry_recommended" | "blocked"
+  reason: "clean" | "warnings_only" | "outside_workspace" | "attempt_limit" | "has_errors"
+  attempt: number
+  max_attempts: number
+  files: string[]
+  diagnostics: DiagnosticCounts
+}
+
 const zero = (): DiagnosticCounts => ({
   total: 0,
   errors: 0,
@@ -84,5 +93,63 @@ export function buildDiagnosticFeedback(input: {
     new_errors: Math.max(0, after.errors - before.errors),
     fixed_errors: Math.max(0, before.errors - after.errors),
     report: report(input.file, input.after[input.normalizedFile] ?? []),
+  }
+}
+
+export function buildDiagnosticRepairPlan(input: {
+  feedback: DiagnosticFeedback
+  attempt?: number
+  maxAttempts?: number
+  fileInWorkspace?: boolean
+}): DiagnosticRepairPlan {
+  const attempt = input.attempt ?? 0
+  const maxAttempts = input.maxAttempts ?? 1
+  if (input.fileInWorkspace === false) {
+    return {
+      status: "blocked",
+      reason: "outside_workspace",
+      attempt,
+      max_attempts: maxAttempts,
+      files: [],
+      diagnostics: input.feedback.after,
+    }
+  }
+  if (input.feedback.status === "clean") {
+    return {
+      status: "not_needed",
+      reason: "clean",
+      attempt,
+      max_attempts: maxAttempts,
+      files: [],
+      diagnostics: input.feedback.after,
+    }
+  }
+  if (input.feedback.status === "has_warnings") {
+    return {
+      status: "not_needed",
+      reason: "warnings_only",
+      attempt,
+      max_attempts: maxAttempts,
+      files: [],
+      diagnostics: input.feedback.after,
+    }
+  }
+  if (attempt >= maxAttempts) {
+    return {
+      status: "blocked",
+      reason: "attempt_limit",
+      attempt,
+      max_attempts: maxAttempts,
+      files: [input.feedback.file],
+      diagnostics: input.feedback.after,
+    }
+  }
+  return {
+    status: "retry_recommended",
+    reason: "has_errors",
+    attempt,
+    max_attempts: maxAttempts,
+    files: [input.feedback.file],
+    diagnostics: input.feedback.after,
   }
 }

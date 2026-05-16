@@ -244,6 +244,17 @@ export function walCheckpointTruncate(): boolean {
   }
 }
 
+export function durabilityCheckpoint(): boolean {
+  const sqlite = Client().$client
+  try {
+    sqlite.run(`PRAGMA wal_checkpoint(PASSIVE)`)
+    return true
+  } catch (err) {
+    log.warn("wal_checkpoint(PASSIVE) failed", { err: String(err) })
+    return false
+  }
+}
+
 export function close() {
   Client().$client.close()
   Client.reset()

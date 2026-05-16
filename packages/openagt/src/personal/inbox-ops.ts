@@ -2,7 +2,7 @@ import z from "zod"
 import { Bus } from "@/bus"
 import { ProjectID } from "@/project/schema"
 import { SessionID } from "@/session/schema"
-import { Database, desc, eq } from "@/storage"
+import { Database, and, desc, eq } from "@/storage"
 import { Effect } from "effect"
 import { InboxItemTable } from "./personal.sql"
 import {
@@ -90,10 +90,13 @@ export function createInboxOps(bus: Bus.Interface) {
         db
           .select()
           .from(InboxItemTable)
-          .where(eq(InboxItemTable.project_id, input.projectID))
+          .where(
+            input.state
+              ? and(eq(InboxItemTable.project_id, input.projectID), eq(InboxItemTable.state, input.state))
+              : eq(InboxItemTable.project_id, input.projectID),
+          )
           .orderBy(desc(InboxItemTable.time_updated))
-          .all()
-          .filter((row) => !input.state || normalizeInboxState(row.state) === input.state),
+          .all(),
       ),
     )
     return rows.map(inboxFromRow)

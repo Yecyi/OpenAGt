@@ -9,6 +9,7 @@ import { JsonMigration } from "../../storage"
 import { integrityCheck, listSchemaVersions } from "../../storage/db"
 import { EOL } from "os"
 import { errorMessage } from "../../util/error"
+import { existsSync, statSync } from "fs"
 
 const QueryCommand = cmd({
   command: "$0 [query]",
@@ -114,6 +115,42 @@ const MigrateCommand = cmd({
 // `openagt db status` — surfaces the v1.21 _schema_version audit table and an
 // on-demand integrity_check. Used by ops to confirm migrations applied cleanly
 // and the SQLite file isn't corrupted.
+function optionalCount(sqlite: ReturnType<typeof Database.Client>["$client"], table: string) {
+  const exists = sqlite
+    .query<{ name: string }, [string]>(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+    .get(table)
+  if (!exists) return 0
+  return sqlite.query<{ count: number }, []>(`SELECT COUNT(*) AS count FROM ${table}`).get()?.count ?? 0
+}
+
+function indexExists(sqlite: ReturnType<typeof Database.Client>["$client"], name: string) {
+  return (
+    sqlite
+      .query<{ name: string }, [string]>(`SELECT name FROM sqlite_master WHERE type='index' AND name=?`)
+      .get(name) !== null
+  )
+}
+
+function storageDiagnostics() {
+  const sqlite = Database.Client().$client
+  const wal = `${Database.Path}-wal`
+  return {
+    event_rows: optionalCount(sqlite, "event"),
+    event_snapshot_rows: optionalCount(sqlite, "event_snapshot"),
+    personal_memory_rows: optionalCount(sqlite, "personal_memory_note"),
+    inbox_rows: optionalCount(sqlite, "inbox_item"),
+    wakeup_rows: optionalCount(sqlite, "scheduled_wakeup"),
+    wal_bytes: existsSync(wal) ? statSync(wal).size : 0,
+    indexes: {
+      event_aggregate_seq_idx: indexExists(sqlite, "event_aggregate_seq_idx"),
+      event_snapshot_aggregate_seq_idx: indexExists(sqlite, "event_snapshot_aggregate_seq_idx"),
+      personal_memory_query_idx: indexExists(sqlite, "personal_memory_query_idx"),
+      inbox_project_state_time_idx: indexExists(sqlite, "inbox_project_state_time_idx"),
+      wakeup_project_state_due_idx: indexExists(sqlite, "wakeup_project_state_due_idx"),
+    },
+  }
+}
+
 const StatusCommand = cmd({
   command: "status",
   describe: "show migration history and run an integrity check",
@@ -134,12 +171,16 @@ const StatusCommand = cmd({
     try {
       const versions = listSchemaVersions()
       const integrity = args.integrity ? integrityCheck() : "skipped"
+      const storage = storageDiagnostics()
       if (args.format === "json") {
-        console.log(JSON.stringify({ path: Database.Path, integrity, migrations: versions }, null, 2))
+        console.log(JSON.stringify({ path: Database.Path, integrity, migrations: versions, storage }, null, 2))
         return
       }
       UI.println(`Database: ${Database.Path}`)
       UI.println(`Integrity: ${integrity}`)
+      UI.println(
+        `Storage: events=${storage.event_rows}, snapshots=${storage.event_snapshot_rows}, wal=${storage.wal_bytes} bytes`,
+      )
       UI.println(`Migrations applied: ${versions.length}`)
       if (versions.length > 0) {
         UI.println("")

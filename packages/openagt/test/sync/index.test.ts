@@ -4,8 +4,8 @@ import z from "zod"
 import { Bus } from "../../src/bus"
 import { Instance } from "../../src/project/instance"
 import { SyncEvent } from "../../src/sync"
-import { Database } from "../../src/storage"
-import { EventTable } from "../../src/sync/event.sql"
+import { Database, eq } from "../../src/storage"
+import { EventSnapshotTable, EventTable } from "../../src/sync/event.sql"
 import { Identifier } from "../../src/id/id"
 import { Flag } from "../../src/flag/flag"
 import { initProjectors } from "../../src/server/projectors"
@@ -74,6 +74,24 @@ describe("SyncEvent", () => {
           )
           .all()
         expect(rows).toHaveLength(1)
+      }),
+    )
+
+    test(
+      "creates snapshot table and indexes for bounded replay",
+      withInstance(() => {
+        const rows = Database.Client()
+          .$client.query<{ name: string }, []>(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='event_snapshot'
+             UNION ALL
+             SELECT name FROM sqlite_master WHERE type='index' AND name IN ('event_snapshot_aggregate_seq_idx', 'event_snapshot_adapter_idx')`,
+          )
+          .all()
+        expect(rows.map((row) => row.name).toSorted()).toEqual([
+          "event_snapshot",
+          "event_snapshot_adapter_idx",
+          "event_snapshot_aggregate_seq_idx",
+        ])
       }),
     )
 
@@ -243,6 +261,71 @@ describe("SyncEvent", () => {
 
         const rows = Database.use((db) => db.select().from(EventTable).all())
         expect(rows.map((row) => row.seq)).toEqual([0, 1, 2, 3])
+      }),
+    )
+
+    test(
+      "replays from event snapshot plus tail events",
+      withInstance(() => {
+        SyncEvent.reset()
+        const projection = new Map<string, string>()
+        const Created = SyncEvent.define({
+          type: "snapshot.item.created",
+          version: 1,
+          aggregate: "id",
+          schema: z.object({ id: z.string(), name: z.string() }),
+        })
+        SyncEvent.init({
+          projectors: [
+            SyncEvent.project(Created, (_db, data) => {
+              projection.set(data.id, data.name)
+            }),
+          ],
+        })
+        SyncEvent.registerSnapshotAdapter({
+          id: "snapshot-test",
+          schemaVersion: 1,
+          projectorVersion: "test",
+          capture: () => ({ items: [...projection.entries()] }),
+          restore: (_db, _aggregateID, payload) => {
+            projection.clear()
+            for (const [id, name] of (payload.items ?? []) as [string, string][]) {
+              projection.set(id, name)
+            }
+          },
+        })
+
+        const id = Identifier.descending("message")
+        SyncEvent.run(Created, { id, name: "first" })
+        SyncEvent.run(Created, { id, name: "second" })
+        const snapshot = SyncEvent.writeSnapshot({ aggregateID: id, adapterID: "snapshot-test" })
+        SyncEvent.run(Created, { id, name: "third" })
+        const events = Database.use((db) =>
+          db
+            .select()
+            .from(EventTable)
+            .where(eq(EventTable.aggregate_id, id))
+            .orderBy(EventTable.seq)
+            .all()
+            .map((row) => ({
+              id: row.id,
+              type: row.type,
+              seq: row.seq,
+              aggregateID: row.aggregate_id,
+              data: row.data,
+            })),
+        )
+
+        SyncEvent.remove(id)
+        projection.clear()
+        const restored = SyncEvent.replayAllFromSnapshot({ snapshot, events })
+        const stored = Database.use((db) => db.select().from(EventSnapshotTable).all())
+
+        expect(restored).toBe(id)
+        expect(projection.get(id)).toBe("third")
+        expect(stored).toHaveLength(1)
+        expect(stored[0]!.seq).toBe(1)
+        expect(Database.use((db) => db.select().from(EventTable).all())).toHaveLength(1)
       }),
     )
   })

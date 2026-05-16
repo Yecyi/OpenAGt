@@ -18,7 +18,7 @@ import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 import { Flag } from "@/flag/flag"
-import { Log } from "@/util"
+import { Log, Token } from "@/util"
 import { DYNAMIC_BOUNDARY_MARKER, parsePromptSegments } from "./system-prompt"
 
 const log = Log.create({ service: "system-prompt" })
@@ -120,7 +120,7 @@ class LRUCache<K, V> {
 }
 
 function computeTokenEstimate(value: string): number {
-  return Math.ceil((value?.length ?? 0) / 4)
+  return Token.estimate(value ?? "")
 }
 
 interface TokenValuedEntry {

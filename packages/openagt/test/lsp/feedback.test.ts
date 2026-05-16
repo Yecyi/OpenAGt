@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildDiagnosticFeedback } from "../../src/lsp/feedback"
+import { buildDiagnosticFeedback, buildDiagnosticRepairPlan } from "../../src/lsp/feedback"
 
 const diagnostic = (severity: 1 | 2 | 3 | 4, message = "diagnostic") => ({
   severity,
@@ -48,5 +48,42 @@ describe("LSP diagnostic feedback", () => {
     expect(feedback.new_errors).toBe(1)
     expect(feedback.report).toContain("<diagnostics")
     expect(feedback.report).toContain("new error")
+  })
+
+  test("recommends exactly one bounded repair attempt for workspace errors", () => {
+    const feedback = buildDiagnosticFeedback({
+      file: "/repo/src/app.ts",
+      normalizedFile: "/repo/src/app.ts",
+      before: {},
+      after: {
+        "/repo/src/app.ts": [diagnostic(1, "new error")],
+      },
+    })
+
+    const first = buildDiagnosticRepairPlan({ feedback, fileInWorkspace: true })
+    const second = buildDiagnosticRepairPlan({ feedback, fileInWorkspace: true, attempt: 1 })
+
+    expect(first.status).toBe("retry_recommended")
+    expect(first.max_attempts).toBe(1)
+    expect(first.files).toEqual(["/repo/src/app.ts"])
+    expect(second.status).toBe("blocked")
+    expect(second.reason).toBe("attempt_limit")
+  })
+
+  test("does not recommend repair for outside-workspace diagnostics", () => {
+    const feedback = buildDiagnosticFeedback({
+      file: "/external/app.ts",
+      normalizedFile: "/external/app.ts",
+      before: {},
+      after: {
+        "/external/app.ts": [diagnostic(1, "new error")],
+      },
+    })
+
+    const plan = buildDiagnosticRepairPlan({ feedback, fileInWorkspace: false })
+
+    expect(plan.status).toBe("blocked")
+    expect(plan.reason).toBe("outside_workspace")
+    expect(plan.files).toEqual([])
   })
 })

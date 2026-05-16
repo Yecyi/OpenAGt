@@ -32,6 +32,8 @@ export const PersonalMemoryNoteTable = sqliteTable(
     index("personal_memory_kind_idx").on(table.kind),
     index("personal_memory_project_idx").on(table.project_id),
     index("personal_memory_session_idx").on(table.session_id),
+    index("personal_memory_query_idx").on(table.scope, table.kind, table.project_id, table.session_id, table.time_updated),
+    index("personal_memory_project_time_idx").on(table.project_id, table.time_updated),
   ],
 )
 
@@ -71,6 +73,7 @@ export const InboxItemTable = sqliteTable(
     index("inbox_project_idx").on(table.project_id),
     index("inbox_session_idx").on(table.session_id),
     index("inbox_state_idx").on(table.state),
+    index("inbox_project_state_time_idx").on(table.project_id, table.state, table.time_updated),
   ],
 )
 
@@ -102,5 +105,6 @@ export const ScheduledWakeupTable = sqliteTable(
     index("wakeup_project_idx").on(table.project_id),
     index("wakeup_state_idx").on(table.state),
     index("wakeup_scheduled_for_idx").on(table.scheduled_for),
+    index("wakeup_project_state_due_idx").on(table.project_id, table.state, table.scheduled_for),
   ],
 )

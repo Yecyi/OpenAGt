@@ -117,7 +117,7 @@ export const layer = Layer.effect(
 
     const memory = createMemoryOps(bus)
     const inbox = createInboxOps(bus)
-    const wakeup = createWakeupOps({ bus, createInboxItem: inbox.createInboxItem })
+    const wakeup = createWakeupOps({ bus })
     const ingestion = createIngestionOps({ createInboxItem: inbox.createInboxItem })
     const overviewOps = createOverviewOps({
       listInboxItems: inbox.listInboxItems,

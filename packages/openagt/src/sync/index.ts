@@ -1,11 +1,11 @@
 import z from "zod"
 import type { ZodObject } from "zod"
-import { Database, eq } from "@/storage"
+import { Database, and, desc, eq, gt } from "@/storage"
 import { GlobalBus } from "@/bus/global"
 import { Bus as ProjectBus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { Instance } from "@/project/instance"
-import { EventSequenceTable, EventTable } from "./event.sql"
+import { EventSequenceTable, EventSnapshotTable, EventTable } from "./event.sql"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
 import { EventID } from "./schema"
 import { Flag } from "@/flag/flag"
@@ -34,13 +34,25 @@ type ProjectorFunc = (db: Database.TxOrDb, data: unknown) => void
 
 export const registry = new Map<string, Definition>()
 let projectors: Map<Definition, ProjectorFunc> | undefined
+const snapshotAdapters = new Map<string, SnapshotAdapter>()
 const versions = new Map<string, number>()
 let frozen = false
 let convertEvent: (type: string, event: Event["data"]) => Promise<Record<string, unknown>> | Record<string, unknown>
 
+export type SnapshotAdapter = {
+  id: string
+  schemaVersion: number
+  projectorVersion: string
+  capture: (db: Database.TxOrDb, aggregateID: string) => Record<string, unknown>
+  restore: (db: Database.TxOrDb, aggregateID: string, payload: Record<string, unknown>) => void
+}
+
+export type EventSnapshot = typeof EventSnapshotTable.$inferSelect
+
 export function reset() {
   frozen = false
   projectors = undefined
+  snapshotAdapters.clear()
   convertEvent = (_, data) => data
 }
 
@@ -99,6 +111,10 @@ export function project<Def extends Definition>(
   func: (db: Database.TxOrDb, data: Event<Def>["data"]) => void,
 ): [Definition, ProjectorFunc] {
   return [def, func as ProjectorFunc]
+}
+
+export function registerSnapshotAdapter(adapter: SnapshotAdapter) {
+  snapshotAdapters.set(adapter.id, adapter)
 }
 
 function process<Def extends Definition>(def: Def, event: Event<Def>, options: { publish: boolean }) {
@@ -191,6 +207,7 @@ export function replay(event: SerializedEvent, options?: { publish: boolean }) {
   }
 
   process(def, event, { publish: !!options?.publish })
+  Database.durabilityCheckpoint()
 }
 
 export function replayAll(events: SerializedEvent[], options?: { publish: boolean }) {
@@ -210,6 +227,117 @@ export function replayAll(events: SerializedEvent[], options?: { publish: boolea
     replay(item, options)
   }
   return source
+}
+
+export function writeSnapshot(input: { aggregateID: string; adapterID: string }) {
+  const adapter = snapshotAdapters.get(input.adapterID)
+  if (!adapter) throw new Error(`Snapshot adapter not found: ${input.adapterID}`)
+  const snapshot = Database.transaction(
+    (tx) => {
+      const row = tx
+        .select({ seq: EventSequenceTable.seq })
+        .from(EventSequenceTable)
+        .where(eq(EventSequenceTable.aggregate_id, input.aggregateID))
+        .get()
+      if (!row) throw new Error(`Cannot snapshot unknown aggregate: ${input.aggregateID}`)
+      const snapshot = {
+        id: EventID.ascending(),
+        aggregate_id: input.aggregateID,
+        adapter_id: adapter.id,
+        seq: row.seq,
+        schema_version: adapter.schemaVersion,
+        projector_version: adapter.projectorVersion,
+        payload: adapter.capture(tx, input.aggregateID),
+        time_created: Date.now(),
+      } satisfies typeof EventSnapshotTable.$inferInsert
+      tx.insert(EventSnapshotTable).values(snapshot).run()
+      return snapshot
+    },
+    { behavior: "immediate" },
+  )
+  Database.durabilityCheckpoint()
+  return snapshot
+}
+
+export function latestSnapshot(input: { aggregateID: string; adapterID?: string }) {
+  return Database.use((db) => {
+    const query = input.adapterID
+      ? db
+          .select()
+          .from(EventSnapshotTable)
+          .where(
+            and(
+              eq(EventSnapshotTable.aggregate_id, input.aggregateID),
+              eq(EventSnapshotTable.adapter_id, input.adapterID),
+            ),
+          )
+      : db.select().from(EventSnapshotTable).where(eq(EventSnapshotTable.aggregate_id, input.aggregateID))
+    return query.orderBy(desc(EventSnapshotTable.seq), desc(EventSnapshotTable.time_created)).get()
+  })
+}
+
+export function replayAllFromSnapshot(input: {
+  snapshot: EventSnapshot
+  events: SerializedEvent[]
+  publish?: boolean
+}) {
+  const adapter = snapshotAdapters.get(input.snapshot.adapter_id)
+  if (!adapter) throw new Error(`Snapshot adapter not found: ${input.snapshot.adapter_id}`)
+  if (input.snapshot.schema_version !== adapter.schemaVersion) {
+    throw new Error(
+      `Snapshot schema mismatch for ${adapter.id}: expected ${adapter.schemaVersion}, got ${input.snapshot.schema_version}`,
+    )
+  }
+  if (input.snapshot.projector_version !== adapter.projectorVersion) {
+    throw new Error(
+      `Snapshot projector mismatch for ${adapter.id}: expected ${adapter.projectorVersion}, got ${input.snapshot.projector_version}`,
+    )
+  }
+  if (input.events.some((item) => item.aggregateID !== input.snapshot.aggregate_id)) {
+    throw new Error("Replay events must belong to the snapshot aggregate")
+  }
+  Database.transaction(
+    (tx) => {
+      adapter.restore(tx, input.snapshot.aggregate_id, input.snapshot.payload)
+      tx.insert(EventSequenceTable)
+        .values({
+          aggregate_id: input.snapshot.aggregate_id,
+          seq: input.snapshot.seq,
+        })
+        .onConflictDoUpdate({
+          target: EventSequenceTable.aggregate_id,
+          set: { seq: input.snapshot.seq },
+        })
+        .run()
+      tx.insert(EventSnapshotTable)
+        .values(input.snapshot)
+        .onConflictDoNothing()
+        .run()
+    },
+    { behavior: "immediate" },
+  )
+  Database.durabilityCheckpoint()
+  const tail = input.events.filter((item) => item.seq > input.snapshot.seq).toSorted((a, b) => a.seq - b.seq)
+  if (tail.length === 0) return input.snapshot.aggregate_id
+  return replayAll(tail, { publish: !!input.publish })
+}
+
+export function tailEventsAfterSnapshot(input: { aggregateID: string; snapshot: EventSnapshot }) {
+  return Database.use((db) =>
+    db
+      .select()
+      .from(EventTable)
+      .where(and(eq(EventTable.aggregate_id, input.aggregateID), gt(EventTable.seq, input.snapshot.seq)))
+      .orderBy(EventTable.seq)
+      .all()
+      .map((row) => ({
+        id: row.id,
+        aggregateID: row.aggregate_id,
+        seq: row.seq,
+        type: row.type,
+        data: row.data,
+      })),
+  )
 }
 
 export function run<Def extends Definition>(def: Def, data: Event<Def>["data"], options?: { publish?: boolean }) {
@@ -246,6 +374,7 @@ export function run<Def extends Definition>(def: Def, data: Event<Def>["data"], 
       behavior: "immediate",
     },
   )
+  Database.durabilityCheckpoint()
 }
 
 export function remove(aggregateID: string) {

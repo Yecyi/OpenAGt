@@ -21,7 +21,7 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { replace, trimDiff } from "./edit-replace"
-import { buildDiagnosticFeedback } from "../lsp/feedback"
+import { buildDiagnosticFeedback, buildDiagnosticRepairPlan } from "../lsp/feedback"
 import { detectEolStyle, type EolStyle } from "@/util/text"
 export * from "./edit-replace"
 
@@ -218,6 +218,11 @@ export const EditTool = Tool.define(
             before: diagnosticsBefore,
             after: diagnostics,
           })
+          const relativeToWorktree = path.relative(Instance.worktree, filePath)
+          const lspRepair = buildDiagnosticRepairPlan({
+            feedback: lspFeedback,
+            fileInWorkspace: !relativeToWorktree.startsWith("..") && !path.isAbsolute(relativeToWorktree),
+          })
           if (lspFeedback.report) output += `\n\nLSP errors detected in this file, please fix:\n${lspFeedback.report}`
           yield* ctx.metadata({
             metadata: {
@@ -225,6 +230,7 @@ export const EditTool = Tool.define(
               filediff,
               diagnostics,
               lsp_feedback: lspFeedback,
+              lsp_repair: lspRepair,
               ...roundTripMetadata(eolStyle),
             },
           })
@@ -233,6 +239,7 @@ export const EditTool = Tool.define(
             metadata: {
               diagnostics,
               lsp_feedback: lspFeedback,
+              lsp_repair: lspRepair,
               diff,
               filediff,
               ...roundTripMetadata(eolStyle),

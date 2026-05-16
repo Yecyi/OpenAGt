@@ -2,18 +2,18 @@ import z from "zod"
 import { Bus } from "@/bus"
 import { ProjectID } from "@/project/schema"
 import { SessionID } from "@/session/schema"
-import { Database, desc, eq } from "@/storage"
+import { Database, and, asc, eq, lte } from "@/storage"
 import { Effect } from "effect"
-import { ScheduledWakeupTable } from "./personal.sql"
+import { InboxItemTable, ScheduledWakeupTable } from "./personal.sql"
 import {
+  InboxItemID,
   ScheduledWakeupID,
   type InboxItem as InboxItemType,
   type ScheduledWakeup as ScheduledWakeupType,
   type WorkPriority as WorkPriorityType,
 } from "./schema"
-import { wakeupFromRow } from "./row-mappers"
-import { SchedulerCompleted, SchedulerFired, SchedulerScheduled } from "./events"
-import type { CreateInboxItemInput } from "./inbox-ops"
+import { inboxFromRow, wakeupFromRow } from "./row-mappers"
+import { InboxCreated, SchedulerCompleted, SchedulerFired, SchedulerScheduled } from "./events"
 
 function now() {
   return Date.now()
@@ -41,9 +41,8 @@ export interface DispatchDueWakeupsInput {
 
 export function createWakeupOps(deps: {
   bus: Bus.Interface
-  createInboxItem: (input: CreateInboxItemInput) => Effect.Effect<InboxItemType, Error>
 }) {
-  const { bus, createInboxItem } = deps
+  const { bus } = deps
 
   const scheduleWakeup = Effect.fn("PersonalAgent.scheduleWakeup")(function* (input: ScheduleWakeupInput) {
     const id = ScheduledWakeupID.ascending()
@@ -81,56 +80,85 @@ export function createWakeupOps(deps: {
         db
           .select()
           .from(ScheduledWakeupTable)
-          .where(eq(ScheduledWakeupTable.project_id, input.projectID))
-          .orderBy(desc(ScheduledWakeupTable.scheduled_for))
-          .all()
-          .filter((row) => row.state === "pending" && row.scheduled_for <= (input.now ?? now())),
+          .where(
+            and(
+              eq(ScheduledWakeupTable.project_id, input.projectID),
+              eq(ScheduledWakeupTable.state, "pending"),
+              lte(ScheduledWakeupTable.scheduled_for, input.now ?? now()),
+            ),
+          )
+          .orderBy(asc(ScheduledWakeupTable.scheduled_for))
+          .all(),
       ),
     )
     return rows.map(wakeupFromRow)
   })
 
   const dispatchDueWakeups = Effect.fn("PersonalAgent.dispatchDueWakeups")(function* (input: DispatchDueWakeupsInput) {
-    const due = yield* listDueWakeups(input)
-    return yield* Effect.all(
-      due.map((wakeup) =>
-        Effect.gen(function* () {
-          const inbox = yield* createInboxItem({
-            projectID: wakeup.projectID as ProjectID,
-            sessionID: wakeup.sessionID ? SessionID.make(wakeup.sessionID) : undefined,
-            source: "scheduled",
-            scope: "workspace",
-            goal: wakeup.goal,
-            contextRefs: wakeup.context_refs,
-            priority: wakeup.priority,
-            scheduledFor: wakeup.scheduled_for,
-            payload: wakeup.payload,
-          })
-          yield* Effect.sync(() =>
-            Database.use((db) =>
-              db
-                .update(ScheduledWakeupTable)
+    const fired = yield* Effect.sync(() =>
+      Database.transaction(
+        (db) =>
+          db
+            .select()
+            .from(ScheduledWakeupTable)
+            .where(
+              and(
+                eq(ScheduledWakeupTable.project_id, input.projectID),
+                eq(ScheduledWakeupTable.state, "pending"),
+                lte(ScheduledWakeupTable.scheduled_for, input.now ?? now()),
+              ),
+            )
+            .orderBy(asc(ScheduledWakeupTable.scheduled_for))
+            .all()
+            .map((row) => {
+              const inboxID = InboxItemID.ascending()
+              const timestamp = now()
+              db.insert(InboxItemTable)
+                .values({
+                  id: inboxID,
+                  project_id: row.project_id,
+                  session_id: row.session_id,
+                  source: "scheduled",
+                  scope: "workspace",
+                  goal: row.goal,
+                  context_refs: row.context_refs,
+                  priority: row.priority,
+                  state: "queued",
+                  scheduled_for: row.scheduled_for,
+                  payload: row.payload,
+                  time_created: timestamp,
+                  time_updated: timestamp,
+                })
+                .run()
+              db.update(ScheduledWakeupTable)
                 .set({
                   state: "fired",
-                  inbox_item_id: inbox.id,
-                  time_fired: now(),
-                  time_updated: now(),
+                  inbox_item_id: inboxID,
+                  time_fired: timestamp,
+                  time_updated: timestamp,
                 })
-                .where(eq(ScheduledWakeupTable.id, wakeup.id))
-                .run(),
-            ),
-          )
-          const fired = yield* Effect.sync(() =>
-            Database.use((db) =>
-              db.select().from(ScheduledWakeupTable).where(eq(ScheduledWakeupTable.id, wakeup.id)).get(),
-            ),
-          ).pipe(Effect.map((row) => wakeupFromRow(row!)))
-          yield* bus.publish(SchedulerFired, { ...fired, inbox_item: inbox })
-          return inbox
-        }),
+                .where(and(eq(ScheduledWakeupTable.id, row.id), eq(ScheduledWakeupTable.state, "pending")))
+                .run()
+              return {
+                inbox: inboxFromRow(db.select().from(InboxItemTable).where(eq(InboxItemTable.id, inboxID)).get()!),
+                wakeup: wakeupFromRow(
+                  db.select().from(ScheduledWakeupTable).where(eq(ScheduledWakeupTable.id, row.id)).get()!,
+                ),
+              }
+            }),
+        { behavior: "immediate" },
       ),
-      { concurrency: "unbounded" },
     )
+    yield* Effect.forEach(
+      fired,
+      (item) =>
+        Effect.gen(function* () {
+          yield* bus.publish(InboxCreated, item.inbox)
+          yield* bus.publish(SchedulerFired, { ...item.wakeup, inbox_item: item.inbox })
+        }),
+      { concurrency: 4 },
+    )
+    return fired.map((item) => item.inbox)
   })
 
   const completeWakeup = Effect.fn("PersonalAgent.completeWakeup")(function* (

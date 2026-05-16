@@ -838,4 +838,64 @@ describe("personal agent core", () => {
       }),
     ),
   )
+
+  it.live("uses database indexes for memory, inbox, and wakeup filters", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const indexes = yield* Effect.sync(() =>
+          Database.Client()
+            .$client.query<{ name: string }, []>(
+              `SELECT name FROM sqlite_master
+               WHERE type='index'
+               AND name IN (
+                'personal_memory_query_idx',
+                'personal_memory_project_time_idx',
+                'inbox_project_state_time_idx',
+                'wakeup_project_state_due_idx'
+               )`,
+            )
+            .all()
+            .map((row) => row.name)
+            .toSorted(),
+        )
+
+        expect(indexes).toEqual([
+          "inbox_project_state_time_idx",
+          "personal_memory_project_time_idx",
+          "personal_memory_query_idx",
+          "wakeup_project_state_due_idx",
+        ])
+      }),
+    ),
+  )
+
+  it.live("dispatchDueWakeups atomically claims a due wakeup once under concurrent dispatch", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const personal = yield* PersonalAgent.Service
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({ title: "Wakeup claim parent" })
+        const projectID = Instance.project.id
+        yield* personal.scheduleWakeup({
+          projectID,
+          sessionID: session.id,
+          goal: "Claim me exactly once",
+          scheduledFor: Date.now() - 1_000,
+        })
+
+        const batches = yield* Effect.all(
+          Array.from({ length: 6 }, () => personal.dispatchDueWakeups({ projectID, now: Date.now() })),
+          { concurrency: 6 },
+        )
+        const inbox = yield* personal.listInboxItems({ projectID })
+        const due = yield* personal.listDueWakeups({ projectID, now: Date.now() })
+
+        expect(batches.flat()).toHaveLength(1)
+        expect(
+          inbox.filter((item) => item.source === "scheduled" && item.goal === "Claim me exactly once"),
+        ).toHaveLength(1)
+        expect(due).toHaveLength(0)
+      }),
+    ),
+  )
 })
