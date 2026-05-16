@@ -18,6 +18,10 @@ export type TaskMetadata = {
   partialSummary?: string
   resultText?: string
   remainingScope?: string[]
+  gaveUp?: boolean
+  giveUpReason?: string
+  inboxId?: string
+  recommendNext?: string
 }
 
 interface TaskParams {
@@ -39,6 +43,19 @@ export interface TaskOutput {
   title: string
   metadata: TaskMetadata
   output: string
+}
+
+export type TaskGiveUpOutcome = {
+  reason: string
+  output: string
+  partialResult?: string
+  recommendNext?: string
+  inboxId?: string
+}
+
+function stringValue(record: Record<string, unknown> | undefined, key: string) {
+  const value = record?.[key]
+  return typeof value === "string" && value.trim() ? value : undefined
 }
 
 export function assistantText(message: MessageV2.WithParts) {
@@ -69,6 +86,25 @@ export function limitReason(message: MessageV2.WithParts) {
   return undefined
 }
 
+export function taskGiveUpOutcome(message: MessageV2.WithParts): TaskGiveUpOutcome | undefined {
+  const part = message.parts.findLast(
+    (item) => item.type === "tool" && item.tool === "task_give_up" && item.state.status === "completed",
+  )
+  if (!part || part.type !== "tool" || part.state.status !== "completed") return
+  return {
+    reason: stringValue(part.state.metadata, "reason") ?? stringValue(part.state.input, "reason") ?? "unknown",
+    output: part.state.output,
+    partialResult: stringValue(part.state.input, "partial_result"),
+    recommendNext: stringValue(part.state.input, "recommend_next"),
+    inboxId: stringValue(part.state.metadata, "inbox_id"),
+  }
+}
+
+export function taskRecordRetryable(record: TaskRecord) {
+  if (record.metadata?.retryable === false) return false
+  return record.metadata?.retryable === true || record.status === "partial"
+}
+
 export function taskPartialSummary(messages: MessageV2.WithParts[]) {
   const items = messages
     .filter((message) => message.info.role === "assistant")
@@ -97,6 +133,7 @@ export function taskPartialSummary(messages: MessageV2.WithParts[]) {
 
 export function formatStoredRecordOutput(params: TaskParams, target: TaskTarget, record: TaskRecord): TaskOutput {
   const { sessionId, model } = target
+  const retryable = taskRecordRetryable(record)
   return {
     title: params.description,
     metadata: {
@@ -106,7 +143,7 @@ export function formatStoredRecordOutput(params: TaskParams, target: TaskTarget,
       status: record.status,
       groupId: record.group_id,
       partial: record.status === "partial" ? true : undefined,
-      retryable: record.metadata?.retryable === true ? true : undefined,
+      retryable,
       limitReason: typeof record.metadata?.limit_reason === "string" ? record.metadata.limit_reason : undefined,
       partialSummary:
         typeof record.metadata?.partial_summary === "string" ? record.metadata.partial_summary : undefined,
@@ -122,7 +159,12 @@ export function formatStoredRecordOutput(params: TaskParams, target: TaskTarget,
       storedTaskResult(record),
       "</task_result>",
       ...(record.status === "partial"
-        ? ["", "Task is partial and retryable; retry only the missing scope if more evidence is required."]
+        ? [
+            "",
+            retryable
+              ? "Task is partial and retryable; retry only the missing scope if more evidence is required."
+              : "Task stopped with a structured blocker; get user input or adjust scope before retrying.",
+          ]
         : []),
     ].join("\n"),
   }
@@ -248,6 +290,43 @@ export function formatStepBudgetPartialOutput(
       "",
       "Remaining work: retry this subagent with narrower scope or a larger step budget if the parent still needs more evidence.",
       "</partial_task_result>",
+    ].join("\n"),
+  }
+}
+
+export function formatGiveUpPartialOutput(
+  params: TaskParams,
+  target: TaskTarget,
+  outcome: TaskGiveUpOutcome,
+): TaskOutput {
+  const { sessionId, model } = target
+  return {
+    title: params.description,
+    metadata: {
+      sessionId,
+      model,
+      taskId: sessionId,
+      status: "partial",
+      groupId: params.group_id,
+      partial: true,
+      retryable: false,
+      limitReason: "task_give_up",
+      partialSummary: outcome.output,
+      resultText: outcome.output,
+      remainingScope: remainingScopeFor(params),
+      gaveUp: true,
+      giveUpReason: outcome.reason,
+      inboxId: outcome.inboxId,
+      recommendNext: outcome.recommendNext,
+    },
+    output: [
+      `task_id: ${sessionId} (partial, blocked)`,
+      "",
+      '<partial_task_result status="partial" reason="task_give_up">',
+      outcome.output,
+      "</partial_task_result>",
+      "",
+      "Task stopped with a structured blocker; get user input or adjust scope before retrying.",
     ].join("\n"),
   }
 }

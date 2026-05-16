@@ -82,7 +82,10 @@ export const recordTaskOutcome = Effect.fn("TaskOutcome.record")(function* (reco
         const time = Date.now()
         const resultText = outcomeText(record)
         const errorText = outcomeError(record)
-        const retryable = booleanMetadata(record, "retryable") || record.status === "partial"
+        const retryable =
+          record.metadata?.retryable === false
+            ? false
+            : booleanMetadata(record, "retryable") || record.status === "partial"
         db.insert(TaskOutcomeTable)
           .values({
             id: Identifier.ascending("taskOutcome"),

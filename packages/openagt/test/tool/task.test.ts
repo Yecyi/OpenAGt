@@ -121,6 +121,60 @@ function reply(input: SessionPrompt.PromptInput, text: string): MessageV2.WithPa
   }
 }
 
+function replyWithGiveUp(input: SessionPrompt.PromptInput): MessageV2.WithParts {
+  const id = MessageID.ascending()
+  return {
+    info: {
+      id,
+      role: "assistant",
+      parentID: input.messageID ?? MessageID.ascending(),
+      sessionID: input.sessionID,
+      mode: input.agent ?? "general",
+      agent: input.agent ?? "general",
+      cost: 0,
+      path: { cwd: "/tmp", root: "/tmp" },
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      modelID: input.model?.modelID ?? ref.modelID,
+      providerID: input.model?.providerID ?? ref.providerID,
+      time: { created: Date.now() },
+      finish: "stop",
+    },
+    parts: [
+      {
+        id: PartID.ascending(),
+        messageID: id,
+        sessionID: input.sessionID,
+        type: "tool",
+        callID: "call_give_up",
+        tool: "task_give_up",
+        state: {
+          status: "completed",
+          input: {
+            reason: "user_judgment_needed",
+            partial_result: "Found two possible fixes but cannot choose policy.",
+            recommend_next: "Pick the desired policy.",
+          },
+          output:
+            'Task ended with reason "user_judgment_needed". Logged to inbox inbox_test. Reason: user_judgment_needed.',
+          title: "Gave up: user_judgment_needed",
+          metadata: {
+            reason: "user_judgment_needed",
+            inbox_id: "inbox_test",
+          },
+          time: { start: Date.now(), end: Date.now() },
+        },
+      },
+      {
+        id: PartID.ascending(),
+        messageID: id,
+        sessionID: input.sessionID,
+        type: "text",
+        text: "I stopped because user judgment is required.",
+      },
+    ],
+  } as MessageV2.WithParts
+}
+
 describe("tool.task", () => {
   it.live("description sorts subagents by name and is stable across calls", () =>
     provideTmpdirInstance(
@@ -672,6 +726,73 @@ describe("tool.task", () => {
         expect(record?.metadata?.limit_reason).toBe("step_budget")
         expect(result.output).toContain('<partial_task_result status="partial" reason="step_budget">')
         expect(result.output).toContain("Remaining work")
+      }),
+    ),
+  )
+
+  it.live("task_give_up subagent result is returned as non-retryable partial output", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        const taskGet = yield* TaskGetTool.pipe(Effect.flatMap((item) => item.init()))
+        const promptOps: TaskPromptOps = {
+          cancel: () => undefined,
+          resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
+          prompt: (input) => Effect.succeed(replyWithGiveUp(input)),
+        }
+
+        const result = yield* def.execute(
+          {
+            description: "choose policy",
+            prompt: "decide between two policy choices",
+            subagent_type: "general",
+            task_kind: "verify",
+            return_mode: "summary",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        const tasks = yield* TaskRuntime.Service
+        const record = (yield* tasks.list(chat.id)).find((item) => item.task_id === result.metadata.taskId)
+        const outcome = record
+          ? yield* tasks.latestOutcome({ taskID: record.task_id, parentSessionID: record.parent_session_id })
+          : undefined
+
+        expect(result.metadata.status).toBe("partial")
+        expect(result.metadata.retryable).toBe(false)
+        expect(result.metadata.gaveUp).toBe(true)
+        expect(result.metadata.giveUpReason).toBe("user_judgment_needed")
+        expect(result.metadata.inboxId).toBe("inbox_test")
+        expect(result.output).toContain('reason="task_give_up"')
+        expect(record?.status).toBe("partial")
+        expect(record?.metadata?.gave_up).toBe(true)
+        expect(record?.metadata?.retryable).toBe(false)
+        expect(outcome && outcome._tag === "Some" ? outcome.value.retryable : undefined).toBe(0)
+
+        const fetched = yield* taskGet.execute(
+          { task_id: String(result.metadata.taskId) },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        expect(fetched.output).toContain("Task stopped with a structured blocker")
       }),
     ),
   )

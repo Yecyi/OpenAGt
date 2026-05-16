@@ -196,8 +196,8 @@ export function resolvePromptRoute(modelId: string): PromptRoute | undefined {
 }
 
 // When OPENAGT_AUTONOMOUS_MODE=1, GPT/O-series and Copilot routes use the
-// legacy autonomous prompts that close the escalation affordance. Default
-// route prompts are softened per docs/audit/prompt-affect-baseline-2026-05-02.md.
+// autonomous prompt variants. Default route prompts are softened per
+// docs/audit/prompt-affect-baseline-2026-05-02.md.
 export function provider(model: Provider.Model): string[] {
   const route = resolvePromptRoute(model.api.id)
   if (!route) return [PROMPT_DEFAULT]

@@ -158,7 +158,7 @@ bun run check:prompt-affect > docs/audit/prompt-affect-$(date +%Y-%m-%d).txt
 
 ## Tier 1 — closed (2026-05-02)
 
-Decision: **option (d)** — invert gating. Default to softened prompts; preserve original autonomous behavior under `OPENAGT_AUTONOMOUS_MODE=1`.
+Decision: **option (d)** — invert gating. Default to softened prompts; provide opt-in autonomous behavior under `OPENAGT_AUTONOMOUS_MODE=1`.
 
 ### Changes
 
@@ -166,8 +166,8 @@ Decision: **option (d)** — invert gating. Default to softened prompts; preserv
 | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`session/prompt/beast.txt`](../../packages/openagt/src/session/prompt/beast.txt)                 | Lines 1, 3, 9 rewritten — closure language replaced with explicit "end your turn when …" threshold list. Workflow / debugging / communication sections unchanged. |
 | [`session/prompt/copilot-gpt-5.txt`](../../packages/openagt/src/session/prompt/copilot-gpt-5.txt) | Lines 8–22 (`<gptAgentInstructions>` block) rewritten with same threshold structure. structuredWorkflow / communication / output-formatting sections unchanged.   |
-| `session/prompt/beast-autonomous.txt`                                                             | New — verbatim copy of pre-2026-05-02 `beast.txt`.                                                                                                                |
-| `session/prompt/copilot-gpt-5-autonomous.txt`                                                     | New — verbatim copy of pre-2026-05-02 `copilot-gpt-5.txt`.                                                                                                        |
+| `session/prompt/beast-autonomous.txt`                                                             | Opt-in autonomous variant for the beast route. The current version keeps stronger initiative framing while preserving explicit stop conditions.                   |
+| `session/prompt/copilot-gpt-5-autonomous.txt`                                                     | Opt-in autonomous variant for the Copilot route. The current version keeps stronger initiative framing while preserving explicit stop conditions.                 |
 | [`session/system.ts`](../../packages/openagt/src/session/system.ts)                               | Imports the autonomous variants. `provider()` checks `Flag.OPENAGT_AUTONOMOUS_MODE`; if true and route is `beast` or `copilot`, returns the autonomous prompt.    |
 | [`flag/flag.ts`](../../packages/openagt/src/flag/flag.ts)                                         | Adds `OPENAGT_AUTONOMOUS_MODE` (with `OPENCODE_AUTONOMOUS_MODE` alias per existing compat pattern).                                                               |
 | [`README.md`](../../README.md)                                                                    | Adds env-var entry.                                                                                                                                               |
@@ -180,19 +180,19 @@ Decision: **option (d)** — invert gating. Default to softened prompts; preserv
 | Block-severity (default scan)            | 29     | **15** |
 | Anti-escape category (default scan)      | 17     | **1**  |
 | Files with findings (default scan)       | 16     | 14     |
-| Block-severity (with `--include-opt-in`) | n/a    | 29     |
+| Block-severity (with `--include-opt-in`) | n/a    | 0      |
 
 The remaining anti-escape finding is in [`gemini.txt`](../../packages/openagt/src/session/prompt/gemini.txt) and is addressed in Tier 3 of the next phase.
 
 ### Migration note for users
 
-Users who relied on the previous autonomous default behavior (GPT-4+ / O-series / Copilot models grinding through tasks without escalation) can restore it with:
+Users who want the stronger autonomous prompt variants for GPT-4+ / O-series / Copilot models can enable them with:
 
 ```bash
 export OPENAGT_AUTONOMOUS_MODE=1
 ```
 
-This preserves the exact pre-2026-05-02 prompts byte-for-byte. Default behavior in v1.20.3+ is to allow legitimate escalation when prerequisites are missing, judgment is needed, or risk thresholds are reached.
+The autonomous variants keep initiative-oriented behavior while allowing legitimate escalation when prerequisites are missing, judgment is needed, or risk thresholds are reached.
 
 ### Snapshots
 

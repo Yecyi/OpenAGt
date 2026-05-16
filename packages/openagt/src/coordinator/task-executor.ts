@@ -5,6 +5,7 @@ import { Event as BehaviorEvent } from "@/bus/behavior-events"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { TaskRuntime } from "@/session/task-runtime"
+import { taskGiveUpOutcome } from "@/tool/task-output"
 import { Cause, Effect, Option } from "effect"
 import { Log } from "@/util"
 import { CoordinatorEvents } from "./events"
@@ -22,11 +23,8 @@ import { buildTaskPrompt, messageText } from "./task-prompt"
 import { mpacrCriticTimeoutMs, taskModel, taskVariant } from "./task-record"
 import { deterministicChecksForTask, metadataChecks, missingDeterministicSignals } from "./verifier-checks"
 import { aggregateVerifierSignals, collectVerifierSignals } from "./verifier-aggregator"
-import type {
-  CoordinatorRun as CoordinatorRunType,
-  CoordinatorRunID as CoordinatorRunIDType,
-  CriticalReviewVerdict as CriticalReviewVerdictType,
-} from "./schema"
+import type { CoordinatorRun as CoordinatorRunType, CoordinatorRunID as CoordinatorRunIDType } from "./schema"
+import { CriticalReviewVerdict, type CriticalReviewVerdict as CriticalReviewVerdictType } from "./schema"
 
 interface CoordinatorTaskExecutorInput {
   readonly tasks: TaskRuntime.Interface
@@ -151,6 +149,46 @@ export class CoordinatorTaskExecutor {
           })
           yield* input.recordCalibrationOutcome(partial, quorumEscalation.verdict)
           yield* input.recordPromptOutcome(partial, false)
+        })
+      const partialTaskGiveUp = (
+        item: TaskRuntime.TaskRecord,
+        outcome: NonNullable<ReturnType<typeof taskGiveUpOutcome>>,
+        verdict: CriticalReviewVerdictType | undefined,
+      ) =>
+        Effect.gen(function* () {
+          const partial = yield* input.tasks.partial({
+            taskID: item.task_id,
+            parentSessionID: item.parent_session_id,
+            output: verdict ? JSON.stringify(verdict) : outcome.output,
+            reason: "task_give_up",
+            retryable: false,
+            remainingScope: [outcome.recommendNext ?? "User input or scope adjustment required before continuing."],
+            metadata: {
+              ...(verdict ? mpacrVerdictMetadata(verdict) : {}),
+              gave_up: true,
+              give_up_reason: outcome.reason,
+              inbox_id: outcome.inboxId,
+              recommend_next: outcome.recommendNext,
+            },
+          })
+          if (verdict) {
+            yield* emitTaskEvent(partial, "review_verdict", {
+              verdict: verdict.verdict,
+              confidence: verdict.confidence,
+              reason: outcome.reason,
+              gave_up: true,
+              inbox_id: outcome.inboxId,
+              required_changes: verdict.required_changes,
+            })
+          }
+          yield* emitTaskEvent(partial, "task_finished", {
+            status: partial.status,
+            retryable: false,
+            reason: outcome.reason,
+            gave_up: true,
+          })
+          yield* input.recordCalibrationOutcome(partial, verdict)
+          yield* input.recordPromptOutcome(partial, true)
         })
       const settleDependentMpacrSynthesis = (critic: TaskRuntime.TaskRecord): Effect.Effect<void, Error> =>
         Effect.gen(function* () {
@@ -283,6 +321,26 @@ export class CoordinatorTaskExecutor {
                   })),
                 )
               : Effect.succeed({ message, verdict: firstReview.verdict })
+            const giveUpOutcome = taskGiveUpOutcome(final.message)
+            if (giveUpOutcome) {
+              if (isMpacrCriticTask(started.metadata)) {
+                yield* completeMpacrCriticAsSkipped(started, `Task gave up: ${giveUpOutcome.reason}`)
+                return
+              }
+              const giveUpVerdict = isMpacrReviewTask(started.metadata)
+                ? CriticalReviewVerdict.parse({
+                    verdict: "ask_user",
+                    missing_evidence: [giveUpOutcome.partialResult ?? giveUpOutcome.output],
+                    required_changes: [
+                      giveUpOutcome.recommendNext ?? `Resolve task_give_up blocker: ${giveUpOutcome.reason}`,
+                    ],
+                    confidence: "low",
+                    evidence_against: [`task_give_up: ${giveUpOutcome.reason}`],
+                  })
+                : undefined
+              yield* partialTaskGiveUp(started, giveUpOutcome, giveUpVerdict)
+              return
+            }
             const reviewFailure = isMpacrCriticTask(started.metadata) ? undefined : reviewFailureMessage(final.verdict)
             if (firstReview.retryPrompt) {
               yield* emitTaskEvent(started, "revise_triggered", {

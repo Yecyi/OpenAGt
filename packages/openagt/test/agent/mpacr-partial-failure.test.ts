@@ -69,6 +69,43 @@ function assistantText(text: string) {
   } as never
 }
 
+function assistantGiveUp() {
+  return {
+    info: {
+      id: `msg_test_${Math.random().toString(36).slice(2)}`,
+      role: "assistant",
+      parentID: "msg_parent",
+      sessionID: "ses_test",
+      mode: "test",
+      agent: "general",
+      cost: 0,
+      path: { cwd: "/", root: "/" },
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      modelID: "test-model",
+      providerID: "test-provider",
+      time: { created: Date.now() },
+    },
+    parts: [
+      {
+        type: "tool",
+        tool: "task_give_up",
+        state: {
+          status: "completed",
+          input: {
+            reason: "user_judgment_needed",
+            partial_result: "Policy choice needs owner input.",
+            recommend_next: "Ask the owner to choose the policy.",
+          },
+          output: "Task ended with reason user_judgment_needed.",
+          title: "Gave up: user_judgment_needed",
+          metadata: { reason: "user_judgment_needed", inbox_id: "inbox_test" },
+          time: { start: Date.now(), end: Date.now() },
+        },
+      },
+    ],
+  } as never
+}
+
 function promptInputText(input: Parameters<SessionPrompt.Interface["prompt"]>[0]) {
   return input.parts
     .filter((part): part is Extract<(typeof input.parts)[number], { type: "text" }> => part.type === "text")
@@ -80,6 +117,12 @@ const promptFailureIt = testEffect(
   Layer.mergeAll(
     coordinatorLayer,
     sessionPromptLayer(() => Effect.die(new Error("critic exploded"))),
+  ),
+)
+const promptGiveUpIt = testEffect(
+  Layer.mergeAll(
+    coordinatorLayer,
+    sessionPromptLayer(() => Effect.succeed(assistantGiveUp())),
   ),
 )
 const promptTimeoutIt = testEffect(
@@ -536,6 +579,38 @@ describe("MPACR skipped critic runtime contract", () => {
 
         expect(completed.metadata?.mpacr_skipped).toBe(true)
         expect(completed.metadata?.mpacr_skip_reason).toBe("critic exploded")
+        expect(completed.error_summary).toBeUndefined()
+      }),
+    ),
+  )
+
+  promptGiveUpIt.live("coordinator converts MPACR critic task_give_up into skipped verdicts", () =>
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const coordinator = yield* Coordinator.Service
+        const sessions = yield* Session.Service
+        const tasks = yield* TaskRuntime.Service
+        const parent = yield* sessions.create({ title: "MPACR task_give_up parent" })
+
+        yield* coordinator.run({
+          sessionID: parent.id,
+          goal: "Review task_give_up behavior",
+          mode: "autonomous",
+          approved: true,
+          effort: "low",
+          nodes: [mpacrCriticNode({ id: "critic_give_up" })],
+        })
+
+        const completed = yield* waitForNodeStatus({
+          tasks,
+          parentSessionID: parent.id,
+          nodeID: "critic_give_up",
+          status: "completed",
+        })
+
+        expect(completed.metadata?.mpacr_skipped).toBe(true)
+        expect(completed.metadata?.mpacr_skip_reason).toBe("Task gave up: user_judgment_needed")
+        expect(completed.metadata?.result_text).toContain('"verdict":"skipped"')
         expect(completed.error_summary).toBeUndefined()
       }),
     ),

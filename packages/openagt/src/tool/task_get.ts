@@ -4,6 +4,7 @@ import * as Tool from "./tool"
 import { TaskRuntime, type TaskRecord } from "@/session/task-runtime"
 import type { TaskOutcome } from "@/session/task-outcomes"
 import { SessionID } from "@/session/schema"
+import { taskRecordRetryable } from "./task-output"
 
 const parameters = z.object({
   task_id: z.string(),
@@ -81,6 +82,7 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
           })
           const latestOutcome = Option.isSome(outcome) ? outcome.value : undefined
           const result = storedResult(record.value, latestOutcome)
+          const retryable = taskRecordRetryable(record.value)
 
           return {
             title: "Task Status",
@@ -95,7 +97,12 @@ export const TaskGetTool = Tool.define<typeof parameters, TaskGetMetadata, TaskR
               result,
               "</task_result>",
               ...(record.value.status === "partial"
-                ? ["", "Task is partial and retryable; retry only the missing scope if more evidence is required."]
+                ? [
+                    "",
+                    retryable
+                      ? "Task is partial and retryable; retry only the missing scope if more evidence is required."
+                      : "Task stopped with a structured blocker; get user input or adjust scope before retrying.",
+                  ]
                 : []),
             ].join("\n"),
             metadata: {

@@ -63,14 +63,14 @@ The Phase 5 audit ([`auto-synth-text-2026-05-02.md`](../audit/auto-synth-text-20
   recommend_next?: string,    // suggested follow-up
   open_inbox_item?: boolean,  // default true — leaves a paper trail
 }
-// terminates the current task; coordinator marks the run state `gave_up`
+// terminates the current task; coordinator records a structured non-retryable partial outcome
 ```
 
 **Implementation path**:
 
 - New tool file: `packages/openagt/src/tool/task-give-up.ts`
-- Adds `"gave_up"` to coordinator task state enum ([`coordinator/schema-enums.ts`](../../packages/openagt/src/coordinator/schema-enums.ts)) — distinct from `"failed"`
-- Run-store distinguishes `gave_up` from `failed` in observability; `gave_up` is **not** a failure metric
+- Stores `gave_up` metadata on partial task records instead of adding a new task-state enum.
+- MPACR critic tasks that call `task_give_up` are converted into `"skipped"` verdicts; MPACR review/synthesis tasks become non-retryable partials with an `"ask_user"` verdict.
 
 **When the agent should use it**:
 
@@ -127,10 +127,10 @@ Same prompt → different behavior across effort tiers. Explicit and tunable.
 
 ## Integration with `OPENAGT_AUTONOMOUS_MODE`
 
-When the legacy autonomous prompts are active (`OPENAGT_AUTONOMOUS_MODE=1`):
+When autonomous prompt variants are active (`OPENAGT_AUTONOMOUS_MODE=1`):
 
-- Tools remain registered and callable. The model may still decide to use them despite prompt language.
-- The system prompt does **not** mention them as first-class options. Consistency principle: autonomous mode = old behavior; default mode = new behavior.
+- Tools remain registered and callable.
+- The system prompt still preserves explicit stop conditions for missing prerequisites, user judgment, and risk thresholds. Consistency principle: autonomous mode = stronger initiative; default mode = softer baseline.
 
 ## UX
 
@@ -168,13 +168,14 @@ Q&A resolutions used during implementation:
 - **Q3**: did **not** drop `OPENAGT_ENABLE_QUESTION_TOOL` gate in this commit. `request_context` was _not_ added as a separate tool — the existing `question` tool covers the synchronous-ask case for users who have it enabled.
 - **Q4**: effort-profile coupling deferred — the tools are unconditionally available; per-effort-tier permission/visibility tuning is a follow-up.
 - **Q5**: `task_give_up.open_inbox_item` defaults to `true` (paper trail).
-- **Q6**: did **not** add `gave_up` to coordinator task-state enum. `task_give_up` writes an inbox item and returns a structured marker; the coordinator sees normal turn completion. If a distinct task-state value is later useful, it can be added incrementally without breaking the tool contract.
+- **Q6**: did **not** add `gave_up` to coordinator task-state enum. `task_give_up` writes an inbox item and returns a structured marker. Task/coordinator execution now detects that marker: regular subagent tasks become non-retryable `partial` records with `gave_up` metadata, MPACR critics become `"skipped"` verdicts for quorum accounting, and MPACR review/synthesis tasks produce `"ask_user"` partial verdicts. If a distinct task-state value is later useful, it can be added incrementally without breaking the tool contract.
 
 What shipped:
 
 - ✅ `"agent"` added to `InboxSource` enum
 - ✅ `escalate_to_inbox` tool — registered, typed, audited (0 block in default scan)
 - ✅ `task_give_up` tool — registered, typed, audited
+- ✅ `task_give_up` task/coordinator marker handling — non-retryable partial records plus MPACR skipped/ask_user routing
 - ✅ Tool mention in `default.txt`, `anthropic.txt`, `beast.txt` system prompts
 - ✅ README key-features entry
 - ✅ Permission default: allow (no special gating; settable via existing `OPENAGT_PERMISSION` config)
@@ -183,7 +184,6 @@ What is deferred:
 
 - Effort-profile coupling logic (per-tier visibility / confirmation requirements)
 - Distinct `gave_up` coordinator task state
-- MPACR critic-quorum awareness of give-up
 - Inbox CLI `--reply <text>` flag _(shipped Wave 10, commit ae0f62a9a + 355cd0a28)_
 - Snapshot tests asserting verbatim user-text preservation through the tool path
 - System-prompt mention in non-headline prompts (`gpt.txt`, `gemini.txt`, `kimi.txt`, `codex.txt`, `trinity.txt`, `copilot-gpt-5.txt`)
@@ -191,11 +191,11 @@ What is deferred:
 ## Phase 1 implementation checklist (historical; reference)
 
 1. Add `"agent"` to `personal/schema.ts:69` `InboxSource` enum + sqlite migration if needed.
-2. Add `"gave_up"` to `coordinator/schema-enums.ts` task state enum + migration.
+2. Add `"gave_up"` to `coordinator/schema-enums.ts` task state enum + migration, or use task metadata if enum churn is not needed. Current implementation uses metadata.
 3. New tool files: `tool/escalate-to-inbox.ts`, `tool/task-give-up.ts`. (`tool/request-context.ts` only if Q3 = (b).)
 4. Register in tool registry; ensure default permission policy is applied.
 5. Update default system prompts ([`default.txt`](../../packages/openagt/src/session/prompt/default.txt), [`anthropic.txt`](../../packages/openagt/src/session/prompt/anthropic.txt)) to mention these as first-class options. Re-run `bun run check:prompt-affect` — should still be 0 block.
-6. Coordinator: route `task_give_up` outcomes to `gave_up` state; pipe to existing run-store / SSE.
+6. Coordinator: route `task_give_up` outcomes to non-retryable partial records and MPACR skipped/ask_user verdicts; pipe metadata through existing run-store / SSE.
 7. Inbox CLI: add `--reply <text>` flag to `inbox resolve` if missing. ✅ shipped Wave 10.
 8. Tests: snapshot tests asserting user-supplied `question` / `what` text is preserved verbatim through inbox storage.
 9. Docs: update [README.md](../../README.md) with the three new tools; cross-link this design doc.

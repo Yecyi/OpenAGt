@@ -33,17 +33,17 @@ Technical documentation:
 
 This comparison is based on the public OpenCode repository and README, not branding alone.
 
-| Topic                     | OpenCode                                                                                      | OpenAGt                                                                                                                                                                                                                                                                           |
-| ------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime center            | Client/server coding agent with a strong TUI emphasis                                         | Backend-first session runtime that can be consumed by CLI, TUI, server, and SDK                                                                                                                                                                                                   |
-| Agent loop                | General coding agent with built-in `build` and `plan` agents plus subagent support            | Session-centric iterative tool loop with task runtime, coordinator graph, and personal-agent primitives                                                                                                                                                                           |
-| Provider strategy         | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK                                                                                                                                                                                      |
-| LSP integration           | Official README highlights out-of-the-box LSP support                                         | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools                                                                                                                                                       |
-| Safety model              | Agent modes and permission prompts are central to the CLI experience                          | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy                                                                                                                                                               |
-| Affect-aware prompts      | Default prompts include strong persistence framing                                            | Prompt corpus is CI-gated against high-affect, affect-instruction, and anti-escape patterns derived from the Anthropic emotion-concepts paper, persona-vectors, and Wiser Human escalation-channel research; legacy autonomous prompts are opt-in via `OPENAGT_AUTONOMOUS_MODE=1` |
-| Orchestration focus       | Terminal-first coding flow with client/server remote-control potential                        | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory                                                                                                                                                                      |
-| Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, JavaScript SDK, and the web/desktop client direction; native mobile clients are not in this line                                                                                                                   |
-| Migration / compatibility | Native source project                                                                         | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration                                                                                                                                                                                                  |
+| Topic                     | OpenCode                                                                                      | OpenAGt                                                                                                                                                                                                                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime center            | Client/server coding agent with a strong TUI emphasis                                         | Backend-first session runtime that can be consumed by CLI, TUI, server, and SDK                                                                                                                                                                                                      |
+| Agent loop                | General coding agent with built-in `build` and `plan` agents plus subagent support            | Session-centric iterative tool loop with task runtime, coordinator graph, and personal-agent primitives                                                                                                                                                                              |
+| Provider strategy         | Explicitly provider-agnostic; official docs call out Claude, OpenAI, Google, and local models | Multi-provider runtime with provider fallback, server exposure, and generated JavaScript SDK                                                                                                                                                                                         |
+| LSP integration           | Official README highlights out-of-the-box LSP support                                         | LSP is integrated as part of the tool runtime and can participate in the same session loop as read/edit/bash/MCP/task tools                                                                                                                                                          |
+| Safety model              | Agent modes and permission prompts are central to the CLI experience                          | Structured approval and safety envelope with `allow/confirm/block`, `shell_safety`, exec policy, and sandbox policy                                                                                                                                                                  |
+| Affect-aware prompts      | Default prompts include strong persistence framing                                            | Prompt corpus is CI-gated against high-affect, affect-instruction, and anti-escape patterns derived from the Anthropic emotion-concepts paper, persona-vectors, and Wiser Human escalation-channel research; stronger autonomous variants are opt-in via `OPENAGT_AUTONOMOUS_MODE=1` |
+| Orchestration focus       | Terminal-first coding flow with client/server remote-control potential                        | Coordinator Runtime v1, task graph scheduling, inbox, wakeups, and durable personal/workspace/session memory                                                                                                                                                                         |
+| Frontend surface          | TUI-first, plus desktop app beta in the official project                                      | Stable release currently centers on CLI, TUI, headless server, JavaScript SDK, and the web/desktop client direction; native mobile clients are not in this line                                                                                                                      |
+| Migration / compatibility | Native source project                                                                         | Keeps `opencode` CLI alias and `.opencode` config compatibility during migration                                                                                                                                                                                                     |
 
 ## Affect-aware agent design
 
@@ -57,7 +57,7 @@ OpenAGt's prompt corpus and tool surface are shaped by 2024–2026 LLM-behavior 
 
 - **Stop affordances.** The runtime ships two tools — [`escalate_to_inbox`](packages/openagt/src/tool/escalate-to-inbox.ts) (write a question or blocker to the user's inbox, optionally pause) and [`task_give_up`](packages/openagt/src/tool/task-give-up.ts) (terminate with a structured reason + recommended next step + paper-trail inbox item). These give the model legitimate alternatives to pushing past a real blocker, which is the deepest application-layer leverage per the persona-vectors "vaccine" mechanism: providing the affordance the model would otherwise have to invent removes the self-pressure that drives misalignment.
 
-- **Autonomous-mode opt-in.** The legacy autonomous prompts (`beast.txt`, `copilot-gpt-5.txt`) are preserved byte-for-byte under `*-autonomous.txt` and selectable via `OPENAGT_AUTONOMOUS_MODE=1` (alias `OPENCODE_AUTONOMOUS_MODE`). Default behavior is the softened variant; users who want the old grind can opt back in explicitly with their eyes open.
+- **Autonomous-mode opt-in.** Stronger autonomous variants (`beast-autonomous.txt`, `copilot-gpt-5-autonomous.txt`) are selectable via `OPENAGT_AUTONOMOUS_MODE=1` (alias `OPENCODE_AUTONOMOUS_MODE`). They preserve the initiative-oriented behavior while keeping explicit stopping conditions for missing prerequisites, judgment calls, and risk thresholds.
 
 - **Behavior audit stream.** A unified `behavior.*` event family (tool calls, permission decisions, memory injections, sub-agent dispatch, file touches) with consistent correlation IDs lets a single observer reconstruct what the agent actually did, independent of the model's stated reasoning — the CoT-faithfulness research shows reasoning trace is only 25–39% accurate on misaligned hints, so action-level audit is the only reliable signal. In-memory by default; persisted to the event ring buffer with `OPENAGT_BEHAVIOR_AUDIT=1`. See [docs/audit/behavior-stream.md](docs/audit/behavior-stream.md).
 
@@ -116,7 +116,7 @@ The current stable runtime is centered around these backend capabilities:
 | Stop affordances                | `escalate_to_inbox` and `task_give_up` tools shipped; mentioned in default system prompts for all model families |
 | Debug doctor / repro bundle     | stable diagnostics surface in v1.16                                                                              |
 | Release verification automation | `bun run verify:v1.21`                                                                                           |
-| Native mobile frontend          | not in scope; desktop/web client direction is Electron + React                               |
+| Native mobile frontend          | not in scope; desktop/web client direction is Electron + React                                                   |
 
 ## Key Features
 
@@ -286,15 +286,15 @@ Shell permission requests also expose structured `shell_safety` metadata.
 
 ## Repository Structure
 
-| Path                       | Purpose                                                             |
-| -------------------------- | ------------------------------------------------------------------- |
-| `packages/openagt`         | Core runtime, CLI, server, tools, session engine                    |
-| `packages/app`             | Solid/Vite web client                                               |
-| `packages/sdk/js`          | Generated JavaScript SDK                                            |
-| `packages/console/*`       | Console and control-plane packages                                  |
-| `packages/opencode`        | Compatibility leftovers, not the main runtime                       |
-| `.opencode/`               | Local examples for agents, commands, plugins, skills, tools, themes |
-| `docs/`                    | Release docs, install docs, technical notes                         |
+| Path                 | Purpose                                                             |
+| -------------------- | ------------------------------------------------------------------- |
+| `packages/openagt`   | Core runtime, CLI, server, tools, session engine                    |
+| `packages/app`       | Solid/Vite web client                                               |
+| `packages/sdk/js`    | Generated JavaScript SDK                                            |
+| `packages/console/*` | Console and control-plane packages                                  |
+| `packages/opencode`  | Compatibility leftovers, not the main runtime                       |
+| `.opencode/`         | Local examples for agents, commands, plugins, skills, tools, themes |
+| `docs/`              | Release docs, install docs, technical notes                         |
 
 ## Compatibility
 
@@ -357,22 +357,22 @@ bun run verify:v1.21
 
 Useful runtime variables:
 
-| Variable                         | Purpose                                                                                                                                                                                         |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OPENAGT_CONFIG`                 | Use a specific config file                                                                                                                                                                      |
-| `OPENAGT_CONFIG_DIR`             | Add an explicit config directory                                                                                                                                                                |
-| `OPENAGT_CONFIG_CONTENT`         | Inject config content directly                                                                                                                                                                  |
-| `OPENAGT_DISABLE_PROJECT_CONFIG` | Ignore project-local config discovery                                                                                                                                                           |
-| `OPENAGT_SERVER_PASSWORD`        | Protect `serve` / `web` server endpoints                                                                                                                                                        |
-| `OPENAGT_SERVER_USERNAME`        | Basic auth username for the server                                                                                                                                                              |
-| `OPENAGT_PERMISSION`             | Inject permission rules via env                                                                                                                                                                 |
-| `OPENAGT_PURE`                   | Disable external plugins                                                                                                                                                                        |
-| `OPENAGT_EXPERIMENTAL`           | Enable experimental feature bundle                                                                                                                                                              |
-| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling                                                                                                                                                               |
-| `OPENAGT_AUTONOMOUS_MODE`        | Restore legacy "beast" / "copilot" autonomous prompts (closes the escalation affordance — opt in only when you understand the trade-off; see `docs/audit/prompt-affect-baseline-2026-05-02.md`) |
-| `OPENAGT_BEHAVIOR_AUDIT`         | Persist `behavior.*` events to the disk-backed ring buffer (in-memory by default; see `docs/audit/behavior-stream.md`)                                                                          |
-| `OPENAGT_EXPERIMENTAL_AUTO_FORK` | Fork to a clean subagent with a handoff brief once a session crosses 75% context, instead of aggressive in-session full-compaction. Schema declared; runtime fork path is in development        |
-| `OPENAGT_DB`                     | Override database path                                                                                                                                                                          |
+| Variable                         | Purpose                                                                                                                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENAGT_CONFIG`                 | Use a specific config file                                                                                                                                                               |
+| `OPENAGT_CONFIG_DIR`             | Add an explicit config directory                                                                                                                                                         |
+| `OPENAGT_CONFIG_CONTENT`         | Inject config content directly                                                                                                                                                           |
+| `OPENAGT_DISABLE_PROJECT_CONFIG` | Ignore project-local config discovery                                                                                                                                                    |
+| `OPENAGT_SERVER_PASSWORD`        | Protect `serve` / `web` server endpoints                                                                                                                                                 |
+| `OPENAGT_SERVER_USERNAME`        | Basic auth username for the server                                                                                                                                                       |
+| `OPENAGT_PERMISSION`             | Inject permission rules via env                                                                                                                                                          |
+| `OPENAGT_PURE`                   | Disable external plugins                                                                                                                                                                 |
+| `OPENAGT_EXPERIMENTAL`           | Enable experimental feature bundle                                                                                                                                                       |
+| `OPENAGT_EXPERIMENTAL_PLAN_MODE` | Enable plan-mode-specific tooling                                                                                                                                                        |
+| `OPENAGT_AUTONOMOUS_MODE`        | Use stronger "beast" / "copilot" autonomous prompt variants while keeping explicit stop-affordance language; see `docs/audit/prompt-affect-baseline-2026-05-02.md`                       |
+| `OPENAGT_BEHAVIOR_AUDIT`         | Persist `behavior.*` events to the disk-backed ring buffer (in-memory by default; see `docs/audit/behavior-stream.md`)                                                                   |
+| `OPENAGT_EXPERIMENTAL_AUTO_FORK` | Fork to a clean subagent with a handoff brief once a session crosses 75% context, instead of aggressive in-session full-compaction. Schema declared; runtime fork path is in development |
+| `OPENAGT_DB`                     | Override database path                                                                                                                                                                   |
 
 ## Extending OpenAGt
 

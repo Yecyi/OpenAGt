@@ -16,11 +16,13 @@ import {
   assistantText,
   formatCompletedOutput,
   formatFailedOutput,
+  formatGiveUpPartialOutput,
   formatPendingOutput,
   formatStepBudgetPartialOutput,
   formatStoredRecordOutput,
   formatTimeoutPartialOutput,
   limitReason,
+  taskGiveUpOutcome,
   taskPartialSummary,
   type TaskMetadata,
 } from "./task-output"
@@ -387,6 +389,28 @@ export const TaskTool = Tool.define(
             }
 
             const completedMessage = result.message
+            const giveUpOutcome = taskGiveUpOutcome(completedMessage)
+            if (giveUpOutcome) {
+              yield* tasks.partial({
+                taskID: nextSession.id,
+                parentSessionID: ctx.sessionID,
+                result: completedMessage,
+                reason: "task_give_up",
+                retryable: false,
+                remainingScope: params.acceptance_checks ??
+                  params.read_scope ??
+                  params.write_scope ?? [params.description],
+                metadata: {
+                  gave_up: true,
+                  give_up_reason: giveUpOutcome.reason,
+                  inbox_id: giveUpOutcome.inboxId,
+                  recommend_next: giveUpOutcome.recommendNext,
+                },
+              })
+
+              return formatGiveUpPartialOutput(params, target, giveUpOutcome)
+            }
+
             const maxStepReason = limitReason(completedMessage)
             if (maxStepReason) {
               yield* tasks.partial({
