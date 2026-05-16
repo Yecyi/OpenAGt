@@ -7,10 +7,14 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 const HELPER_PROTOCOL_VERSION: u32 = 1;
-const SETUP_VERSION: &str = "1";
+const SETUP_VERSION: &str = "2";
 const ACL_APPLY_MODE_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_APPLY_ACL";
 const ADMIN_GATE_REPORT_ENV: &str = "OPENAGT_SANDBOX_WINDOWS_ADMIN_GATE_REPORT";
-const SETUP_PROVIDER_DATA: &[u8] = b"openagt-windows-sandbox-setup-v1";
+const SETUP_PROVIDER_DATA: &[u8] = b"openagt-windows-sandbox-setup-v2-loopback";
+#[cfg(windows)]
+const OPENAGT_NETWORK_NONE_SID: &str = "S-1-5-21-3982884702-1351317600-1941531470-11701";
+#[cfg(windows)]
+const OPENAGT_NETWORK_LOOPBACK_SID: &str = "S-1-5-21-3982884702-1351317600-1941531470-11702";
 
 #[cfg(windows)]
 const OPENAGT_WFP_PROVIDER_KEY: windows_sys::core::GUID =
@@ -30,6 +34,52 @@ const OPENAGT_WFP_INBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
 #[cfg(windows)]
 const OPENAGT_WFP_INBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
     windows_sys::core::GUID::from_u128(0xaaa2eb49_c0dc_4c43_97d7_269c50fc9717);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xc8c1730a_bcf8_4805_8f46_9e8442a1041f);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x46434b88_b28d_4067_9cb6_1c743f478b14);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x5cab32cb_a705_4c0e_b988_9213bfb8cbd5);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xff345843_8b72_4a1d_b774_16ddfbe651bc);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xce2c6cb5_14a7_453d_8436_f2783ba41925);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0x4f29531f_7490_441e_8033_48bc00907d1a);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V4_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xef1e06c3_a975_4734_847c_d9ea16ad5d18);
+#[cfg(windows)]
+const OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V6_FILTER_KEY: windows_sys::core::GUID =
+    windows_sys::core::GUID::from_u128(0xb54f7d68_4935_4822_8df0_e62c8e320784);
+
+#[cfg(windows)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WfpFilterAction {
+    Permit,
+    Block,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WfpAddressScope {
+    Any,
+    LoopbackV4,
+    LoopbackV6,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WfpPolicySid {
+    None,
+    Loopback,
+}
 
 #[cfg(windows)]
 #[derive(Clone, Copy)]
@@ -37,6 +87,9 @@ struct WfpFilterSpec {
     key: windows_sys::core::GUID,
     layer: windows_sys::core::GUID,
     description: &'static str,
+    action: WfpFilterAction,
+    address_scope: WfpAddressScope,
+    policy_sid: WfpPolicySid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -236,6 +289,14 @@ struct WfpSetupState {
     outbound_v6_filter_installed: bool,
     inbound_v4_filter_installed: bool,
     inbound_v6_filter_installed: bool,
+    loopback_allow_outbound_v4_filter_installed: bool,
+    loopback_allow_outbound_v6_filter_installed: bool,
+    loopback_allow_inbound_v4_filter_installed: bool,
+    loopback_allow_inbound_v6_filter_installed: bool,
+    loopback_block_outbound_v4_filter_installed: bool,
+    loopback_block_outbound_v6_filter_installed: bool,
+    loopback_block_inbound_v4_filter_installed: bool,
+    loopback_block_inbound_v6_filter_installed: bool,
     setup_version: String,
     reason: Option<String>,
 }
@@ -249,6 +310,14 @@ impl WfpSetupState {
             && self.outbound_v6_filter_installed
             && self.inbound_v4_filter_installed
             && self.inbound_v6_filter_installed
+            && self.loopback_allow_outbound_v4_filter_installed
+            && self.loopback_allow_outbound_v6_filter_installed
+            && self.loopback_allow_inbound_v4_filter_installed
+            && self.loopback_allow_inbound_v6_filter_installed
+            && self.loopback_block_outbound_v4_filter_installed
+            && self.loopback_block_outbound_v6_filter_installed
+            && self.loopback_block_inbound_v4_filter_installed
+            && self.loopback_block_inbound_v6_filter_installed
             && self.setup_version == SETUP_VERSION
     }
 
@@ -269,10 +338,38 @@ impl WfpSetupState {
     }
 
     fn enforced_policies(&self) -> Vec<String> {
-        if self.installed() {
-            return vec!["none".to_string()];
+        if self.setup_version != SETUP_VERSION
+            || !self.engine_available
+            || !self.provider_installed
+            || !self.sublayer_installed
+        {
+            return Vec::new();
         }
-        Vec::new()
+        [
+            (self.none_filters_installed()).then_some("none".to_string()),
+            (self.loopback_filters_installed()).then_some("loopback".to_string()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    fn none_filters_installed(&self) -> bool {
+        self.outbound_v4_filter_installed
+            && self.outbound_v6_filter_installed
+            && self.inbound_v4_filter_installed
+            && self.inbound_v6_filter_installed
+    }
+
+    fn loopback_filters_installed(&self) -> bool {
+        self.loopback_allow_outbound_v4_filter_installed
+            && self.loopback_allow_outbound_v6_filter_installed
+            && self.loopback_allow_inbound_v4_filter_installed
+            && self.loopback_allow_inbound_v6_filter_installed
+            && self.loopback_block_outbound_v4_filter_installed
+            && self.loopback_block_outbound_v6_filter_installed
+            && self.loopback_block_inbound_v4_filter_installed
+            && self.loopback_block_inbound_v6_filter_installed
     }
 }
 
@@ -357,6 +454,15 @@ fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
     if value.get("status").and_then(|item| item.as_str()) != Some("passed") {
         return None;
     }
+    if !matches!(
+        value
+            .get("policy")
+            .and_then(|item| item.as_str())
+            .unwrap_or("none"),
+        "none" | "loopback"
+    ) {
+        return None;
+    }
     match value.get("results").and_then(|item| item.as_array()) {
         Some(items) if !items.is_empty() => {}
         _ => return None,
@@ -374,13 +480,19 @@ fn admin_gate_verified_at(path: Option<&str>) -> Option<String> {
         "original_status",
         "install",
         "installed_status",
-        "network_policy_none_proof",
         "restore",
         "restored_status",
     ] {
         if !report_step_passed(setup_evidence.get(field)) {
             return None;
         }
+    }
+    if !report_step_passed(
+        setup_evidence
+            .get("network_policy_proof")
+            .or_else(|| setup_evidence.get("network_policy_none_proof")),
+    ) {
+        return None;
     }
     if setup_evidence
         .get("restored")
@@ -452,11 +564,15 @@ fn probe() -> ProbeOutput {
         Some("path-preflight".to_string()),
         restricted_token_supported.then(|| "restricted-token".to_string()),
         filesystem_enforced.then(|| "filesystem-acl-enforcement".to_string()),
-        wfp.installed().then(|| "wfp-network-none".to_string()),
         Some("setup-status".to_string()),
     ]
     .into_iter()
     .flatten()
+    .chain(
+        wfp.enforced_policies()
+            .into_iter()
+            .map(|policy| format!("wfp-network-{policy}")),
+    )
     .collect::<Vec<_>>();
     ProbeOutput {
         helper_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -484,7 +600,7 @@ fn probe() -> ProbeOutput {
         filesystem_enforced,
         filesystem_reason,
         network_ready: wfp.engine_available,
-        network_enforced: wfp.installed(),
+        network_enforced: !wfp.enforced_policies().is_empty(),
         network_reason: wfp.network_reason(),
         network_policies_enforced: wfp.enforced_policies(),
         admin_verification_required,
@@ -544,6 +660,14 @@ fn wfp_setup_state() -> WfpSetupState {
         outbound_v6_filter_installed: false,
         inbound_v4_filter_installed: false,
         inbound_v6_filter_installed: false,
+        loopback_allow_outbound_v4_filter_installed: false,
+        loopback_allow_outbound_v6_filter_installed: false,
+        loopback_allow_inbound_v4_filter_installed: false,
+        loopback_allow_inbound_v6_filter_installed: false,
+        loopback_block_outbound_v4_filter_installed: false,
+        loopback_block_outbound_v6_filter_installed: false,
+        loopback_block_inbound_v4_filter_installed: false,
+        loopback_block_inbound_v6_filter_installed: false,
         setup_version: "0".to_string(),
         reason: Some("Windows Filtering Platform is only available on Windows".to_string()),
     }
@@ -571,6 +695,14 @@ fn wfp_setup_state() -> WfpSetupState {
             outbound_v6_filter_installed: false,
             inbound_v4_filter_installed: false,
             inbound_v6_filter_installed: false,
+            loopback_allow_outbound_v4_filter_installed: false,
+            loopback_allow_outbound_v6_filter_installed: false,
+            loopback_allow_inbound_v4_filter_installed: false,
+            loopback_allow_inbound_v6_filter_installed: false,
+            loopback_block_outbound_v4_filter_installed: false,
+            loopback_block_outbound_v6_filter_installed: false,
+            loopback_block_inbound_v4_filter_installed: false,
+            loopback_block_inbound_v6_filter_installed: false,
             setup_version: "0".to_string(),
             reason: Some(error),
         },
@@ -578,32 +710,108 @@ fn wfp_setup_state() -> WfpSetupState {
 }
 
 #[cfg(windows)]
-fn wfp_filter_specs() -> [WfpFilterSpec; 4] {
+fn wfp_filter_specs() -> Vec<WfpFilterSpec> {
     use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
         FWPM_LAYER_ALE_AUTH_CONNECT_V4, FWPM_LAYER_ALE_AUTH_CONNECT_V6,
         FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
     };
 
-    [
+    vec![
         WfpFilterSpec {
             key: OPENAGT_WFP_OUTBOUND_V4_FILTER_KEY,
             layer: FWPM_LAYER_ALE_AUTH_CONNECT_V4,
-            description: "OpenAGt block outbound IPv4",
+            description: "OpenAGt block none-policy outbound IPv4",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::None,
         },
         WfpFilterSpec {
             key: OPENAGT_WFP_OUTBOUND_V6_FILTER_KEY,
             layer: FWPM_LAYER_ALE_AUTH_CONNECT_V6,
-            description: "OpenAGt block outbound IPv6",
+            description: "OpenAGt block none-policy outbound IPv6",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::None,
         },
         WfpFilterSpec {
             key: OPENAGT_WFP_INBOUND_V4_FILTER_KEY,
             layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
-            description: "OpenAGt block inbound IPv4",
+            description: "OpenAGt block none-policy inbound IPv4",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::None,
         },
         WfpFilterSpec {
             key: OPENAGT_WFP_INBOUND_V6_FILTER_KEY,
             layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
-            description: "OpenAGt block inbound IPv6",
+            description: "OpenAGt block none-policy inbound IPv6",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::None,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+            description: "OpenAGt allow loopback-policy outbound IPv4 loopback",
+            action: WfpFilterAction::Permit,
+            address_scope: WfpAddressScope::LoopbackV4,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+            description: "OpenAGt allow loopback-policy outbound IPv6 loopback",
+            action: WfpFilterAction::Permit,
+            address_scope: WfpAddressScope::LoopbackV6,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
+            description: "OpenAGt allow loopback-policy inbound IPv4 loopback",
+            action: WfpFilterAction::Permit,
+            address_scope: WfpAddressScope::LoopbackV4,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+            description: "OpenAGt allow loopback-policy inbound IPv6 loopback",
+            action: WfpFilterAction::Permit,
+            address_scope: WfpAddressScope::LoopbackV6,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+            description: "OpenAGt block loopback-policy outbound IPv4 non-loopback",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+            description: "OpenAGt block loopback-policy outbound IPv6 non-loopback",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V4_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
+            description: "OpenAGt block loopback-policy inbound IPv4 non-loopback",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::Loopback,
+        },
+        WfpFilterSpec {
+            key: OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V6_FILTER_KEY,
+            layer: FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+            description: "OpenAGt block loopback-policy inbound IPv6 non-loopback",
+            action: WfpFilterAction::Block,
+            address_scope: WfpAddressScope::Any,
+            policy_sid: WfpPolicySid::Loopback,
         },
     ]
 }
@@ -656,6 +864,22 @@ fn query_wfp_setup_state() -> Result<WfpSetupState, String> {
         wfp_filter_installed(&engine, &OPENAGT_WFP_INBOUND_V4_FILTER_KEY)?;
     let inbound_v6_filter_installed =
         wfp_filter_installed(&engine, &OPENAGT_WFP_INBOUND_V6_FILTER_KEY)?;
+    let loopback_allow_outbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V4_FILTER_KEY)?;
+    let loopback_allow_outbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_ALLOW_OUTBOUND_V6_FILTER_KEY)?;
+    let loopback_allow_inbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V4_FILTER_KEY)?;
+    let loopback_allow_inbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_ALLOW_INBOUND_V6_FILTER_KEY)?;
+    let loopback_block_outbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V4_FILTER_KEY)?;
+    let loopback_block_outbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_BLOCK_OUTBOUND_V6_FILTER_KEY)?;
+    let loopback_block_inbound_v4_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V4_FILTER_KEY)?;
+    let loopback_block_inbound_v6_filter_installed =
+        wfp_filter_installed(&engine, &OPENAGT_WFP_LOOPBACK_BLOCK_INBOUND_V6_FILTER_KEY)?;
     let state = WfpSetupState {
         engine_available: true,
         provider_installed: provider.0,
@@ -664,6 +888,14 @@ fn query_wfp_setup_state() -> Result<WfpSetupState, String> {
         outbound_v6_filter_installed,
         inbound_v4_filter_installed,
         inbound_v6_filter_installed,
+        loopback_allow_outbound_v4_filter_installed,
+        loopback_allow_outbound_v6_filter_installed,
+        loopback_allow_inbound_v4_filter_installed,
+        loopback_allow_inbound_v6_filter_installed,
+        loopback_block_outbound_v4_filter_installed,
+        loopback_block_outbound_v6_filter_installed,
+        loopback_block_inbound_v4_filter_installed,
+        loopback_block_inbound_v6_filter_installed,
         setup_version: provider.1,
         reason: None,
     };
@@ -685,6 +917,22 @@ fn wfp_missing_reason(state: &WfpSetupState) -> String {
         (!state.outbound_v6_filter_installed).then_some("outbound_v6_filter"),
         (!state.inbound_v4_filter_installed).then_some("inbound_v4_filter"),
         (!state.inbound_v6_filter_installed).then_some("inbound_v6_filter"),
+        (!state.loopback_allow_outbound_v4_filter_installed)
+            .then_some("loopback_allow_outbound_v4_filter"),
+        (!state.loopback_allow_outbound_v6_filter_installed)
+            .then_some("loopback_allow_outbound_v6_filter"),
+        (!state.loopback_allow_inbound_v4_filter_installed)
+            .then_some("loopback_allow_inbound_v4_filter"),
+        (!state.loopback_allow_inbound_v6_filter_installed)
+            .then_some("loopback_allow_inbound_v6_filter"),
+        (!state.loopback_block_outbound_v4_filter_installed)
+            .then_some("loopback_block_outbound_v4_filter"),
+        (!state.loopback_block_outbound_v6_filter_installed)
+            .then_some("loopback_block_outbound_v6_filter"),
+        (!state.loopback_block_inbound_v4_filter_installed)
+            .then_some("loopback_block_inbound_v4_filter"),
+        (!state.loopback_block_inbound_v6_filter_installed)
+            .then_some("loopback_block_inbound_v6_filter"),
         (state.setup_version != SETUP_VERSION).then_some("version"),
     ]
     .into_iter()
@@ -935,18 +1183,27 @@ fn add_wfp_sublayer(engine: &WfpEngine) -> Result<(), String> {
 fn add_wfp_filter(engine: &WfpEngine, spec: WfpFilterSpec) -> Result<(), String> {
     use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
         FwpmFilterAdd0, FWPM_ACTION0, FWPM_ACTION0_0, FWPM_CONDITION_ALE_USER_ID,
+        FWPM_CONDITION_IP_REMOTE_ADDRESS_V4, FWPM_CONDITION_IP_REMOTE_ADDRESS_V6,
         FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER0_0, FWPM_FILTER_CONDITION0,
-        FWPM_FILTER_FLAG_PERSISTENT, FWP_ACTION_BLOCK, FWP_BYTE_BLOB, FWP_CONDITION_VALUE0,
-        FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL, FWP_SECURITY_DESCRIPTOR_TYPE, FWP_UINT8,
-        FWP_VALUE0, FWP_VALUE0_0,
+        FWPM_FILTER_FLAG_PERSISTENT, FWP_ACTION_BLOCK, FWP_ACTION_PERMIT, FWP_BYTE_BLOB,
+        FWP_CONDITION_VALUE0, FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL,
+        FWP_SECURITY_DESCRIPTOR_TYPE, FWP_UINT8, FWP_V4_ADDR_AND_MASK, FWP_V4_ADDR_MASK,
+        FWP_V6_ADDR_AND_MASK, FWP_V6_ADDR_MASK, FWP_VALUE0, FWP_VALUE0_0,
     };
 
     let mut name = wide_null(spec.description);
-    let mut description =
-        wide_null("Blocks network for OpenAGt restricted-token sandbox processes");
+    let mut description = wide_null("Applies network policy for OpenAGt sandbox processes");
     let mut provider_key = OPENAGT_WFP_PROVIDER_KEY;
-    let user_condition = WfpUserMatchCondition::for_restricted_code()?;
-    let mut condition = FWPM_FILTER_CONDITION0 {
+    let user_condition = WfpUserMatchCondition::for_policy(spec.policy_sid)?;
+    let mut v4_loopback = FWP_V4_ADDR_AND_MASK {
+        addr: 0x7f00_0000,
+        mask: 0xff00_0000,
+    };
+    let mut v6_loopback = FWP_V6_ADDR_AND_MASK {
+        addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        prefixLength: 128,
+    };
+    let mut conditions = vec![FWPM_FILTER_CONDITION0 {
         fieldKey: FWPM_CONDITION_ALE_USER_ID,
         matchType: FWP_MATCH_EQUAL,
         conditionValue: FWP_CONDITION_VALUE0 {
@@ -955,7 +1212,31 @@ fn add_wfp_filter(engine: &WfpEngine, spec: WfpFilterSpec) -> Result<(), String>
                 sd: &user_condition.blob as *const _ as *mut _,
             },
         },
-    };
+    }];
+    if spec.address_scope == WfpAddressScope::LoopbackV4 {
+        conditions.push(FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_IP_REMOTE_ADDRESS_V4,
+            matchType: FWP_MATCH_EQUAL,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_V4_ADDR_MASK,
+                Anonymous: FWP_CONDITION_VALUE0_0 {
+                    v4AddrMask: &mut v4_loopback,
+                },
+            },
+        });
+    }
+    if spec.address_scope == WfpAddressScope::LoopbackV6 {
+        conditions.push(FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_IP_REMOTE_ADDRESS_V6,
+            matchType: FWP_MATCH_EQUAL,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_V6_ADDR_MASK,
+                Anonymous: FWP_CONDITION_VALUE0_0 {
+                    v6AddrMask: &mut v6_loopback,
+                },
+            },
+        });
+    }
     let filter = FWPM_FILTER0 {
         filterKey: spec.key,
         displayData: FWPM_DISPLAY_DATA0 {
@@ -972,12 +1253,22 @@ fn add_wfp_filter(engine: &WfpEngine, spec: WfpFilterSpec) -> Result<(), String>
         subLayerKey: OPENAGT_WFP_SUBLAYER_KEY,
         weight: FWP_VALUE0 {
             r#type: FWP_UINT8,
-            Anonymous: FWP_VALUE0_0 { uint8: 15 },
+            Anonymous: FWP_VALUE0_0 {
+                uint8: if spec.action == WfpFilterAction::Permit {
+                    16
+                } else {
+                    15
+                },
+            },
         },
-        numFilterConditions: 1,
-        filterCondition: &mut condition,
+        numFilterConditions: conditions.len() as u32,
+        filterCondition: conditions.as_mut_ptr(),
         action: FWPM_ACTION0 {
-            r#type: FWP_ACTION_BLOCK,
+            r#type: if spec.action == WfpFilterAction::Permit {
+                FWP_ACTION_PERMIT
+            } else {
+                FWP_ACTION_BLOCK
+            },
             Anonymous: unsafe { std::mem::zeroed::<FWPM_ACTION0_0>() },
         },
         Anonymous: FWPM_FILTER0_0 { rawContext: 0 },
@@ -1009,7 +1300,11 @@ struct WfpUserMatchCondition {
 
 #[cfg(windows)]
 impl WfpUserMatchCondition {
-    fn for_restricted_code() -> Result<Self, String> {
+    fn for_policy(policy: WfpPolicySid) -> Result<Self, String> {
+        Self::for_sid(&network_policy_sid(policy)?)
+    }
+
+    fn for_sid(sid: &[u8]) -> Result<Self, String> {
         use std::ptr::{null, null_mut};
         use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
         use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
@@ -1021,7 +1316,6 @@ impl WfpUserMatchCondition {
         };
         use windows_sys::Win32::Security::PSECURITY_DESCRIPTOR;
 
-        let restricted_sid = restricted_code_sid()?;
         let access = EXPLICIT_ACCESS_W {
             grfAccessPermissions: FWP_ACTRL_MATCH_FILTER,
             grfAccessMode: GRANT_ACCESS,
@@ -1031,7 +1325,7 @@ impl WfpUserMatchCondition {
                 MultipleTrusteeOperation: NO_MULTIPLE_TRUSTEE,
                 TrusteeForm: TRUSTEE_IS_SID,
                 TrusteeType: TRUSTEE_IS_UNKNOWN,
-                ptstrName: restricted_sid.as_ptr() as *mut u16,
+                ptstrName: sid.as_ptr() as *mut u16,
             },
         };
 
@@ -1301,6 +1595,35 @@ fn restricted_code_sid() -> Result<Vec<u8>, String> {
     }
     sid.truncate(sid_len as usize);
     Ok(sid)
+}
+
+#[cfg(windows)]
+fn network_policy_sid(policy: WfpPolicySid) -> Result<Vec<u8>, String> {
+    string_sid_to_bytes(match policy {
+        WfpPolicySid::None => OPENAGT_NETWORK_NONE_SID,
+        WfpPolicySid::Loopback => OPENAGT_NETWORK_LOOPBACK_SID,
+    })
+}
+
+#[cfg(windows)]
+fn string_sid_to_bytes(input: &str) -> Result<Vec<u8>, String> {
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::ConvertStringSidToSidW;
+    use windows_sys::Win32::Security::GetLengthSid;
+
+    unsafe {
+        let mut sid = std::ptr::null_mut();
+        if ConvertStringSidToSidW(wide_null(input).as_ptr(), &mut sid) == 0 {
+            return Err(format!(
+                "ConvertStringSidToSidW failed for {input}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let bytes =
+            std::slice::from_raw_parts(sid as *const u8, GetLengthSid(sid) as usize).to_vec();
+        LocalFree(sid.cast());
+        Ok(bytes)
+    }
 }
 
 #[cfg(windows)]
@@ -1861,11 +2184,11 @@ fn exec_output(
     stderr: Vec<u8>,
     filesystem_enforced: bool,
 ) -> ExecOutput {
-    let network_enforced = request.network_policy == "none"
+    let network_enforced = request.network_policy != "full"
         && wfp_setup_state()
             .enforced_policies()
             .iter()
-            .any(|item| item == "none");
+            .any(|item| item == &request.network_policy);
     let enforced = filesystem_enforced || network_enforced;
     ExecOutput {
         request_id: request.request_id.clone(),
@@ -2071,7 +2394,8 @@ fn spawn_restricted_process(request: &ExecRequest) -> Result<RestrictedProcess, 
                 std::io::Error::last_os_error()
             ));
         }
-        let restricted_token = create_restricted_token(OwnedHandle(restricted_token))?;
+        let restricted_token =
+            create_restricted_token(OwnedHandle(restricted_token), &request.network_policy)?;
 
         let mut security = SECURITY_ATTRIBUTES {
             nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -2129,7 +2453,10 @@ fn spawn_restricted_process(request: &ExecRequest) -> Result<RestrictedProcess, 
 }
 
 #[cfg(windows)]
-fn create_restricted_token(token: OwnedHandle) -> Result<OwnedHandle, String> {
+fn create_restricted_token(
+    token: OwnedHandle,
+    network_policy: &str,
+) -> Result<OwnedHandle, String> {
     use windows_sys::Win32::Security::{
         CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, LUID_AND_ATTRIBUTES, SID_AND_ATTRIBUTES,
     };
@@ -2138,10 +2465,24 @@ fn create_restricted_token(token: OwnedHandle) -> Result<OwnedHandle, String> {
     unsafe {
         let mut restricted = 0;
         let restricted_sid = restricted_code_sid()?;
-        let restricted_sids = [SID_AND_ATTRIBUTES {
-            Sid: restricted_sid.as_ptr() as _,
-            Attributes: SE_GROUP_ENABLED,
-        }];
+        let policy_sid = match network_policy {
+            "none" => Some(network_policy_sid(WfpPolicySid::None)?),
+            "loopback" => Some(network_policy_sid(WfpPolicySid::Loopback)?),
+            _ => None,
+        };
+        let restricted_sids = [
+            Some(SID_AND_ATTRIBUTES {
+                Sid: restricted_sid.as_ptr() as _,
+                Attributes: SE_GROUP_ENABLED,
+            }),
+            policy_sid.as_ref().map(|sid| SID_AND_ATTRIBUTES {
+                Sid: sid.as_ptr() as _,
+                Attributes: SE_GROUP_ENABLED,
+            }),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
         if CreateRestrictedToken(
             token.0,
             DISABLE_MAX_PRIVILEGE,
@@ -2824,7 +3165,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn wfp_user_match_condition_uses_security_descriptor_blob() {
-        let condition = super::WfpUserMatchCondition::for_restricted_code().unwrap();
+        let condition =
+            super::WfpUserMatchCondition::for_policy(super::WfpPolicySid::None).unwrap();
 
         assert!(condition.blob.size > 0);
         assert!(!condition.blob.data.is_null());
@@ -2876,56 +3218,55 @@ mod tests {
         let _ = fs::remove_dir_all(dir);
     }
 
-    #[test]
-    fn wfp_setup_state_only_enforces_none_when_complete() {
-        let missing = super::WfpSetupState {
+    fn wfp_setup_state(
+        setup_version: &str,
+        none_filters_installed: bool,
+        loopback_filters_installed: bool,
+    ) -> super::WfpSetupState {
+        super::WfpSetupState {
             engine_available: true,
             provider_installed: true,
             sublayer_installed: true,
-            outbound_v4_filter_installed: true,
-            outbound_v6_filter_installed: true,
-            inbound_v4_filter_installed: true,
-            inbound_v6_filter_installed: false,
-            setup_version: super::SETUP_VERSION.to_string(),
+            outbound_v4_filter_installed: none_filters_installed,
+            outbound_v6_filter_installed: none_filters_installed,
+            inbound_v4_filter_installed: none_filters_installed,
+            inbound_v6_filter_installed: none_filters_installed,
+            loopback_allow_outbound_v4_filter_installed: loopback_filters_installed,
+            loopback_allow_outbound_v6_filter_installed: loopback_filters_installed,
+            loopback_allow_inbound_v4_filter_installed: loopback_filters_installed,
+            loopback_allow_inbound_v6_filter_installed: loopback_filters_installed,
+            loopback_block_outbound_v4_filter_installed: loopback_filters_installed,
+            loopback_block_outbound_v6_filter_installed: loopback_filters_installed,
+            loopback_block_inbound_v4_filter_installed: loopback_filters_installed,
+            loopback_block_inbound_v6_filter_installed: loopback_filters_installed,
+            setup_version: setup_version.to_string(),
             reason: None,
-        };
+        }
+    }
+
+    #[test]
+    fn wfp_setup_state_reports_policy_specific_enforcement() {
+        let missing = wfp_setup_state(super::SETUP_VERSION, true, false);
         assert!(!missing.installed());
         assert!(missing.setup_required());
-        assert!(missing.enforced_policies().is_empty());
+        assert_eq!(missing.enforced_policies(), vec!["none".to_string()]);
 
-        let stale = super::WfpSetupState {
-            inbound_v6_filter_installed: true,
-            setup_version: "0".to_string(),
-            ..missing.clone()
-        };
+        let stale = wfp_setup_state("0", true, true);
         assert!(!stale.installed());
         assert!(stale.enforced_policies().is_empty());
 
-        let complete = super::WfpSetupState {
-            setup_version: super::SETUP_VERSION.to_string(),
-            ..stale
-        };
+        let complete = wfp_setup_state(super::SETUP_VERSION, true, true);
         assert!(complete.installed());
-        assert_eq!(complete.enforced_policies(), vec!["none".to_string()]);
+        assert_eq!(
+            complete.enforced_policies(),
+            vec!["none".to_string(), "loopback".to_string()]
+        );
     }
 
     #[test]
     fn native_readiness_distinguishes_setup_and_admin_gate() {
-        let complete = super::WfpSetupState {
-            engine_available: true,
-            provider_installed: true,
-            sublayer_installed: true,
-            outbound_v4_filter_installed: true,
-            outbound_v6_filter_installed: true,
-            inbound_v4_filter_installed: true,
-            inbound_v6_filter_installed: true,
-            setup_version: super::SETUP_VERSION.to_string(),
-            reason: None,
-        };
-        let missing = super::WfpSetupState {
-            inbound_v6_filter_installed: false,
-            ..complete.clone()
-        };
+        let complete = wfp_setup_state(super::SETUP_VERSION, true, true);
+        let missing = wfp_setup_state(super::SETUP_VERSION, true, false);
 
         assert_eq!(
             super::native_readiness(true, false, &complete, false),
@@ -3044,13 +3385,18 @@ mod tests {
     fn wfp_filter_specs_are_table_driven() {
         let specs = super::wfp_filter_specs();
 
-        assert_eq!(specs.len(), 4);
+        assert_eq!(specs.len(), 12);
         assert!(specs
             .iter()
-            .any(|spec| spec.description.contains("outbound IPv4")));
-        assert!(specs
-            .iter()
-            .any(|spec| spec.description.contains("inbound IPv6")));
+            .any(|spec| spec.description.contains("none-policy outbound IPv4")));
+        assert!(specs.iter().any(|spec| spec
+            .description
+            .contains("loopback-policy outbound IPv4 loopback")
+            && spec.action == super::WfpFilterAction::Permit));
+        assert!(specs.iter().any(|spec| spec
+            .description
+            .contains("loopback-policy inbound IPv6 non-loopback")
+            && spec.action == super::WfpFilterAction::Block));
     }
 
     #[test]
@@ -3058,15 +3404,18 @@ mod tests {
         let probe = super::probe();
         assert_eq!(
             probe.network_enforced,
-            probe
+            !probe.network_policies_enforced.is_empty()
+        );
+        if probe.setup_installed {
+            assert!(probe
                 .network_policies_enforced
                 .iter()
-                .any(|policy| policy == "none")
-        );
-        assert!(!probe
-            .network_policies_enforced
-            .iter()
-            .any(|policy| policy == "loopback"));
+                .any(|policy| policy == "none"));
+            assert!(probe
+                .network_policies_enforced
+                .iter()
+                .any(|policy| policy == "loopback"));
+        }
     }
 
     #[test]
@@ -3155,7 +3504,7 @@ mod tests {
     }
 
     #[test]
-    fn wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect() {
+    fn wfp_setup_allows_full_and_loopback_network_and_blocks_none_policy_loopback_connect() {
         if std::env::var(RUN_WINDOWS_WFP_TESTS_ENV).as_deref() != Ok("1") {
             return;
         }
@@ -3165,6 +3514,7 @@ mod tests {
 
         with_wfp_setup_restored(|| {
             assert!(exec_loopback_connection_attempt("full"));
+            assert!(exec_loopback_connection_attempt("loopback"));
             assert!(!exec_loopback_connection_attempt("none"));
         });
     }

@@ -176,13 +176,13 @@ function adminGateReportValid(windows: SandboxBackendStatus) {
     if (report.schema_version !== 1) return false
     if (report.gate !== "windows_sandbox_admin_execution") return false
     if (report.status !== "passed") return false
-    if (report.policy !== undefined && report.policy !== "none") return false
+    if (report.policy !== undefined && report.policy !== "none" && report.policy !== "loopback") return false
     if (!Array.isArray(report.results) || report.results.length === 0) return false
     if (!report.results.every(reportStepPassed)) return false
     if (!reportStepPassed(setupEvidence.original_status)) return false
     if (!reportStepPassed(setupEvidence.install)) return false
     if (!reportStepPassed(setupEvidence.installed_status)) return false
-    if (!reportStepPassed(setupEvidence.network_policy_none_proof)) return false
+    if (!reportStepPassed(setupEvidence.network_policy_proof ?? setupEvidence.network_policy_none_proof)) return false
     if (!reportStepPassed(setupEvidence.restore)) return false
     if (!reportStepPassed(setupEvidence.restored_status)) return false
     if (setupEvidence.restored !== true) return false
@@ -290,13 +290,13 @@ function actionFor(input: {
   if (input.windows.readiness === "network_policy_unsupported") {
     return {
       kind: "use_supported_network_policy",
-      label: "Use network_policy=none or full; loopback remains deferred.",
+      label: "Use an enforced network policy, or run the elevated loopback admin gate after WFP setup.",
     } satisfies SandboxNextAction
   }
   if (input.sandbox.network_policy === "loopback" && !networkPolicySupported(input.windows, "loopback")) {
     return {
       kind: "use_supported_network_policy",
-      label: "Use network_policy=none or full; loopback remains deferred.",
+      label: "Use network_policy=none or full, or run the elevated loopback admin gate after WFP setup.",
     } satisfies SandboxNextAction
   }
   if (input.windows.available && input.windows.readiness === "ready") {

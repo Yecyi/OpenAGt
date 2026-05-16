@@ -46,6 +46,7 @@ type SetupEvidence = {
   original_status: StepResult
   install: StepResult
   installed_status: StepResult
+  network_policy_proof: StepResult
   network_policy_none_proof: StepResult
   restore_action: "install" | "uninstall"
   restore: StepResult
@@ -232,7 +233,7 @@ async function writeReport(report: AdminGateReport) {
         ? [
             `- Setup restore action: ${report.setup_evidence.restore_action}`,
             `- Setup restored: ${report.setup_evidence.restored ? "yes" : "no"}`,
-            `- Network none proof: ${report.setup_evidence.network_policy_none_proof.status}`,
+            `- Network ${report.policy} proof: ${report.setup_evidence.network_policy_proof.status}`,
           ]
         : []),
       "",
@@ -269,9 +270,7 @@ const preflightFailures = [
   !cargo ? "Rust cargo is required to run the Windows sandbox admin gate." : undefined,
   !preflight.manifest_exists ? `Windows sandbox helper manifest not found: ${manifest}` : undefined,
   helper.status === "failed" ? "Windows sandbox helper probe failed." : undefined,
-  policy !== "none"
-    ? `Windows sandbox admin gate currently supports --policy none only; requested ${policy}.`
-    : undefined,
+  policy === "full" ? "Windows sandbox admin gate validates WFP policies only; use --policy none or loopback." : undefined,
 ].filter((item): item is string => item !== undefined)
 
 if (preflightOnly || preflightFailures.length) {
@@ -318,9 +317,15 @@ const installedStatus = await run(
   helperCommand("setup", "--status", "--json"),
   env,
 )
-const networkPolicyNoneProof = await run(
-  "Windows sandbox WFP network_policy=none execution proof",
-  [cargo, "test", "--manifest-path", manifest, "wfp_setup_allows_full_network_and_blocks_none_policy_loopback_connect"],
+const networkPolicyProof = await run(
+  `Windows sandbox WFP network_policy=${policy} execution proof`,
+  [
+    cargo,
+    "test",
+    "--manifest-path",
+    manifest,
+    "wfp_setup_allows_full_and_loopback_network_and_blocks_none_policy_loopback_connect",
+  ],
   env,
 )
 const restoreAction = setupInstalled(originalStatus) ? "install" : "uninstall"
@@ -338,13 +343,14 @@ const setupEvidence: SetupEvidence = {
   original_status: originalStatus,
   install,
   installed_status: installedStatus,
-  network_policy_none_proof: networkPolicyNoneProof,
+  network_policy_proof: networkPolicyProof,
+  network_policy_none_proof: networkPolicyProof,
   restore_action: restoreAction,
   restore,
   restored_status: restoredStatus,
   restored: setupInstalled(restoredStatus) === setupInstalled(originalStatus),
 }
-const results = [originalStatus, install, installedStatus, networkPolicyNoneProof, restore, restoredStatus]
+const results = [originalStatus, install, installedStatus, networkPolicyProof, restore, restoredStatus]
 
 const report = {
   schema_version: 1,

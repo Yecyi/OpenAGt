@@ -158,8 +158,11 @@ async function verifyWindowsSandboxDefaultOnContract() {
   if (!docs.includes("Default-on Windows OS-native sandbox enforcement remains blocked")) {
     throw new Error("hardening-status must state that Windows native sandbox default-on remains blocked")
   }
-  if (!docs.includes("network_policy=loopback` remains deferred")) {
-    throw new Error("hardening-status must state that network_policy=loopback remains deferred")
+  if (!docs.includes("`network_policy=none` and `network_policy=loopback` capability reporting")) {
+    throw new Error("hardening-status must state that WFP reports none and loopback capabilities")
+  }
+  if (!docs.includes("-- --policy loopback")) {
+    throw new Error("hardening-status must document the loopback admin-only WFP evidence gate")
   }
 }
 

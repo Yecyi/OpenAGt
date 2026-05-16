@@ -27,6 +27,7 @@ function setupEvidence(patch: Record<string, unknown> = {}) {
     original_status: step("Windows sandbox setup status before admin gate"),
     install: step("Windows sandbox setup install"),
     installed_status: step("Windows sandbox setup status after install"),
+    network_policy_proof: step("Windows sandbox WFP network_policy=none execution proof"),
     network_policy_none_proof: step("Windows sandbox WFP network_policy=none execution proof"),
     restore_action: "uninstall",
     restore: step("Windows sandbox setup restore"),
@@ -287,10 +288,10 @@ describe("sandbox status", () => {
     expect(result.default_on_blockers).toContain("admin_gate_missing_or_stale")
   })
 
-  test("non-none admin gate policy report blocks default-on readiness", async () => {
+  test("full admin gate policy report blocks default-on readiness", async () => {
     await using tmp = await tmpdir()
     const report = path.join(tmp.path, "admin-gate-report.json")
-    writeAdminReport(report, { policy: "loopback" })
+    writeAdminReport(report, { policy: "full" })
 
     const result = getWith(
       status({
@@ -392,6 +393,38 @@ describe("sandbox status", () => {
     expect(result.default_on_enabled).toBe(false)
     expect(result.default_on_blockers).toContain("network_loopback_not_enforced")
     expect(result.next_action.kind).toBe("use_supported_network_policy")
+  })
+
+  test("configured loopback policy can satisfy default-on readiness when WFP loopback is enforced", async () => {
+    await using tmp = await tmpdir()
+    const report = path.join(tmp.path, "admin-gate-report.json")
+    writeAdminReport(report, {
+      policy: "loopback",
+      setup_evidence: setupEvidence({
+        network_policy_proof: step("Windows sandbox WFP network_policy=loopback execution proof"),
+      }),
+    })
+
+    const result = getWithConfig(
+      status({
+        available: true,
+        readiness: "ready",
+        admin_gate_report_path: report,
+        network_policies_enforced: ["none", "loopback"],
+      }),
+      {
+        backend: "auto",
+        failure_policy: "closed",
+        windows_acl_apply_mode: "apply",
+        network_policy: "loopback",
+      },
+    )
+
+    expect(result.admin_gate_report_valid).toBe(true)
+    expect(result.config.network_policy).toBe("loopback")
+    expect(result.ready_for_default_on).toBe(true)
+    expect(result.default_on_enabled).toBe(true)
+    expect(result.default_on_blockers).toEqual([])
   })
 
   test("returns parseable status contract", () => {
