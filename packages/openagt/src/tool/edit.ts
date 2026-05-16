@@ -21,8 +21,9 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@openagt/shared/filesystem"
 import { replace, trimDiff } from "./edit-replace"
-import { buildDiagnosticFeedback, buildDiagnosticRepairPlan } from "../lsp/feedback"
+import { buildDiagnosticFeedback, buildDiagnosticRepairPlan, diagnosticRepairPlanFromMetadata } from "../lsp/feedback"
 import { detectEolStyle, type EolStyle } from "@/util/text"
+import type { MessageV2 } from "../session/message-v2"
 export * from "./edit-replace"
 
 const log = Log.create({ service: "tool.edit" })
@@ -47,6 +48,34 @@ function roundTripMetadata(style: EolStyle) {
     round_trip_partial: style === "mixed",
     round_trip_reason: style === "mixed" ? "mixed_eol" : undefined,
   }
+}
+
+function changedLineRange(before: string, after: string) {
+  let line = 1
+  let start: number | undefined
+  let end: number | undefined
+  for (const change of diffLines(before, after)) {
+    const count = change.count ?? change.value.split(/\r\n|\r|\n/).length - 1
+    if (change.added || change.removed) {
+      start = start ?? line
+      end = Math.max(end ?? line, line + Math.max(0, change.added ? count - 1 : 0))
+    }
+    if (!change.removed) line += count
+  }
+  if (start === undefined || end === undefined) return
+  return { start_line: start, end_line: Math.max(start, end) }
+}
+
+function lspRepairAttempts(messages: MessageV2.WithParts[], filePath: string) {
+  const normalized = AppFileSystem.normalizePath(filePath)
+  return messages
+    .flatMap((message) => message.parts)
+    .flatMap((part) => {
+      if (part.type !== "tool" || part.state.status !== "completed") return []
+      return [diagnosticRepairPlanFromMetadata(part.state.metadata?.lsp_repair)]
+    })
+    .filter((plan) => plan?.files.some((file) => AppFileSystem.normalizePath(file) === normalized))
+    .length
 }
 
 const Parameters = z.object({
@@ -221,6 +250,9 @@ export const EditTool = Tool.define(
           const relativeToWorktree = path.relative(Instance.worktree, filePath)
           const lspRepair = buildDiagnosticRepairPlan({
             feedback: lspFeedback,
+            diagnostics: diagnostics[normalizedFilePath] ?? [],
+            changedRange: changedLineRange(contentOld, contentNew),
+            attempt: lspRepairAttempts(ctx.messages, filePath),
             fileInWorkspace: !relativeToWorktree.startsWith("..") && !path.isAbsolute(relativeToWorktree),
           })
           if (lspFeedback.report) output += `\n\nLSP errors detected in this file, please fix:\n${lspFeedback.report}`

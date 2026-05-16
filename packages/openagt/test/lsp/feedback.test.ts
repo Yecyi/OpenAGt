@@ -1,12 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { buildDiagnosticFeedback, buildDiagnosticRepairPlan } from "../../src/lsp/feedback"
+import {
+  buildDiagnosticFeedback,
+  buildDiagnosticRepairPlan,
+  diagnosticRepairPlanFromMetadata,
+  diagnosticRepairReminder,
+} from "../../src/lsp/feedback"
 
-const diagnostic = (severity: 1 | 2 | 3 | 4, message = "diagnostic") => ({
+const diagnostic = (severity: 1 | 2 | 3 | 4, message = "diagnostic", line = 0) => ({
   severity,
   message,
   range: {
-    start: { line: 0, character: 0 },
-    end: { line: 0, character: 1 },
+    start: { line, character: 0 },
+    end: { line, character: 1 },
   },
 })
 
@@ -85,5 +90,44 @@ describe("LSP diagnostic feedback", () => {
     expect(plan.status).toBe("blocked")
     expect(plan.reason).toBe("outside_workspace")
     expect(plan.files).toEqual([])
+  })
+
+  test("blocks repair when diagnostics do not map to the changed range", () => {
+    const feedback = buildDiagnosticFeedback({
+      file: "/repo/src/app.ts",
+      normalizedFile: "/repo/src/app.ts",
+      before: {},
+      after: {
+        "/repo/src/app.ts": [diagnostic(1, "unrelated error", 19)],
+      },
+    })
+
+    const plan = buildDiagnosticRepairPlan({
+      feedback,
+      diagnostics: [diagnostic(1, "unrelated error", 19)],
+      changedRange: { start_line: 1, end_line: 3 },
+      fileInWorkspace: true,
+    })
+
+    expect(plan.status).toBe("blocked")
+    expect(plan.reason).toBe("diagnostic_outside_changed_range")
+  })
+
+  test("builds a bounded repair reminder from metadata", () => {
+    const feedback = buildDiagnosticFeedback({
+      file: "/repo/src/app.ts",
+      normalizedFile: "/repo/src/app.ts",
+      before: {},
+      after: {
+        "/repo/src/app.ts": [diagnostic(1, "new error")],
+      },
+    })
+
+    const plan = buildDiagnosticRepairPlan({ feedback, diagnostics: [diagnostic(1, "new error")] })
+    const parsed = diagnosticRepairPlanFromMetadata(plan)
+
+    expect(parsed?.status).toBe("retry_recommended")
+    expect(diagnosticRepairReminder(parsed)).toContain("<lsp_repair>")
+    expect(diagnosticRepairReminder({ ...plan, status: "blocked", reason: "attempt_limit" })).toBeUndefined()
   })
 })

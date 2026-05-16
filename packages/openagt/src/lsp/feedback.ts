@@ -26,11 +26,23 @@ export type DiagnosticFeedback = {
 
 export type DiagnosticRepairPlan = {
   status: "not_needed" | "retry_recommended" | "blocked"
-  reason: "clean" | "warnings_only" | "outside_workspace" | "attempt_limit" | "has_errors"
+  reason:
+    | "clean"
+    | "warnings_only"
+    | "outside_workspace"
+    | "diagnostic_outside_changed_range"
+    | "attempt_limit"
+    | "has_errors"
   attempt: number
   max_attempts: number
   files: string[]
   diagnostics: DiagnosticCounts
+  changed_range?: LineRange
+}
+
+export type LineRange = {
+  start_line: number
+  end_line: number
 }
 
 const zero = (): DiagnosticCounts => ({
@@ -98,6 +110,8 @@ export function buildDiagnosticFeedback(input: {
 
 export function buildDiagnosticRepairPlan(input: {
   feedback: DiagnosticFeedback
+  diagnostics?: Diagnostic[]
+  changedRange?: LineRange
   attempt?: number
   maxAttempts?: number
   fileInWorkspace?: boolean
@@ -112,6 +126,7 @@ export function buildDiagnosticRepairPlan(input: {
       max_attempts: maxAttempts,
       files: [],
       diagnostics: input.feedback.after,
+      changed_range: input.changedRange,
     }
   }
   if (input.feedback.status === "clean") {
@@ -122,6 +137,7 @@ export function buildDiagnosticRepairPlan(input: {
       max_attempts: maxAttempts,
       files: [],
       diagnostics: input.feedback.after,
+      changed_range: input.changedRange,
     }
   }
   if (input.feedback.status === "has_warnings") {
@@ -132,6 +148,27 @@ export function buildDiagnosticRepairPlan(input: {
       max_attempts: maxAttempts,
       files: [],
       diagnostics: input.feedback.after,
+      changed_range: input.changedRange,
+    }
+  }
+  const errorDiagnostics = (input.diagnostics ?? []).filter((item) => (item.severity ?? 1) === 1)
+  const changedRange = input.changedRange
+  if (
+    changedRange &&
+    errorDiagnostics.length > 0 &&
+    !errorDiagnostics.some((item) => {
+      const line = item.range.start.line + 1
+      return line >= changedRange.start_line && line <= changedRange.end_line
+    })
+  ) {
+    return {
+      status: "blocked",
+      reason: "diagnostic_outside_changed_range",
+      attempt,
+      max_attempts: maxAttempts,
+      files: [input.feedback.file],
+      diagnostics: input.feedback.after,
+      changed_range: input.changedRange,
     }
   }
   if (attempt >= maxAttempts) {
@@ -142,6 +179,7 @@ export function buildDiagnosticRepairPlan(input: {
       max_attempts: maxAttempts,
       files: [input.feedback.file],
       diagnostics: input.feedback.after,
+      changed_range: input.changedRange,
     }
   }
   return {
@@ -151,5 +189,28 @@ export function buildDiagnosticRepairPlan(input: {
     max_attempts: maxAttempts,
     files: [input.feedback.file],
     diagnostics: input.feedback.after,
+    changed_range: input.changedRange,
   }
+}
+
+export function diagnosticRepairPlanFromMetadata(value: unknown): DiagnosticRepairPlan | undefined {
+  if (!value || typeof value !== "object") return
+  const plan = value as Record<string, unknown>
+  if (plan.status !== "not_needed" && plan.status !== "retry_recommended" && plan.status !== "blocked") return
+  if (typeof plan.reason !== "string") return
+  if (typeof plan.attempt !== "number" || typeof plan.max_attempts !== "number") return
+  if (!Array.isArray(plan.files) || !plan.files.every((item) => typeof item === "string")) return
+  if (!plan.diagnostics || typeof plan.diagnostics !== "object") return
+  return plan as DiagnosticRepairPlan
+}
+
+export function diagnosticRepairReminder(plan: DiagnosticRepairPlan | undefined): string | undefined {
+  if (plan?.status !== "retry_recommended") return
+  return [
+    "<lsp_repair>",
+    `A bounded LSP repair retry is available for: ${plan.files.join(", ")}`,
+    `Attempt ${plan.attempt + 1} of ${plan.max_attempts}.`,
+    "Next response should repair only the listed diagnostics or explain why a targeted repair is not possible.",
+    "</lsp_repair>",
+  ].join("\n")
 }

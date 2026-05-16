@@ -15,9 +15,34 @@ import { Instance } from "../project/instance"
 import { Log } from "@/util"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
+import {
+  buildDiagnosticFeedback,
+  buildDiagnosticRepairPlan,
+  diagnosticRepairPlanFromMetadata,
+} from "../lsp/feedback"
+import type { MessageV2 } from "../session/message-v2"
 
 const log = Log.create({ service: "tool.write" })
 const MAX_PROJECT_DIAGNOSTICS_FILES = 5
+
+function lineRangeForContent(content: string) {
+  return {
+    start_line: 1,
+    end_line: Math.max(1, content.split(/\r\n|\r|\n/).length),
+  }
+}
+
+function lspRepairAttempts(messages: MessageV2.WithParts[], filePath: string) {
+  const normalized = AppFileSystem.normalizePath(filePath)
+  return messages
+    .flatMap((message) => message.parts)
+    .flatMap((part) => {
+      if (part.type !== "tool" || part.state.status !== "completed") return []
+      return [diagnosticRepairPlanFromMetadata(part.state.metadata?.lsp_repair)]
+    })
+    .filter((plan) => plan?.files.some((file) => AppFileSystem.normalizePath(file) === normalized))
+    .length
+}
 
 export const WriteTool = Tool.define(
   "write",
@@ -42,6 +67,7 @@ export const WriteTool = Tool.define(
 
           const exists = yield* fs.existsSafe(filepath)
           const contentOld = exists ? yield* fs.readFileString(filepath) : ""
+          const diagnosticsBefore = yield* lsp.diagnostics()
 
           const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
           yield* ctx.ask({
@@ -89,6 +115,20 @@ export const WriteTool = Tool.define(
           yield* lsp.touchFile(filepath, true)
           const diagnostics = yield* lsp.diagnostics()
           const normalizedFilepath = AppFileSystem.normalizePath(filepath)
+          const lspFeedback = buildDiagnosticFeedback({
+            file: filepath,
+            normalizedFile: normalizedFilepath,
+            before: diagnosticsBefore,
+            after: diagnostics,
+          })
+          const relativeToWorktree = path.relative(Instance.worktree, filepath)
+          const lspRepair = buildDiagnosticRepairPlan({
+            feedback: lspFeedback,
+            diagnostics: diagnostics[normalizedFilepath] ?? [],
+            changedRange: lineRangeForContent(params.content),
+            attempt: lspRepairAttempts(ctx.messages, filepath),
+            fileInWorkspace: !relativeToWorktree.startsWith("..") && !path.isAbsolute(relativeToWorktree),
+          })
           let projectDiagnosticsCount = 0
           for (const [file, issues] of Object.entries(diagnostics)) {
             const current = file === normalizedFilepath
@@ -107,6 +147,8 @@ export const WriteTool = Tool.define(
             title: path.relative(Instance.worktree, filepath),
             metadata: {
               diagnostics,
+              lsp_feedback: lspFeedback,
+              lsp_repair: lspRepair,
               filepath,
               exists: exists,
             },

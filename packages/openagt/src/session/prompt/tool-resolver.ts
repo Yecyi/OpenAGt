@@ -19,6 +19,8 @@ import { SessionProcessor } from "../processor"
 import { PartID } from "../schema"
 import { mcpToolOutputParts } from "./mcp-output"
 import { createToolScheduler } from "./tool-resolution"
+import { diagnosticRepairPlanFromMetadata, diagnosticRepairReminder } from "../../lsp/feedback"
+import { addReminder } from "./reminder"
 
 export type PromptToolResolverInput = {
   agent: Agent.Info
@@ -108,6 +110,10 @@ export class PromptToolResolver {
                     { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID, args },
                     output,
                   )
+                  const repairReminder = diagnosticRepairReminder(
+                    diagnosticRepairPlanFromMetadata(output.metadata?.lsp_repair),
+                  )
+                  if (repairReminder) addReminder(repairReminder, 10, String(ctx.sessionID))
                   yield* input.processor.completeToolCall(call.toolCallId, output)
                   return output
                 }),

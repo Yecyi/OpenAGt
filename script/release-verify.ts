@@ -204,6 +204,14 @@ async function verifyRuntimeReliabilityContract() {
       throw new Error(`provider cache diagnostics is missing marker: ${marker}`)
     }
   }
+
+  const lspFeedback = await Bun.file("packages/openagt/src/lsp/feedback.ts").text()
+  const toolResolver = await Bun.file("packages/openagt/src/session/prompt/tool-resolver.ts").text()
+  for (const marker of ["diagnostic_outside_changed_range", "diagnosticRepairReminder", "addReminder(repairReminder"]) {
+    if (!lspFeedback.includes(marker) && !toolResolver.includes(marker)) {
+      throw new Error(`LSP bounded repair hook is missing marker: ${marker}`)
+    }
+  }
 }
 
 async function verifyStorageScalabilityContract() {
@@ -265,6 +273,24 @@ async function verifyStorageScalabilityContract() {
   }
 }
 
+async function verifyHardeningStatusConsistency() {
+  const packageJson = await Bun.file("package.json").json()
+  if (packageJson.scripts?.["verify:runtime-foundation"] !== "bun run script/verify-runtime-foundation.ts") {
+    throw new Error("package.json must expose verify:runtime-foundation")
+  }
+
+  const hardening = await Bun.file("docs/hardening-status.md").text()
+  for (const marker of [
+    "| Edit + LSP feedback loop                      | regression-covered",
+    "| Storage/event snapshots/indexes               | implemented",
+    "| Personal memory SQL pushdown/wakeup claim     | implemented",
+    "Default-on Windows OS-native sandbox enforcement remains blocked",
+    "Grouped runtime foundation gate",
+  ]) {
+    if (!hardening.includes(marker)) throw new Error(`hardening-status is missing marker: ${marker}`)
+  }
+}
+
 const steps = [
   {
     title: "Build SDK",
@@ -313,6 +339,14 @@ const steps = [
   {
     title: "Verify storage scalability contract",
     run: verifyStorageScalabilityContract,
+  },
+  {
+    title: "Verify hardening status consistency",
+    run: verifyHardeningStatusConsistency,
+  },
+  {
+    title: "Verify grouped runtime foundation gate",
+    run: () => $`bun run verify:runtime-foundation`,
   },
   {
     title: "Verify Windows sandbox helper",
