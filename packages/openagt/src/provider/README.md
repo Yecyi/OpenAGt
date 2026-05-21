@@ -302,6 +302,7 @@ const chain = [
 | -------------------------- | ---------- | ------------ |
 | `ANTHROPIC_API_KEY`        | Anthropic  | API Key      |
 | `OPENAI_API_KEY`           | OpenAI     | API Key      |
+| `NEARAI_API_KEY`           | NEAR AI    | API Key      |
 | `GOOGLE_CLOUD_PROJECT`     | Vertex     | GCP 项目     |
 | `GOOGLE_VERTEX_LOCATION`   | Vertex     | 区域         |
 | `AWS_REGION`               | Bedrock    | AWS 区域     |

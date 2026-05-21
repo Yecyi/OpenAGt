@@ -303,6 +303,23 @@ describe("ProviderTransform.options - gpt-5 textVerbosity", () => {
     expect(result.textVerbosity).toBeUndefined()
   })
 
+  test("NEAR AI gpt-5 should not set OpenAI-only reasoning or verbosity options", () => {
+    const model = {
+      ...createGpt5Model("openai/gpt-5"),
+      id: "openai/gpt-5",
+      providerID: "nearai",
+      api: {
+        id: "openai/gpt-5",
+        url: "https://cloud-api.near.ai/v1",
+        npm: "@ai-sdk/openai-compatible",
+      },
+    }
+    const result = ProviderTransform.options({ model, sessionID, providerOptions: {} })
+    expect(result.reasoningEffort).toBeUndefined()
+    expect(result.reasoningSummary).toBeUndefined()
+    expect(result.textVerbosity).toBeUndefined()
+  })
+
   test("gpt-5.2-codex should NOT have textVerbosity set (codex models excluded)", () => {
     const model = createGpt5Model("gpt-5.2-codex")
     const result = ProviderTransform.options({ model, sessionID, providerOptions: {} })
@@ -2026,6 +2043,32 @@ describe("ProviderTransform.message - cache control on gateway", () => {
       },
     })
   })
+
+  test("NEAR AI Claude models do not receive prompt cache controls", () => {
+    const model = createModel({
+      id: "anthropic/claude-sonnet-4-5",
+      providerID: "nearai",
+      api: {
+        id: "anthropic/claude-sonnet-4-5",
+        url: "https://cloud-api.near.ai/v1",
+        npm: "@ai-sdk/openai-compatible",
+      },
+    })
+    const msgs = [
+      {
+        role: "system",
+        content: "You are a helpful assistant",
+      },
+      {
+        role: "user",
+        content: "Hello",
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, model, {}) as any[]
+
+    expect(result[0].providerOptions).toBeUndefined()
+  })
 })
 
 describe("ProviderTransform.variants", () => {
@@ -2573,6 +2616,20 @@ describe("ProviderTransform.variants", () => {
       expect(Object.keys(result)).toEqual(["low", "medium", "high"])
       expect(result.low).toEqual({ reasoningEffort: "low" })
       expect(result.high).toEqual({ reasoningEffort: "high" })
+    })
+
+    test("returns no reasoning variants for NEAR AI", () => {
+      const model = createMockModel({
+        id: "openai/gpt-5",
+        providerID: "nearai",
+        api: {
+          id: "openai/gpt-5",
+          url: "https://cloud-api.near.ai/v1",
+          npm: "@ai-sdk/openai-compatible",
+        },
+      })
+      const result = ProviderTransform.variants(model)
+      expect(result).toEqual({})
     })
   })
 
