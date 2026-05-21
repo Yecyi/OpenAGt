@@ -2050,6 +2050,51 @@ test("models.dev normalization fills required response fields", () => {
   expect(model.release_date).toBe("")
 })
 
+test("models.dev normalization supports NEAR AI Cloud provider metadata", () => {
+  const provider = {
+    id: "nearai",
+    name: "NEAR AI Cloud",
+    api: "https://cloud-api.near.ai/v1",
+    npm: "@ai-sdk/openai-compatible",
+    env: ["NEARAI_API_KEY"],
+    models: {
+      "openai/gpt-5": {
+        id: "openai/gpt-5",
+        name: "GPT-5",
+        family: "gpt",
+        release_date: "2025-08-07",
+        attachment: true,
+        reasoning: true,
+        temperature: false,
+        tool_call: true,
+        modalities: {
+          input: ["text", "image"],
+          output: ["text"],
+        },
+        cost: {
+          input: 1.25,
+          output: 10,
+          cache_read: 0.125,
+        },
+        limit: {
+          context: 400_000,
+          input: 272_000,
+          output: 128_000,
+        },
+      },
+    },
+  } as unknown as ModelsDev.Provider
+
+  const info = Provider.fromModelsDevProvider(provider)
+  const model = info.models["openai/gpt-5"]
+  expect(info.id).toBe(ProviderID.nearai)
+  expect(info.name).toBe("NEAR AI Cloud")
+  expect(info.env).toEqual(["NEARAI_API_KEY"])
+  expect(model.api.url).toBe("https://cloud-api.near.ai/v1")
+  expect(model.api.npm).toBe("@ai-sdk/openai-compatible")
+  expect(model.providerID).toBe(ProviderID.nearai)
+})
+
 test("model variants are generated for reasoning models", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {

@@ -2,6 +2,7 @@
 // It does not transform messages, load providers, or sanitize tool schemas.
 
 import type * as Provider from "./provider"
+import { isNearAI } from "./nearai"
 
 // Maps npm package to the key the AI SDK expects for providerOptions
 export function sdkKey(npm: string): string | undefined {
@@ -119,7 +120,7 @@ export function options(input: {
     result["enable_thinking"] = true
   }
 
-  if (input.model.api.id.includes("gpt-5") && !input.model.api.id.includes("gpt-5-chat")) {
+  if (input.model.api.id.includes("gpt-5") && !input.model.api.id.includes("gpt-5-chat") && !isNearAI(input.model)) {
     if (!input.model.api.id.includes("gpt-5-pro")) {
       result["reasoningEffort"] = "medium"
       // Only inject reasoningSummary for providers that support it natively.

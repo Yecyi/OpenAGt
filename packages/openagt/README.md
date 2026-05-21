@@ -130,7 +130,7 @@ type Part = TextPart | ReasoningPart | ToolPart | FilePart | SnapshotPart | Comp
 - Mistral, Groq, DeepInfra, Cerebras, Cohere
 - xAI, TogetherAI, Perplexity, Vercel AI, Alibaba
 - GitHub Copilot (自定义加载器)
-- Venice AI, 等等 (见 `BUNDLED_PROVIDERS`)
+- NEAR AI Cloud (OpenAI-compatible TEE inference), Venice AI, 等等 (见 models.dev catalog 和 `BUNDLED_PROVIDERS`)
 
 ### Tool 模块
 

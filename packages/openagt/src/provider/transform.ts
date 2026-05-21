@@ -5,6 +5,7 @@ import type * as Provider from "./provider"
 import { Flag } from "@/flag/flag"
 import { transformProviderSchema } from "./schema-transform"
 import { applyCaching, normalizeMessages, unsupportedParts } from "./message-transform"
+import { isNearAI } from "./nearai"
 import { sdkKey } from "./request-options"
 export { temperature, topP, topK, variants } from "./model-variant-policy"
 export { options, smallOptions, providerOptions } from "./request-options"
@@ -15,6 +16,7 @@ export function message(msgs: ModelMessage[], model: Provider.Model, options: Re
   msgs = unsupportedParts(msgs, model)
   msgs = normalizeMessages(msgs, model, options)
   if (
+    !isNearAI(model) &&
     (model.providerID === "anthropic" ||
       model.providerID === "google-vertex-anthropic" ||
       model.api.id.includes("anthropic") ||

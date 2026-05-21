@@ -4,6 +4,7 @@
 import { iife } from "@/util/iife"
 import type * as Provider from "./provider"
 import { anthropicAdaptiveEfforts, OPENAI_EFFORTS, WIDELY_SUPPORTED_EFFORTS } from "./model-reasoning-efforts"
+import { isNearAI } from "./nearai"
 export { temperature, topK, topP } from "./model-sampling-policy"
 
 /**
@@ -17,6 +18,7 @@ export { temperature, topK, topP } from "./model-sampling-policy"
  */
 export function variants(model: Provider.Model): Record<string, Record<string, any>> {
   if (!model.capabilities.reasoning) return {}
+  if (isNearAI(model)) return {}
 
   const id = model.id.toLowerCase()
   const adaptiveEfforts = anthropicAdaptiveEfforts(model.api.id)
